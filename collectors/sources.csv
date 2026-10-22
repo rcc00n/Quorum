@@ -4,7 +4,7 @@ reuters,Reuters,reuters.com,agency,,,reuters,,,,,,https://news.google.com/rss/se
 afp,Agence France-Presse,afp.com,agency,,,afp,,,,,,https://news.google.com/rss/search?q=site:france24.com+AFP+Ukraine&hl=en-US&gl=US&ceid=US:en,3,FR,en
 guardian,The Guardian,theguardian.com,outlet,left,major,guardian,,,,,,,1,UK,en
 nyt,The New York Times,nytimes.com,outlet,left,major,nyt,,,,,,https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml|https://rss.nytimes.com/services/xml/rss/nyt/World.xml,2,US,en
-wapo,The Washington Post,washingtonpost.com,outlet,left,major,wapo,,,,,,https://feeds.washingtonpost.com/rss/politics|https://feeds.washingtonpost.com/rss/world,2,US,en
+wapo,The Washington Post,washingtonpost.com,outlet,left,major,wapo,,,,,,https://news.google.com/rss/search?q=site:washingtonpost.com+Ukraine&hl=en-US&gl=US&ceid=US:en,2,US,en
 cnn,CNN,cnn.com,outlet,left,major,cnn,,,,,,http://rss.cnn.com/rss/cnn_allpolitics.rss|http://rss.cnn.com/rss/cnn_world.rss,1,US,en
 npr,NPR,npr.org,outlet,left,major,npr,,,,,,https://feeds.npr.org/1014/rss.xml|https://feeds.npr.org/1004/rss.xml,1,US,en
 fox-news,Fox News,foxnews.com,outlet,right,major,fox-news,,,,,,https://moxie.foxnews.com/google-publisher/politics.xml|https://moxie.foxnews.com/google-publisher/world.xml,1,US,en
@@ -12,9 +12,9 @@ ny-post,New York Post,nypost.com,outlet,right,major,ny-post,,,,,,https://nypost.
 daily-wire,The Daily Wire,dailywire.com,outlet,right,minor,daily-wire,,,,,,https://www.dailywire.com/feeds/rss.xml,1,US,en
 breitbart,Breitbart,breitbart.com,outlet,right,minor,breitbart,,,,,,https://feeds.feedburner.com/breitbart,1,US,en
 wsj,The Wall Street Journal,wsj.com,outlet,center,,wsj,,,,,,https://feeds.a.dj.com/rss/RSSWorldNews.xml|https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml,2,US,en
-isw,Institute for the Study of War,understandingwar.org,military,,,isw,,,,,,https://www.understandingwar.org/feeds.xml,1,US,en
+isw,Institute for the Study of War,understandingwar.org,military,,,isw,,,,,,https://news.google.com/rss/search?q=site:understandingwar.org&hl=en-US&gl=US&ceid=US:en,1,US,en
 federal-register,Federal Register,federalregister.gov,official,,,us-gov,,,,,,,1,US,en
 congress-gov,Congress.gov,congress.gov,official,,,us-gov,,,,,,,1,US,en
 whitehouse,The White House,whitehouse.gov,official,,,us-gov,,,,,,https://www.whitehouse.gov/news/feed/,1,US,en
-president-ua,Office of the President of Ukraine,president.gov.ua,official,,,ua-gov,,,,,,https://www.president.gov.ua/en/rss,1,UA,uk
-kremlin,Kremlin,kremlin.ru,official,,,ru-gov,,,,,,http://kremlin.ru/events/all/feed,1,RU,ru
+president-ua,Office of the President of Ukraine,president.gov.ua,official,,,ua-gov,,,,,,https://news.google.com/rss/search?q=site:president.gov.ua&hl=en-US&gl=US&ceid=US:en,1,UA,uk
+kremlin,Kremlin,kremlin.ru,official,,,ru-gov,,,,,,http://en.kremlin.ru/events/president/news/feed,1,RU,ru
