@@ -1,0 +1,13 @@
+# REVIEW ONLY: not installed in Windows and no WSL restart is authorized.
+# Recommendation for this 16 GiB physical-RAM machine: retain approximately the
+# current 8 GiB WSL cap, all 8 logical CPUs, and observed 2 GiB swap.
+# This does not solve Windows application memory pressure or create new RAM.
+# The current .wslconfig is absent; no existing file needs a backup now.
+# Before any future application, recheck/backup an existing .wslconfig and
+# separately authorize a maintenance window for WSL/Docker interruption.
+[wsl2]
+memory=8GB
+processors=8
+swap=2GB
+
+# No experimental overrides: preserve installed WSL's reclamation behavior.

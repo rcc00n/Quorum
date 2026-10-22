@@ -11,7 +11,7 @@ Repository: https://github.com/rcc00n/Quorum, branch `master`. No project/track 
 | Ports | PASS — CONFIGURED, NOT live | GUI 3000; REST 8888/api/v1.0; internal API 8889, JDBC 10000, Spark UI 4040. Static ports free during audit; all exposures loopback-only. Postgres/additional driver host mappings are auto-assigned, avoiding occupied 5432. |
 | Official preflight.sh | BLOCKED | Docker/Compose/architecture/CPU/disk passed, memory warning, missing Azure Registry authentication failed the prerequisite. Script actually ran; exit 1. |
 | Azure Registry login | BLOCKED | No registry credentials in current Docker config or bundle. One bounded noninteractive login attempt could not authenticate. Gateway private login remains required. No private images pulled or new containers started. |
-| Resource headroom | BLOCKED for safe startup | Docker sees 7.66 GiB (approximately an 8 GiB WSL allocation); official minimum 6 GiB/recommended 8 GiB. WSL available ~4.59 GiB, Windows physical free ~567 MiB at audit. Local startup gates are 5 GiB WSL-available and 4 GiB Windows-free; these protect existing workloads. |
+| Resource headroom | BLOCKED for startup; host pressure improved | Later memory diagnosis: 16 GiB installed, Docker 7.66 GiB / 8 CPUs. Approved graceful Chrome closure increased Windows available 0.910→4.592 GiB and lowered commit 94%→75%; guest available 4.562 GiB remains below the separate 5 GiB safety gate. No WSL increase/restart is needed to pass official minimum; see memory-readiness.md. |
 | Official verify.sh | BLOCKED | Actually invoked read-only; could not pass because stack was not deployed. Raw output withheld. No successful platform verification claimed. |
 | SQL Editor SELECT 1 / sample data | BLOCKED | Real SELECT 1 AS one and NY_TAXI.customers verification prepared from the bundled route/payload. No actual SQL request possible until authenticated startup. |
 | Existing Docker workloads | PASS — PRESERVED | All 19 active/stopped containers and 22 volumes retained; no image/cache prune or project/service interruption. Existing running-container status checked afterward. |
@@ -31,3 +31,5 @@ Next: private Azure Gateway authentication and sufficient host/WSL RAM headroom;
 [Disk audit and exact cleanup ledger](disk-cleanup.md) · [Manual actions](../docs/MANUAL_ACTIONS.md) · [Platform details](../docs/SPONSOR_SETUP.md).
 
 Diagnostics: `cd ~/Quorum && ./scripts/verify-all.sh`. Environment readiness does not establish final hackathon submission compliance.
+
+Subsequent memory diagnosis and approved optimization: [memory-readiness.md](memory-readiness.md). No forced process termination, container stop or WSL change occurred.
