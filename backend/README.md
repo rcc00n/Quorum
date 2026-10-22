@@ -41,7 +41,7 @@ Reasoning must supply event grouping/IDs, date and topic membership, neutral sum
 
 ## Control and checks
 
-`/staff/`: branded overview, users, topic preferences (read-only), sources (read-only), system status and integration readiness. Any active staff account can open Control. Model permissions protect preference inspection. Only superusers may manage accounts or staff permissions, preventing delegated privilege escalation. Provision the first superuser interactively; none is seeded.
+`/staff/`: branded overview, users, topic preferences (read-only), sources (read-only), system status and integration readiness. Any active staff account can open Control. Model permissions protect preference inspection. Only superusers may manage accounts or staff permissions, preventing delegated privilege escalation. Source and migrations do not seed accounts or passwords. A separately authorized production operation provisioned four superusers and four regular users; see [deployment status](../deploy/STATUS.md#account-and-email-follow-up). Credentials are held only in a restricted local WSL file.
 
 ```bash
 DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py check

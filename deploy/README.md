@@ -24,7 +24,7 @@ QUORUM_STATIC_ROOT=/opt/quorum/static
 QUORUM_CATALOG_PATH=/etc/quorum/catalog.json
 ```
 
-Install `backend/requirements.txt` in the isolated venv, load the private environment without printing it, then run `manage.py migrate`, `check --deploy`, `collectstatic --noinput`, and optionally `createsuperuser` interactively. No default administrator is created. Keep auth database backups private and take one before every subsequent migration. Stop only Quorum API briefly for a consistent SQLite copy, or use SQLite's backup API.
+Install `backend/requirements.txt` in the isolated venv, load the private environment without printing it, then run `manage.py migrate`, `check --deploy`, `collectstatic --noinput`, and optionally `createsuperuser` interactively. Source/migrations create no default administrator. The authorized production account provisioning is recorded in [status](STATUS.md#account-and-email-follow-up). Keep auth database backups private and take one before every subsequent migration. Stop only Quorum API briefly for a consistent SQLite copy, or use SQLite's backup API.
 
 ## First installation gates
 
