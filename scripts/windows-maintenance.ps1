@@ -16,6 +16,7 @@ $script:records = @()
 $script:runningIds = @()
 $script:policyChanged = $false
 $script:shutdownRequested = $false
+$script:diskpartAttempted = $false
 $script:problem = $null
 $before = (Get-Item -LiteralPath $VhdPath).Length
 function Log([string]$message) {
@@ -86,7 +87,8 @@ try {
     if($active.Count){throw 'WSL relaunched before compaction; refusing a live VHD'}
     Status 'CompactingOfflineVHD'
     $dp=Join-Path $OutputDirectory 'compact.txt'
-    @('select vdisk file="'+$VhdPath+'"','attach vdisk readonly','compact vdisk','detach vdisk','exit') | Set-Content -LiteralPath $dp -Encoding ASCII
+    @(('select vdisk file="'+$VhdPath+'"'),'attach vdisk readonly','compact vdisk','detach vdisk','exit') | Set-Content -LiteralPath $dp -Encoding ASCII
+    $script:diskpartAttempted=$true
     & diskpart.exe /s $dp 2>&1 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'diskpart.log') -Encoding UTF8
     $dpExit=$LASTEXITCODE
     if($dpExit -ne 0){throw 'DiskPart compaction unsuccessful; inspect private log'}
@@ -96,10 +98,11 @@ try {
     Log ('ERROR '+$script:problem)
 } finally {
     # Always attempt detach even if DiskPart partially failed, before restarting the distro.
-    if($script:shutdownRequested){
+    $activeNow=@(& wsl.exe --list --running --quiet | ForEach-Object {$_.Replace([string][char]0,'').Trim()} | Where-Object {$_})
+    if($script:diskpartAttempted -and !$activeNow.Count){
         try {
             $detach=Join-Path $OutputDirectory 'detach.txt'
-            @('select vdisk file="'+$VhdPath+'"','detach vdisk','exit') | Set-Content -LiteralPath $detach -Encoding ASCII
+            @(('select vdisk file="'+$VhdPath+'"'),'detach vdisk','exit') | Set-Content -LiteralPath $detach -Encoding ASCII
             & diskpart.exe /s $detach 2>&1 | Out-Null
         } catch { Log 'Detach cleanup unsuccessful; inspect DiskPart log' }
     }
