@@ -56,3 +56,7 @@ Exit codes: `0` all checks passed, `1` at least one failure, `2` blocked or unte
 Start with [setup](docs/SETUP.md), [sponsor configuration](docs/SPONSOR_SETUP.md), [manual actions](docs/MANUAL_ACTIONS.md) and the latest [readiness record](reports/readiness.md). The official platform is extracted and configured; registry login and RAM headroom still block startup on the prepared machine.
 
 Environment readiness alone does not satisfy the hackathon's submission requirements: a 1–4 minute demo video, slides, this repository with a README, and an explanation of how the sponsor technologies were used (verify the current list on the challenge page in HackOS).
+
+## Web portals
+
+The Next.js user portal and Django **Quorum Control** are isolated in `web/` and `backend/`. Setup and integration boundaries: [frontend](web/README.md), [backend](backend/README.md). VPS deployment and rollback: [deploy](deploy/README.md). Live data remains pending until the Zetaris adapter and reasoning contract are connected.

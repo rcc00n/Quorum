@@ -192,3 +192,26 @@ class PortalTests(TestCase):
                 self.assertEqual(snapshot["events"], [])
                 path.write_text("{}")
                 self.assertEqual(CatalogAdapter().snapshot()["topics"], [])
+
+    def test_catalog_source_validation(self):
+        import json, tempfile, os
+        from pathlib import Path
+        from .integration import CatalogAdapter
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "catalog.json"
+            source = {
+                "id": "test-only",
+                "name": "DEMO source",
+                "domain": "example.com",
+                "internal": "not-public",
+            }
+            catalog = {"revision": "test-fixture", "topics": [], "sources": [source]}
+            path.write_text(json.dumps(catalog))
+            with patch.dict(os.environ, {"QUORUM_CATALOG_PATH": str(path)}):
+                output = CatalogAdapter().snapshot()["sources"][0]
+                self.assertIsNone(output["allsides"])
+                self.assertNotIn("internal", output)
+                source["allsides"] = 2
+                path.write_text(json.dumps(catalog))
+                self.assertEqual(CatalogAdapter().snapshot()["sources"], [])
