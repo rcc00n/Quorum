@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div class="quorum-overview">
+<p class="eyebrow">QUORUM CONTROL / {{ section|upper }}</p>
+<h1>{{ title }}</h1><p class="intro">A clear view of your editorial workspace.</p>
+{% if section == 'overview' %}<div class="summary"><div><strong>{{ user_count }}</strong><span>Registered accounts</span></div><div><strong>{{ preference_count }}</strong><span>Preference profiles</span></div></div>
+<h2>Workspace</h2><div class="control-links"><a href="/staff/auth/user/">Manage users →</a><a href="/staff/portal/preference/">Inspect topic preferences →</a><a href="/staff/integrations/">Integration readiness →</a></div>
+{% elif section == 'topics' %}<h2>Topic catalog</h2>{% for topic in snapshot.topics %}<p>{{ topic.name }} · {{ topic.id }}</p>{% empty %}<p>The shared catalog is not connected. Topic definitions remain owned by data collection.</p>{% endfor %}<div class="control-links"><a href="/staff/portal/preference/">Inspect user topic preferences →</a></div>
+{% elif section == 'sources' %}<h2>Registered sources</h2>{% for source in snapshot.sources %}<p>{{ source.name }} · {{ source.domain }}</p>{% empty %}<p>No live source registry connected. Source records remain read-only and owned by data collection.</p>{% endfor %}
+{% elif section == 'status' %}<h2>Web application</h2><p>This page was served by Django. No ingestion, reasoning, provider health or operational error telemetry is connected.</p><p>Upstream status: unavailable. No inference requests are made by this page.</p>
+{% else %}<h2>Connections pending</h2><table><thead><tr><th>Integration</th><th>Readiness</th><th>Owner</th></tr></thead><tbody><tr><td>Source and topic catalog via Zetaris</td><td>Not connected</td><td>Data collection</td></tr><tr><td>Events, claims, evidence, digests</td><td>Contract pending</td><td>Reasoning</td></tr><tr><td>Ingestion and reasoning telemetry</td><td>Not connected</td><td>Upstream workstreams</td></tr></tbody></table>{% endif %}
+</div>
+{% endblock %}

@@ -42,3 +42,7 @@ Thumbs.db
 *.der
 *.class
 pgdata/
+
+# Portal build output (dependencies and runtime stay outside the repository)
+.next/
+*.tsbuildinfo

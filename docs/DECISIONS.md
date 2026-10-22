@@ -117,14 +117,17 @@ The account is built around the topics the user selects. The interface is visual
 
 ## Stack and work blocks
 
-Data flows through Zetaris, reasoning runs on NVIDIA Nemotron and Meterless, and the interface and backend are Next.js + TypeScript. The architecture is an agent system with verification loops, not a linear pipeline; its detailed design is a separate task on the board.
+Data flows through Zetaris and reasoning runs on NVIDIA Nemotron and Meterless. The user-facing frontend is Next.js + TypeScript; Django owns authentication, user management, administration and web-facing API endpoints.
+
+Previous stack decision (superseded 2026-10-22 by explicit human team-approved clarification): interface and backend both used Next.js + TypeScript. Collectors and reasoning ownership and architecture are unchanged. The architecture is an agent system with verification loops, not a linear pipeline; its detailed design is a separate task on the board.
 
 | Layer | Technology | Role |
 | --- | --- | --- |
 | Data | Zetaris | Single data layer. SQL queries across different sources as if they were one database. |
 | Reasoning | NVIDIA Nemotron, Meterless | Claim verification, agent processes. |
 | Independent review | Additional LLMs | Independent review of complex conclusions, if the rules allow. |
-| Interface and backend | Next.js + TypeScript | Portal: account, topic and event pages. |
+| Interface | Next.js + TypeScript | User portal: account, topic and event pages. |
+| Web backend and administration | Django | Session authentication, preferences, web API, Quorum Control. Dedicated portal database, separate from collector tables. |
 | Development | Cursor / Codex / Claude Code — each team member's own | Rules for all assistants are in [AGENTS.md](../AGENTS.md). Verify the track requirements in HackOS: the event page lists NVIDIA, Zetaris, SpaceX AI and Meterless as sponsors. |
 
 **Three work blocks**
@@ -172,5 +175,6 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex, explicit human team-approved amendment | Next.js frontend; Django auth, administration and web API; dedicated persistent SQLite portal database. Typed read-only integration adapter pending reasoning contract. | Clarify team ownership without changing data or reasoning architecture; isolated lightweight VPS deployment. |
 | 2026-10-22 | Yelysei / Claude | Repository documentation, including this file, is written in English | Readable for the judges and for the whole team |
 | 2026-10-22 | Yelysei / team discussion in chat, written up with Claude | First version: MVP scope, principles for handling facts, four rating modes and cohorts, model-based selection of major news, source list, user account, stack, demo, what comes after the hackathon | Fix the team's agreements before the source audit and the architecture design begin |
