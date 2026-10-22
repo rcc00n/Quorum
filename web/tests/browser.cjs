@@ -1,0 +1,102 @@
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
+const fs = require("fs");
+(async () => {
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.CHROMIUM_PATH,
+    args: ["--no-sandbox"],
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+  });
+  const issues = [];
+  page.on("pageerror", (e) => issues.push(e.message));
+  const root = process.env.QUORUM_TEST_URL || "http://127.0.0.1:3017";
+  const shot =
+    process.env.QUORUM_SCREENSHOTS ||
+    require("os").homedir() + "/.local/share/quorum/portal-screenshots";
+  fs.mkdirSync(shot, { recursive: true });
+  async function go(route) {
+    await page.goto(root + route);
+    await page.waitForLoadState("networkidle");
+    if (await page.locator("body").evaluate((e) => e.scrollWidth > innerWidth))
+      throw Error("Overflow " + route);
+  }
+  await go("/");
+  await page.screenshot({
+    path: shot + "/landing-desktop.png",
+    fullPage: true,
+  });
+  const username = "quorum-smoke-" + Date.now();
+  const password =
+    require("node:crypto").randomBytes(24).toString("base64url") + "A1!";
+  if (process.env.QUORUM_SMOKE_ACCOUNT_FILE)
+    fs.writeFileSync(process.env.QUORUM_SMOKE_ACCOUNT_FILE, username, {
+      mode: 0o600,
+    });
+  await go("/register");
+  await page.getByLabel("Username", { exact: true }).fill(username);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page
+    .getByRole("button", { name: "Create account", exact: true })
+    .click();
+  await page.waitForURL("**/onboarding");
+  const choices = page.locator(".topic-option input");
+  const hasTopics = (await choices.count()) > 0;
+  if (hasTopics) await choices.first().check();
+  await page.getByRole("button", { name: "Continue to your brief" }).click();
+  await page.waitForURL("**/dashboard");
+  await page.getByText("No published events are available").waitFor();
+  if (hasTopics)
+    await page.getByText("1 topic in your brief", { exact: true }).waitFor();
+  await page.screenshot({
+    path: shot + "/dashboard-desktop.png",
+    fullPage: true,
+  });
+  for (const r of [
+    "/history",
+    "/topics/pending",
+    "/events/pending",
+    "/settings",
+  ])
+    await go(r);
+  if (
+    hasTopics &&
+    !(await page.locator(".topic-option input").first().isChecked())
+  )
+    throw Error("Selected topic did not persist");
+  await page.getByLabel("Name", { exact: true }).fill("Visual Reader");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await page.getByText("Profile saved.", { exact: true }).waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const r of [
+    "/dashboard",
+    "/history",
+    "/onboarding",
+    "/topics/pending",
+    "/events/pending",
+    "/settings",
+    "/",
+  ]) {
+    await go(r);
+    if (r === "/dashboard" || r === "/")
+      await page.screenshot({
+        path:
+          shot + (r === "/" ? "/landing-mobile.png" : "/dashboard-mobile.png"),
+        fullPage: true,
+      });
+  }
+  await go("/settings");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.waitForURL("**/login");
+  await go("/dashboard");
+  await page.waitForURL("**/login");
+  if (issues.length) throw Error(issues.join("\n"));
+  console.log(
+    "PASS: desktop/mobile routes, registration, onboarding, preferences, profile, logout, auth redirect, no overflow or browser errors",
+  );
+  await browser.close();
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

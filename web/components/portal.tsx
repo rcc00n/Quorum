@@ -1,0 +1,749 @@
+"use client";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ArrowUpRight,
+  LayoutDashboard,
+  History,
+  Settings,
+  LogOut,
+  Bookmark,
+  ArrowRight,
+  RefreshCw,
+  FileSearch,
+} from "lucide-react";
+import { Brand } from "./brand";
+import {
+  api,
+  session,
+  feed,
+  User,
+  Snapshot,
+  Event,
+  Source,
+  rating,
+  cohort,
+  safeUrl,
+} from "@/lib/api";
+const today = () => new Date().toLocaleDateString("en-CA");
+function Empty({
+  title = "Your next perspective is on its way",
+  children,
+}: {
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="empty">
+      <FileSearch size={34} strokeWidth={1} />
+      <h3>{title}</h3>
+      <p>{children}</p>
+    </div>
+  );
+}
+function Spectrum({ sources }: { sources: Source[] }) {
+  const [mode, setMode] = useState("average");
+  const points = sources.flatMap((source) => {
+    const score = rating(source, mode);
+    return score !== null && source.audience !== null && source.audience > 0
+      ? [{ source, score, log: Math.log10(source.audience) }]
+      : [];
+  });
+  const low = Math.min(...points.map((p) => p.log));
+  const high = Math.max(...points.map((p) => p.log));
+  return (
+    <section className="spectrum">
+      <div className="section-heading">
+        <h2>Source spectrum</h2>
+        <label className="inline-label">
+          Rating mode
+          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="allsides">AllSides</option>
+            <option value="mbfc">MBFC</option>
+            <option value="adfontes">Ad Fontes</option>
+            <option value="average">Average</option>
+          </select>
+        </label>
+      </div>
+      <p className="help">
+        External source ratings describe editorial position, not factual
+        accuracy. Average = mean of available normalized ratings. Missing
+        ratings are excluded, never treated as zero.
+      </p>
+      {points.length > 0 && (
+        <figure className="audience-plot">
+          <figcaption>
+            Source position × audience{" "}
+            <span>Logarithmic audience scale · supplied estimates only</span>
+          </figcaption>
+          <svg
+            viewBox="0 0 640 260"
+            role="img"
+            aria-label="Sources by external rating and audience on a logarithmic scale. Exact values follow in the source list."
+          >
+            <line x1="45" x2="615" y1="220" y2="220" stroke="#a8b9ae" />
+            <line x1="45" x2="45" y1="25" y2="220" stroke="#a8b9ae" />
+            <line x1="330" x2="330" y1="25" y2="220" stroke="#e2e8e5" />
+            <text x="45" y="245">
+              −1
+            </text>
+            <text x="326" y="245">
+              0
+            </text>
+            <text x="597" y="245">
+              +1
+            </text>
+            {points.map((p) => (
+              <circle
+                key={p.source.id}
+                cx={45 + (p.score + 1) * 285}
+                cy={
+                  high === low
+                    ? 120
+                    : 210 - ((p.log - low) / (high - low)) * 170
+                }
+                r="5"
+                fill="#16766d"
+              >
+                <title>
+                  {p.source.name}: {p.score.toFixed(2)}, audience{" "}
+                  {p.source.audience?.toLocaleString()}
+                </title>
+              </circle>
+            ))}
+          </svg>
+        </figure>
+      )}
+      <div className="spectrum-axis">
+        <span>Left −1</span>
+        <span>Center 0</span>
+        <span>Right +1</span>
+      </div>
+      {sources.length ? (
+        sources.map((s) => {
+          const score = rating(s, mode);
+          return (
+            <div className="source-row" key={s.id}>
+              <span>
+                {s.name}
+                {s.audience !== null && (
+                  <small className="audience-value">
+                    Audience: {s.audience.toLocaleString()}
+                  </small>
+                )}
+              </span>
+              {score === null ? (
+                <span>Unrated</span>
+              ) : (
+                <>
+                  <div className="spectrum-track">
+                    <span style={{ left: `${(score + 1) * 50}%` }} />
+                  </div>
+                  <span>
+                    {cohort(score)} · {score.toFixed(2)}
+                  </span>
+                </>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <p className="muted">
+          No rated sources are available for this selection.
+        </p>
+      )}
+      <details>
+        <summary>How ratings are calculated</summary>
+        <p>
+          AllSides: −1, −0.5, 0, +0.5, +1. MBFC: −1, −0.67, −0.33, 0, +0.33,
+          +0.67, +1. Ad Fontes: bias ÷ 42. Collector values are already
+          normalized. Left ≤ −0.25; right ≥ +0.25; center lies between. Audience
+          is only displayed when supplied; no audience or cohort shares are
+          estimated.
+        </p>
+      </details>
+    </section>
+  );
+}
+function Analysis({ event }: { event: Event }) {
+  return (
+    <>
+      <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
+      <h1>{event.title}</h1>
+      <p className="lede">{event.summary}</p>
+      {event.importance && (
+        <aside className="notice">
+          <strong>{event.importance.label}</strong>
+          <p>{event.importance.explanation}</p>
+        </aside>
+      )}
+      {(
+        [
+          "established",
+          "statements",
+          "disputed",
+          "unknown",
+          "coverage",
+        ] as const
+      ).map((key, i) => (
+        <section className="analysis-section" key={key}>
+          <p className="eyebrow">0{i + 1}</p>
+          <h2>
+            {
+              [
+                "What is established",
+                "Attributed statements",
+                "Disputed claims",
+                "What remains unknown",
+                "Coverage differences",
+              ][i]
+            }
+          </h2>
+          {event[key].length ? (
+            event[key].map((item, j) => (
+              <article key={j}>
+                <h3>{item.text}</h3>
+                <p>{item.explanation}</p>
+                {item.sources.map(
+                  (s, k) =>
+                    safeUrl(s.url) && (
+                      <a
+                        key={k}
+                        className="source-link"
+                        href={safeUrl(s.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {s.title}
+                        <ArrowUpRight size={14} />
+                      </a>
+                    ),
+                )}
+              </article>
+            ))
+          ) : (
+            <p className="muted">No information supplied for this section.</p>
+          )}
+        </section>
+      ))}
+      <Spectrum sources={event.sources} />
+    </>
+  );
+}
+export function Portal({
+  view,
+  id,
+  initialDay,
+}: {
+  view: string;
+  id?: string;
+  initialDay?: string;
+}) {
+  const router = useRouter();
+  const path = usePathname();
+  const [user, setUser] = useState<User | null>(null);
+  const [data, setData] = useState<Snapshot | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [day, setDay] = useState(initialDay || today());
+  const [topic, setTopic] = useState(view === "topic" ? id || "" : "");
+  const [selected, setSelected] = useState<string[]>([]);
+  const load = useCallback(async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const s = await session();
+      if (!s.user) {
+        router.replace("/login");
+        return;
+      }
+      setUser(s.user);
+      setSelected(s.user.topics);
+      setData(await feed(day, topic));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [router, day, topic]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  async function saveTopics() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const s = await api<{ user: User }>("preferences", { topics: selected });
+      setUser(s.user);
+      setMessage("Topics saved.");
+      if (view === "onboarding") router.push("/dashboard");
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveForm(e: React.FormEvent<HTMLFormElement>, target: string) {
+    e.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      await api(target, Object.fromEntries(new FormData(e.currentTarget)));
+      setMessage(target === "profile" ? "Profile saved." : "Password changed.");
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function signout() {
+    try {
+      await api("logout", {});
+      router.replace("/login");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  const digests = (data?.digests || []).filter((d) =>
+    view === "history"
+      ? d.date === day && (!topic || d.topic_id === topic)
+      : user?.topics.includes(d.topic_id),
+  );
+  const names: Record<string, string> = {
+    dashboard: "Your daily perspective",
+    topic: data?.topics.find((t) => t.id === id)?.name || "Topic brief",
+    history: "The perspective archive",
+    settings: "Your workspace",
+    onboarding: "What matters to you?",
+    event: "Event analysis",
+  };
+  const topicsPanel = (
+    <section className="topic-picker">
+      <div className="section-heading">
+        <h2>Your topics</h2>
+        <span className="muted">{selected.length} selected</span>
+      </div>
+      <p>Choose the topics you want in your daily brief.</p>
+      {data?.catalog_revision && (
+        <p className="help">
+          Team catalog snapshot · definitions only. Live analysis is pending.
+        </p>
+      )}
+      {data?.topics.length ? (
+        <div className="topic-options">
+          {data.topics.map((t) => (
+            <label key={t.id} className="topic-option">
+              <input
+                type="checkbox"
+                checked={selected.includes(t.id)}
+                onChange={(e) =>
+                  setSelected(
+                    e.target.checked
+                      ? [...selected, t.id]
+                      : selected.filter((x) => x !== t.id),
+                  )
+                }
+              />
+              <span>{t.name}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <aside className="notice">
+          <Bookmark size={20} />
+          <div>
+            <strong>The topic catalog is not connected yet.</strong>
+            <p>
+              You can return here to choose topics once the catalog is
+              available.
+            </p>
+          </div>
+        </aside>
+      )}
+      <button className="button" disabled={busy} onClick={saveTopics}>
+        {view === "onboarding" ? "Continue to your brief" : "Save topics"}
+        <ArrowRight size={16} />
+      </button>
+    </section>
+  );
+  return (
+    <div className="app-layout">
+      <aside className="sidebar">
+        <Brand />
+        <p className="nav-label">YOUR WORKSPACE</p>
+        <nav>
+          {[
+            [LayoutDashboard, "Daily brief", "/dashboard"],
+            [History, "History", "/history"],
+            [Settings, "Settings", "/settings"],
+          ].map(([Icon, label, url]) => {
+            const I = Icon as typeof History;
+            return (
+              <Link
+                key={url as string}
+                className={path === url ? "active" : ""}
+                href={url as string}
+              >
+                <I size={18} />
+                {label as string}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="sidebar-topics">
+          <p className="nav-label">FOLLOWING</p>
+          {data?.topics
+            .filter((t) => user?.topics.includes(t.id))
+            .map((t) => (
+              <Link key={t.id} href={"/topics/" + t.id}>
+                <Bookmark size={15} />
+                {t.name}
+              </Link>
+            ))}
+          {!user?.topics.length && (
+            <p className="help">Your interests belong here.</p>
+          )}
+          <Link className="manage-topics" href="/onboarding">
+            Choose topics <ArrowUpRight size={14} />
+          </Link>
+        </div>
+        <div className="sidebar-bottom">
+          {user?.is_staff && <a href="/staff/">Quorum Control ↗</a>}
+          <p className="account-name">
+            {user?.name || user?.username || "Your account"}
+          </p>
+          <button className="text-button" onClick={signout}>
+            <LogOut size={15} />
+            Sign out
+          </button>
+        </div>
+      </aside>
+      <div className="workspace">
+        <header className="workspace-header">
+          <span>THE QUORUM BRIEF</span>
+          <span>
+            {new Intl.DateTimeFormat("en", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            }).format(new Date())}
+          </span>
+        </header>
+        <main id="main" className="workspace-main">
+          {loading ? (
+            <div className="loading" role="status">
+              <div className="loading-line" />
+              <h1>Preparing your workspace…</h1>
+            </div>
+          ) : error ? (
+            <div className="empty" role="alert">
+              <h1>We couldn’t load your workspace.</h1>
+              <p>{error}</p>
+              <button className="button" onClick={load}>
+                <RefreshCw size={16} />
+                Try again
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="page-heading">
+                <p className="eyebrow">
+                  {view === "dashboard"
+                    ? "CURATED AROUND YOUR INTERESTS"
+                    : view.toUpperCase()}
+                </p>
+                {view !== "event" && <h1>{names[view]}</h1>}
+                <p>
+                  {view === "dashboard"
+                    ? "A considered view of the stories that matter to you."
+                    : view === "history"
+                      ? "Return to a day. Revisit the evidence."
+                      : view === "settings"
+                        ? "A few details. A more personal brief."
+                        : view === "onboarding"
+                          ? "Start with your interests. Keep an open perspective."
+                          : ""}
+                </p>
+              </div>
+              {data?.status === "demo" && (
+                <p className="message" role="status">
+                  DEMO · Fictional interface fixture. Not verified news or live
+                  findings.
+                </p>
+              )}
+              {message && (
+                <p className="message" role="status">
+                  {message}
+                </p>
+              )}
+              {view === "settings" ? (
+                <div className="settings-grid">
+                  <section>
+                    <h2>Profile</h2>
+                    <form onSubmit={(e) => saveForm(e, "profile")}>
+                      <label>
+                        Name
+                        <input
+                          name="name"
+                          defaultValue={user?.name}
+                          maxLength={150}
+                          autoComplete="name"
+                        />
+                      </label>
+                      <label>
+                        Email
+                        <input
+                          name="email"
+                          type="email"
+                          defaultValue={user?.email}
+                          autoComplete="email"
+                        />
+                      </label>
+                      <button disabled={busy} className="button">
+                        Save profile
+                      </button>
+                    </form>
+                  </section>
+                  {topicsPanel}
+                  <section>
+                    <h2>Change password</h2>
+                    <form onSubmit={(e) => saveForm(e, "password")}>
+                      <label>
+                        Current password
+                        <input
+                          name="old_password"
+                          type="password"
+                          autoComplete="current-password"
+                          required
+                        />
+                      </label>
+                      <label>
+                        New password
+                        <input
+                          name="new_password1"
+                          type="password"
+                          autoComplete="new-password"
+                          required
+                          minLength={8}
+                        />
+                      </label>
+                      <label>
+                        Confirm new password
+                        <input
+                          name="new_password2"
+                          type="password"
+                          autoComplete="new-password"
+                          required
+                          minLength={8}
+                        />
+                      </label>
+                      <button disabled={busy} className="button">
+                        Change password
+                      </button>
+                    </form>
+                  </section>
+                  <section>
+                    <h2>End your session</h2>
+                    <button className="secondary-button" onClick={signout}>
+                      Sign out <LogOut size={16} />
+                    </button>
+                  </section>
+                </div>
+              ) : view === "onboarding" ? (
+                topicsPanel
+              ) : view === "event" ? (
+                (() => {
+                  const event = data?.events.find((e) => e.id === id);
+                  return event ? (
+                    <Analysis event={event} />
+                  ) : (
+                    <Empty title="This analysis is not available">
+                      No published analysis is available for this event.
+                      Conclusions and evidence will appear here when supplied.
+                      <br />
+                      <Link href="/dashboard">
+                        Return to your daily brief →
+                      </Link>
+                    </Empty>
+                  );
+                })()
+              ) : (
+                <>
+                  <div className="brief-toolbar">
+                    <div className="tabs">
+                      <span className="selected">
+                        {view === "history"
+                          ? "Past digests"
+                          : "The daily edition"}
+                      </span>
+                      <span>Evidence first</span>
+                    </div>
+                    <div className="filters">
+                      <label>
+                        Edition date
+                        <input
+                          type="date"
+                          value={day}
+                          max={today()}
+                          onChange={(e) => setDay(e.target.value || today())}
+                        />
+                      </label>
+                      {view === "history" && (
+                        <label>
+                          Topic
+                          <select
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                          >
+                            <option value="">All topics</option>
+                            {data?.topics.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                  {view === "dashboard" && (
+                    <div className="followed">
+                      <Bookmark size={16} />
+                      <span>
+                        {user?.topics.length
+                          ? `${user.topics.length} ${user.topics.length === 1 ? "topic" : "topics"} in your brief`
+                          : "Make this brief your own"}
+                      </span>
+                      <Link href="/onboarding">
+                        Choose topics <ArrowUpRight size={14} />
+                      </Link>
+                    </div>
+                  )}
+                  <div className="brief-columns">
+                    <section>
+                      <div className="section-heading">
+                        <h2>
+                          {view === "history"
+                            ? "Daily digests"
+                            : view === "topic"
+                              ? "Ten major events"
+                              : "Today’s top events"}
+                        </h2>
+                        <span className="edition-label">{day}</span>
+                      </div>
+                      {view === "history" ? (
+                        digests.length ? (
+                          digests.map((d, i) => (
+                            <article className="event-row" key={i}>
+                              <p className="eyebrow">DIGEST / {d.date}</p>
+                              <h3>
+                                <Link
+                                  href={`/topics/${d.topic_id}?date=${d.date}`}
+                                >
+                                  {data?.topics.find((t) => t.id === d.topic_id)
+                                    ?.name || d.topic_id}
+                                </Link>
+                              </h3>
+                              <p>{d.summary}</p>
+                            </article>
+                          ))
+                        ) : (
+                          <Empty title="An archive begins with the first brief">
+                            No digests are available for this date and topic.
+                            Choose another edition or return when your first
+                            digest is published.
+                          </Empty>
+                        )
+                      ) : (
+                        (() => {
+                          const events = (data?.events || [])
+                            .filter(
+                              (e) =>
+                                e.date === day &&
+                                (topic
+                                  ? e.topic_id === topic
+                                  : user?.topics.includes(e.topic_id)),
+                            )
+                            .slice(0, 10);
+                          return events.length ? (
+                            events.map((e, i) => (
+                              <article className="event-row" key={e.id}>
+                                <p className="eyebrow">
+                                  {String(i + 1).padStart(2, "0")} /{" "}
+                                  {e.importance?.label ||
+                                    "Importance not supplied"}
+                                </p>
+                                <h3>
+                                  <Link
+                                    href={"/events/" + e.id + "?date=" + day}
+                                  >
+                                    {e.title} <ArrowUpRight size={19} />
+                                  </Link>
+                                </h3>
+                                <p>{e.summary}</p>
+                                {e.importance && (
+                                  <p className="help">
+                                    {e.importance.explanation}
+                                  </p>
+                                )}
+                              </article>
+                            ))
+                          ) : (
+                            <Empty title="Space for a clearer picture">
+                              No published events are available for this
+                              edition. Your brief will appear when source-backed
+                              analysis is connected.
+                            </Empty>
+                          );
+                        })()
+                      )}
+                    </section>
+                    <aside className="brief-aside">
+                      <p className="eyebrow">THE READING ROOM</p>
+                      <h3>Understanding takes perspective.</h3>
+                      <p>
+                        Every brief separates established facts, attributed
+                        statements and what remains uncertain.
+                      </p>
+                      <div className="aside-rule" />
+                      <h4>Latest digest</h4>
+                      {digests[0] ? (
+                        <p>{digests[0].summary}</p>
+                      ) : (
+                        <p>
+                          Your latest digest will appear here when published.
+                        </p>
+                      )}
+                      <Link href="/history">
+                        Explore the archive <ArrowRight size={15} />
+                      </Link>
+                      <div className="aside-rule" />
+                      <span className="status-dot" />
+                      <span className="help">
+                        {data?.status === "pending"
+                          ? "Live data connection pending"
+                          : data?.status === "demo"
+                            ? "DEMO fixture · fictional data"
+                            : "Source data supplied"}
+                      </span>
+                    </aside>
+                  </div>
+                  {view === "topic" && (
+                    <Spectrum sources={data?.sources || []} />
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </main>
+        <footer className="workspace-footer">
+          <span>QUORUM</span>
+          <span>Follow the evidence. Keep the questions.</span>
+        </footer>
+      </div>
+    </div>
+  );
+}
