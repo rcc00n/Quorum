@@ -94,7 +94,9 @@ The set is text-based news outlets split by flank and tier, plus news agencies a
 | Military specialists, attributed only | ISW, DeepState, Oryx | Their own lens; presented as statements with the author named. |
 | Official government bodies (candidates) | US: whitehouse.gov, federalregister.gov, congress.gov, defense.gov, state.gov, supremecourt.gov. Ukraine: president.gov.ua, mod.gov.ua, mfa.gov.ua. Russia: kremlin.ru, mid.ru, mil.ru | Federal Register and Congress.gov have APIs. Documents are facts, statements are words (see "Principles for handling facts"). |
 
-- Access levels: 1 — full text; 2 — headline and lead from RSS; 3 — only the fact of coverage. Paywalled sources participate at level 2 and their scores are marked "by headline".
+- Access levels: 1 — full text; 2 — headline and lead from RSS; 3 — only the fact of coverage. Paywalled sources participate at level 2 and their scores are marked "by headline". A domain whose robots.txt disallows our crawler drops to level 2 automatically.
+- Full article text is never stored. The `documents` table keeps title, lead, URL and a content hash; reasoning reads the text at analysis time and stores only verbatim quotes with character offsets (`quotes`). Government documents (`official_docs`) are stored in full: they are public domain. Schema and module rules: `collectors/README.md`.
+- Collection delivers a flat stream of documents tagged with topics; event ids and clustering are assigned by reasoning. Confirmation excludes wire reprints (`wire_origin`); coverage counts every publication.
 - An outlet's flank comes from the external ratings in the selected mode, not from the team's taste. Tier comes from audience; for the MVP the majors are a fixed list.
 - Audience figures for the Y axis and cohort shares are public estimates, entered by hand into the CSV.
 - Social networks are out of scope.
@@ -172,5 +174,6 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | Yelysei / Claude | Data collection: no stored article text, quotes with offsets and hashes instead; robots.txt decides access level 1 vs 2; collection delivers documents, reasoning assigns events; schema in `collectors/schema.sql` | Keeps the block clear of copy-storage claims while every conclusion stays verifiable; fixes the contract between blocks before parallel work starts |
 | 2026-10-22 | Yelysei / Claude | Repository documentation, including this file, is written in English | Readable for the judges and for the whole team |
 | 2026-10-22 | Yelysei / team discussion in chat, written up with Claude | First version: MVP scope, principles for handling facts, four rating modes and cohorts, model-based selection of major news, source list, user account, stack, demo, what comes after the hackathon | Fix the team's agreements before the source audit and the architecture design begin |
