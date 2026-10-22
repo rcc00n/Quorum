@@ -1,39 +1,39 @@
-# Sponsor configuration
+# Organizer sponsor setup
 
-## Zetaris
+Authority: GenAI Works Academy, **Start Here: Set Up Your Data, Build and Power Layers**, as corrected by the user. The [public course syllabus](https://academy.genai.works/courses/open-agent-hackathon-2026/details) confirms the Data/Build/Power layers but does not expose the lesson body. The exact sample dataset recipe, Composer/Grok prompt, provider URL and model ID still require the enrolled lesson or organizer. No project/track is selected.
 
-Official sources: [getting-started](https://github.com/zetaris/getting-started), [local installation guide](https://github.com/zetaris/getting-started/blob/main/docs/install/updated_zetaris_installation_guide.md), [connection helpers](https://github.com/zetaris/getting-started/blob/main/scripts/zetaris_api.py).
+## Zetaris Freemium
 
-Prefer an organizer-provided instance and account. Supply its UI origin as `ZETARIS_BASE_URL`, numeric `ZETARIS_ORG_ID`, and either `ZETARIS_API_KEY` or username/password. An engine ID is optional. No credentials or instance were available in this session.
+Use [zetaris/Freemium](https://github.com/zetaris/Freemium), pinned at `9dd4fe943afebca6b204b6ed5eccdca91b831e6c`, cloned outside Quorum at `~/.local/share/quorum/zetaris-freemium`. The prior Zetaris Cloud bundle instructions and UI-proxy API assumptions have been removed.
 
-The verifier follows the official UI proxy helper: `/api/auth/login`, authenticated database listing, and `/api/proxy/sql-editor/sqls/run-query` with `SELECT 1 AS one`. It only passes SQL after recognizing an actual row containing 1. Unrecognized or asynchronous result shapes need private inspection in SQL Editor. Data source discovery uses the official `SHOW DATASOURCES` command and requires a structured rows response; database listing alone is insufficient. Set `ZETARIS_HEALTH_URL` only to a supported health endpoint supplied by the operator. HTTPS is required except loopback; redirects are rejected to avoid forwarding credentials.
+The actual upstream Compose contains four core services plus privateai, tools, Ollama, OpenSearch and digiavatar. Preparation selects **only** zetaris-db, zetaris-server, zetaris-api and zetaris-gui. It keeps upstream image tags, dependencies and entrypoints. No local LLM/GPU services are prepared or started.
 
-For local installation, sign in at [Zetaris Cloud](https://cloud.enterprise.zetaris.com/dashboard/download). Obtain `zetaris-platform.zip`, matching private `.env`, registry credentials and evaluation/licence entitlement. Extract outside Quorum. Use current bundle instructions and its preflight/verification scripts. Keep supplied image versions together. No images were pulled and no cloud resources created.
+Run `python3 scripts/services.py prepare`. This creates a mode-700 external runtime at `~/.local/share/quorum/zetaris-runtime`, with mode-600 `compose.json`, random PostgreSQL password, private installation-specific RSA DER keys, and isolated data directories. Existing configuration is preserved. The Compose project is `quorum-zetaris` with its own default network. Its database is reachable only on that network, so occupied host port 5432 needs no remapping or service changes. Host ports are **127.0.0.1:9001 (GUI), :8888 (REST), :10000 (JDBC)**. Debug/internal ports remain unpublished.
 
-The official guide recommends 8 GiB for Docker and rejects below 6 GiB; allow at least 15 GB disk. Current total Docker memory is approximately 7.7 GiB and other services already run, so check available headroom before starting. Ports such as 5432 are occupied. Review the bundle's mappings without altering existing services.
+Security adaptations: replace the public upstream DB password and test encryption keys; use PostgreSQL's postgres role consistently so the supplied init script's grants are valid; disable statement logging; restrict upstream startup's recursive world-writable chmod to owner access; allow localhost/127.0.0.1 GUI origins. Other vendor initialization/start scripts are mounted read-only. These adaptations pass Compose validation but their image-level compatibility cannot be verified until image access and memory are available. Runtime ownership/key permissions may need image-specific validation at that point; do not weaken them to world-readable/writable.
 
-## Cursor
+The organizer requires at least 8 GB available to Docker. This setup uses a conservative **8 GiB allocated and currently available** gate. Current allocation is 7.66 GiB; available WSL RAM is roughly 4.6 GiB. No WSL memory limits were changed.
 
-Official sources: [Windows download](https://cursor.com/downloads), [quickstart](https://cursor.com/docs/get-started/quickstart).
+Docker Hub login was attempted once and required manual authentication. One pull of `zetaris/lightning-server:v2.4.1.0-latest` was denied. Other private images and public PostgreSQL were not downloaded after that denial. Do not repeat pulls until the organizer grants access.
 
-The previously initiated official Windows user installation produced Cursor 3.24.18. No second download or installation is needed. Its CLI is under `%LOCALAPPDATA%\Programs\cursor\resources\app\bin\cursor.cmd`; the executable is `%LOCALAPPDATA%\Programs\cursor\Cursor.exe`.
+After access is granted, authenticate locally with `docker login` and pull only the four services using the private Compose/project commands in SETUP.md. Start is guarded and never pulls automatically.
 
-Cursor CLI version was verified and a Windows process launch succeeded after removing inherited `ELECTRON_RUN_AS_NODE=1` and `VSCODE_IPC_HOOK_CLI` from the child process environment only. These Codex host variables must not be inherited by a GUI launch. A process launch is distinct from a successful WSL connection. Finish first-run/login screens if presented, then open `~/Quorum` through WSL2. See the manual acceptance steps. No subscription was purchased.
+**Account initialization:** the actual Freemium README invokes `/home/zetaris/lightning/bin/dev-account.sh` inside zetaris-server. Use the documented helper with your own account/password/organization; do not use the README's public example password. The account helper has not run because containers cannot start. See manual actions for avoiding passwords in shell history.
 
-## Meterless
+**Sample data:** register the lesson's sample source in the GUI exactly as taught, then record its real dataset SELECT in private `ZETARIS_DATASET_SQL`. No sample name, external source URL, JDBC driver class or REST SQL route has been invented. Configure the matching official JDBC JAR and credentials. The Java smoke executes the supplied SELECT and requires an actual result row. `SELECT 1` or an open port does not establish dataset readiness.
 
-Official sources: [reference README](https://github.com/Meterless/Meterless/tree/main/engines/hmem/reference), [World Model reference](https://github.com/Meterless/Meterless/tree/main/engines/world-model/reference), [runtime provider contract](https://github.com/Meterless/Meterless/blob/main/docs/agent-ready/add-meterless-provider.md).
+Set `ZETARIS_REST_CHECK_URL` only to a documented Freemium API JSON endpoint. HTTP availability and authenticated dataset querying have separate statuses.
 
-The lightweight references use Node.js and local JSON persistence; they run on the current WSL2 machine without GPU dependencies. They are reference components, not a production SDK or an installed Nightshift inference service.
+## Cursor Build layer
 
-Optional runtime discovery needs `METERLESS_BASE_URL` ending in `/v1` and the real `METERLESS_RUNTIME_TOKEN` from the authorized runtime's `<stateDir>/proxy-token`. Authenticated `/v1/models` returns `meterless/*` routing modes. `/healthz` alone does not establish authenticated readiness. No paid edition, optional heavy runtime or model weights were installed.
+Preserve the installed, authenticated Cursor (authentication reported by user). Windows installation now reports 3.26.16 (previous CLI verification was 3.24.18); no update or reinstall was initiated by this work. No reinstall, logout, model-settings changes, extension installation or credit purchase is performed.
 
-## NVIDIA Nemotron
+Use the lesson's Composer and Grok selections for the manual Agent smoke. A preparatory read-only prompt and external acceptance record are documented in MANUAL_ACTIONS.md. Exact lesson prompt/model availability remains unverified until the lesson is accessible. Do not paste Meterless keys into Cursor model settings or use provider inference credits for coding.
 
-Official sources: [API endpoint](https://docs.api.nvidia.com/nim/reference/llm-apis), [configured model](https://docs.api.nvidia.com/nim/reference/nvidia-llama-3_3-nemotron-super-49b-v1_5).
+## Meterless → NVIDIA Nemotron Power layer
 
-Defaults: `https://integrate.api.nvidia.com/v1`, model `nvidia/llama-3.3-nemotron-super-49b-v1.5`. A missing `NVIDIA_API_KEY` blocks inference without sending a request. With a key, the verifier sends one nonstreaming request capped at 32 output tokens and checks actual nonempty response content. It never prints the key or model output.
+Required private fields are **METERLESS_BASE_URL**, **METERLESS_API_KEY**, **NEMOTRON_MODEL**, all blank by default. Obtain the exact values and supported OpenAI-compatible chat contract from the organizer. No direct NVIDIA API fallback, guessed URL, version path or model ID is configured.
 
-Create a free/trial key from the model's [NVIDIA build page](https://build.nvidia.com/nvidia/llama-3_3-nemotron-super-49b-v1_5), reviewing current access/terms. Do not enable billing. Store the key only in private configuration.
+`./scripts/verify-all.sh` never sends provider inference requests. The explicit one-request smoke is `./scripts/verify-all.sh --inference`; it requires all three real values and sends one nonstreaming `/chat/completions` request with 32 output tokens maximum. It does not retry, print outputs/keys, purchase credits or run development workloads. Confirm the provided route/key is for sponsored smoke testing before invoking it.
 
-Meterless's documented inference route exposes `meterless/*` routing modes, not NVIDIA-hosted model IDs. The reviewed provider contract does not establish a hosted Nemotron bridge. Keep the NVIDIA API route separate until Meterless confirms a supported sponsor configuration; no unverified route is claimed operational.
+The existing H-MEM reference and state-persistence tests remain useful component checks. They do **not** establish hosted Meterless access, Nemotron model identity or inference readiness. Only a real nonempty response from the organizer-configured route passes the inference smoke. A response alone cannot independently prove which backend model the provider executed.

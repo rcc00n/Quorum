@@ -37,3 +37,8 @@ volumes/
 *.gguf
 .DS_Store
 Thumbs.db
+
+# Deployment keys and Java smoke artifacts
+*.der
+*.class
+pgdata/

@@ -1,30 +1,34 @@
-# Environment readiness — 2026-10-21
+# Environment readiness — 2026-10-21, organizer correction
 
-Repository: https://github.com/rcc00n/Quorum — existing default branch `master`.
-Scope: reusable development environment only; no project/track selected, no application built.
+Repository: https://github.com/rcc00n/Quorum, branch `master`.
+Authority: user-provided corrections from Academy's “Start Here: Set Up Your Data, Build and Power Layers”; [public syllabus](https://academy.genai.works/courses/open-agent-hackathon-2026/details). The full enrolled lesson text is not publicly accessible here. No project or track selected; no application/agent created.
 
-| Component | State | Evidence / limitation |
+| Component | Status | Actual evidence / remaining boundary |
 |---|---|---|
-| GitHub | PASS — CONFIGURED / VERIFIED | Authenticated as repository owner; origin and remote default branch checked. Publication requires successful push and remote SHA comparison. |
-| Ubuntu WSL2 | PASS — VERIFIED | `wsl.exe -l -v` reports Ubuntu-20.04 version 2. No conversion or upgrade performed. |
-| Docker Engine | PASS — INSTALLED / VERIFIED | Native Linux CLI reaches Docker 29.0.2 on Ubuntu 22.04.5 LTS through a Unix socket. Compose 2.40.3 works. Existing containers unchanged. |
-| Docker Desktop integration | NOT_TESTED | Desktop WSL distributions were stopped in initial audit; current working Linux Engine is used. Desktop integration is not claimed. |
-| Core tools | PASS — INSTALLED / VERIFIED | Git 2.34.1, Node 22.19.0, npm 10.9.3, Python 3.10.18. No reinstall. |
-| Cursor | PASS — INSTALLED; CLI / process launch VERIFIED | Official Windows user installation 3.24.18. CLI reports version/commit. Windows process launched after removing inherited Electron node-mode variables in child environment only. |
-| Cursor WSL project / integrated terminal / Git | NOT_TESTED | Remote-open request made; no interactive acceptance observed. Complete first-run/login and WSL checks manually. Bundled Git extension exists, which does not prove integration works. |
-| Meterless H-MEM | PASS — INSTALLED / VERIFIED reference | Official pinned checkout outside Quorum; 10 official smoke tests pass. No production embedding or inference claim. |
-| Meterless persistence/state | PASS — VERIFIED reference | Real temporary JSON persistence and reload passed for memory records, audit ledger and World Model entity state. Own temporary files removed. |
-| Meterless inference runtime | BLOCKED | No authorized runtime URL/token. Optional heavyweight runtime and models not installed. |
-| Zetaris | BLOCKED | No instance URL/org/account/API key or official platform bundle/registry/licence access available. Authentication, discovery, SQL SELECT 1 and health not executed. |
-| NVIDIA Nemotron | CONFIGURED / BLOCKED | Official hosted endpoint/model in template; NVIDIA_API_KEY absent. No inference request sent. |
-| Safe service lifecycle | PASS — VERIFIED blocked path | Missing bundle exits BLOCKED without service mutation. Shell syntax and Python compilation pass. Configured bundle start/stop path remains NOT_TESTED. |
+| WSL2 / native Docker | PASS — VERIFIED | Ubuntu-20.04 WSL2, working existing Linux Docker 29.0.2 Unix socket and Compose 2.40.3. No backend/WSL changes. |
+| Docker Desktop integration | NOT_TESTED | Existing working Linux Engine is used; Desktop integration is not inferred. |
+| Zetaris Freemium source | PASS — PREPARED | Official checkout outside Quorum, revision `9dd4fe943afebca6b204b6ed5eccdca91b831e6c`. Actual README/Compose inspected. |
+| Freemium isolated configuration | PASS — CONFIGURED / syntax VERIFIED | External private Compose validates. Exactly zetaris-db/server/api/gui, isolated project/network/data, DB unpublished, localhost 9001/8888/10000 only. No optional model/GPU services. |
+| Docker memory prerequisite | BLOCKED | 7.66 GiB allocation, roughly 4.61 GiB currently available. Start requires 8 GiB allocated AND available, a conservative interpretation of organizer's 8 GB. No limits silently changed. |
+| Docker Hub authentication | BLOCKED | One noninteractive `docker login` attempt required manual authentication. No credentials supplied or printed. |
+| Freemium image access | BLOCKED | One pull of `zetaris/lightning-server:v2.4.1.0-latest` denied. No repeated pull, alternate obsolete tag, optional image pull or Cloud-bundle substitution. |
+| Four core containers | BLOCKED | None started; memory and image-access prerequisites unmet. Existing unrelated containers untouched. |
+| GUI / REST availability | BLOCKED | No running deployment. Script checks HTTP HTML/JSON application responses separately from SQL. Exact REST probe endpoint still needs lesson/operator confirmation. |
+| Registered dataset query | BLOCKED | Need lesson's actual source registration recipe/sample SELECT, matching external JDBC JAR, initialized account and running engine. Java smoke compiled successfully but no real SQL request was possible. |
+| Cursor installation | PASS — INSTALLED | Current Windows executable 3.26.16; installation/login preserved. No reinstall, model-settings change or credit purchase. Authentication is user-reported. |
+| Cursor Composer/Grok Agent acceptance | NOT_TESTED | Preparatory read-only smoke and external user-evidence format documented. Exact lesson prompt/model selections and interactive success not observed. |
+| Meterless H-MEM/state references | PASS — VERIFIED components | Existing pinned external installation preserved; 10 official smoke tests and real JSON memory/ledger/World Model persistence checks pass. These do not prove inference readiness. |
+| Nemotron through Meterless | BLOCKED | Organizer-issued METERLESS_BASE_URL, METERLESS_API_KEY, NEMOTRON_MODEL absent. No endpoint/model invented; previous direct NVIDIA route removed. No provider credits spent. |
+| GitHub / public-file safety | PASS — VERIFIED before publication | Correct origin/master and authentication. Staged paths, content, sizes and heuristic secret scan reviewed before commit/push. Remote SHA checked after successful push. |
 
-Final diagnostics: **19 PASS, 0 FAIL, 7 BLOCKED, 2 NOT_TESTED**; exit code **2** intentionally indicates incomplete integrations. `verify-all.sh` includes `doctor.sh`'s checks. No mocks or unavailable services are counted as successful integrations. Source-specific health/SQL response shapes remain untested until credentials are provided.
+Final `verify-all.sh`: **19 PASS, 0 FAIL, 10 BLOCKED, 2 NOT_TESTED**, exit **2**. Reference tests are actual official/local persistence checks. No mock inference, open-port success or SELECT 1 is counted as dataset/inference integration.
 
-Resources: approximately 7.7 GiB total Docker memory and 846 GiB free workspace disk. Existing workloads consume RAM. Linux listening ports include 53, 631, 3310, 5432, 6379, 8081, 11434 and 34201. No ports or existing services were changed. Current free RAM must be checked before attempting Zetaris.
+Additional validation: Python compilation, shell syntax, Java smoke compilation, private Compose validation, idempotent preparation, and memory-blocked startup path. Image-level startup, runtime ownership/private-key compatibility, account helper, HTTP probes, registered-data SQL and configured provider inference remain untested because prerequisites are missing.
 
-Security: credential values were neither printed nor written to reports; .env templates contain blanks. Vendor checkout, installed packages and Windows installer are outside Quorum. Staged paths/content, file sizes and secret patterns are checked before publication. The scan is heuristic and does not establish compliance with every possible secret format.
+Security: generated DB password, RSA DER private keys, vendor repository, private deployment, datasets and runtime files stay outside Quorum. Private files/directories use restricted permissions; DB statement logging and upstream world-writable data chmod are removed in the isolated preparation. Public example credentials/test encryption keys are not used for this deployment. No secrets or binaries are staged.
 
-Manual work: [MANUAL_ACTIONS.md](../docs/MANUAL_ACTIONS.md). Full diagnostics: `cd ~/Quorum && ./scripts/verify-all.sh`.
+Workspace has approximately 846 GiB free. Existing host port 5432 remains untouched; Freemium PostgreSQL is internal-only. No containers or WSL memory settings were changed.
 
-This environment does not establish final hackathon eligibility or submission compliance.
+Manual actions: [MANUAL_ACTIONS.md](../docs/MANUAL_ACTIONS.md). Normal diagnostics: `cd ~/Quorum && ./scripts/verify-all.sh` (no inference credits). Explicit sponsored inference only after real access is supplied: `./scripts/verify-all.sh --inference`.
+
+Environment preparation does not establish hackathon submission compliance.

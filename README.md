@@ -2,11 +2,12 @@
 
 Reusable environment preparation for Open Agent Hackathon 2026. No project or track has been selected; this repository contains no application or agent.
 
-Ubuntu-20.04 is confirmed as **WSL2**. Use the existing Linux Docker CLI and backend. Dependencies, sponsor distributions and credentials live outside version control.
+Ubuntu-20.04 is confirmed as **WSL2**. Use the existing Linux Docker CLI and backend. Dependencies, the official Zetaris Freemium checkout, private deployment and credentials live outside version control. The isolated deployment contains only four core services; Nemotron must use organizer-supplied Meterless access.
 
 ```bash
 ./scripts/doctor.sh       # tools, WSL2, Docker, GitHub, Cursor installation
-./scripts/verify-all.sh   # doctor + official memory tests + configured sponsor requests
+./scripts/verify-all.sh   # doctor + memory/state tests + Zetaris checks; NO provider inference
+# Optional: --inference explicitly sends one capped request with real sponsor credentials
 ```
 
 Exit codes: `0` all checks passed, `1` at least one failure, `2` blocked or untested checks remain. Output uses `PASS`, `FAIL`, `BLOCKED`, `NOT_TESTED`. Missing sponsor credentials intentionally produce `BLOCKED`.

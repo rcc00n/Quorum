@@ -1,55 +1,56 @@
-# Setup
+# Reusable setup on the existing WSL2 machine
 
-Run commands inside the existing Ubuntu-20.04 WSL2 distribution from `~/Quorum`. Do not convert WSL or replace the working Docker backend. Git, Node.js 22.19.0, npm 10.9.3, Python 3.10.18, Docker 29.0.2 and Compose 2.40.3 were already installed.
-
-## Private configuration
+Run from `~/Quorum` inside Ubuntu-20.04 WSL2. Reuse the verified native Linux Docker CLI and backend; leave existing containers and WSL limits alone.
 
 ```bash
 cd ~/Quorum
-# Only create a private configuration if none exists:
 if [ ! -e .env.local ]; then (umask 077; cp .env.example .env.local); fi
 chmod 600 .env.local
-```
-
-Edit `.env.local` locally. Never put real credentials in `.env.example`, shell history, reports or commits. Scripts accept literal `KEY=value`, optionally quoted, without executing code or expanding variables. Exported environment values take precedence. Empty values use documented defaults. Custom paths must be absolute; use the full home path rather than `$HOME` in the file.
-
-No package installation is needed for diagnostics: Bash and Python's standard library suffice.
-
-## Meterless reference engines
-
-The existing sparse vendor checkout is `~/.local/share/quorum/meterless`, pinned to `1742dec56a66e58eef9dda2d2b865823758ca8cd`. Preserve it. It contains only the H-MEM and World Model reference directories plus upstream root files. H-MEM test dependencies are outside Quorum.
-
-For a fresh machine only:
-
-```bash
-./scripts/setup-meterless.sh
-```
-
-The script reuses existing installed dependencies, checks source revision and origin, disables install hooks, and installs no models or GPU runtime. Direct tooling versions are tsx 4.23.0 and Vitest 2.1.9. The generated npm lock stays with the external checkout; reuse it via `npm ci` when dependencies are absent. A fresh initial install resolves transitive dependencies, so it is not a fully hermetic dependency snapshot.
-
-```bash
+./scripts/doctor.sh
 ./scripts/verify-all.sh
 ```
 
-The H-MEM official suite tests actual reference behavior. Its embedder is upstream's deterministic hash implementation; passing it does not prove production embeddings, LLM inference or sponsor runtime access. The separate persistence check writes and reloads real temporary JSON files for memory, audit ledger and World Model, then removes only its own temporary directory.
+Configuration files contain literal `KEY=value`, optionally quoted, with no shell execution/expansion. Exported environment values take precedence. Use absolute external paths. Existing old Cloud/NVIDIA/runtime-token settings must be replaced with the current example keys; unknown keys are rejected. Do not print credentials or commit private configuration.
 
-## Docker and service lifecycle
+## Freemium preparation and lifecycle
 
-Native Linux `docker` accesses the existing Unix socket. Docker Desktop integration is reported separately: a reachable Linux Engine does not prove Desktop integration. Do not modify existing unrelated containers or change Docker contexts.
-
-Zetaris requires its official matching distribution outside Quorum. After obtaining access, configure `ZETARIS_BUNDLE_DIR`, complete official setup/preflight, and pull images explicitly in that external directory. Review port bindings and set least-privilege credentials first.
+The existing official checkout and private generated deployment are outside Quorum. For a fresh machine, clone the official repo to `~/.local/share/quorum/zetaris-freemium` and checkout revision `9dd4fe943afebca6b204b6ed5eccdca91b831e6c` before preparation.
 
 ```bash
+python3 scripts/services.py prepare
+```
+
+Preparation generates only four core services, keeps DB port 5432 unpublished and binds GUI/REST/JDBC to localhost. Repeating it preserves the existing secrets/configuration. Never start the entire upstream Compose file: it includes optional GPU/model services.
+
+After the organizer grants Docker Hub image access, log in locally. Do not repeat the already-denied pull before access changes. To pull the four core images once after that:
+
+```bash
+cd ~/.local/share/quorum/zetaris-runtime
+docker login
+docker compose -p quorum-zetaris -f compose.json pull zetaris-db zetaris-server zetaris-api zetaris-gui
+cd ~/Quorum
 ./scripts/start-services.sh
+./scripts/verify-all.sh
+# Stop only Quorum's isolated four services; retain data:
 ./scripts/stop-services.sh
 ```
 
-These commands operate only on the explicitly configured external Zetaris Compose file. Start validates Compose, requires at least 6 GiB allocated and currently available RAM (8 GiB recommended), and runs official preflight. It never pulls images or builds. Stop retains volumes. Missing configuration exits 2 without touching other services. No automatic WSL/Docker installation or conversion occurs.
+Start validates private Compose and checks 8 GiB Docker allocation plus 8 GiB currently available memory, then uses `--pull never --no-build`. It does not install, download or silently adjust WSL. Successful start requests do not imply readiness; diagnostics must confirm four running containers and application/query responses.
 
-## Publishing safely
+For sample SQL verification, use a matching vendor-supplied JDBC JAR outside Quorum and the existing JDK's Java 11+ source launcher. `ZETARIS_JDBC_DRIVER` is optional when the driver supports JDBC automatic discovery. Credentials are passed in process environment, not command-line arguments. SQL and returned data are withheld from reports. No PostgreSQL client connection is substituted for Zetaris SQL.
+
+## Existing Meterless references
+
+Preserve `~/.local/share/quorum/meterless` at `1742dec56a66e58eef9dda2d2b865823758ca8cd`. `scripts/setup-meterless.sh` is only for missing reference tooling and reuses working dependencies. No models or GPU runtimes are installed. H-MEM uses the official deterministic reference embedder; reference passes do not prove LLM integration. Persistence checks create/reload real temporary JSON files and remove only their own temporary directory.
+
+## Diagnostics and explicit inference
 
 ```bash
-python3 scripts/security-check.py
+./scripts/verify-all.sh              # no provider credits spent
+./scripts/verify-all.sh --inference  # explicit ONE capped sponsored inference, if configured
+python3 scripts/security-check.py   # staged/tracked file safety heuristic
 ```
 
-This scans staged/tracked blobs, not ignored private files, and reports filenames without secret values. Inspect staged paths and diffs as well. It is a heuristic check, not a guarantee against every secret format. Never force-push.
+Statuses: PASS, FAIL, BLOCKED, NOT_TESTED. Exit 0 means all checks passed; 1 means a failure; 2 means blocked or untested checks remain. Missing credentials, images, RAM, sample SQL or exact endpoints never count as operational integrations. Cursor interactive acceptance requires evidence of actual observed GUI checks, not executable presence.
+
+Inspect staged paths, diff and file sizes before publishing; the secret scanner is heuristic. Never commit `.env*` except `.env.example`, the Freemium checkout, private deployment, keys, data, logs or binaries. Never force-push.

@@ -17,7 +17,7 @@ for raw in paths:
         continue
     name = raw.decode()
     p = PurePosixPath(name)
-    forbidden = (p.name.startswith('.env') and p.name != '.env.example') or any(x in p.parts for x in ('node_modules', 'vendor', '.aws', '.ssh', 'volumes')) or p.suffix.lower() in ('.exe', '.msi', '.zip', '.gguf', '.pem', '.key', '.pfx', '.db', '.dump', '.log')
+    forbidden = (p.name.startswith('.env') and p.name != '.env.example') or any(x in p.parts for x in ('node_modules', 'vendor', '.aws', '.ssh', 'volumes', 'Freemium', 'zetaris-freemium', 'zetaris-runtime')) or p.suffix.lower() in ('.exe', '.msi', '.zip', '.gguf', '.pem', '.key', '.pfx', '.db', '.dump', '.log', '.der', '.class')
     data = subprocess.check_output(['git', 'show', ':'+name])
     if forbidden or len(data) > 1024*1024 or b'\0' in data or any(re.search(pattern, data) for pattern in patterns):
         print('FAIL | public repository safety | review '+name)

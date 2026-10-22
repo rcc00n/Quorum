@@ -8,3 +8,5 @@
 - Run scripts/doctor.sh and targeted scripts/verify-all.sh checks. Missing credentials are BLOCKED; only actual successful requests pass. Never present mocks as operational integrations.
 - Inspect staged paths, diffs, secret patterns and file sizes before committing. Preserve remote history/default branch; never force-push.
 - Environment readiness does not establish hackathon submission compliance.
+
+- Follow the organizer's Freemium Data layer and Meterless→Nemotron Power layer. Start only the isolated four-service Zetaris project after memory/access checks. Never put Meterless keys in Cursor settings. Inference is opt-in (`--inference`); routine diagnostics must spend no provider credits.
