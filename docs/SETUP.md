@@ -41,14 +41,14 @@ Never use the bundle's destructive installation-test suite or `down -v` on this 
 ## Configuration and diagnostics
 
 ```bash
-if [ ! -e .env.local ]; then (umask 077; cp .env.example .env.local); fi
-chmod 600 .env.local
+if [ ! -e .env ]; then (umask 077; cp .env.example .env); fi
+chmod 600 .env
 ./scripts/verify-all.sh              # no provider inference
 ./scripts/verify-all.sh --inference  # explicit one capped hosted test, if configured
 python3 scripts/security-check.py
 ```
 
-Remove obsolete Freemium configuration keys from private Quorum configuration if present; do not delete old vendor/data directories. Do not copy platform credentials into Quorum. Meterless URL/key/model remain organizer-supplied blanks until available. The external pinned H-MEM references and setup script are preserved; their tests do not establish inference readiness.
+Remove obsolete Freemium configuration keys from private Quorum configuration if present; do not delete old vendor/data directories. Do not copy platform credentials into Quorum. Copy the Meterless URL, token and route from this machine's Nightshift Console into `.env`; organizers do not issue them. `scripts/checks.py` still reads `.env.local` when that file is the one you already have. The external pinned H-MEM references and setup script are preserved; their tests do not establish inference readiness.
 
 Statuses are PASS, FAIL, BLOCKED, NOT_TESTED. Exit 0 means all checks passed, 1 means a failure, 2 means blocked/untested work remains. Open ports and reference tests never stand in for authenticated platform SQL or hosted inference.
 

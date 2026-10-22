@@ -19,6 +19,14 @@ ROOT = Path(__file__).resolve().parent.parent
 PIN = '1742dec56a66e58eef9dda2d2b865823758ca8cd'
 RESULTS = []
 CFG = dict(os.environ)
+# smoke_test.py names are canonical. Nightshift Console names (Power 4.5) and the
+# previous Quorum token name fill those when the canonical entry is empty.
+GUIDE_ALIASES = {
+    'METERLESS_BASE_URL': 'MODEL_BASE_URL',
+    'METERLESS_RUNTIME_TOKEN': 'MODEL_API_KEY',
+    'METERLESS_API_KEY': 'MODEL_API_KEY',
+    'METERLESS_MODEL': 'NEMOTRON_MODEL',
+}
 
 
 def emit(status, name, detail):
@@ -36,8 +44,15 @@ def run(args, timeout=25, cwd=ROOT, env=None):
         return 127, ''
 
 
+def apply_guide_aliases(cfg):
+    for alias, canonical in GUIDE_ALIASES.items():
+        if cfg.get(alias) and not cfg.get(canonical):
+            cfg[canonical] = cfg[alias]
+    return cfg
+
+
 def load_config():
-    known = set(re.findall(r'^([A-Z_]+)=', (ROOT / '.env.example').read_text(), re.M))
+    known = set(re.findall(r'^([A-Z_]+)=', (ROOT / '.env.example').read_text(), re.M)) | set(GUIDE_ALIASES)
     for name in ('.env', '.env.local'):
         path = ROOT / name
         if not path.exists():
@@ -58,6 +73,7 @@ def load_config():
             # Exported values take precedence; files are never executed as shell code.
             if key not in os.environ:
                 CFG[key] = value
+    apply_guide_aliases(CFG)
 
 
 def val(key, default=''):
@@ -200,7 +216,10 @@ def zetaris():
         rc, raw = run(['docker', 'inspect', '--format', '{{index .Config.Labels "com.docker.compose.service"}}|{{.State.Status}}|{{.State.ExitCode}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}', *ids])
         if rc == 0:
             state = {parts[0]: parts[1:] for line in raw.splitlines() if len(parts := line.split('|')) == 4}
-    for name in services.RUNNING:
+    running_expected = services.RUNNING
+    if 'ai-datasteward' in data.get('services', {}):
+        running_expected = services.RUNNING + ('ai-datasteward',)
+    for name in running_expected:
         entry = state.get(name)
         ok = entry and entry[0] == 'running' and entry[2] in ('healthy', 'none')
         emit('PASS' if ok else 'FAIL' if entry and entry[0] not in ('created', 'running') else 'BLOCKED', 'Zetaris '+name,
@@ -267,18 +286,19 @@ def probe_api_http(url):
 
 
 def nemotron(allow_inference=False):
-    required = ('METERLESS_BASE_URL', 'METERLESS_API_KEY', 'NEMOTRON_MODEL')
+    # Same three settings smoke_test.py reads. Nightshift Console aliases are already folded in.
+    required = ('MODEL_BASE_URL', 'MODEL_API_KEY', 'NEMOTRON_MODEL')
     if not all(val(key) for key in required):
-        emit('BLOCKED', 'Nemotron through Meterless', 'Organizer-issued METERLESS_BASE_URL, METERLESS_API_KEY and NEMOTRON_MODEL required; no guessed defaults')
+        emit('BLOCKED', 'Nemotron through Meterless', 'MODEL_BASE_URL, MODEL_API_KEY and NEMOTRON_MODEL from your Nightshift Console or the NVIDIA route on that same base URL')
         return
     if not allow_inference:
         emit('NOT_TESTED', 'Nemotron through Meterless', 'Credentials configured; explicitly use --inference for one capped request; diagnostics spend no provider credits')
         return
     try:
-        base = val('METERLESS_BASE_URL').rstrip('/')
+        base = val('MODEL_BASE_URL').rstrip('/')
         if base.endswith(('/chat/completions', '/models')):
             raise ValueError('Supply the API base URL, not an operation URL')
-        data = request(base+'/chat/completions', val('METERLESS_API_KEY'), {
+        data = request(base+'/chat/completions', val('MODEL_API_KEY'), {
             'model': val('NEMOTRON_MODEL'), 'messages': [{'role': 'user', 'content': 'Reply with OK.'}],
             'max_tokens': 32, 'stream': False, 'temperature': 0})
         content = data['choices'][0]['message']['content']

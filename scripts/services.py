@@ -12,6 +12,9 @@ PROJECT = 'zetaris'
 SERVICES = ('postgres', 'init', 'driver', 'api', 'ui', 'bootstrap')
 RUNNING = ('postgres', 'driver', 'api', 'ui')
 JOBS = ('init', 'bootstrap')
+# Participant guide lists this as running on a current local install. The bundle
+# verified earlier in this repo resolves without it, so it is allowed, not required.
+OPTIONAL_RUNNING = ('ai-datasteward',)
 
 
 def platform_dir():
@@ -57,14 +60,21 @@ def resolved_config():
     return json.loads(raw)
 
 
+def selected_services(data=None):
+    data = resolved_config() if data is None else data
+    present = set(data.get('services', {}))
+    if not set(SERVICES) <= present <= set(SERVICES) | set(OPTIONAL_RUNNING):
+        raise ValueError('Unexpected service/profile selection')
+    return tuple(name for name in (*SERVICES, *OPTIONAL_RUNNING) if name in present)
+
+
 def validate_deployment():
     root = platform_dir()
     for filename in ('.env', 'compose.override.yml'):
         if (root/filename).stat().st_mode & 0o077:
             raise ValueError('Private platform configuration requires mode 600')
     data = resolved_config()
-    if set(data.get('services', {})) != set(SERVICES):
-        raise ValueError('Unexpected service/profile selection')
+    selected_services(data)
     for service in data['services'].values():
         for port in service.get('ports', []):
             if port.get('host_ip') != '127.0.0.1':
@@ -144,7 +154,8 @@ def main():
         return preflight()
     if action == 'start':
         rc, running = checks.run(compose_args()+['ps', '--status', 'running', '--services'], cwd=platform_dir(), env=command_env())
-        if rc == 0 and set(RUNNING).issubset(set(running.split())):
+        long_running = tuple(name for name in (*RUNNING, *OPTIONAL_RUNNING) if name in selected_services())
+        if rc == 0 and set(long_running).issubset(set(running.split())):
             print('PASS | Zetaris start | Required long-running services already running; verify health separately')
             return 0
     if action in ('pull', 'start'):
@@ -154,7 +165,7 @@ def main():
         if preflight():
             return 2
     if action == 'pull':
-        command = ['pull', *SERVICES]
+        command = ['pull', *selected_services()]
     elif action == 'start':
         # 2g driver + 1g API plus ~2 GiB working headroom; not a vendor hard minimum.
         if available_memory() < 5*1024**3:
@@ -175,9 +186,9 @@ def main():
                     if probe.connect_ex(('127.0.0.1', published)) == 0:
                         print(f'BLOCKED | Zetaris start | Host port {published} occupied; existing service preserved')
                         return 2
-        command = ['up', '-d', '--pull', 'never', '--no-build', *SERVICES]
+        command = ['up', '-d', '--pull', 'never', '--no-build', *selected_services()]
     elif action == 'stop':
-        command = ['stop', *SERVICES]
+        command = ['stop', *selected_services()]
     elif action == 'verify':
         rc, _ = checks.run(['bash', './verify.sh'], cwd=platform_dir(), env=command_env(), timeout=120)
         _, active = checks.run(compose_args()+['ps', '-q', 'api'], cwd=platform_dir(), env=command_env())
