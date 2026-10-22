@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 import urllib.error
@@ -102,11 +101,15 @@ def doctor():
     if rc == 0:
         fields = out.splitlines()[-1].split()
         emit('PASS' if int(fields[3]) >= 15*1024*1024 else 'BLOCKED', 'disk capacity', f'{int(fields[3])//(1024*1024)} GiB available')
-    rc, out = run(['docker', 'info', '--format', '{{.MemTotal}}'])
-    if rc == 0 and out.isdigit():
-        emit('PASS' if int(out) >= 8*1024**3 else 'BLOCKED', 'Zetaris Docker memory allocation', f'{int(out)/1024**3:.2f} GiB total; minimum 8 GiB required; no limits changed')
-    available = int(next(x.split()[1] for x in Path('/proc/meminfo').read_text().splitlines() if x.startswith('MemAvailable:')))*1024
-    emit('PASS' if available >= 8*1024**3 else 'BLOCKED', 'Zetaris available memory', f'{available/1024**3:.2f} GiB available; minimum 8 GiB required before start')
+    rc, out = run(['docker', 'info', '--format', '{{.MemTotal}} {{.NCPU}}'])
+    if rc == 0:
+        memory, cpus = map(int, out.split())
+        emit('PASS' if memory >= 6*1024**3 and cpus >= 4 else 'BLOCKED', 'Zetaris Docker capacity',
+             f'{memory/1024**3:.2f} GiB / {cpus} CPUs; bundle minimum 6 GiB, recommendation ~8 GiB and 4 CPUs')
+    import services
+    available = services.available_memory()
+    emit('PASS' if available >= 5*1024**3 else 'BLOCKED', 'Zetaris startup headroom',
+         f'{available/1024**3:.2f} GiB available; local safety gate 5 GiB for default 2g/1g heaps and headroom')
     rc, out = run(['ss', '-H', '-ltn'])
     ports = sorted({int(x.split()[3].rsplit(':', 1)[-1]) for x in out.splitlines() if len(x.split()) > 3}) if rc == 0 else []
     emit('PASS' if rc == 0 else 'BLOCKED', 'occupied Linux TCP ports', ', '.join(map(str, ports)) if rc == 0 else 'Port enumeration unavailable')
@@ -180,75 +183,87 @@ def cursor_acceptance():
         emit('FAIL', 'Cursor acceptance evidence', 'External evidence cannot be validated; contents withheld')
 
 
-def http_probe(url, kind, token=''):
-    parsed = urllib.parse.urlsplit(url)
-    if parsed.username or parsed.password or parsed.query or parsed.fragment or not parsed.hostname:
-        raise ValueError('Unsafe URL')
-    if parsed.scheme != 'https' and not (parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', 'localhost', '::1')):
-        raise ValueError('HTTPS required except loopback')
-    headers = {'Authorization': 'Bearer '+token} if token else {}
-    with urllib.request.build_opener(NoRedirect).open(urllib.request.Request(url, headers=headers), timeout=15) as response:
-        raw = response.read(1024*1024)
-        if kind == 'gui':
-            return 'html' in response.headers.get('Content-Type', '').lower() and b'<html' in raw.lower()
-        data = json.loads(raw)
-        return isinstance(data, (dict, list)) and bool(data)
-
-
 def zetaris():
     import services
-    args = services.compose_args()
-    rc, output = run(['docker', 'ps', '--all', '--filter', 'label=com.docker.compose.project='+services.PROJECT,
-                      '--format', '{{.Label "com.docker.compose.service"}} {{.State}}'])
-    states = dict(line.split(maxsplit=1) for line in output.splitlines() if len(line.split()) == 2) if rc == 0 else {}
-    for name in services.SERVICES:
-        state = states.get(name)
-        emit('PASS' if state == 'running' else 'FAIL' if state else 'BLOCKED', name,
-             'Isolated project container running' if state == 'running' else 'Container '+state if state else 'Not deployed; image access / memory prerequisites blocked')
-    _, runtime = services.locations()
-    prepared = runtime/'compose.json'
-    if prepared.exists():
-        try:
-            services.validate_deployment()
-        except (ValueError, OSError):
-            emit('FAIL', 'Freemium isolation', 'Private deployment scope/permissions invalid')
-            return
-        rc, _ = run(args+['config', '--quiet'])
-        emit('PASS' if rc == 0 else 'FAIL', 'Freemium isolated Compose', 'Private four-service config validates' if rc == 0 else 'Compose validation unsuccessful')
-    else:
-        emit('BLOCKED', 'Freemium isolated Compose', 'Run python3 scripts/services.py prepare')
-    ready = all(states.get(name) == 'running' for name in services.SERVICES)
-    for kind, key, default in [('GUI', 'ZETARIS_GUI_URL', 'http://127.0.0.1:9001'),
-                               ('REST API', 'ZETARIS_REST_CHECK_URL', '')]:
-        endpoint = val(key, default)
-        if not ready or not endpoint:
-            emit('BLOCKED', 'Zetaris '+kind, 'Four running containers and documented endpoint required')
-            continue
-        try:
-            ok = http_probe(endpoint, 'gui' if kind == 'GUI' else 'api', val('ZETARIS_API_KEY') if kind != 'GUI' else '')
-            emit('PASS' if ok else 'NOT_TESTED', 'Zetaris '+kind, 'HTTP application response validated; not SQL verification' if ok else 'Unrecognized HTTP response')
-        except Exception as exc:
-            failure('Zetaris '+kind, exc)
-    required = ('ZETARIS_JDBC_JAR', 'ZETARIS_USERNAME', 'ZETARIS_PASSWORD', 'ZETARIS_DATASET_SQL')
-    if not ready or not all(val(k) for k in required):
-        emit('BLOCKED', 'Zetaris registered dataset SELECT', 'Running services, official JDBC JAR, credentials and organizer sample SQL required')
+    try:
+        data = services.validate_deployment()
+    except (ValueError, OSError, KeyError):
+        emit('BLOCKED', 'Official Zetaris platform', 'Prepare the external supplied bundle and private configuration')
         return
-    jar = Path(val('ZETARIS_JDBC_JAR')).expanduser().resolve()
-    sql = val('ZETARIS_DATASET_SQL').strip().rstrip(';')
-    if not jar.is_file() or ROOT in jar.parents or not re.match(r'(?is)^SELECT\b.+\bFROM\b', sql) or ';' in sql:
-        emit('FAIL', 'Zetaris dataset configuration', 'External matching JDBC JAR and a single dataset SELECT with FROM required')
+    emit('PASS', 'Official platform configuration', 'Supplied images/env retained; six default services; loopback-only exposure')
+    emit('PASS' if services.registry_configured() else 'BLOCKED', 'Azure Registry login',
+         'Credential entry present; actual image access still requires successful pull' if services.registry_configured() else 'Gateway registry credentials unavailable; no images pulled')
+    rc, raw = run(['docker', 'ps', '-aq', '--filter', 'label=com.docker.compose.project='+services.PROJECT])
+    state = {}
+    ids = raw.split() if rc == 0 else []
+    if ids:
+        rc, raw = run(['docker', 'inspect', '--format', '{{index .Config.Labels "com.docker.compose.service"}}|{{.State.Status}}|{{.State.ExitCode}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}', *ids])
+        if rc == 0:
+            state = {parts[0]: parts[1:] for line in raw.splitlines() if len(parts := line.split('|')) == 4}
+    for name in services.RUNNING:
+        entry = state.get(name)
+        ok = entry and entry[0] == 'running' and entry[2] in ('healthy', 'none')
+        emit('PASS' if ok else 'FAIL' if entry and entry[0] not in ('created', 'running') else 'BLOCKED', 'Zetaris '+name,
+             'Running with acceptable health' if ok else 'Not ready; official deployment not started or prerequisite pending')
+    for name in services.JOBS:
+        entry = state.get(name)
+        ok = entry and entry[0] == 'exited' and entry[1] == '0'
+        emit('PASS' if ok else 'FAIL' if entry and entry[0] == 'exited' else 'BLOCKED', 'Zetaris '+name,
+             'One-shot completed with exit 0' if ok else 'Required one-shot job incomplete')
+    ready = all(name in state and state[name][0] == 'running' and state[name][2] in ('healthy', 'none') for name in services.RUNNING)
+    if not ready:
+        for name in ('GUI /api/config', 'REST API', 'SQL Editor SELECT 1', 'sample dataset SELECT', 'official verify.sh'):
+            emit('BLOCKED', 'Zetaris '+name, 'Running official deployment prerequisite missing; no integration PASS claimed')
         return
-    if not shutil.which('java'):
-        emit('BLOCKED', 'Zetaris dataset SELECT', 'JDK 11+ source launcher required; no runtime installed automatically')
-        return
-    env = dict(os.environ)
-    env.update({k: val(k) for k in required})
-    env['ZETARIS_DATASET_SQL'] = sql
-    env['ZETARIS_JDBC_URL'] = val('ZETARIS_JDBC_URL', 'jdbc:zetaris:lightning@127.0.0.1:10000')
-    env['ZETARIS_JDBC_DRIVER'] = val('ZETARIS_JDBC_DRIVER')
-    rc, output = run(['java', '--class-path', str(jar), str(ROOT/'scripts/ZetarisSmoke.java')], env=env, timeout=45)
-    emit('PASS' if rc == 0 and output.startswith('PASS ') else 'FAIL', 'Zetaris registered dataset SELECT',
-         'Actual authenticated dataset query returned a row; values withheld' if rc == 0 and output.startswith('PASS ') else 'JDBC smoke unsuccessful; details withheld')
+    settings = services.bundle_env()
+    ui = 'http://localhost:'+settings.get('UI_PORT', '3000')
+    api = 'http://127.0.0.1:'+settings.get('API_PORT', '8888')
+    try:
+        config = request(ui+'/api/config')
+        emit('PASS' if isinstance(config, dict) else 'NOT_TESTED', 'Zetaris GUI /api/config', 'Actual UI config response; not SQL verification')
+    except Exception as exc:
+        failure('Zetaris GUI /api/config', exc)
+    # The bundle's API healthcheck uses HTTP /, while REST routes live under /api/v1.0.
+    try:
+        probe_api_http(api+'/')
+        emit('PASS', 'Zetaris REST API process', 'HTTP health response at the bundled API healthcheck URL; SQL tested separately')
+    except Exception as exc:
+        failure('Zetaris REST API process', exc)
+    try:
+        login = request(ui+'/api/auth/login', body={'username': settings['ZETARIS_ADMIN_EMAIL'], 'password': settings['ZETARIS_ADMIN_PASSWORD']})
+        serialized = json.dumps(login)
+        token = re.search(r'[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}', serialized)
+        org = re.search(r'"orgId"\s*:\s*([0-9]+)', serialized)
+        if not token or not org:
+            raise ValueError('Login missing documented token or orgId')
+        headers = {'X-Org-ID': org[1], 'X-Request-ID': '11111111-2222-3333-4444-555555555555'}
+        def contains_one(obj):
+            if isinstance(obj, dict):
+                return obj.get('one') in (1, '1') or any(contains_one(v) for v in obj.values())
+            if isinstance(obj, list):
+                return any(contains_one(v) for v in obj)
+            return False
+        result = request(ui+'/api/proxy/query/sql/start', token[0], {'select': 'SELECT 1 AS one', 'pageLimit': 1}, headers)
+        emit('PASS' if contains_one(result) else 'NOT_TESTED', 'Zetaris SQL Editor SELECT 1',
+             'Actual one=1 returned through UI → API → engine' if contains_one(result) else 'Response shape/result not validated; values withheld')
+        sample = request(ui+'/api/proxy/query/sql/start', token[0], {'select': 'SELECT * FROM NY_TAXI.customers LIMIT 1', 'pageLimit': 1}, headers)
+        # Only accept recognizable nonempty row collections; never a query receipt alone.
+        def has_rows(obj):
+            if isinstance(obj, dict):
+                return any(isinstance(obj.get(k), list) and bool(obj[k]) and isinstance(obj[k][0], (dict, list)) for k in ('rows', 'records')) or any(has_rows(v) for v in obj.values())
+            return False
+        emit('PASS' if has_rows(sample) else 'NOT_TESTED', 'Zetaris sample dataset SELECT',
+             'Bundled NY_TAXI.customers query returned structured rows' if has_rows(sample) else 'Dataset row schema not validated; inspect privately')
+    except Exception as exc:
+        failure('Zetaris authenticated SQL', exc)
+    rc, _ = run(['bash', './verify.sh'], cwd=services.platform_dir(), env=services.command_env(), timeout=120)
+    emit('PASS' if rc == 0 else 'FAIL', 'Official Zetaris verify.sh', 'All bundled checks passed' if rc == 0 else 'Official checks unsuccessful; raw output withheld')
+
+
+def probe_api_http(url):
+    with urllib.request.build_opener(NoRedirect).open(url, timeout=15) as response:
+        if response.status != 200:
+            raise ValueError('API healthcheck did not return HTTP 200')
 
 
 def nemotron(allow_inference=False):

@@ -1,39 +1,39 @@
-# Organizer sponsor setup
+# Sponsor setup: downloaded official Zetaris platform
 
-Authority: GenAI Works Academy, **Start Here: Set Up Your Data, Build and Power Layers**, as corrected by the user. The [public course syllabus](https://academy.genai.works/courses/open-agent-hackathon-2026/details) confirms the Data/Build/Power layers but does not expose the lesson body. The exact sample dataset recipe, Composer/Grok prompt, provider URL and model ID still require the enrolled lesson or organizer. No project/track is selected.
+The **new supported platform bundle** from [Zetaris Cloud Gateway](https://cloud.enterprise.zetaris.com/dashboard/download) supersedes the earlier Freemium preparation. Follow the bundled README/preflight/verify and [official getting-started guide](https://github.com/zetaris/getting-started). The old external Freemium checkout and preparation were preserved but are not started or used by the current scripts.
 
-## Zetaris Freemium
+## Actual installed files and configuration
 
-Use [zetaris/Freemium](https://github.com/zetaris/Freemium), pinned at `9dd4fe943afebca6b204b6ed5eccdca91b831e6c`, cloned outside Quorum at `~/.local/share/quorum/zetaris-freemium`. The prior Zetaris Cloud bundle instructions and UI-proxy API assumptions have been removed.
+Archive found read-only at `C:\Users\Vadim\Downloads\zetaris-platform.zip`; size 27,996,894 bytes; SHA256 `14c6a811a140378bec1749ceffd7fa123bafb2f178545b26354e8f9433b413d3`. It was safely extracted outside Git to `~/.local/share/quorum/zetaris-platform-bundle/zetaris-platform`. The archive had 19 entries, approximately 31.2 MB expanded. Archive paths/symlinks were checked before extraction.
 
-The actual upstream Compose contains four core services plus privateai, tools, Ollama, OpenSearch and digiavatar. Preparation selects **only** zetaris-db, zetaris-server, zetaris-api and zetaris-gui. It keeps upstream image tags, dependencies and entrypoints. No local LLM/GPU services are prepared or started.
+The supplied `.env` already contains administrator email/password/organization and all image/database settings. These values were retained, never invented or printed. Configuration is mode 600 and the private installation directory is mode 700. Change the supplied administrator password privately at first successful login. No registry credentials were in the bundle or existing Docker configuration.
 
-Run `python3 scripts/services.py prepare`. This creates a mode-700 external runtime at `~/.local/share/quorum/zetaris-runtime`, with mode-600 `compose.json`, random PostgreSQL password, private installation-specific RSA DER keys, and isolated data directories. Existing configuration is preserved. The Compose project is `quorum-zetaris` with its own default network. Its database is reachable only on that network, so occupied host port 5432 needs no remapping or service changes. Host ports are **127.0.0.1:9001 (GUI), :8888 (REST), :10000 (JDBC)**. Debug/internal ports remain unpublished.
+Actual default services: `postgres`, `init`, `driver`, `api`, `ui`, `bootstrap`. `init` and `bootstrap` must complete with exit 0; the other four must run with acceptable health. There is no optional GPU, Ollama or local-model service in this selection. No required default service is removed.
 
-Security adaptations: replace the public upstream DB password and test encryption keys; use PostgreSQL's postgres role consistently so the supplied init script's grants are valid; disable statement logging; restrict upstream startup's recursive world-writable chmod to owner access; allow localhost/127.0.0.1 GUI origins. Other vendor initialization/start scripts are mounted read-only. These adaptations pass Compose validation but their image-level compatibility cannot be verified until image access and memory are available. Runtime ownership/key permissions may need image-specific validation at that point; do not weaken them to world-readable/writable.
+Only a private Compose override was added, binding the UI to loopback. Supplied `.env` settings/images are unchanged. Scripts explicitly select the supplied Compose plus this override with project `zetaris`; this also applies when running official scripts through the wrappers.
 
-The organizer requires at least 8 GB available to Docker. This setup uses a conservative **8 GiB allocated and currently available** gate. Current allocation is 7.66 GiB; available WSL RAM is roughly 4.6 GiB. No WSL memory limits were changed.
+Configured endpoints (not live until startup): GUI `http://localhost:3000`; REST `http://localhost:8888/api/v1.0`; API internal host port 8889 and JDBC 10000 are loopback-only. Spark UI uses localhost:4040. PostgreSQL and the driver's additional 8080 mapping use auto-assigned loopback host ports (`published: 0`), so occupied host port 5432 is untouched. Static required ports 3000/8888/8889/10000/4040 were free during the audit.
 
-Docker Hub login was attempted once and required manual authentication. One pull of `zetaris/lightning-server:v2.4.1.0-latest` was denied. Other private images and public PostgreSQL were not downloaded after that denial. Do not repeat pulls until the organizer grants access.
+## Resource and authentication results
 
-After access is granted, authenticate locally with `docker login` and pull only the four services using the private Compose/project commands in SETUP.md. Start is guarded and never pulls automatically.
+Existing native Linux Docker 29.0.2 / Compose 2.40.3 works on WSL2. Docker sees 8 CPUs and **7.66 GiB** total RAM, approximately an 8 GiB WSL allocation after overhead. The bundle's actual preflight **requires 6 GiB**, recommends 8 GiB and 4 CPUs, and accepted this allocation with a warning. It found over 850 GiB free disk after cleanup.
 
-**Account initialization:** the actual Freemium README invokes `/home/zetaris/lightning/bin/dev-account.sh` inside zetaris-server. Use the documented helper with your own account/password/organization; do not use the README's public example password. The account helper has not run because containers cannot start. See manual actions for avoiding passwords in shell history.
+Approximately 4.57 GiB was available to WSL before installation, while Windows had only ~567 MiB free physical memory. Default heaps are driver `2g`, API `1g`, Spark `local[2]` with 2 cores; no server-size overrides were used. Local startup safety gates require 5 GiB WSL-available RAM and 4 GiB free Windows physical memory. These are workload-protection gates, not claims about vendor hard requirements. No WSL/Docker memory setting, application or existing container was changed.
 
-**Sample data:** register the lesson's sample source in the GUI exactly as taught, then record its real dataset SELECT in private `ZETARIS_DATASET_SQL`. No sample name, external source URL, JDBC driver class or REST SQL route has been invented. Configure the matching official JDBC JAR and credentials. The Java smoke executes the supplied SELECT and requires an actual result row. `SELECT 1` or an open port does not establish dataset readiness.
+No `.wslconfig` resource entries were reported in the read-only check. With approximately 15.8 GiB physical host RAM, raising a configured 8 GiB WSL cap to **9 GiB** would be the smallest whole-GiB change expected to report more than 8 GiB after overhead, leaving roughly 6.8 GiB theoretical host capacity. It is **not safe to apply while the host is this memory-constrained**, and is not required merely to pass the vendor's 6 GiB minimum. Free host headroom manually first; any `.wslconfig` edit or WSL shutdown requires separate authorization. Disk cleanup does not increase RAM.
 
-Set `ZETARIS_REST_CHECK_URL` only to a documented Freemium API JSON endpoint. HTTP availability and authenticated dataset querying have separate statuses.
+The official `preflight.sh` ran: Docker/Compose/architecture/CPU/disk PASS; memory WARN; Azure registry login FAIL. A bounded noninteractive login attempt confirmed that private interactive credentials are unavailable. No image pull/start was attempted past the failed prerequisite. The supplied `verify.sh` also ran read-only and could not pass because the platform is not deployed. Its credential-bearing raw output was withheld.
 
-## Cursor Build layer
+## Verification prepared for the actual bundle
 
-Preserve the installed, authenticated Cursor (authentication reported by user). Windows installation now reports 3.26.16 (previous CLI verification was 3.24.18); no update or reinstall was initiated by this work. No reinstall, logout, model-settings changes, extension installation or credit purchase is performed.
+The current wrappers validate the official Compose and run the bundled scripts. Diagnostics distinguish long-running services, successful one-shot jobs, `/api/config`, the API's documented healthcheck at HTTP `/`, and actual SQL results.
 
-Use the lesson's Composer and Grok selections for the manual Agent smoke. A preparatory read-only prompt and external acceptance record are documented in MANUAL_ACTIONS.md. Exact lesson prompt/model availability remains unverified until the lesson is accessible. Do not paste Meterless keys into Cursor model settings or use provider inference credits for coding.
+The authenticated SQL Editor proxy route and payload come from the **bundled verify.sh**: `/api/auth/login`, token plus actual `orgId`, then `/api/proxy/query/sql/start` with `select` and `pageLimit`. The extra smoke requires `SELECT 1 AS one` to return `one=1`. The bundled sample query uses `NY_TAXI.customers`; sample bootstrap registers NY_TAXI and TPCDS_DB from the vendor's public S3 bucket. A query receipt/open port is not a dataset PASS.
 
-## Meterless → NVIDIA Nemotron Power layer
+The bundle includes the matching official JDBC JAR and driver class, so no driver download or guessed class is needed. The existing Java helper is preserved; current integration diagnostics follow the bundle's UI proxy verification route instead.
 
-Required private fields are **METERLESS_BASE_URL**, **METERLESS_API_KEY**, **NEMOTRON_MODEL**, all blank by default. Obtain the exact values and supported OpenAI-compatible chat contract from the organizer. No direct NVIDIA API fallback, guessed URL, version path or model ID is configured.
+## Cursor and Meterless → Nemotron
 
-`./scripts/verify-all.sh` never sends provider inference requests. The explicit one-request smoke is `./scripts/verify-all.sh --inference`; it requires all three real values and sends one nonstreaming `/chat/completions` request with 32 output tokens maximum. It does not retry, print outputs/keys, purchase credits or run development workloads. Confirm the provided route/key is for sponsored smoke testing before invoking it.
+Preserve the installed/authenticated Cursor. No reinstall, logout, credits purchase or model-settings changes were made. Composer/Grok Agent acceptance still needs actual user observation; the read-only smoke remains in MANUAL_ACTIONS.md.
 
-The existing H-MEM reference and state-persistence tests remain useful component checks. They do **not** establish hosted Meterless access, Nemotron model identity or inference readiness. Only a real nonempty response from the organizer-configured route passes the inference smoke. A response alone cannot independently prove which backend model the provider executed.
+Hosted inference still requires the exact organizer-provided `METERLESS_BASE_URL`, `METERLESS_API_KEY`, `NEMOTRON_MODEL`. No defaults or direct NVIDIA fallback are invented. Keep Meterless keys out of Cursor settings. Routine diagnostics never send inference; `--inference` explicitly allows one capped sponsored request after real values are supplied. Existing H-MEM and persistence passes are reference-component results, not inference readiness.

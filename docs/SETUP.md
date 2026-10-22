@@ -1,56 +1,59 @@
-# Reusable setup on the existing WSL2 machine
+# Setup on the existing Ubuntu WSL2 machine
 
-Run from `~/Quorum` inside Ubuntu-20.04 WSL2. Reuse the verified native Linux Docker CLI and backend; leave existing containers and WSL limits alone.
+Work in `~/Quorum`. Keep the working native Linux Docker backend and all existing workloads. The newly downloaded **official platform bundle** replaces Freemium as the supported installation path; existing vendor checkouts remain untouched outside Git.
 
 ```bash
 cd ~/Quorum
-if [ ! -e .env.local ]; then (umask 077; cp .env.example .env.local); fi
-chmod 600 .env.local
+python3 scripts/services.py prepare
+python3 scripts/services.py preflight
 ./scripts/doctor.sh
 ./scripts/verify-all.sh
 ```
 
-Configuration files contain literal `KEY=value`, optionally quoted, with no shell execution/expansion. Exported environment values take precedence. Use absolute external paths. Existing old Cloud/NVIDIA/runtime-token settings must be replaced with the current example keys; unknown keys are rejected. Do not print credentials or commit private configuration.
+The default private bundle path is `~/.local/share/quorum/zetaris-platform-bundle/zetaris-platform`; override only with an absolute `ZETARIS_PLATFORM_DIR` in private configuration. Supplied images, database values and administrator fields remain in its `.env`, not in Quorum. Literal `KEY=value` files are never sourced as shell code. A private Compose override binds UI to localhost. Do not use the server example or enable optional profiles on this laptop.
 
-## Freemium preparation and lifecycle
+## Authenticate, pull, start, verify
 
-The existing official checkout and private generated deployment are outside Quorum. For a fresh machine, clone the official repo to `~/.local/share/quorum/zetaris-freemium` and checkout revision `9dd4fe943afebca6b204b6ed5eccdca91b831e6c` before preparation.
+Azure authentication is the remaining access prerequisite. Use the official Gateway's current registry sign-in in a trusted private WSL terminal, without putting credentials in chat, reports or shell history. Prefer `docker login zetarishackathon.azurecr.io` and enter the supplied username/password interactively. The assistant cannot complete an interactive login without those credentials.
+
+After authentication and sufficient RAM headroom:
 
 ```bash
-python3 scripts/services.py prepare
+cd ~/Quorum
+python3 scripts/services.py preflight
+python3 scripts/services.py pull
+./scripts/start-services.sh
+# Once startup/bootstrap finish:
+python3 scripts/services.py verify
+./scripts/verify-all.sh
 ```
 
-Preparation generates only four core services, keeps DB port 5432 unpublished and binds GUI/REST/JDBC to localhost. Repeating it preserves the existing secrets/configuration. Never start the entire upstream Compose file: it includes optional GPU/model services.
+Wrappers use the actual official project `zetaris`, supplied Compose/environment and private override. Required services are postgres/init/driver/api/ui/bootstrap. Start uses `--pull never --no-build` and checks static port conflicts. It refuses insufficient current WSL/Windows memory and never stops other services or edits WSL limits. No automatic retries. Pull/start output is captured to avoid leaking credentials; a timeout/blocked status must be diagnosed rather than retried blindly.
 
-After the organizer grants Docker Hub image access, log in locally. Do not repeat the already-denied pull before access changes. To pull the four core images once after that:
+Stop only this platform while retaining volumes:
 
 ```bash
-cd ~/.local/share/quorum/zetaris-runtime
-docker login
-docker compose -p quorum-zetaris -f compose.json pull zetaris-db zetaris-server zetaris-api zetaris-gui
-cd ~/Quorum
-./scripts/start-services.sh
-./scripts/verify-all.sh
-# Stop only Quorum's isolated four services; retain data:
 ./scripts/stop-services.sh
 ```
 
-Start validates private Compose and checks 8 GiB Docker allocation plus 8 GiB currently available memory, then uses `--pull never --no-build`. It does not install, download or silently adjust WSL. Successful start requests do not imply readiness; diagnostics must confirm four running containers and application/query responses.
+Never use the bundle's destructive installation-test suite or `down -v` on this installation. Volume/key loss would destroy databases and encrypted data-source credentials. `init`/`bootstrap` exiting 0 is expected success.
 
-For sample SQL verification, use a matching vendor-supplied JDBC JAR outside Quorum and the existing JDK's Java 11+ source launcher. `ZETARIS_JDBC_DRIVER` is optional when the driver supports JDBC automatic discovery. Credentials are passed in process environment, not command-line arguments. SQL and returned data are withheld from reports. No PostgreSQL client connection is substituted for Zetaris SQL.
-
-## Existing Meterless references
-
-Preserve `~/.local/share/quorum/meterless` at `1742dec56a66e58eef9dda2d2b865823758ca8cd`. `scripts/setup-meterless.sh` is only for missing reference tooling and reuses working dependencies. No models or GPU runtimes are installed. H-MEM uses the official deterministic reference embedder; reference passes do not prove LLM integration. Persistence checks create/reload real temporary JSON files and remove only their own temporary directory.
-
-## Diagnostics and explicit inference
+## Configuration and diagnostics
 
 ```bash
-./scripts/verify-all.sh              # no provider credits spent
-./scripts/verify-all.sh --inference  # explicit ONE capped sponsored inference, if configured
-python3 scripts/security-check.py   # staged/tracked file safety heuristic
+if [ ! -e .env.local ]; then (umask 077; cp .env.example .env.local); fi
+chmod 600 .env.local
+./scripts/verify-all.sh              # no provider inference
+./scripts/verify-all.sh --inference  # explicit one capped hosted test, if configured
+python3 scripts/security-check.py
 ```
 
-Statuses: PASS, FAIL, BLOCKED, NOT_TESTED. Exit 0 means all checks passed; 1 means a failure; 2 means blocked or untested checks remain. Missing credentials, images, RAM, sample SQL or exact endpoints never count as operational integrations. Cursor interactive acceptance requires evidence of actual observed GUI checks, not executable presence.
+Remove obsolete Freemium configuration keys from private Quorum configuration if present; do not delete old vendor/data directories. Do not copy platform credentials into Quorum. Meterless URL/key/model remain organizer-supplied blanks until available. The external pinned H-MEM references and setup script are preserved; their tests do not establish inference readiness.
 
-Inspect staged paths, diff and file sizes before publishing; the secret scanner is heuristic. Never commit `.env*` except `.env.example`, the Freemium checkout, private deployment, keys, data, logs or binaries. Never force-push.
+Statuses are PASS, FAIL, BLOCKED, NOT_TESTED. Exit 0 means all checks passed, 1 means a failure, 2 means blocked/untested work remains. Open ports and reference tests never stand in for authenticated platform SQL or hosted inference.
+
+## Disk safety
+
+The completed cleanup is documented in [disk-cleanup.md](../reports/disk-cleanup.md), including every removed cache object. No reusable cleanup command is provided: deletion authorization was tied to a specific protected period and inspected file metadata. Do not rerun broad prune/cache-clean operations based on that one-time audit.
+
+Review staged files, diffs, secret patterns and sizes before publication. Keep archives, binaries, vendor sources, secrets, models, logs and runtime data outside Git; never force-push. Free Linux blocks do not automatically shrink the Windows-hosted WSL virtual disk. No compaction/reset was performed.

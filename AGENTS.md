@@ -9,4 +9,6 @@
 - Inspect staged paths, diffs, secret patterns and file sizes before committing. Preserve remote history/default branch; never force-push.
 - Environment readiness does not establish hackathon submission compliance.
 
-- Follow the organizer's Freemium Data layer and Meterless→Nemotron Power layer. Start only the isolated four-service Zetaris project after memory/access checks. Never put Meterless keys in Cursor settings. Inference is opt-in (`--inference`); routine diagnostics must spend no provider credits.
+- Use the newly downloaded official Zetaris platform bundle (supersedes Freemium), with the organizer's Data layer and Meterless→Nemotron Power layer. Use the bundle’s required default services and official preflight/verify scripts after resource/authentication checks; preserve supplied environment values. Never put Meterless keys in Cursor settings. Inference is opt-in (`--inference`); routine diagnostics must spend no provider credits.
+
+- Disk cleanup must preserve all user projects/data, models needed for the statistics exam, Docker containers/volumes and files created or modified since 2026-04-21. Windows deletions and WSL memory changes require explicit approval.

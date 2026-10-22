@@ -1,137 +1,135 @@
 #!/usr/bin/env python3
-"""Prepare and control only Quorum's isolated four-service Freemium deployment."""
+"""Control the externally installed official Zetaris platform, never legacy Freemium."""
 import json
 import os
 from pathlib import Path
-import secrets
+import socket
 import subprocess
 import sys
 import checks
 
-PIN = '9dd4fe943afebca6b204b6ed5eccdca91b831e6c'
-PROJECT = 'quorum-zetaris'
-SERVICES = ('zetaris-db', 'zetaris-server', 'zetaris-api', 'zetaris-gui')
+PROJECT = 'zetaris'
+SERVICES = ('postgres', 'init', 'driver', 'api', 'ui', 'bootstrap')
+RUNNING = ('postgres', 'driver', 'api', 'ui')
+JOBS = ('init', 'bootstrap')
 
 
-def locations():
-    vendor = Path(checks.val('ZETARIS_FREEMIUM_HOME', str(Path.home()/'.local/share/quorum/zetaris-freemium'))).expanduser().resolve()
-    runtime = Path(checks.val('ZETARIS_RUNTIME_DIR', str(Path.home()/'.local/share/quorum/zetaris-runtime'))).expanduser().resolve()
-    for path in (vendor, runtime):
-        if path == checks.ROOT or checks.ROOT in path.parents:
-            raise ValueError('Vendor and runtime must be outside Quorum')
-    return vendor, runtime
+def platform_dir():
+    path = Path(checks.val('ZETARIS_PLATFORM_DIR', str(Path.home()/'.local/share/quorum/zetaris-platform-bundle/zetaris-platform'))).expanduser().resolve()
+    if path == checks.ROOT or checks.ROOT in path.parents:
+        raise ValueError('Platform must be outside Quorum')
+    return path
+
+
+def bundle_env():
+    # Preserve supplied values; never source a credential-bearing file as shell code.
+    values = {}
+    for line in (platform_dir()/'.env').read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        key, sep, value = line.partition('=')
+        if sep:
+            values[key] = value.strip().strip('\"\'')
+    return values
+
+
+def command_env():
+    root = platform_dir()
+    env = dict(os.environ)
+    env['COMPOSE_FILE'] = str(root/'docker-compose.yml')+':'+str(root/'compose.override.yml')
+    env['COMPOSE_PROJECT_NAME'] = PROJECT
+    env['COMPOSE_PROFILES'] = ''
+    env['COMPOSE_ENV_FILES'] = str(root/'.env')
+    # Bundled .env wins over unrelated exported settings; do not print the result.
+    env.update(bundle_env())
+    return env
 
 
 def compose_args():
-    _, runtime = locations()
-    return ['docker', 'compose', '-p', PROJECT, '--project-directory', str(runtime), '-f', str(runtime/'compose.json')]
+    return ['docker', 'compose', '-p', PROJECT]
+
+
+def resolved_config():
+    rc, raw = checks.run(compose_args()+['config', '--format', 'json'], cwd=platform_dir(), env=command_env())
+    if rc:
+        raise ValueError('Compose resolution failed')
+    return json.loads(raw)
 
 
 def validate_deployment():
-    _, runtime = locations()
-    path = runtime/'compose.json'
-    config = json.loads(path.read_text())
-    if path.stat().st_mode & 0o077 or set(config.get('services', {})) != set(SERVICES) or config.get('name') != PROJECT:
-        raise ValueError('Private deployment permissions or service scope invalid')
-    expected_ports = {'zetaris-server': 10000, 'zetaris-api': 8888, 'zetaris-gui': 9001}
-    for name, service in config['services'].items():
-        ports = service.get('ports', [])
-        if name == 'zetaris-db' and ports:
-            raise ValueError('Database must not publish a host port')
-        if name in expected_ports and (len(ports) != 1 or ports[0].get('host_ip') != '127.0.0.1' or
-                                      ports[0].get('target') != expected_ports[name] or
-                                      str(ports[0].get('published')) != str(expected_ports[name])):
-            raise ValueError('Unexpected host port binding')
-
-
-def memory_ready():
-    rc, memory = checks.run(['docker', 'info', '--format', '{{.MemTotal}}'])
-    available = int(next(x.split()[1] for x in Path('/proc/meminfo').read_text().splitlines() if x.startswith('MemAvailable:')))*1024
-    return rc == 0 and memory.isdigit() and int(memory) >= 8*1024**3 and available >= 8*1024**3
+    root = platform_dir()
+    for filename in ('.env', 'compose.override.yml'):
+        if (root/filename).stat().st_mode & 0o077:
+            raise ValueError('Private platform configuration requires mode 600')
+    data = resolved_config()
+    if set(data.get('services', {})) != set(SERVICES):
+        raise ValueError('Unexpected service/profile selection')
+    for service in data['services'].values():
+        for port in service.get('ports', []):
+            if port.get('host_ip') != '127.0.0.1':
+                raise ValueError('Platform ports must be loopback-only')
+    supplied = bundle_env()
+    if not all(supplied.get(key) for key in ('ZETARIS_ADMIN_EMAIL', 'ZETARIS_ADMIN_PASSWORD', 'ZETARIS_ADMIN_ORG')):
+        raise ValueError('Administrator values missing; enter privately in bundled .env')
+    return data
 
 
 def prepare():
-    vendor, runtime = locations()
-    rc, rev = checks.run(['git', '-C', str(vendor), 'rev-parse', 'HEAD'])
-    if rc or rev != PIN:
-        print('BLOCKED | Freemium preparation | Expected external pinned official checkout missing')
-        return 2
-    runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(runtime, 0o700)
-    target = runtime/'compose.json'
-    if target.exists():
-        validate_deployment()
-        print('PASS | Freemium preparation | Existing private configuration preserved')
-        return 0
-    # Resolve upstream without printing its .env or unrelated service settings.
-    rc, raw = checks.run(['docker', 'compose', '-f', str(vendor/'docker-compose.yml'), 'config', '--format', 'json'], cwd=vendor)
-    if rc:
-        print('BLOCKED | Freemium preparation | Upstream Compose cannot be resolved')
-        return 2
-    upstream = json.loads(raw)['services']
-    selected = {name: upstream[name] for name in SERVICES}
-    password = secrets.token_hex(32)
-    # Fresh isolated PostgreSQL role also makes upstream init grants to postgres valid.
-    selected['zetaris-db']['environment'].update(POSTGRES_USER='postgres', POSTGRES_PASSWORD=password)
-    selected['zetaris-db']['command'] = ['postgres']  # Do not log every SQL statement.
-    for name, service in selected.items():
-        service['restart'] = 'unless-stopped'
-        service.pop('ports', None)
-        service.pop('networks', None)
-        for key in list(service.get('environment', {})):
-            if key in ('METASTORE_JDBC_URL', 'METASTORE_DATABASE_URL', 'AUDIT_LOG_JDBC_URL', 'AUDIT_LOG_DATABASE_URL'):
-                database = 'audit' if key.startswith('AUDIT') else 'metastore'
-                service['environment'][key] = f'jdbc:postgresql://zetaris-db:5432/{database}?user=postgres&password={password}'
-        for mount in service.get('volumes', []):
-            destination = mount['target']
-            if destination.startswith('/var/lib/postgresql'):
-                source = runtime/'pgdata'
-            elif destination == '/home/zetaris/data':
-                source = runtime/'customer_data'
-            elif destination.endswith('/tokens'):
-                source = runtime/'tokens'
-            elif destination.endswith('/passwordkeys'):
-                source = runtime/'passwordkeys'
-            else:
-                continue  # Read-only vendor initialization/start scripts.
-            source.mkdir(parents=True, exist_ok=True, mode=0o700)
-            mount['source'] = str(source)
-            if destination.endswith('/passwordkeys'):
-                mount['read_only'] = True
-            mount.pop('bind', None)
-        for mount in service.get('volumes', []):
-            if mount['source'].startswith(str(vendor)):
-                mount['read_only'] = True
-    for name, port in (('zetaris-server', 10000), ('zetaris-api', 8888), ('zetaris-gui', 9001)):
-        selected[name]['ports'] = [{'target': port, 'published': str(port), 'host_ip': '127.0.0.1', 'protocol': 'tcp'}]
-    selected['zetaris-api']['environment']['ALLOWED_ORIGINS'] = 'http://localhost:9001;http://127.0.0.1:9001'
-    # Replace the public upstream test encryption keys with private per-install RSA DER keys.
-    private = runtime/'passwordkeys/private_key.der'
-    public = runtime/'passwordkeys/public_key.der'
-    if not private.exists():
-        rawkey = private.with_suffix('.temporary.der')
-        try:
-            subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:2048', '-outform', 'DER', '-out', str(rawkey)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            # Upstream Java key is PKCS8 DER, not traditional PKCS1 DER.
-            subprocess.run(['openssl', 'pkcs8', '-topk8', '-nocrypt', '-inform', 'DER', '-in', str(rawkey), '-outform', 'DER', '-out', str(private)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        finally:
-            rawkey.unlink(missing_ok=True)
-    if not public.exists():
-        subprocess.run(['openssl', 'pkey', '-inform', 'DER', '-in', str(private), '-pubout', '-outform', 'DER', '-out', str(public)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    os.chmod(private, 0o600)
-    os.chmod(public, 0o600)
-    # Upstream startup recursively makes data world-writable. Restrict this to the owner instead.
-    startup = (vendor/'lightning/server/start.sh').read_text().replace('chmod -R 777', 'chmod -R u+rwX,go-rwx')
-    startfile = runtime/'server-start.sh'
-    startfile.write_text(startup)
-    os.chmod(startfile, 0o700)
-    for mount in selected['zetaris-server']['volumes']:
-        if mount['target'] == '/home/zetaris/lightning/bin/start.sh':
-            mount['source'] = str(startfile)
-    with open(target, 'x', opener=lambda path, flags: os.open(path, flags, 0o600)) as handle:
-        json.dump({'name': PROJECT, 'services': selected}, handle, indent=2)
-    print('PASS | Freemium preparation | Four services isolated; DB unpublished; only localhost 9001/8888/10000')
+    root = platform_dir()
+    for name in ('.env', 'docker-compose.yml', 'preflight.sh', 'verify.sh'):
+        if not (root/name).is_file():
+            print('BLOCKED | Zetaris platform | Official extracted bundle missing')
+            return 2
+    os.chmod(root, 0o700)
+    os.chmod(root/'.env', 0o600)
+    override = root/'compose.override.yml'
+    if not override.exists():
+        # Preserve every supplied .env value. Only restrict the UI's host exposure.
+        data = resolved_without_override()
+        ports = data['services']['ui']['ports']
+        for port in ports:
+            port['host_ip'] = '127.0.0.1'
+            port['published'] = '${UI_PORT:-3000}'
+        text = 'services:\n  ui:\n    ports: !override '+json.dumps(ports)+'\n'
+        with open(override, 'x', opener=lambda p, flags: os.open(p, flags, 0o600)) as handle:
+            handle.write(text)
+    validate_deployment()
+    print('PASS | Zetaris preparation | Official laptop settings/credentials preserved; six required services; loopback ports')
     return 0
+
+
+def resolved_without_override():
+    root = platform_dir()
+    env = dict(os.environ, COMPOSE_PROFILES='', COMPOSE_PROJECT_NAME=PROJECT)
+    env.update(bundle_env())
+    rc, raw = checks.run(['docker', 'compose', '-f', str(root/'docker-compose.yml'), 'config', '--format', 'json'], cwd=root, env=env)
+    if rc:
+        raise ValueError('Official Compose resolution failed')
+    return json.loads(raw)
+
+
+def available_memory():
+    return int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:')))*1024
+
+
+def registry_configured():
+    path = Path(os.environ.get('DOCKER_CONFIG', str(Path.home()/'.docker')))/'config.json'
+    try:
+        data = json.loads(path.read_text())
+        return any('zetarishackathon.azurecr.io' in host for host in data.get('auths', {})) or bool(data.get('credHelpers', {}).get('zetarishackathon.azurecr.io'))
+    except (OSError, ValueError):
+        return False
+
+
+def preflight():
+    rc, output = checks.run(['bash', './preflight.sh'], cwd=platform_dir(), env=command_env(), timeout=60)
+    # The official script's static status lines are safe; do not print arbitrary logs.
+    for line in output.splitlines():
+        if line.lstrip().startswith(('PASS ', 'WARN ', 'FAIL ')):
+            print(line)
+    print(('PASS' if rc == 0 else 'BLOCKED')+' | Official preflight.sh | '+('Required checks passed; heed memory warning' if rc == 0 else 'Resolve reported prerequisites before image pull/start'))
+    return 0 if rc == 0 else 2
 
 
 def main():
@@ -141,27 +139,55 @@ def main():
     action = sys.argv[1]
     if action == 'prepare':
         return prepare()
-    _, runtime = locations()
-    if not (runtime/'compose.json').exists():
-        print('BLOCKED | Zetaris services | Run python3 scripts/services.py prepare first')
-        return 2
     validate_deployment()
-    args = compose_args()
-    rc, _ = checks.run(args+['config', '--quiet'])
-    if rc:
-        print('FAIL | Zetaris services | Private Compose validation unsuccessful')
-        return 1
+    if action == 'preflight':
+        return preflight()
     if action == 'start':
-        if not memory_ready():
-            print('BLOCKED | Zetaris services | Require 8 GiB allocated to Docker and currently available; no WSL limit changed')
+        rc, running = checks.run(compose_args()+['ps', '--status', 'running', '--services'], cwd=platform_dir(), env=command_env())
+        if rc == 0 and set(RUNNING).issubset(set(running.split())):
+            print('PASS | Zetaris start | Required long-running services already running; verify health separately')
+            return 0
+    if action in ('pull', 'start'):
+        if not registry_configured():
+            print('BLOCKED | Azure registry | Complete private Gateway authentication; no pull attempted')
             return 2
+        if preflight():
+            return 2
+    if action == 'pull':
+        command = ['pull', *SERVICES]
+    elif action == 'start':
+        # 2g driver + 1g API plus ~2 GiB working headroom; not a vendor hard minimum.
+        if available_memory() < 5*1024**3:
+            print('BLOCKED | Zetaris start | Less than 5 GiB currently available for default heaps/headroom; do not disrupt existing workloads')
+            return 2
+        if os.environ.get('WSL_DISTRO_NAME'):
+            rc, free_kib = checks.run(['powershell.exe', '-NoProfile', '-Command', '(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory'], timeout=20)
+            if rc or not free_kib.isdigit() or int(free_kib)*1024 < 4*1024**3:
+                print('BLOCKED | Zetaris start | Need at least 4 GiB free Windows physical memory for stack and host headroom; no applications stopped')
+                return 2
+        data = resolved_config()
+        for service in data['services'].values():
+            for port in service.get('ports', []):
+                published = int(port.get('published') or 0)
+                if not published:
+                    continue
+                with socket.socket() as probe:
+                    if probe.connect_ex(('127.0.0.1', published)) == 0:
+                        print(f'BLOCKED | Zetaris start | Host port {published} occupied; existing service preserved')
+                        return 2
         command = ['up', '-d', '--pull', 'never', '--no-build', *SERVICES]
     elif action == 'stop':
         command = ['stop', *SERVICES]
+    elif action == 'verify':
+        rc, _ = checks.run(['bash', './verify.sh'], cwd=platform_dir(), env=command_env(), timeout=120)
+        _, active = checks.run(compose_args()+['ps', '-q', 'api'], cwd=platform_dir(), env=command_env())
+        status = 'PASS' if rc == 0 else 'FAIL' if active else 'BLOCKED'
+        print(status+' | Official verify.sh | '+('All bundled checks passed' if rc == 0 else 'Verification unsuccessful; raw credential-bearing output withheld'))
+        return 0 if rc == 0 else 1 if active else 2
     else:
         raise ValueError('Unsupported action')
-    rc, _ = checks.run(args+command, timeout=60)
-    print(('PASS' if rc == 0 else 'BLOCKED')+' | Zetaris services | '+('Start requested; verify readiness separately' if action == 'start' else 'Isolated project stopped; data retained'))
+    rc, _ = checks.run(compose_args()+command, cwd=platform_dir(), env=command_env(), timeout=1800 if action == 'pull' else 900 if action == 'start' else 60)
+    print(('PASS' if rc == 0 else 'BLOCKED')+' | Zetaris '+action+' | '+('Command completed; readiness must be verified separately' if rc == 0 else 'Command unsuccessful; no automatic retry; inspect privately'))
     return 0 if rc == 0 else 2
 
 
@@ -169,5 +195,5 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except (ValueError, OSError, KeyError, subprocess.SubprocessError):
-        print('FAIL | Zetaris services | Preparation/control error; inspect private configuration locally')
+        print('FAIL | Zetaris platform control | Configuration/control error; inspect private bundle locally')
         sys.exit(1)
