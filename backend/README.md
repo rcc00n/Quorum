@@ -33,7 +33,7 @@ Unauthenticated protected endpoints return 401, invalid input 400, rate limits 4
 
 ## Integration boundary — pending, not operational
 
-`portal/integration.py:DataAdapter.snapshot(day, topic)` is the sole read-only seam. It currently returns `status: pending` and empty collections. Wire it to authorized Zetaris access after credentials, reachability and schema mapping are approved. No direct collector DB connection, provider call, or inferred reasoning contract exists.
+`portal/integration.py:DataAdapter.snapshot(day, topic)` is the sole read-only seam. It returns `status: pending`, empty events/digests, and optionally the reviewed catalog definitions from an external `QUORUM_CATALOG_PATH` JSON export. Catalog provenance is returned as `catalog_revision`; it does not imply a live connection. Wire it to authorized Zetaris access after credentials, reachability and schema mapping are approved. `deploy/export-catalog.py` reads the chosen collector Git revision without checking it out or executing it, exporting only existing topic/source definitions to a path outside the repository. No topic names or ratings are invented. No direct collector DB connection, provider call, or inferred reasoning contract exists.
 
 Available on `data-collection`: `sources` (normalized nullable ratings, audience, independence group), `topics`, `documents` (title, lead, URLs, timestamps, access level; no full text), `official_docs`, `quotes`, `coverage`. Do not create or migrate these tables here.
 
@@ -54,3 +54,5 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
 | 2026-10-22 | rcc00n / Codex | Unfold 0.81 with branded pages; superuser-only account management; read-only preferences/source views | Reuse Django security while preventing staff self-escalation and cross-workstream writes |
+
+| 2026-10-22 | rcc00n / Codex | Optional external catalog export pinned to collector commit, with provenance; live events/digests remain empty | Enable real preference selection and source inspection before runtime integration, without duplicating team registry data in this branch |

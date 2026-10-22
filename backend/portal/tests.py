@@ -167,3 +167,28 @@ class PortalTests(TestCase):
             {"username": "staff-login", "password": "A-clear-perspective-928!"},
         )
         self.assertRedirects(response, "/staff/")
+
+    def test_external_catalog_is_not_live_analysis(self):
+        import json, tempfile, os
+        from .integration import CatalogAdapter
+
+        with tempfile.TemporaryDirectory() as directory:
+            from pathlib import Path
+
+            path = Path(directory) / "catalog.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "revision": "test-fixture",
+                        "topics": [{"id": "demo", "name": "DEMO only"}],
+                        "sources": [],
+                    }
+                )
+            )
+            with patch.dict(os.environ, {"QUORUM_CATALOG_PATH": str(path)}):
+                snapshot = CatalogAdapter().snapshot()
+                self.assertEqual(snapshot["status"], "pending")
+                self.assertEqual(snapshot["topics"][0]["id"], "demo")
+                self.assertEqual(snapshot["events"], [])
+                path.write_text("{}")
+                self.assertEqual(CatalogAdapter().snapshot()["topics"], [])
