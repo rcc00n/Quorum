@@ -47,16 +47,38 @@ Contract details:
 
 ## Running
 
-Not implemented yet; the layout below is the plan for the first commit of code.
+```
+pip install -r collectors/requirements.txt
+psql "$DATABASE_URL" -f collectors/schema.sql        # once
+python3 -m collectors.probe_feeds                    # which feeds answer, robots.txt verdict per domain
+python3 -m collectors.run                            # one pass over every topic and collector
+python3 -m collectors.run --only rss --loop 900      # one collector, every 15 minutes
+python3 collectors/verify_collectors.py              # PASS / FAIL / BLOCKED, same exit codes as scripts/checks.py
+```
+
+Layout:
 
 ```
 collectors/
-  schema.sql            Postgres DDL for the five tables
-  sources.csv           source registry, edited by hand (ratings, audience, groups)
-  verify_collectors.py  PASS / FAIL / BLOCKED check in the style of scripts/checks.py
+  common.py             env, Postgres, polite Fetcher (robots.txt + 2 s/domain), hashing, wire_origin, upserts
+  rss.py                outlets via RSS: title + lead; page fetched only for the hash at level 1
+  guardian.py           Guardian Open Platform (GUARDIAN_API_KEY), full text for the hash
+  federal_register.py   Federal Register documents API, no key; full text stored in official_docs
+  congress.py           Congress.gov v3 bills (CONGRESS_API_KEY) -> official_docs
+  run.py                entry point; TOPICS dict lives here until the portal provides topics
+  probe_feeds.py        network-only feed check
+  verify_collectors.py  readiness check
+  schema.sql            Postgres DDL
+  sources.csv           hand-edited registry: rss_urls separated by |
+  zetaris/              Lightning SQL to register Postgres and a live Federal Register REST table in Zetaris
 ```
 
+Database: the Postgres that ships inside the Zetaris bundle, or any Postgres reachable from both the collectors and the
+Zetaris containers (`host.docker.internal` from inside Docker). `DATABASE_URL` in `.env` points at it; `collectors/zetaris/01_register_postgres.sql` registers it in Zetaris.
+
 Environment variables (names only; values in local `.env`): `DATABASE_URL`, `GUARDIAN_API_KEY`, `CONGRESS_API_KEY`, `COLLECTOR_USER_AGENT`.
+
+Tested end-to-end against a mock feed and a local Postgres: topic filter, robots.txt downgrade to level 2, wire detection, tracking-parameter stripping, re-run idempotence, article-edit versioning via `supersedes_id`, official_docs upsert. Live feeds were not reachable from the sandbox; run `probe_feeds.py` on a machine with open internet and fix any feed URL that fails.
 
 ## Decisions
 
@@ -68,3 +90,6 @@ Environment variables (names only; values in local `.env`): `DATABASE_URL`, `GUA
 | 2026-10-22 | Yelysei / Claude | `wire_origin` is set from the byline and a same-day title match against AP / Reuters / AFP; such rows stay in `coverage` but are excluded from confirmation. | Implements "ten reprints of one wire story are one piece of evidence" from `docs/DECISIONS.md › Principles`. |
 | 2026-10-22 | Yelysei / Claude | A changed `content_hash` on re-fetch creates a new `documents` row with `supersedes_id`; the old row is kept. | Edits to published articles are themselves a signal and must not overwrite history. |
 | 2026-10-22 | Yelysei / Claude | Collectors write to Postgres; Zetaris sits on top as the SQL layer. Direct Zetaris REST connectors to external APIs are tried first, Postgres-only is the fallback. | Collection must not depend on an untested connector two days before the deadline. |
+| 2026-10-22 | Anastasia / Claude | Collectors are plain Python modules run by `collectors/run.py` (cron or `--loop`), writing to Postgres with psycopg; no Django, Celery or framework yet. | The portal does not exist yet; a Django app can wrap these tables later with `inspectdb` without rewriting the collectors. |
+| 2026-10-22 | Anastasia / Claude | Topic matching at collection is a whole-word match of `topics.query_terms` against title + lead; no model call. | Cheap gate that keeps the demo corpus small; reasoning re-clusters anyway. |
+| 2026-10-22 | Anastasia / Claude | Federal Register and Congress.gov are collected both by Python (into `official_docs`, for the hash-and-quote pipeline) and exposed as live Zetaris REST tables (for the judges' cross-source SQL demo). | Satisfies the "SQL across sources" requirement without making collection depend on an untested connector. |
