@@ -15,7 +15,7 @@ Repository: https://github.com/rcc00n/Quorum, branch `master`. No project/track 
 | Official verify.sh | BLOCKED | Actually invoked read-only; could not pass because stack was not deployed. Raw output withheld. No successful platform verification claimed. |
 | SQL Editor SELECT 1 / sample data | BLOCKED | Real SELECT 1 AS one and NY_TAXI.customers verification prepared from the bundled route/payload. No actual SQL request possible until authenticated startup. |
 | Existing Docker workloads | PASS — PRESERVED | All 19 active/stopped containers and 22 volumes retained; no image/cache prune or project/service interruption. Existing running-container status checked afterward. |
-| Disk cleanup | PASS — COMPLETED | 24 exact old pip cache files removed; ~5.40 GB / 5.029 GiB reclaimed. Before/after and every path in disk-cleanup.md. No project, dependency, database or Windows file removed. |
+| Disk cleanup | PASS — COMPLETED | 24 exact old pip cache files removed; ~5.40 GB / 5.029 GiB reclaimed. Before/after and every path in disk-cleanup.md. No project, dependency or database removed. Subsequently, exactly two user-approved Windows installers (520,689,304 bytes) were deleted; see the separate ledger. |
 | Ollama offline availability | PASS — PRESERVED | ollama list responds; all seven names retained, including exam model qwen3:8b. qwen3.5:9b absent. No model deletion, download or Ollama restart. |
 | Cursor | PASS installation; Agent NOT_TESTED | Installed 3.26.16 preserved; Composer/Grok/terminal/Git interactive acceptance still unobserved. No software/settings changes. |
 | Meterless memory/state references | PASS — VERIFIED components | Existing pinned installation retained; 10 official H-MEM tests and real JSON memory/ledger/state persistence checks pass. Not inference readiness. |
@@ -26,7 +26,7 @@ Final normal diagnostics: **20 PASS, 0 FAIL, 14 BLOCKED, 2 NOT_TESTED**, exit **
 
 No WSL memory limit change, WSL shutdown, VHD compaction, automatic Windows cleanup or system prune was performed. Disk cleanup does not increase RAM or automatically shrink the Windows VHD. See the calculated minimum potential WSL allocation and host-memory caveat in SPONSOR_SETUP.md; any system change requires separate authorization.
 
-Next: private Azure Gateway authentication and sufficient host/WSL RAM headroom; then documented pull/start/official verify/SQL checks. Windows installer cleanup remains an optional approval-only action. Administrator fields are already supplied by the bundle; no password was invented.
+Next: private Azure Gateway authentication and sufficient host/WSL RAM headroom; then documented pull/start/official verify/SQL checks. The two explicitly approved Windows installer deletions are complete; no further Windows cleanup is authorized. Administrator fields are already supplied by the bundle; no password was invented.
 
 [Disk audit and exact cleanup ledger](disk-cleanup.md) · [Manual actions](../docs/MANUAL_ACTIONS.md) · [Platform details](../docs/SPONSOR_SETUP.md).
 

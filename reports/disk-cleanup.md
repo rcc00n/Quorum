@@ -82,15 +82,15 @@ Preserved exact names:
 
 `qwen3.5:9b` was not installed; nothing was downloaded or substituted. Other models were shown as modified three months ago, inside the protected period, so none was considered disposable.
 
-## Windows: read-only candidates, approval required
+## Windows: two explicitly approved installer deletions
 
-No Windows file was deleted or application/setting changed. The largest recent dataset, photo archive and video in Downloads were treated as protected personal/user data, not removal targets; their names are omitted from this public report.
+After the initial read-only audit, the user explicitly approved deleting only the two named installers below. Their exact paths, file types, sizes and modification dates in the client timezone (UTC−06:00) were verified before deletion; device/inode/size/mtime were rechecked immediately before unlink. Both paths were confirmed absent afterward. No Windows application or setting was changed. The largest recent dataset, photo archive and video in Downloads were preserved; their names are omitted from this public report.
 
-Only these obvious older installer files are potential review candidates, **not approved deletions**:
+**Deleted after explicit approval: 520,689,304 logical bytes (approximately 520.69 MB / 496.57 MiB).** This is separate from the Linux before/after measurement above; Windows filesystem free-space change was not measured.
 
-| Exact Windows path | Bytes | Last modified | Decision / potential recovery |
+| Exact Windows path | Bytes | Last modified | Result |
 |---|---:|---|---|
-| `C:\Users\Vadim\Downloads\mysql-workbench-community-8.0.46-winx64.msi` | 261,623,808 | 2026-02-13 | Ask approval first; ~249.5 MiB if no longer needed |
-| `C:\Users\Vadim\Downloads\UbisoftConnectInstaller.exe` | 259,065,496 | 2026-01-09 | Ask approval first; ~247.1 MiB if no longer needed |
+| `C:\Users\Vadim\Downloads\mysql-workbench-community-8.0.46-winx64.msi` | 261,623,808 | 2026-02-13 | Deleted after explicit user approval |
+| `C:\Users\Vadim\Downloads\UbisoftConnectInstaller.exe` | 259,065,496 | 2026-01-09 | Deleted after explicit user approval |
 
 Unknown archives, university ZIPs, new Zetaris installer, all user data and Windows application/profile directories were preserved. No AppData/Program Files modifications or WSL VHD compaction/reset was performed. Reclaiming Linux blocks does **not** guarantee immediate reduction of the Windows-hosted virtual disk file; disk cleanup also does not increase available RAM.
