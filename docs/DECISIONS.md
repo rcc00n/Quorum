@@ -16,14 +16,14 @@ Quorum is a multi-agent system that, for one event, collects publications from d
 
 ## MVP scope
 
-The MVP consists of the six features from the agreed project description plus five team decisions: topic selection, login, an independent fact-checker, four spectrum-rating modes, and model-based selection of major news.
+The MVP consists of the six features from the agreed project description plus seven team decisions: topic selection, login, an independent fact-checker, four spectrum-rating modes, selection of stories by an absolute impact bar, stories written as articles, and the "Also today" roundup.
 
 | Feature | What it includes |
 | --- | --- |
 | 1. Multi-source intelligence | News from several independent sources: RSS, news APIs, official publications. Federated through Zetaris with SQL queries across sources. Grouping of publications about one event. |
 | 2. Autonomous fact verification | The AI extracts checkable claims, looks for supporting and contradicting evidence, and requests additional sources when needed. It distinguishes confirmed facts, disputed claims, and what cannot yet be verified. It accounts for several publications retelling one primary source. |
 | 3. Evidence-based reasoning | Every conclusion carries its sources and an explanation of the evidence it rests on. When sources contradict each other, the agent investigates the cause of the discrepancy. When evidence is insufficient, the system says so plainly. The user sees the verification process and can go to the originals. |
-| 4. Neutral news brief | A short summary of the event without imposing a political interpretation. Clearly separated: what happened, statements by interested parties, what is still unknown. |
+| 4. Neutral news brief | A short article (3–4 minutes) built only from verified claims, without political interpretation or evaluation. What happened, what the parties say and what is not confirmed are kept apart by writing rules, not by headings (see "Stories as articles"). |
 | 5. Narrative & framing comparison | How different sources cover one event: which facts they highlight, which they omit, which wording they use. Comparison of specific outlets and statements by political organizations. Every conclusion comes with examples from the source material. |
 | 6. Interactive dashboard | Event feed and topic filter. Event page with facts, sources and disagreements. Comparison of coverage across sources. Drill-down into evidence and reasoning. |
 
@@ -33,7 +33,9 @@ The MVP consists of the six features from the agreed project description plus fi
 - Login and password. No subscription; free at first.
 - An independent fact-checker in addition to cross-checking publications (see "Principles for handling facts").
 - Four political-spectrum rating modes and a cohort diagram (see "Spectrum ratings and cohorts").
-- The model selects the day's major news by impact on people's lives; coverage and silence per cohort are a separate fact (see "Selecting major news").
+- Stories are selected by an absolute impact bar, up to ten a day per topic and with no minimum; coverage and silence per cohort are a separate fact (see "Selecting major news").
+- Stories are written as short articles with photos, not as briefs with headings; facts only, no evaluation (see "Stories as articles").
+- An "Also today" roundup per topic and day: one line for every event below the bar, with its source and status (see "Selecting major news").
 
 **Out of scope:** social networks (Facebook and others) — many bots, an unrealistic picture, and questionable legality of collection. Sources are news outlets and official government bodies.
 
@@ -70,14 +72,32 @@ $$
 
 Outlets are placed in cohorts according to the agreed tier assignment; exact positions on both axes will appear once the CSV with ratings and audience is filled in. The center (WSJ) sits outside the cohorts.
 
+## Stories as articles
+
+A story is a short article the reader can form their own view from: facts with sources, the parties' statements with their authors, and what is not confirmed. No evaluation is added. The three parts of the brief stay as data and as rules for the critic; on the page they are prose, not headings.
+
+- **Built only from verified claims.** Every sentence maps to a claim with a status. The writer cannot add a sentence that has no claim behind it, and the critic rejects any that does.
+- **Status is shown by typography, not by sections.** A confirmed fact is plain text with its sources in small gray links right after the sentence. A statement is attributed in the sentence itself ("the White House says"). What is not confirmed is a short paragraph at the end, "Not confirmed". One gray line under the headline explains this key.
+- **No evaluation.** Forbidden in the writer's voice: evaluative adjectives and adverbs, predictions, causal links without a source, and any "why it matters". What an event may change is for the reader to decide or for the parties to claim, with attribution.
+- **Context only as facts.** Prior comparable events, the document's own provisions, numbers from official data — each with a source. "The previous package took eleven weeks to ship" is context; "this one matters because it is a law" is not.
+- **Fixed order:** facts in chronological order, then statements, then what is not confirmed. A fixed order removes framing by sequence.
+- **Headline and standfirst.** Headline: subject, verb, object, no adjectives. Standfirst: three facts.
+- **Length:** 2–4 minutes of reading. The writer picks one of a few shapes by event type (event report, document explainer, dispute explainer); the shapes are few so the critic can check them.
+- **Photos.** One lead photo and at most one inline photo, only when the agent finds a suitable image under an allowed license: US federal government sites (public domain) and Wikimedia Commons with an open license. Always with a credit and a caption that says what is shown, without adjectives. No photo is fine. AP, Reuters and AFP photos are not used. A photo is also framing: documentary and official images, not emotional ones.
+- **At the end, as an appendix:** "Across the spectrum" — how left and right outlets told the story, one line on where big and small outlets differ, and links to all claims with evidence and to the reasoning trace. A reader who wants only the facts never reaches it.
+
 ## Selecting major news
 
-The model determines a news item's importance by its impact on people's lives, not by the number of sources that covered it. Silence of sources is itself useful information and is shown separately.
+Importance is measured by impact on people's lives, not by how many outlets covered an event. Ten stories a day per topic is a cap, not a target: a day with three stories shows three, a day with none says so.
 
 - **Candidates** are all events in the corpus, including official documents. An event nobody published cannot be seen by the system. The realistic case is "covered only by government bodies or by one or two sources".
-- **An open importance rubric**, so the score is not merely the model's opinion: who is affected and how many people; scale; irreversibility; legal force (law, decree, court ruling). The score is shown together with the rubric and the reasoning trace.
-- **Coverage and silence per cohort** is a separate, visible fact: "covered by N of M sources in the cohort". A whole cohort's silence on a major story is a highlighted line.
-- **On the topic page:** the ten major news items of the day by this score.
+- **An absolute bar, not a ranking.** A top-N always produces N. Instead each event is scored on an open rubric and shown only if it crosses a fixed threshold: legal force (0 none, 1 official statement, 2 adopted document); reach (0 local or unknown, 1 a region or one sector, 2 national or several sectors, 3 several countries); irreversibility (0 reversible, 1 hard to reverse, 2 irreversible); confirmation (0 unverified, 1 one independent source, 2 two independent sources or a document). A story is shown when the total is at least 6 and confirmation is at least 1. The threshold is a configuration parameter and is calibrated on the first real days.
+- **Confirmation is a gate.** An unconfirmed event never becomes a story, however large its potential impact; it goes to the roundup marked "reported, not confirmed".
+- **"Interesting" is not a criterion.** Only the rubric decides; liveliness follows from impact.
+- **No minimum.** A day with no story above the bar is stated plainly on the topic page and on the home card: "No story crossed the bar today". The roundup then carries every event of the day.
+- **"Also today" roundup** — one article per topic and day for everything below the bar: one line per event with its source and status (confirmed, disputed, statements only, single source), grouped by sub-topic, ordered by rubric score. It includes events covered only by official sources. No framing analysis for roundup items.
+- **Coverage and silence per cohort** is a separate, visible fact: "covered by N of M sources in the cohort". A whole cohort's silence on a story is a highlighted line.
+- **The rule is visible.** The topic page carries a short "What crosses the bar" note; the full rubric score for each story is in its trace.
 
 ## Sources
 
@@ -101,19 +121,21 @@ The set is text-based news outlets split by flank and tier, plus news agencies a
 
 ## User account and interface
 
-The account is built around the topics the user selects. The interface is visually clear and uncluttered: a few readable metrics beat many unclear ones.
+The account is built around the topics the user selects. The interface is simple in the manner of Apple News: a few readable elements beat many metrics. Numbers and analysis live behind links, never on the first screen. A design mock of all screens exists as a Claude Design canvas, "Quorum — app screens" (Yelysei's account; ask for a share link).
 
 1. **Sign-in.** Login and password. No subscription; free at first.
 2. **First setup.** The user picks the topics they care about. The agents collect and analyze only those.
-3. **Topic page for today.**
-    - The ten major news items of the day by the model's score.
-    - A short summary: how the views of different parties are distributed.
-    - Which views exist at all — with the spectrum diagram, so it is visible which outlets count as left and right, and the rating-mode switch.
-    - Which views are popular: frequency of an interpretation across sources, share of outlets and audience per cohort.
-    - Links to the sources the model found weighty enough as evidence.
-4. **History** — a separate tab, by day, labeled like "digest for 10/12/2026".
-5. **Shift in party positions** — under the topic, outside the days. Implemented after the hackathon; data accumulates from day one.
-6. **Event page** — facts, parties' statements, what is unknown, disagreements, coverage comparison, drill-down into evidence and reasoning.
+3. **Home.** One card per topic, like Apple News: a photo of the day as background, the topic name in a large rounded display font over it, one line with the lead story and the number of stories today (or "No story crossed the bar today"), a small photo credit. The first topic is a full-width card, the rest a two-column grid.
+4. **Topic page for today.**
+    - One paragraph: how many events crossed the bar and how the views of different parties are distributed.
+    - The stories that crossed the bar (up to ten): number, headline, a one-line factual standfirst with reading time, a thumbnail. A whole cohort's silence is one red line under the story.
+    - A card to the "Also today" roundup, naming what is in it.
+    - Aside: the lead story's interpretations in words ("19 outlets, mostly left"); who counts as left and right, with the rating-mode switch as a text link; a three-sentence "What crosses the bar" note.
+5. **Story page** — the article (see "Stories as articles"), then "Across the spectrum" as an appendix.
+6. **Roundup page** — "Also today": one line per event below the bar, grouped, with source and status.
+7. **History** — a tab on the topic page, by day, labeled like "digest for 10/12/2026".
+8. **Shift in party positions** — under the topic, outside the days. Implemented after the hackathon; data accumulates from day one.
+9. **Type and color.** Display: SF Pro Rounded via the CSS generic `ui-rounded` (Safari, iOS), with Nunito from Google Fonts as the fallback elsewhere. Body: the system font, with Inter as the fallback. White background, one red accent for the date, cohort colors blue (left) and red (right), darker for big outlets and lighter for small ones. Status words, not colored pills.
 
 ## Stack and work blocks
 
@@ -124,14 +146,18 @@ Data flows through Zetaris, reasoning runs on NVIDIA Nemotron and Meterless, and
 | Data | Zetaris | Single data layer. SQL queries across different sources as if they were one database. |
 | Reasoning | NVIDIA Nemotron, Meterless | Claim verification, agent processes. |
 | Independent review | Additional LLMs | Independent review of complex conclusions, if the rules allow. |
-| Interface and backend | Next.js + TypeScript | Portal: account, topic and event pages. |
+| Interface and backend | Next.js + TypeScript | Portal: account, topic, story and roundup pages. |
+| User accounts | Django | Proposed by Vadim and agreed in the team chat on 2026-10-22 for user management and its built-in security. Whether Django is only the auth layer or the whole backend next to Next.js is open (see "Still to clarify"). |
+| Deployment | quorum.raccncode.com | Temporary host for the user portal, set up by Vadim. |
 | Development | Cursor / Codex / Claude Code — each team member's own | Rules for all assistants are in [AGENTS.md](../AGENTS.md). Verify the track requirements in HackOS: the event page lists NVIDIA, Zetaris, SpaceX AI and Meterless as sponsors. |
 
-**Three work blocks**
+**Three work blocks and who owns them** (agreed in the team chat on 2026-10-22; not a strict split, everything is discussed together)
 
-1. Data collection: sources, APIs, databases.
-2. Analysis and reasoning.
-3. Frontend, interface, UI/UX.
+1. Data collection: sources, APIs, databases — Nastya.
+2. Analysis and reasoning, the agent architecture — Yelysei.
+3. Frontend, interface, UI/UX — Vadim.
+
+**Git.** Nobody works on `master`. Each member works on their own branch, named `<name>/<area>` (`nastya/data`, `yelysei/agents`, `vadim/frontend`), and merges to `master` through a pull request.
 
 **What the judges consider a strong submission:** agents that delegate tasks dynamically, critique and validate outputs, work in planner — executor — evaluator loops, share memory, can branch, retry, escalate and recover, and leave reasoning traces. A chain "agent A → agent B → agent C" with no feedback is rated as weak.
 
@@ -157,10 +183,11 @@ Four things are deferred. For the first of them, data accumulates from day one.
 
 ## Still to clarify
 
-Six questions the team has not closed yet.
+Seven questions the team has not closed yet.
 
 - [ ] Whether the model's own rating is needed as a fifth mode already in the MVP. Default: no.
-- [ ] Priority order of the elements on the topic page: what is visible at once, what opens on click.
+- [ ] Django's scope: only user accounts and auth, or the whole backend next to Next.js. Decide before the frontend and the agent layer agree on how they read the database.
+- [ ] The impact-bar threshold: start at 6 of 9 with confirmation ≥ 1, then calibrate on the first real days.
 - [ ] Which official government bodies are in the hackathon slice, and which event we take for the demo.
 - [ ] Language of the interface and the demo: the judges are English-speaking.
 - [ ] The track's requirements for sponsor technologies and development tools — verify on the challenge page in HackOS.
@@ -172,5 +199,9 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | Yelysei / Claude | Ten stories a day is a cap, not a target: an absolute impact bar scored on an open rubric, confirmation as a gate, no minimum, quiet days stated plainly; an "Also today" roundup carries everything below the bar | Padding to ten dilutes the product; saying "nothing important today" builds trust |
+| 2026-10-22 | Yelysei / Claude | Stories are short articles built only from verified claims: facts with sources, attributed statements, "not confirmed" at the end, fixed order, no evaluation and no "why it matters"; photos only from public-domain or openly licensed sources, with credits; the spectrum analysis is an appendix | Readers form their own view from facts; section headings read like a dashboard, and evaluation hides in "why it matters" |
+| 2026-10-22 | Yelysei / Claude | Interface in the manner of Apple News: topic cards with a photo and a rounded display font, text instead of metrics, analysis behind links; type and colors as in "User account and interface" | A few readable elements beat many metrics (agreed with Vadim); a first draft felt like an analytics console |
+| 2026-10-22 | Yelysei, Vadim, Nastya / team chat | Work split: Nastya — data collection, Yelysei — analysis and reasoning, Vadim — interface; one branch per member, `master` only through pull requests; portal temporarily at quorum.raccncode.com; user accounts via Django, scope to confirm | Start building in parallel without stepping on each other |
 | 2026-10-22 | Yelysei / Claude | Repository documentation, including this file, is written in English | Readable for the judges and for the whole team |
 | 2026-10-22 | Yelysei / team discussion in chat, written up with Claude | First version: MVP scope, principles for handling facts, four rating modes and cohorts, model-based selection of major news, source list, user account, stack, demo, what comes after the hackathon | Fix the team's agreements before the source audit and the architecture design begin |

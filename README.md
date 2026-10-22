@@ -9,9 +9,10 @@ Built by team **Quorum** for the [Open Agent Hackathon 2026](https://hackathon.g
 - **Multi-source intelligence** — RSS, news APIs and official publications, federated through Zetaris so agents query everything as one SQL layer; publications are grouped by event.
 - **Autonomous fact verification** — agents extract checkable claims, look for supporting and contradicting evidence, request more sources when needed, and separate confirmed facts from disputed and unverifiable ones. Reprints of a single wire story count as one piece of evidence, not ten.
 - **Evidence-based reasoning** — every conclusion carries its sources and reasoning trace; when evidence is thin, the system says so instead of guessing. An independent fact-checker agent re-verifies claims without seeing the primary verifier's output.
-- **Neutral news brief** — what happened, what interested parties claim, and what is still unknown, kept apart. Signed documents are facts; statements are statements.
-- **Narrative & framing comparison** — what each source highlights, omits and how it words it, by cohort (major/minor × left/right) under four selectable bias-rating modes (AllSides, MBFC, Ad Fontes, averaged).
-- **Dashboard** — topics chosen by the user, ten major events per topic per day, the spectrum of interpretations, coverage and silence per cohort, and drill-down into evidence and reasoning.
+- **Stories as articles** — each story is a short article built only from verified claims: facts with their sources, the parties' statements with their authors, and what is not confirmed, in a fixed order and with no evaluation added. Signed documents are facts; statements are statements. The reader forms their own view.
+- **An impact bar, not a top ten** — up to ten stories a day per topic, shown only if they cross an absolute bar (legal force, reach, irreversibility, at least one independent source). No minimum: a quiet day says so. Everything below the bar goes into an "Also today" roundup, one line per event with its source.
+- **Narrative & framing comparison** — as an appendix to each story: what left and right outlets highlight, omit and how they word it, by cohort (major/minor × left/right) under four selectable bias-rating modes (AllSides, MBFC, Ad Fontes, averaged).
+- **A simple reader** — topics chosen by the user, one card per topic in the manner of Apple News, text instead of metrics; coverage, silence, evidence and reasoning traces one link away.
 
 The full set of decisions — scope, principles, source list, cohort rules, UI, stack, demo plan, open questions — is in [docs/DECISIONS.md](docs/DECISIONS.md). That file is the source of truth; code that contradicts it is a bug.
 
@@ -21,8 +22,8 @@ The full set of decisions — scope, principles, source list, cohort rules, UI, 
 | --- | --- |
 | Data | [Zetaris](https://www.zetaris.com/) — one SQL layer over all sources |
 | Reasoning | NVIDIA Nemotron via Meterless; additional LLMs for independent review where the rules allow |
-| App | Next.js + TypeScript |
-| Development | Each team member uses their own AI assistant (Cursor, Codex, Claude Code); shared rules in [AGENTS.md](AGENTS.md) |
+| App | Next.js + TypeScript; user accounts via Django (scope being settled) |
+| Development | Each team member uses their own AI assistant (Cursor, Codex, Claude Code); shared rules in [AGENTS.md](AGENTS.md); one branch per member, `master` through pull requests |
 
 ## Repository layout
 
