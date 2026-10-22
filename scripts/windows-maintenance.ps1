@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Distribution,
     [Parameter(Mandatory=$true)][string]$VhdPath,
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
+    [switch]$CloseQuorumWSLWindow,
     [switch]$Apply
 )
 $ErrorActionPreference = 'Stop'
@@ -17,26 +18,27 @@ $script:runningIds = @()
 $script:policyChanged = $false
 $script:shutdownRequested = $false
 $script:diskpartAttempted = $false
+$script:codePath = $null
 $script:problem = $null
 $before = (Get-Item -LiteralPath $VhdPath).Length
 function Log([string]$message) {
     ('{0:o} {1}' -f (Get-Date), $message) | Add-Content -LiteralPath $logPath
 }
 function Status([string]$phase) {
-    [pscustomobject]@{Phase=$phase;BeforeVhdBytes=$before;AfterVhdBytes=if(Test-Path -LiteralPath $VhdPath){(Get-Item -LiteralPath $VhdPath).Length}else{$null};Error=$script:problem;RunningBefore=$script:runningIds;UpdatedAt=(Get-Date).ToString('o')} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statusPath -Encoding UTF8
+    [pscustomobject]@{Phase=$phase;BeforeVhdBytes=$before;AfterVhdBytes=if(Test-Path -LiteralPath $VhdPath){(Get-Item -LiteralPath $VhdPath).Length}else{$null};Error=$script:problem;RunningBefore=$script:runningIds;EditorPath=$script:codePath;UpdatedAt=(Get-Date).ToString('o')} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statusPath -Encoding UTF8
 }
 function Docker([string[]]$Arguments) {
-    $value = & wsl.exe -d $Distribution -u root -- docker @Arguments 2>&1
+    $value = & wsl.exe -d $Distribution -u root --exec docker @Arguments 2>&1
     if ($LASTEXITCODE -ne 0) { throw ('Docker command unsuccessful: '+$Arguments[0]) }
     return $value
 }
 function Restore-Workloads {
     if (!$script:policyChanged -and !$script:shutdownRequested) { return }
     Log 'Restoring Docker availability and exact pre-maintenance container selection'
-    & wsl.exe -d $Distribution -u root -- systemctl start docker 2>&1 | Out-Null
+    & wsl.exe -d $Distribution -u root --exec systemctl start docker 2>&1 | Out-Null
     $ready=$false
     for($i=0;$i -lt 30;$i++) {
-        & wsl.exe -d $Distribution -u root -- docker info --format '{{.ServerVersion}}' 2>&1 | Out-Null
+        & wsl.exe -d $Distribution -u root --exec docker info --format '{{.ServerVersion}}' 2>&1 | Out-Null
         if($LASTEXITCODE -eq 0){$ready=$true;break}
         Start-Sleep -Seconds 2
     }
@@ -52,12 +54,20 @@ function Restore-Workloads {
     $extra=@($current | Where-Object {$_ -and $script:runningIds -notcontains $_})
     if($extra.Count){throw 'Unexpected newly running container detected; no unrelated process stopped automatically'}
     foreach($id in $script:runningIds){if($current -notcontains $id){throw 'Previously running container not restored'}}
-    $summary=Docker -Arguments @('ps','-a','--format','{{.Names}}|{{.Status}}')
+    $summary=Docker -Arguments @('ps','-a','--format','{{json .}}')
     $summary | Set-Content -LiteralPath (Join-Path $OutputDirectory 'containers-after.txt') -Encoding UTF8
     Log 'Exact running container IDs restored; original restart policies restored'
 }
 Status 'Starting'
 try {
+    if($CloseQuorumWSLWindow){
+        $windows=@(Get-Process Code -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match 'Quorum' -and $_.MainWindowTitle -match 'WSL.*Ubuntu-20\.04|Ubuntu-20\.04.*WSL'})
+        foreach($window in $windows){
+            $script:codePath=$window.Path
+            if(!$window.CloseMainWindow()){throw 'Quorum WSL window did not accept graceful closure'}
+        }
+        if($windows.Count){Log 'Approved Quorum WSL editor window closed normally';Start-Sleep -Seconds 4}
+    }
     $active=@(& wsl.exe --list --running --quiet | ForEach-Object {$_.Replace([string][char]0,'').Trim()} | Where-Object {$_})
     if(@($active | Where-Object {$_ -ne $Distribution}).Count){throw 'Another WSL distribution is running; shutdown scope would exceed approval'}
     $all=@(Docker -Arguments @('ps','-aq','--no-trunc') | Where-Object {$_})
@@ -75,8 +85,31 @@ try {
     if($all.Count){Docker -Arguments (@('update','--restart=no')+$all) | Out-Null}
     Status 'GracefullyStoppingContainers'
     # Infinite grace: never turn this maintenance into a timed SIGKILL of a database/job.
+    foreach($id in $script:runningIds){
+        $lines=@(Docker -Arguments @('top',$id,'-eo','pid,ppid,comm'))
+        $processRows=@($lines | Select-Object -Skip 1 | ForEach-Object {,@($_.Trim() -split '\s+')})
+        if($processRows.Count -eq 1 -and $processRows[0][2] -eq 'tail'){
+            Log ('Stopping verified tail-only keepalive container '+$id+'; no server process')
+            Docker -Arguments @('kill','--signal=SIGKILL',$id) | Out-Null
+            continue
+        }
+        foreach($row in $processRows){
+            if($row[2] -ne 'gunicorn'){continue}
+            $parent=@($processRows | Where-Object {$_[0] -eq $row[1] -and $_[2] -eq 'sh'})
+            if(!$parent.Count){continue}
+            $hostPid=$row[0]
+            $status=@(& wsl.exe -d $Distribution -u root --exec cat ('/proc/'+$hostPid+'/status'))
+            $nsLine=@($status | Where-Object {$_ -match '^NSpid:'})
+            if(!$nsLine.Count){throw 'Cannot identify Gunicorn PID namespace safely'}
+            $inner=($nsLine[0].Trim() -split '\s+')[-1]
+            if($inner -notmatch '^\d+$'){throw 'Invalid namespace PID'}
+            $signal='test "$(cat /proc/'+$inner+'/comm)" = gunicorn && kill -TERM '+$inner
+            Docker -Arguments @('exec','-u','0',$id,'/bin/sh','-c',$signal) | Out-Null
+            Log ('Forwarded graceful TERM to Gunicorn behind non-forwarding shell in '+$id)
+        }
+    }
     if($script:runningIds.Count){Docker -Arguments (@('stop','--timeout=-1')+$script:runningIds) | Out-Null}
-    & wsl.exe -d $Distribution -u root -- sync
+    & wsl.exe -d $Distribution -u root --exec sync
     if($LASTEXITCODE -ne 0){throw 'Linux sync failed; will not compact'}
     Status 'ShuttingDownWSL'
     $script:shutdownRequested=$true
@@ -110,5 +143,6 @@ try {
         $script:problem=([string]$script:problem+'; restoration: '+$_.Exception.Message).Trim('; ')
         Log $script:problem
     }
+    if($script:codePath){Log 'Editor reopening delegated to original-user Windows watcher (not elevated)'}
     Status $(if($script:problem){'CompletedWithError'}else{'Completed'})
 }
