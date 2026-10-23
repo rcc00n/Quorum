@@ -105,7 +105,7 @@ The set is text-based news outlets split by flank and tier, plus news agencies a
 
 | Group | Sources | Access |
 | --- | --- | --- |
-| Agencies, fact anchor | AP, Reuters, AFP | AP — RSS with full text. Reuters — public RSS closed; headlines via Google News RSS by domain. AFP — check whether a usable feed exists. |
+| Agencies, fact anchor | AP, Reuters, AFP | AP — RSS with full text. Reuters — public RSS closed; headlines via Google News RSS by domain (superseded 2026-10-23: Google News links do not resolve without JavaScript; Reuters headlines come from the collectors' own discovery, see `collectors/`). AFP — check whether a usable feed exists. |
 | Left, major | CNN, NYT, Washington Post, Guardian, NPR, MSNBC, HuffPost | NYT and Washington Post — paywall, headline and lead only. Guardian — free API with full text. Others — full text. |
 | Left, minor | Vox, Mother Jones, The Intercept, Salon, The Atlantic, The Daily Beast, Slate, The New Republic, The Nation, Common Dreams | The Atlantic — paywall. Others — full text. |
 | Right, major | Fox News, NY Post | Full text. |
@@ -212,6 +212,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-23 | Yelysei / Claude Code (raised by Anastasia) | Research round 2 does not use Google News RSS. It widens over our own corpus (the day, then previous days), official sites of record, and the GDELT DOC API restricted to the domains in `sources`; a GDELT hit counts toward confirmation only when its domain has an `independence_group`, otherwise as spread | Google News RSS links do not resolve to the publication's URL without JavaScript; confirmation must stay on curated sources so wire reprints are not counted twice |
 | 2026-10-22 | Yelysei / Claude Code | Reasoning code lives in `reasoning/` (package `quorum_reasoning`), one folder per work block next to `collectors/`; module-level decisions in `reasoning/README.md › Decisions`; the snapshot of ARCHITECTURE.md § 8 gains optional fields (`trace`, `errors`, per-story `review_reason`, `critic_notes`, `drafts`, `sources`; per-claim `kind`, `speaker`; per-evidence `found_by`, `is_document`) | The skeleton of every node now runs end to end in dry run; the portal and the demo need to show how a story was arrived at, and a separate trace endpoint does not exist yet. Vadim's SNAPSHOT_PROPOSAL.md still has to be reconciled with § 8 (see Still to clarify) |
 | 2026-10-22 | Yelysei / Claude | Reasoning block: Python and LangGraph, LangGraph Studio for development and the demo; agents read only through Zetaris and write results to Postgres directly; one run per topic per day plus on-demand runs; design in ARCHITECTURE.md | Loops, checkpoints and a visible trace come with the library; the data block is Python already |
 | 2026-10-22 | Yelysei / Claude | Merged this file across branches: kept the coordination and portal rows (master, PR #1), the stack rows and superseded notes from PR #1, and restated the Development row as each member's own assistant | Three branches edited this file on the same day; "Codex — current team workflow" implied one tool for the team, but Vadim uses Codex and Yelysei uses Claude Code |
