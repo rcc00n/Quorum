@@ -18,6 +18,12 @@ from ..state import DocRef
 
 _FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 
+# documents.id and official_docs.id are independent Postgres sequences; both start at 1. Loaded into the
+# one DocRef.id space they collide, and every by-id lookup (score, extract, the origin skip in research)
+# silently picks the wrong document. Official rows are therefore namespaced above this offset; evidence
+# rows map back to the database id (nodes/research.evidence_from).
+OFFICIAL_ID_OFFSET = 1_000_000_000
+
 
 def _zetaris_db() -> str:
     return os.getenv("ZETARIS_COLLECTION_DB", "QUORUM_COLLECT")
@@ -55,7 +61,7 @@ def load_documents(topic_id: str, edition_date: str, *, dry_run: bool) -> list[D
     start, end = _edition_window(edition_date)
     docs_sql = f"""
         SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
-               d.url, d.title, d.lead, d.published_at, d.access_level, d.wire_origin
+               d.url, d.title, d.lead, d.published_at, d.access_level, d.wire_origin, d.supersedes_id
         FROM {db}.public.documents d
         JOIN {db}.public.sources s ON s.id = d.source_id
         WHERE d.topic_id = '{topic_id}'
@@ -73,16 +79,25 @@ def load_documents(topic_id: str, edition_date: str, *, dry_run: bool) -> list[D
           AND COALESCE(o.signed_at, o.published_at) < TIMESTAMP '{end}'
     """
     out: list[DocRef] = []
-    for row in _run_sql(docs_sql, limit=500):
+    rows = list(_run_sql(docs_sql, limit=500))
+    # A correction re-fetch (collectors/schema.sql: supersedes_id) replaces the row it supersedes: only
+    # the current version of a document takes part in the day, or retracted text keeps feeding evidence.
+    superseded = {int(r["supersedes_id"]) for r in rows if r.get("supersedes_id")}
+    for row in rows:
+        if int(row["id"]) in superseded:
+            continue
         out.append(_docref(row, official=False))
     for row in _run_sql(official_sql, limit=200):
         out.append(_docref(row, official=True))
+    doc_ids = [d["id"] for d in out]
+    if len(set(doc_ids)) != len(doc_ids):
+        raise ValueError("duplicate document ids in the day's corpus after namespacing; refusing to run on a corrupt corpus")
     return out
 
 
 def _docref(row: dict, *, official: bool) -> DocRef:
     ref = DocRef(
-        id=int(row["id"]),
+        id=int(row["id"]) + (OFFICIAL_ID_OFFSET if official else 0),
         source_id=str(row["source_id"]),
         source_name=str(row.get("source_name") or row["source_id"]),
         independence_group=str(row.get("independence_group") or row["source_id"]),

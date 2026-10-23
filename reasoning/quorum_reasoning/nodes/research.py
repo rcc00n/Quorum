@@ -10,7 +10,8 @@ from __future__ import annotations
 from .. import config, llm
 from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin
 from ..state import Claim, DocRef, Evidence, RunState, StepError
-from ..text import best_passage
+from ..text import best_passage, clip_sentences
+from ..tools.corpus import OFFICIAL_ID_OFFSET
 from ..tools.fetch_text import fetch_text
 from ..trace import finish, step
 
@@ -24,11 +25,18 @@ def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str) -> Evid
     is_doc = bool(doc.get("official")) and doc.get("doc_type") in DOCUMENT_TYPES_THAT_ESTABLISH
     if doc.get("official") and not is_doc and stance == "supports":
         stance = "statement"  # an official release is the party's words, not evidence for them
+    # A reprint carries the wire's independence group: ten reprints of one wire story are one piece of
+    # evidence (DECISIONS.md › Principles for handling facts). wire_origin is 'AP'/'Reuters'/'AFP' in
+    # collectors/schema.sql; independence groups are lower-case slugs.
+    group = (doc.get("wire_origin") or "").strip().lower() or doc["independence_group"]
+    # Official ids are namespaced above OFFICIAL_ID_OFFSET (tools/corpus.py); the evidence row keeps the
+    # database id so analysis.evidence rows point at real official_docs rows.
+    db_id = doc["id"] - OFFICIAL_ID_OFFSET if doc.get("official") and doc["id"] >= OFFICIAL_ID_OFFSET else doc["id"]
     return Evidence(
-        quote=passage[:300],
+        quote=clip_sentences(passage, 300),
         document_id=None if doc.get("official") else doc["id"],
-        official_doc_id=doc["id"] if doc.get("official") else None,
-        independence_group=doc["independence_group"],
+        official_doc_id=db_id if doc.get("official") else None,
+        independence_group=group,
         stance=stance,  # type: ignore[typeddict-item]
         found_by=found_by,
         url=doc["url"],

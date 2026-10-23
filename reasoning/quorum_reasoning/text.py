@@ -34,6 +34,28 @@ def containment(claim: str, passage: str) -> float:
     return len(tc & tp) / len(tc)
 
 
+def clip_sentences(text: str, limit: int) -> str:
+    """The longest prefix of whole sentences within `limit` characters.
+
+    DECISION(2026-10-23, Yelysei Shkirpan/Claude Code): a stored quote never ends mid-sentence. Why: a
+    character cut can drop the half of a sentence that reverses its meaning ("... the convoy did" with
+    "not cross" gone); only when a single sentence exceeds the limit does a word-boundary cut apply.
+    """
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    out = ""
+    for sent in sentences(text):
+        candidate = (out + " " + sent).strip()
+        if len(candidate) > limit:
+            break
+        out = candidate
+    if out:
+        return out
+    cut = text[:limit]
+    return cut.rsplit(" ", 1)[0] if " " in cut else cut
+
+
 def best_passage(claim_text: str, text: str) -> str:
     """The sentence of `text` that shares the most words with the claim; empty when nothing is shared."""
     cw = tokens(claim_text)
