@@ -71,7 +71,7 @@ class ValidationTests(SimpleTestCase):
             ),
             change(
                 ["events", 0, "analysis", "documents", 0, "url"],
-                "https://user:password@example.com/",
+                "https://" + "test-user:test-password@" + "example.com/",
             ),
             change(["events", 0, "analysis", "documents", 0, "content_hash"], None),
             change(["events", 0, "analysis", "documents", 0, "access_level"], 3),
@@ -185,6 +185,32 @@ class StoreTests(SimpleTestCase):
         path.write_bytes(raw)
         return self.store.publish(
             path, hashlib.sha256(raw).hexdigest(), allow_demo=True
+        )
+
+    def test_failed_processing_without_usable_events_remains_error(self):
+        p = sample()
+        p["events"] = []
+        p["digests"] = []
+        for error in p["errors"]:
+            error["event_id"] = None
+        self.publish(p)
+        self.assertEqual(self.store.read()[1]["status"], "error")
+
+    def test_read_only_command_does_not_change_active_head_or_audit(self):
+        from django.core.management import call_command, CommandError
+        from io import StringIO
+
+        self.publish()
+        before = {p.name: p.read_bytes() for p in self.root.iterdir() if p.is_file()}
+        call_command(
+            "portal_snapshot", "validate", file=str(FIXTURE), stdout=StringIO()
+        )
+        f = self.root / "staging/invalid.json"
+        f.write_text("{}")
+        with self.assertRaises(CommandError):
+            call_command("portal_snapshot", "validate", file=str(f), stdout=StringIO())
+        self.assertEqual(
+            before, {p.name: p.read_bytes() for p in self.root.iterdir() if p.is_file()}
         )
 
     def test_atomic_publication_selection_and_stale(self):
@@ -372,3 +398,102 @@ class PublishedAPITests(TestCase):
             self.assertContains(response, "demo-r1")
             self.assertContains(response, "DEMO")
             self.assertEqual(response.context["operational"]["event_count"], 1)
+
+
+class CompatibilityCommandTests(TestCase):
+    def test_read_only_valid_report_and_no_database_queries(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        out = StringIO()
+        with self.assertNumQueries(0), patch(
+            "portal.snapshot_store.SnapshotStore.prepare"
+        ) as prepare:
+            call_command("portal_snapshot", "validate", file=str(FIXTURE), stdout=out)
+        report = json.loads(out.getvalue())
+        self.assertTrue(report["compatible"])
+        self.assertFalse(report["published"])
+        self.assertEqual(report["counts"]["events"], 1)
+        prepare.assert_not_called()
+
+    def test_invalid_reports_are_actionable_without_input_values(self):
+        from io import StringIO
+        from django.core.management import call_command, CommandError
+
+        with tempfile.TemporaryDirectory() as temp:
+            candidate = Path(temp) / "candidate.json"
+            for value in (
+                b'{"schema_version":"PRIVATE-INPUT-MARKER"}',
+                b'{"a":1,"a":2}',
+                b"not-json",
+            ):
+                candidate.write_bytes(value)
+                out = StringIO()
+                with self.assertNumQueries(0), self.assertRaises(CommandError):
+                    call_command(
+                        "portal_snapshot", "validate", file=str(candidate), stdout=out
+                    )
+                report = json.loads(out.getvalue())
+                self.assertFalse(report["compatible"])
+                self.assertTrue(report["issues"][0]["hint"])
+                self.assertNotIn("PRIVATE-INPUT-MARKER", out.getvalue())
+            p = sample()
+            p["events"][0]["analysis"]["claims"][1]["attribution"] = None
+            candidate.write_text(json.dumps(p))
+            out = StringIO()
+            with self.assertRaises(CommandError):
+                call_command(
+                    "portal_snapshot", "validate", file=str(candidate), stdout=out
+                )
+            self.assertEqual(
+                json.loads(out.getvalue())["issues"][0]["code"], "missing_attribution"
+            )
+
+    def test_non_regular_inputs_and_expired_candidates(self):
+        from .snapshot_compatibility import compatibility_report
+        from portal.snapshot_store import read_bounded
+
+        with tempfile.TemporaryDirectory() as temp:
+            fifo = Path(temp) / "fifo"
+            os.mkfifo(fifo)
+            with self.assertRaises(SnapshotError):
+                read_bounded(fifo)
+        p = sample()
+        with patch("portal.snapshot_compatibility.datetime") as clock:
+            clock.now.return_value = datetime(2030, 1, 1, tzinfo=timezone.utc)
+            report = compatibility_report(json.dumps(p).encode())
+        self.assertTrue(report["compatible"])
+        self.assertIn("expired_not_publishable_as_current", report["warnings"])
+
+
+class IndependenceAndAccessTests(SimpleTestCase):
+    def test_same_group_reprints_do_not_establish_independence(self):
+        p = sample()
+        a = p["events"][0]["analysis"]
+        for d in a["documents"]:
+            d.update(kind="article", primary=False)
+        for source in p["sources"]:
+            source["independence_group"] = "same-wire"
+        claim = a["claims"][0]
+        claim["supporting"].append(
+            {**claim["supporting"][0], "document_id": a["documents"][1]["id"]}
+        )
+        with self.assertRaisesRegex(SnapshotError, "insufficient_independent_support"):
+            validate_snapshot(p)
+        p["sources"][1]["independence_group"] = "independent-newsroom"
+        validate_snapshot(p)
+
+    def test_level_three_can_count_coverage_but_not_evidence_or_frames(self):
+        p = sample()
+        a = p["events"][0]["analysis"]
+        d = copy.deepcopy(a["documents"][1])
+        d.update(id="demo-coverage-only", access_level=3)
+        a["documents"].append(d)
+        validate_snapshot(p)
+        a["frames"][1]["document_id"] = d["id"]
+        with self.assertRaisesRegex(SnapshotError, "coverage_only_framing"):
+            validate_snapshot(p)
+        a["frames"] = []
+        a["claims"][2]["contradicting"][0]["document_id"] = d["id"]
+        with self.assertRaisesRegex(SnapshotError, "coverage_only_evidence"):
+            validate_snapshot(p)

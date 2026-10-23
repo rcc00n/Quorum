@@ -53,6 +53,9 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 | 2026-10-22 | rcc00n / Codex | Unfold 0.81 with branded pages; superuser-only account management; read-only preferences/source views | Reuse Django security while preventing staff self-escalation and cross-workstream writes |
 | 2026-10-22 | rcc00n / Codex | Optional external catalog export pinned to collector commit, with provenance; live events/digests remain empty | Enable real preference selection and source inspection before runtime integration, without duplicating team registry data in this branch |
 | 2026-10-22 | rcc00n / Codex | Pinned jsonschema with explicit format checks; private local immutable snapshot store and CLI, opt-in publication | Validate the portal-owned proposal without exposing ingestion or giving processing access to auth data; team transport/schema approval remains required |
+| 2026-10-23 | rcc00n / Codex | Bounded value-free schema diagnostics and read-only compatibility report; configured catalog failures remain errors | Give upstream owners useful local feedback without leaking payloads or converting outages into empty successful editions |
 
 
 Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.
+
+Read-only upstream compatibility: `portal_snapshot validate --file /path/to/candidate.json`. The [canonical handoff](../docs/PORTAL_INTEGRATION.md#read-only-compatibility-command) specifies the JSON report, exit codes and limits. It checks the same production validator/projection without creating a snapshot store or touching auth records.

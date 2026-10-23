@@ -52,3 +52,21 @@ Screenshots remain outside the public repository at `~/.local/share/quorum/porta
 ## Release limits and next owner
 
 Yelysei must supply/agree the actual reasoning result and safe trace; Anastasia must confirm provenance/access/hash semantics and real Zetaris retrieval. All owners must approve versioning, expiry and restricted transport, and reconcile reasoning-branch product amendments before integration. Credentials/real upstream readiness remain BLOCKED. Keep the [web deployment gates](RELEASE_CHECKLIST.md) unchecked until the corresponding production evidence exists. No new deployment backup was necessary because no production mutation/deployment occurred; every future deployment still requires a restricted auth backup and rollback verification.
+
+
+## Integration-readiness milestone — 2026-10-23 UTC
+
+Branch `feature/web-portals`, baseline `9a79ea9`; PR #1. Read-only collector review advanced to `09890a0`; reasoning remains `49e6d1f`, without a real structured sample. Compatibility matrix and product approval options are in PORTAL_INTEGRATION.md. No other branch was checked out, merged, rebased, cherry-picked, committed or pushed in this milestone.
+
+Local checks: 36 Django tests; six temporary-filesystem upgrade safety tests; Django system/migration drift checks; Next production build/typecheck; four tooling tests; rating checks; validated JSON→actual TypeScript model check. The new isolated HTTP browser harness exercises actual candidate validation/publication→session-authenticated API→TypeScript→Evidence/Perspective/Timeline, corrections, missing trace, stable dateless links and rollback, plus admin access/regular-user denial, all existing auth/routes through browser.cjs and the rich recovery/responsive suite through analysis.cjs. Desktop/tablet/mobile widths pass. All snapshots/accounts here are explicitly TEST/DEMO, outside production; no sponsor calls occur.
+
+Reproduce after installing/building per module READMEs:
+
+```bash
+DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py portal_snapshot validate --file backend/portal/fixtures/analysis-demo.json
+node web/tests/contract.cjs
+PLAYWRIGHT_MODULE=<external-playwright> CHROMIUM_PATH=<chromium> node web/tests/boundary.cjs
+python3 -m unittest discover -s deploy -p 'test_*.py'
+```
+
+Doctor: PASS=15 FAIL=0 BLOCKED=1 NOT_TESTED=1. Verify: PASS=19 FAIL=0 BLOCKED=14 NOT_TESTED=1. Same actual resource/registry/model prerequisites; no Cursor gate and no inference. A compact branch-only CI workflow is added; a local pass is not a claim that hosted CI has run. Guarded production plan/backup/deploy and authenticated HTTPS results are recorded below when actually completed.

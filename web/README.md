@@ -35,3 +35,5 @@ Snapshot implementation and unapproved transport: [portal-owned proposal](../doc
 
 
 `web/tests/analysis.cjs` tests the rich UI against an externally projected DEMO snapshot (`QUORUM_ANALYSIS_FIXTURE`); this is not real integration. Exact fixture preparation and test evidence are in the release record.
+
+Integration acceptance: `node web/tests/contract.cjs` checks a production-validated projection against the actual TypeScript model. `node web/tests/boundary.cjs` (with external Playwright/Chromium) starts isolated temporary Django/Next/proxy processes, publishes only a labelled TEST snapshot locally, authenticates a generated test account, checks actual API JSON/types/UI and exercises corrections, dateless links, rollback and three widths. It never points at production or uses provisioned account passwords. Existing `analysis.cjs` retains deterministic hostile-service/stale/missing-state UI cases.

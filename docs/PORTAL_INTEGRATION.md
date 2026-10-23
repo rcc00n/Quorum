@@ -214,3 +214,42 @@ node web/tests/ratings.cjs
 ./scripts/doctor.sh
 ./scripts/verify-all.sh  # no inference; real missing credentials remain BLOCKED
 ```
+
+## Compatibility review — integration-readiness milestone
+
+Read-only review on 2026-10-23 UTC: `origin/data-collection@09890a0` and `origin/yelysei/agents@49e6d1f`. Collector runtime/source mix has advanced; schema ownership is unchanged. The reasoning branch still has no concrete structured result JSON, event/claim generator, verification output or correction/trace API. No real candidate was available to validate. Collector README reports local Postgres/mock-feed checks; that is not evidence of genuine Zetaris or Nemotron execution. Production catalog remains the previously reviewed `46b0d00` export; this review does not silently replace it.
+
+| Upstream field / available structure | Portal proposal field | Status | Required transformation | Missing information | Owner |
+| --- | --- | --- | --- | --- | --- |
+| `topics.id/name`, `run.py:TOPICS` | `topics[].id/name`, `event.topic_id` | Available definitions | Preserve IDs; export reviewed registry | Preference→schedule sync | Anastasia + Vadim |
+| `sources.id/name/domain/kind/tier/independence_group` | Same named source fields | Available schema | Preserve registry IDs; null tier for unclassified sources | Run-level registry revision | Anastasia |
+| Normalized `allsides/mbfc/adfontes`, nullable audience + `audience_source_url` | Same fields + `rating_provenance`, `audience_as_of` | Partial | Preserve nulls; do not normalize twice; keep ratings/audience null until required provenance is supplied | Per-rating URLs and audience estimate date absent from SQL | Anastasia |
+| `documents.id` BIGSERIAL / `official_docs.id` BIGSERIAL | `analysis.documents[].id` string | Needs mapping | **Proposal:** prefix table namespace (`document:` / `official:`) to avoid numeric ID collisions; agree before use | Global identity/export convention | Anastasia + Yelysei |
+| `documents.url/canonical_url/title/source_id/published_at/fetched_at/access_level` | Document `url/title/source_id/published_at/fetched_at/access_level` | Available schema | Original publisher URL, UTC `Z`; preserve level 2 headline/lead and level 3 coverage-only | Which original/canonical URL is authoritative | Anastasia |
+| `documents.content_hash/supersedes_id` | Document `content_hash/revision` | Partial | Preserve hash; agree version identifier from immutable collector row | `content_hash` is SHA-256 of title + newline + lead + newline + first 2000 body characters at fetch; not full article hash | Anastasia |
+| `official_docs.full_text`, no hash column | Official document hash + `primary` | Needs agreement | Derive/export a documented exact text hash without altering collector schema; authority/primary status must be justified | Canonical encoding/normalization and primary flag | Anastasia + Yelysei |
+| `quotes.claim_id/quote_text/char_start/char_end/content_hash_at_quote/verified_at` | Claim ID; citation quote/offsets/hash | Schema only | Preserve exact text and hash; resolve exactly one document/official reference | Actual rows; Unicode code points vs bytes/UTF-16, exact hashed text, verified timestamp export | Yelysei + Anastasia |
+| `coverage.event_id/source_id/document_id/counted_in_confirmation`, `wire_origin` | Event IDs, covered sources, publication count, independent count | Schema only | Preserve publications for spread; deduplicate actual independence, including wire origin | Actual event assignments, eligible source set and grouping rule per run | Yelysei + Anastasia |
+| No concrete reasoning JSON | `events[].id`, `analysis.claims[].id/status/attribution/supporting/contradicting` | BLOCKED | Map the reasoning-owned output after agreement | One real structured result with stable IDs and original evidence | Yelysei |
+| No verifier/trace/correction output | Primary/independent verification, disagreement, trace, corrections | BLOCKED | Public-safe summaries only; immutable prior revision references | Reviewer independence, outcome meanings, trace actors and correction semantics | Yelysei |
+| No published edition envelope/digest | Edition/run/revision/generated/expiry/completeness/errors/digests | BLOCKED | Agree timezone/order/expiry; no inferred operational health | Actual envelope, source revision and partial/failure policy | Yelysei + Vadim |
+
+**Exact sample requested:** one real event with stable event/claim/topic/source/document IDs, original URLs, collector hashes/versions/access/times, at least one attributed claim, established/disputed/unknown outcomes where genuinely supported, primary and independent review summaries, explicit null ratings/audience, public-safe trace, edition/run/generated/expiry/source revision, completeness/errors and digest ordering. Include a second immutable revision referencing a genuinely corrected/retracted prior claim, or explicitly state that no correction exists. Do not manufacture disputed findings to fill the example. Supply the reasoning-owned schema/version alongside it; the portal proposal is only a compatibility target.
+
+### Read-only compatibility command
+
+```bash
+DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py portal_snapshot validate --file /path/to/candidate.json
+```
+
+Exit 0 means structurally compatible and serializable through the portal projection; exit 1 means incompatible/unreadable. JSON stdout is `quorum.portal.compatibility.v1`, with `compatible`, `target_schema`, `published:false`, bounded `issues` and `warnings`, plus collection counts on success. Example diagnostic:
+
+```json
+{"report_version":"quorum.portal.compatibility.v1","compatible":false,"target_schema":"quorum.portal.snapshot.v1-proposal","published":false,"issues":[{"code":"schema_format","path":"/edition","schema_path":"/properties/edition/format","hint":"Use the declared date, UTC timestamp, revision/domain or public HTTP(S) URL format."}],"warnings":[]}
+```
+
+Schema errors locate safe JSON pointers and schema keywords; semantic errors give stable invariant codes and corrective hints. No candidate values, unknown property names, original text or secrets are echoed. At most 20 shape issues are returned per run. Fix shape errors before semantic validation. No active head/audit/auth mutation, publication flag, model call or snapshot root is needed. Expired compatible candidates are explicitly warned as not publishable as current; correction history requires the actual private store at publication. This does not prove truth, authorized delivery, upstream schema ownership or full privacy review. See [proposal](SNAPSHOT_PROPOSAL.md) and [checks](PORTAL_VERIFICATION.md).
+
+### Product compatibility options — team approval required
+
+The reasoning branch proposes an absolute impact bar (initially 6/9 with confirmation ≥1), a maximum of ten rather than a target, quiet-day explanations, article prose with spectrum/evidence appendices, licensed photos/credits and an “Also today” roundup. These changes are not merged/adopted here. Existing event ordering and `importance.label/explanation` can display an upstream-approved rubric without calculating it in the portal. A future short article can keep stable event URLs and link to the existing Evidence Explorer; structured paragraphs and licensed image metadata would need agreed extensions. A roundup could use a new explicit view model, rather than pretending the existing digest summary already expresses ranked below-threshold events. Agree threshold/calibration, quiet-day vs missing-data semantics, article source references, image licenses and roundup shape before implementation. Preserve current editorial palette/auth ownership; reconcile branch decisions in the canonical decision log through the team process.

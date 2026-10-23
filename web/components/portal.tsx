@@ -640,7 +640,9 @@ export function Portal({
                           ? "Live data connection pending"
                           : data?.status === "demo"
                             ? "DEMO fixture · fictional data"
-                            : "Source data supplied"}
+                            : data?.status === "error"
+                              ? "Data unavailable"
+                              : "Source data supplied"}
                       </span>
                     </aside>
                   </div>

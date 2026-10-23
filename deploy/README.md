@@ -49,6 +49,7 @@ The first-install commands are captured in `install-release.sh`. It refuses occu
 | 2026-10-22 | rcc00n / Codex | Standalone local Next build, isolated Node 22 binary and Python venv, dedicated system user and loopback-only systemd services | VPS already hosts projects; avoid changing shared runtimes or building under limited memory |
 | 2026-10-22 | rcc00n / Codex | Public staff static files in `/opt/quorum/static`; private SQLite in mode-750 `/var/lib/quorum` | Nginx can read assets without gaining access to auth data |
 | 2026-10-22 | rcc00n / Codex | HSTS applies to this host; subdomain inclusion and browser preload remain opt-in | Do not assert TLS policy for uninspected future subdomains |
+| 2026-10-23 | rcc00n / Codex | Existing-deployment upgrade with private backups, additive-only dependencies, no migrations and automatic code/static rollback | Make independently tested website improvements deployable while retaining users, old runtime compatibility and unrelated workloads |
 
 Optional reviewed catalog export (definitions, not ingestion or reasoning results):
 
@@ -61,3 +62,17 @@ python3 deploy/export-catalog.py origin/data-collection ~/.local/share/quorum/po
 `build-web.sh` refuses existing build directories without its ownership marker and refuses repository/ancestor destinations. It reuses dependencies when the lockfile matches. `package-release.py` refuses existing release directories and packages only standalone assets and portal/deploy source; secrets and runtime data are excluded.
 
 Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.
+
+## Guarded upgrades of this existing deployment
+
+Use `upgrade-release.py`, **not** the first-install script. Package a clean tested commit, upload/extract to a new root-controlled `/opt/quorum/releases/<label>` and inspect it before running:
+
+```bash
+# On the VPS, after upload/extraction:
+python3 /opt/quorum/releases/<label>/deploy/upgrade-release.py /opt/quorum/releases/<label>
+python3 /opt/quorum/releases/<label>/deploy/upgrade-release.py /opt/quorum/releases/<label> --apply
+```
+
+Plan mode is read-only. Apply requires the recognized current release, active Quorum services/loopback ports, private production environment, disabled snapshot root/publication, disk/RAM headroom and unchanged old dependency pins. It creates private integrity-checked SQLite backups before any installation, adds only missing pinned distributions without replacing old ones, runs production checks and rejects any pending migration. It then stops only Quorum, takes a final consistent auth backup/fingerprint, backs up static files, collects static, atomically switches the release and starts only those two services. HTTPS and unchanged auth/preferences/container start identities are verified. A bounded health failure switches back and restores static assets. No DB is automatically restored because migrations are forbidden and concurrent user writes must survive. Additive packages may remain installed; the old release's pins remain intact. No Nginx/SSH/firewall/Docker configuration changes occur. Real authenticated post-release browser checks remain a separate release gate.
+
+For an operator rollback, read the private `rollback.json`, verify the old release exists, stop only `quorum-api` and `quorum-web`, atomically select that previous release and start those two units. Restore the saved static tree if assets changed. Keep the current auth database; restore a backup only after explicit diagnosis/authorization of a data issue. Recheck HTTPS and authenticated routes. The upgrade path refuses migrations rather than guessing a reverse migration.

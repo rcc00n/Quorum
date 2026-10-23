@@ -17,8 +17,28 @@ SCHEMA = json.loads(
 FORMATS = FormatChecker()
 
 
+def schema_fields(node):
+    if not isinstance(node, dict):
+        return set()
+    result = set(node.get("properties", {}))
+    for value in node.values():
+        if isinstance(value, dict):
+            result.update(schema_fields(value))
+        elif isinstance(value, list):
+            for item in value:
+                result.update(schema_fields(item))
+    return result
+
+
+SAFE_FIELDS = schema_fields(SCHEMA)
+
+
 class SnapshotError(ValueError):
-    """Public-safe code only; never include rejected payload values in logs/errors."""
+    """Public-safe diagnostics only; never include rejected payload values."""
+
+    def __init__(self, code, issues=None):
+        super().__init__(code)
+        self.issues = issues or [{"code": code, "path": "/"}]
 
 
 def require(condition, code):
@@ -125,7 +145,25 @@ def bounded_structure(value, depth=0):
 
 def validate_snapshot(payload):
     bounded_structure(payload)
-    require(VALIDATOR.is_valid(payload), "invalid_snapshot_schema")
+    # Report schema locations, never jsonschema's value-echoing message/instance.
+    issues = []
+    for error in VALIDATOR.iter_errors(payload):
+        path = "/" + "/".join(
+            str(v) if isinstance(v, int) or str(v) in SAFE_FIELDS else "*"
+            for v in error.absolute_path
+        )
+        issues.append(
+            {
+                "code": "schema_" + error.validator,
+                "path": path,
+                "schema_path": "/" + "/".join(map(str, error.absolute_schema_path)),
+            }
+        )
+        if len(issues) == 20:
+            break
+    if issues:
+        raise SnapshotError("invalid_snapshot_schema", issues)
+
     topics = unique(payload["topics"])
     sources = unique(payload["sources"])
     events = unique(payload["events"])

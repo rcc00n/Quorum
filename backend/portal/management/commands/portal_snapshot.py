@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
-from portal.snapshot_store import SnapshotStore
+from portal.snapshot_store import SnapshotStore, read_bounded
 from portal.snapshot_validation import SnapshotError
+from portal.snapshot_compatibility import compatibility_report
 
 
 class Command(BaseCommand):
@@ -8,7 +9,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "action", choices=["prepare", "publish", "rollback", "status"]
+            "action", choices=["validate", "prepare", "publish", "rollback", "status"]
         )
         parser.add_argument("--file")
         parser.add_argument("--sha256")
@@ -16,6 +17,21 @@ class Command(BaseCommand):
         parser.add_argument("--allow-demo", action="store_true")
 
     def handle(self, *args, **options):
+        if options["action"] == "validate":
+            import json
+            from pathlib import Path
+
+            try:
+                if not options["file"]:
+                    raise SnapshotError("candidate_file_required")
+                report = compatibility_report(read_bounded(Path(options["file"])))
+            except (OSError, SnapshotError) as exc:
+                report = compatibility_report(error=exc)
+            self.stdout.write(json.dumps(report, sort_keys=True))
+            if not report["compatible"]:
+                # stdout is the machine-readable report; stderr is value-free.
+                raise CommandError("Snapshot compatibility failed", returncode=1)
+            return
         store = SnapshotStore()
         try:
             if options["action"] == "prepare":

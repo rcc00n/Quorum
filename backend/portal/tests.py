@@ -192,6 +192,7 @@ class PortalTests(TestCase):
                 self.assertEqual(snapshot["events"], [])
                 path.write_text("{}")
                 self.assertEqual(CatalogAdapter().snapshot()["topics"], [])
+                self.assertEqual(CatalogAdapter().snapshot()["status"], "error")
 
     def test_catalog_source_validation(self):
         import json, tempfile, os

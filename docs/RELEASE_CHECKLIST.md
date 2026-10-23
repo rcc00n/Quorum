@@ -40,3 +40,16 @@ Local gates below refer to [PORTAL_VERIFICATION.md](PORTAL_VERIFICATION.md), PR 
 ## Rollback
 
 Use [deploy/README.md](../deploy/README.md). Switch only the Quorum release symlink and restart only its services; restore a consistent private auth backup only if necessary for migrations. Roll snapshot heads back only to an intact validated immutable revision. Preserve unrelated projects/data and certificates. Re-run relevant HTTPS/auth checks and record rollback evidence.
+
+
+## Integration-readiness release gates (feature/web-portals)
+
+- [x] Baseline branch `9a79ea9` and clean tree verified before edits; remote contracts/tracker read without branch changes.
+- [x] Read-only compatibility report, immutable-head/auth no-write tests, full existing regressions and actual local HTTP/type/browser boundary pass.
+- [x] Upgrade tool safety tests pass, including simulated failed-health code/static rollback; no migrations or publishing permitted.
+- [ ] Hosted branch CI result verified.
+- [ ] Target-host plan, restricted auth backups, previous release and Python 3.10 compatibility verified before cutover.
+- [ ] Guarded Quorum-only release switch, HTTPS/auth/staff/catalog/pending/new-asset checks and unrelated workload preservation verified.
+- [ ] Exact code/release SHA, rollback, tracker and draft PR updated with real outcomes.
+
+These deployment gates do not close sponsor or genuine upstream-result gates.

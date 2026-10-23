@@ -37,3 +37,16 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 | WEB-SMOKE | Production smoke and rollback evidence | DEPLOYED | Existing `deploy/STATUS.md` evidence | Recheck per release |
 
 Current local release evidence and exact commands: [verification record](PORTAL_VERIFICATION.md). New snapshot/UI capabilities are TESTED, not INTEGRATED or DEPLOYED. Existing production release remains `20261022-web-portals-r2`; current read-only smoke reconfirmed HTTPS, service state and all eight account roles. No credentials were accessed, no database was mutated and no deployment occurred. No production publisher or machine credential may be enabled without cross-team approval. Product changes in `origin/yelysei/agents@49e6d1f` (impact bar/articles/roundup) are a reconciliation dependency, not silently merged decisions.
+
+
+## Next integration-readiness milestone (feature/web-portals)
+
+| Feature ID | Status | Location / evidence | Deployment / dependency |
+| --- | --- | --- | --- |
+| WEB-COMPAT | TESTED | `portal_snapshot validate`; safe JSON diagnostic report, zero DB queries and unchanged head/audit tests | Local tool; not publication or schema ownership |
+| WEB-BOUNDARY | TESTED | Real isolated HTTP API → TypeScript → browser, all claim states, disagreement, corrections/rollback/deep links and auth/admin regressions | DEMO/TEST only; real upstream result still BLOCKED |
+| WEB-ERRORS | TESTED | Configured catalog failure and processing failure without usable events remain ERROR; expired editions stay STALE | Included in candidate release |
+| WEB-UPGRADE | TESTED | Six isolated safety tests incl. failed-health rollback; private backup, additive-only pins, migration/publication gates | Production application pending guarded preflight |
+| WEB-CI | IMPLEMENTED | Branch-only public Ubuntu job; Python 3.10/backend/upgrade/fixture/Next/TypeScript checks | Hosted result recorded after push |
+
+Owners: Vadim for all rows; branch `feature/web-portals`; PR #1. Exact implementation/release commit and final deployment evidence are recorded in the milestone section of PORTAL_VERIFICATION.md after the guarded release. Existing capabilities above remain preserved; no upstream integration item is closed.

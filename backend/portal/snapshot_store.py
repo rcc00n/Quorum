@@ -31,7 +31,7 @@ def iso():
 
 
 def read_bounded(path, limit=MAX_BYTES):
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as stream:
         info = os.fstat(stream.fileno())
         require(
@@ -298,12 +298,16 @@ class SnapshotStore:
                     "demo_publication_forbidden",
                 )
                 state = (
-                    "stale"
-                    if instant(payload["expires_at"]) <= now()
+                    "error"
+                    if payload["errors"] and not payload["events"]
                     else (
-                        "partial"
-                        if payload["completeness"] == "partial"
-                        else "available"
+                        "stale"
+                        if instant(payload["expires_at"]) <= now()
+                        else (
+                            "partial"
+                            if payload["completeness"] == "partial"
+                            else "available"
+                        )
                     )
                 )
                 return payload, {
@@ -352,7 +356,7 @@ class SnapshotStore:
             return result
         try:
             path = self.root / "audit.jsonl"
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
             with os.fdopen(fd, "rb") as stream:
                 size = os.fstat(stream.fileno()).st_size
                 stream.seek(max(0, size - 65536))

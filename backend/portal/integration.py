@@ -81,7 +81,15 @@ class CatalogAdapter:
             if not isinstance(catalog.get("revision"), str):
                 raise ValueError()
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
-            # Invalid/missing catalog is unavailable, never replaced by a demo fixture.
+            # A configured catalog failure is an error, not a successful empty edition.
+            snapshot["status"] = "error"
+            snapshot["errors"] = [
+                {
+                    "code": "catalog_unavailable",
+                    "message": "The configured catalog could not be read or validated.",
+                    "event_id": None,
+                }
+            ]
             return snapshot
         snapshot.update(
             topics=[{key: t[key] for key in ("id", "name")} for t in topics],
@@ -116,6 +124,8 @@ class PublishedAdapter:
             result = project(payload, publication, topic)
             result["catalog_revision"] = catalog["catalog_revision"]
             return result
+        if catalog["status"] == "error" and publication["status"] == "pending":
+            publication = {"status": "error", "error_code": "catalog_unavailable"}
         catalog["publication"] = publication
         if publication["status"] == "error":
             catalog["status"] = "error"
@@ -154,7 +164,7 @@ class PublishedAdapter:
                     if any(e["id"] == event_id for e in candidate["events"]):
                         result = candidate
                         break
-                except (ValueError, OSError, KeyError, TypeError):
+                except (ValueError, OSError, KeyError, TypeError, AttributeError):
                     continue
         result["events"] = [e for e in result["events"] if e["id"] == event_id]
         return result
