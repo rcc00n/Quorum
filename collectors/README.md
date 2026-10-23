@@ -72,11 +72,11 @@ collectors/
   verify_collectors.py  readiness check
   schema.sql            Postgres DDL
   sources.csv           hand-edited registry: rss_urls separated by |
-  zetaris/              Lightning SQL to register Postgres and a live Federal Register REST table in Zetaris
+  zetaris/              register.py (REST, via agent/tools_zetaris.py) + SQL to register Postgres as datasource QUORUM_COLLECT
 ```
 
 Database: the Postgres that ships inside the Zetaris bundle, or any Postgres reachable from both the collectors and the
-Zetaris containers (`host.docker.internal` from inside Docker). `DATABASE_URL` in `.env` points at it; `collectors/zetaris/01_register_postgres.sql` registers it in Zetaris.
+Zetaris containers (`host.docker.internal` from inside Docker). `DATABASE_URL` in `.env` points at it; `python3 collectors/zetaris/register.py` registers it in Zetaris as datasource `QUORUM_COLLECT` (needs `requests`, `python-dotenv` and the Zetaris settings in `.env`). Reasoning queries it as `SELECT ... FROM QUORUM_COLLECT.documents` through `agent/tools_zetaris.py`. Registered 2026-10-22, datasource id 807.
 
 Environment variables (names only; values in local `.env`): `DATABASE_URL`, `GUARDIAN_API_KEY`, `CONGRESS_API_KEY`, `COLLECTOR_USER_AGENT`.
 
@@ -97,3 +97,4 @@ Tested end-to-end against a mock feed and a local Postgres: topic filter, robots
 | 2026-10-22 | Anastasia / Claude | Federal Register and Congress.gov are collected both by Python (into `official_docs`, for the hash-and-quote pipeline) and exposed as live Zetaris REST tables (for the judges' cross-source SQL demo). | Satisfies the "SQL across sources" requirement without making collection depend on an untested connector. |
 | 2026-10-22 | Anastasia / Claude | Google News RSS is not used for article discovery: its links cannot be resolved to publisher URLs without executing Google's JavaScript (no redirect, no token in HTML as of 2026-10-22). Sources without a bot-readable feed (WaPo, ISW) drop to level 3. | A `documents.url` that points at news.google.com is not a citation the user can verify. |
 | 2026-10-22 | Anastasia / Claude | US-centred corpus: US outlets get 3–4 section feeds each, Guardian is capped at 50 `us-news` items, AFP comes via France24 at level 2. | The demo is a US event on a US spectrum; the first live run was 100 Guardian items vs 2–3 per US outlet. |
+| 2026-10-22 | Anastasia / Claude | Postgres is registered in Zetaris with `CREATE DATASOURCE` (JDBC) + `REGISTER DATASOURCE TABLES`, not `CREATE LIGHTNING DATABASE`, which Zetaris reserves for file and REST sources. Tables are addressed as `QUORUM_COLLECT.<table>`. | Per zetaris/getting-started `zetaris-lightning-sql-commands.md`; verified live. |
