@@ -12,11 +12,11 @@ from langgraph.graph import END, START, StateGraph
 
 from . import config, ids
 from .nodes import adjudicate, cluster, critique, escalate, extract, fact_check, frame, plan, publish, research, roundup, score, verify, write
-from .state import RunState, initial_state
+from .state import RunInput, RunState, run_input
 
 
 def build() -> StateGraph:
-    b = StateGraph(RunState)
+    b = StateGraph(RunState, input_schema=RunInput)  # Studio's input form shows RunInput only
     b.add_node("plan", plan.run)
     b.add_node("cluster", cluster.run)
     b.add_node("score_importance", score.run)
@@ -59,7 +59,7 @@ def run_local(topic_id: str, edition_date: str, *, dry_run: bool, attempt: int =
     app = builder.compile(checkpointer=InMemorySaver())
     rid = ids.run_id(topic_id, edition_date, attempt)
     cfg = {"configurable": {"thread_id": rid}, "recursion_limit": int(config.get("loops", "recursion_limit", 60))}
-    return app.invoke(initial_state(rid, topic_id, edition_date, dry_run=dry_run), cfg)  # type: ignore[return-value]
+    return app.invoke(run_input(topic_id, edition_date, dry_run=dry_run, run_id=rid), cfg)  # type: ignore[return-value]
 
 
 def mermaid() -> str:

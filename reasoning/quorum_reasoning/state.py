@@ -108,6 +108,15 @@ class StepError(TypedDict):
     message: str
 
 
+class RunInput(TypedDict):
+    """What starts a run. Studio shows exactly these fields; everything else in RunState is filled by `plan`."""
+
+    topic_id: str  # slug, e.g. russia-ukraine-war
+    edition_date: str  # YYYY-MM-DD
+    dry_run: NotRequired[bool]  # True: deterministic stand-ins, no credits
+    run_id: NotRequired[str]  # default: <date>-<topic>-1
+
+
 class RunState(TypedDict):
     run_id: str
     topic_id: str
@@ -124,7 +133,15 @@ class RunState(TypedDict):
     errors: Annotated[list[StepError], operator.add]
 
 
+def run_input(topic_id: str, edition_date: str, *, dry_run: bool, run_id: str | None = None) -> RunInput:
+    inp = RunInput(topic_id=topic_id, edition_date=edition_date, dry_run=dry_run)
+    if run_id:
+        inp["run_id"] = run_id
+    return inp
+
+
 def initial_state(run_id: str, topic_id: str, edition_date: str, *, dry_run: bool) -> RunState:
+    """A full state for tests that call a node directly; the graph itself starts from `run_input`."""
     return RunState(
         run_id=run_id,
         topic_id=topic_id,

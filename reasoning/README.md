@@ -20,6 +20,8 @@ python -m quorum_reasoning.run --mermaid              # the graph as Mermaid (do
 langgraph dev                                         # LangGraph Studio on the same graph
 ```
 
+In Studio the input form has four fields: `topic_id`, `edition_date`, `dry_run` (switch it on unless you mean to spend credits) and an optional `run_id`. Submit with the first two empty and `plan` stops with a message saying so. The yellow "LangSmith API key is missing" banner is expected: tracing to LangSmith stays off (ARCHITECTURE.md § 9); the run's own trace is the `steps` list in the state. The **Deploy** button pushes the graph to LangChain's hosted platform (LangSmith Deployment); we do not use it — the graph runs on our own host.
+
 Output: `snapshots/<topic>/<date>.json` (git-ignored) and the trace printed as a table. A committed copy of the dry-run output is `docs/examples/snapshot.sample.json`, the test dataset for the portal. Exit code 2 when the snapshot is `partial` (a node recorded an error).
 
 Environment, all read from the repo-level `.env` (see `.env.example`): `MODEL_BASE_URL`, `MODEL_API_KEY`, `NEMOTRON_MODEL` (or the `METERLESS_*` names) for the model; `ZETARIS_REST_URL`, `ZETARIS_ORG_ID`, `ZETARIS_API_KEY` for the corpus; `ZETARIS_COLLECTION_DB` when the Lightning database is not `QUORUM_COLLECT`; `COLLECTOR_USER_AGENT` for fetching article text; `QUORUM_DRY_RUN=1` to force the dry run. With no model key configured the graph runs dry on its own.

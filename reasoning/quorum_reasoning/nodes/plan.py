@@ -13,8 +13,10 @@ from ..trace import finish, step
 
 
 def run(state: RunState) -> dict:
-    topic_id = state["topic_id"]
-    edition_date = state["edition_date"]
+    topic_id = state.get("topic_id") or ""
+    edition_date = state.get("edition_date") or ""
+    if not topic_id or not edition_date:
+        raise ValueError("a run needs topic_id (e.g. russia-ukraine-war) and edition_date (YYYY-MM-DD); set dry_run=true to spend no credits")
     dry_run = bool(state.get("dry_run", False))
     with step(state, "plan") as s:
         docs = state.get("documents") or load_documents(topic_id, edition_date, dry_run=dry_run)
