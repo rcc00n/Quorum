@@ -3,6 +3,8 @@
     python -m quorum_reasoning.run --topic russia-ukraine-war --date 2026-10-22 --dry-run
     python -m quorum_reasoning.run --date 2026-10-22 --model live --corpus fixture   # try the prompts, no Zetaris needed
     python -m quorum_reasoning.run --date 2026-10-23 --model live --corpus zetaris   # the real thing
+    python -m quorum_reasoning.run --models         # routes the hotspot offers; pin Nemotron ones in .env
+    python -m quorum_reasoning.run --test-connection # one completion per lane, shows which model answered
     python -m quorum_reasoning.run --mermaid        # the graph as Mermaid, for docs/ARCHITECTURE.md
 
 Two axes: --model dry|live (dry = deterministic stand-ins, no credits; also forced by QUORUM_DRY_RUN=1 or a
@@ -41,11 +43,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--fixture", default=None, help="fixture day for --corpus fixture: sample_day (default) or e.g. usecases/quiet_day")
     ap.add_argument("--out", default="snapshots", help="directory for the snapshot JSON")
     ap.add_argument("--mermaid", action="store_true", help="print the graph as Mermaid and exit")
+    ap.add_argument("--models", action="store_true", help="list the routes the configured hotspot offers (GET /v1/models) and exit")
+    ap.add_argument("--test-connection", action="store_true", help="one small completion per lane (default, fact_checker) and exit")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
 
     if args.mermaid:
         print(graph.mermaid())
+        return 0
+    if args.models or args.test_connection:
+        try:
+            if args.models:
+                for m in llm.list_models():
+                    print(m + ("   <- Nemotron" if "nemotron" in m.lower() else ""))
+            else:
+                for lane in ("default", "fact_checker"):
+                    r = llm.test_connection(lane)
+                    print(f"{r['lane']:<13} route {r['route']}  answered by {r['answered_by'] or '?'}  reply: {r['reply']!r}")
+        except Exception as exc:  # noqa: BLE001 — a CLI check reports, it does not trace
+            print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
         return 0
 
     if args.fixture:

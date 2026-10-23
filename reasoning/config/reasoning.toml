@@ -25,6 +25,8 @@ forbidden_words = [
 attribution_verbs = ["says", "said", "states", "stated", "claims", "claimed", "according to", "announced", "told"]
 
 [models]
-default = "nemotron"            # env MODEL_BASE_URL / MODEL_API_KEY / NEMOTRON_MODEL, same route as smoke_test.py
-fact_checker = "nemotron"       # a different provider when the rules allow; same model, blind context otherwise
+# One hotspot (Meterless Nightshift: MODEL_BASE_URL / MODEL_API_KEY), two lanes by env: NEMOTRON_MODEL for every
+# task, NEMOTRON_MODEL_FACT_CHECKER for the blind second check (falls back to NEMOTRON_MODEL when unset).
+default = "env:NEMOTRON_MODEL"
+fact_checker = "env:NEMOTRON_MODEL_FACT_CHECKER"
 temperature = 0.1

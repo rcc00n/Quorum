@@ -195,7 +195,7 @@ Seven questions the team has not closed yet.
 - [ ] The impact-bar threshold: start at 6 of 9 with confirmation ≥ 1, then calibrate on the first real days.
 - [ ] Which official government bodies are in the hackathon slice, and which event we take for the demo.
 - [ ] Language of the interface and the demo: the judges are English-speaking.
-- [ ] The track's requirements for sponsor technologies and development tools — verify on the challenge page in HackOS.
+- [ ] The track's requirements for sponsor technologies and development tools — verify on the challenge page in HackOS. Known from the Participant Setup Guide (21 Oct 2026): the Power rule — the app must support Meterless Nightshift as a primary AI provider, which reasoning does (`reasoning/quorum_reasoning/llm.py`, two lanes); the Build rule — **at least one Meterless Engine (H-MEM, Markovian, World Model or Scout Intent) integrated in a working feature with its conformance suite passing**. Nothing in Quorum satisfies the Build rule yet. Candidate: H-MEM as the cross-day memory behind research round 2 and the history of interpretations per source; alternative: World Model for the shared event/claim state. Owner: Yelysei; decide after reading `engines/hmem/AGENTS.md` in the Meterless repository.
 - [ ] Where the audience estimates for the Y axis and cohort shares come from.
 
 ## Portal integration proposal

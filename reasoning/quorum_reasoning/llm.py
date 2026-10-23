@@ -31,12 +31,61 @@ def _env() -> None:
         _loaded = True
 
 
+APP_NAME = "quorum-reasoning"  # the meterless-app header: how the request shows up in Nightshift's receipts
+TIMEOUT_S = 180  # a model load on the hotspot can take minutes (Setup Guide › Power)
+
+
 def _route(which: str = "default") -> tuple[str, str, str]:
+    """(base URL, Runtime token, model route) for a task lane.
+
+    One hotspot (Nightshift) for every lane; what differs per lane is the model route. `default` reads
+    NEMOTRON_MODEL (the fast worker lane); `fact_checker` reads NEMOTRON_MODEL_FACT_CHECKER and falls back
+    to the default route when it is not set. Routes are Nightshift ids (`meterless/<class>.<disposition>` or
+    a pinned model id from GET /v1/models); the NVIDIA key itself lives in Nightshift's Providers tab, never here.
+    """
     _env()
     base = os.getenv("MODEL_BASE_URL") or os.getenv("METERLESS_BASE_URL") or ""
     key = os.getenv("MODEL_API_KEY") or os.getenv("METERLESS_RUNTIME_TOKEN") or ""
     model = os.getenv("NEMOTRON_MODEL") or os.getenv("METERLESS_MODEL") or "meterless/auto"
+    if which == "fact_checker":
+        model = os.getenv("NEMOTRON_MODEL_FACT_CHECKER") or model
     return base.strip(), key.strip(), model.strip()
+
+
+def _client():
+    from openai import OpenAI  # imported lazily: not needed in dry run
+
+    base, key, _ = _route()
+    # meterless-app and meterless-scope are the Runtime contract's required headers (Setup Guide § 4.5);
+    # NVIDIA's own endpoint ignores them, so the same client works on a direct route.
+    return OpenAI(
+        base_url=base,
+        api_key=key,
+        timeout=TIMEOUT_S,
+        max_retries=2,
+        default_headers={"meterless-app": APP_NAME, "meterless-scope": "user"},
+    )
+
+
+def list_models() -> list[str]:
+    """GET /v1/models on the configured hotspot: the routes a run may pin. Raises when the route is not configured."""
+    base, key, _ = _route()
+    if not (base and key):
+        raise RuntimeError("no model route configured: set MODEL_BASE_URL and MODEL_API_KEY (or METERLESS_*) in .env")
+    return sorted(m.id for m in _client().models.list())
+
+
+def test_connection(which: str = "default") -> dict[str, str]:
+    """One small chat completion on a lane. Returns the route asked for and the model that answered."""
+    base, key, model = _route(which)
+    if not (base and key):
+        raise RuntimeError("no model route configured: set MODEL_BASE_URL and MODEL_API_KEY (or METERLESS_*) in .env")
+    completion = _client().chat.completions.create(
+        model=model,
+        temperature=0,
+        messages=[{"role": "user", "content": "Reply with the single word: ready"}],
+    )
+    return {"lane": which, "route": model, "answered_by": getattr(completion, "model", "") or "", "reply": (completion.choices[0].message.content or "").strip()[:40]}
 
 
 def is_dry_run(state_flag: bool) -> bool:
@@ -66,19 +115,15 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
     if is_dry_run(dry_run):
         return getattr(dryrun, task)(payload)
 
-    from openai import OpenAI  # imported lazily: not needed in dry run
-
-    base, key, model = _route(which)
-    client = OpenAI(base_url=base, api_key=key)
+    _, _, model = _route(which)
     temperature = float(config.get("models", "temperature", 0.1))
-    completion = client.chat.completions.create(
+    completion = _client().chat.completions.create(
         model=model,
         temperature=temperature,
         messages=[
             {"role": "system", "content": _prompt(task)},
             {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
         ],
-        extra_headers={"X-Quorum-Task": task},
     )
     text = completion.choices[0].message.content or "{}"
     obj = parse_json_object(text)
