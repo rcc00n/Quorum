@@ -24,7 +24,9 @@ for (const status of ["pending", "error", "partial", "stale"])
     isQuietDay({ ...snapshot, publication: { status } }, edition),
     false,
   );
-assert.equal(isQuietDay({ ...snapshot, status: "pending" }, edition), false);
+for (const status of ["pending", "error", "partial", "stale"]) {
+  assert.equal(isQuietDay({ ...snapshot, status }, edition), false);
+}
 assert.equal(isQuietDay({ ...snapshot, events: [event] }, edition), false);
 assert.equal(
   isQuietDay(snapshot, { ...edition, completion: "partial" }),

@@ -54,8 +54,7 @@ export function visibleStories(
 }
 export function isQuietDay(snapshot: Snapshot, edition: EditionPresentation) {
   return (
-    snapshot.status !== "pending" &&
-    snapshot.status !== "error" &&
+    ["available", "demo"].includes(snapshot.status) &&
     snapshot.publication?.status === "available" &&
     edition.completion === "complete" &&
     edition.quiet_day &&
