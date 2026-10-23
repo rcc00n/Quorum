@@ -1,8 +1,8 @@
 """Article text at analysis time. Never stored: the caller keeps only verbatim quotes with offsets.
 
 Honours the document's access level (1 = full text allowed, 2 = headline and lead only, 3 = nothing) and
-robots.txt, with the same honest user agent the collectors use (COLLECTOR_USER_AGENT in .env). In dry run the
-fixture's `text` field stands in for the page.
+robots.txt, with the same honest user agent the collectors use (COLLECTOR_USER_AGENT in .env). A document that
+carries `text` (official rows, fixture rows) is read from it without any fetch.
 """
 
 from __future__ import annotations
@@ -43,15 +43,20 @@ def allowed(url: str) -> bool:
 
 
 def fetch_text(doc: DocRef, *, dry_run: bool, max_chars: int = 20000) -> str | None:
-    """Returns the text reasoning may read for this document, or None when nothing beyond the lead is allowed."""
-    if doc.get("official") and doc.get("text"):
+    """Returns the text reasoning may read for this document, or None when nothing beyond the lead is allowed.
+
+    A document that carries `text` (official documents; fixture documents) is read from it, so the fixture corpus
+    works with a live model too. Collection never stores outlet text, so live documents always go through the
+    access-level and robots checks below. `dry_run` means: never touch the network.
+    """
+    if doc.get("text") and (doc.get("official") or doc["access_level"] == 1):
         return doc["text"]
     if doc["access_level"] >= 3:
         return None
     if doc["access_level"] == 2:
         return doc["lead"] or None
     if dry_run:
-        return doc.get("text") or doc["lead"] or None
+        return doc["lead"] or None
     if not allowed(doc["url"]):
         return doc["lead"] or None
     try:

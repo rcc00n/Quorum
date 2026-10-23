@@ -57,7 +57,7 @@ def run_day(day: dict, *, dry_run: bool) -> dict:
     """One graph run with the day's documents injected in place of the corpus loader."""
     docs = docrefs(day)
     original = plan.load_documents
-    plan.load_documents = lambda topic_id, edition_date, *, dry_run: list(docs)  # noqa: ARG005
+    plan.load_documents = lambda topic_id, edition_date, **kw: list(docs)  # noqa: ARG005
     try:
         return graph.run_local(TOPIC, day["edition_date"], dry_run=dry_run)
     finally:

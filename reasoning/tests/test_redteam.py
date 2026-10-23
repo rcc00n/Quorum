@@ -171,7 +171,7 @@ def test_a2_live_corpus_keeps_document_and_official_ids_apart(monkeypatch):
     Loaded into one DocRef.id space they collide, and every by-id lookup (score, extract, the origin
     skip in research) silently picks the wrong document. The corpus must namespace them."""
     monkeypatch.setattr(corpus, "_run_sql", _rows_with_colliding_ids)
-    docs = corpus.load_documents(TOPIC, DAY, dry_run=False)
+    docs = corpus.load_documents(TOPIC, DAY, corpus="zetaris")
     ids = [d["id"] for d in docs]
     assert len(set(ids)) == len(ids), f"colliding ids in the loaded corpus: {ids}"
 
@@ -180,7 +180,7 @@ def test_a2_official_evidence_keeps_the_database_id(monkeypatch):
     """A2. With the namespace applied, an evidence row's official_doc_id must still be the database id,
     so analysis.evidence rows keep pointing at real official_docs rows."""
     monkeypatch.setattr(corpus, "_run_sql", _rows_with_colliding_ids)
-    docs = corpus.load_documents(TOPIC, DAY, dry_run=False)
+    docs = corpus.load_documents(TOPIC, DAY, corpus="zetaris")
     official = next(d for d in docs if d.get("official"))
     ev = research.evidence_from(official, "The act appropriates funds.", "supports", "researcher")
     assert ev["official_doc_id"] == 7
@@ -229,7 +229,7 @@ def test_a8_superseded_document_is_not_part_of_the_corpus(monkeypatch):
     replaces the old one. Reasoning must read only the current version, or a claim keeps being
     supported by text its own outlet has already corrected within the same day."""
     monkeypatch.setattr(corpus, "_run_sql", _rows_with_correction)
-    docs = corpus.load_documents(TOPIC, DAY, dry_run=False)
+    docs = corpus.load_documents(TOPIC, DAY, corpus="zetaris")
     ids = [d["id"] for d in docs]
     assert 22 in ids and 21 not in ids
 

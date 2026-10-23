@@ -24,7 +24,7 @@ USECASES = Path(__file__).resolve().parent.parent / "quorum_reasoning" / "fixtur
 def run_day(monkeypatch, name: str):
     data = json.loads((USECASES / f"{name}.json").read_text(encoding="utf-8"))
     docs = [DocRef(**{k: v for k, v in d.items() if k != "topic_id"}) for d in data["documents"]]
-    monkeypatch.setattr(plan_node, "load_documents", lambda topic, day, dry_run: list(docs))
+    monkeypatch.setattr(plan_node, "load_documents", lambda topic, day, **kw: list(docs))
     os.environ["QUORUM_DRY_RUN"] = "1"
     return graph.run_local(data["topic_id"], data["edition_date"], dry_run=True)
 

@@ -113,7 +113,8 @@ class RunInput(TypedDict):
 
     topic_id: str  # slug, e.g. russia-ukraine-war
     edition_date: str  # YYYY-MM-DD
-    dry_run: NotRequired[bool]  # True: deterministic stand-ins, no credits
+    dry_run: NotRequired[bool]  # True: deterministic stand-ins for every model call, no credits
+    corpus: NotRequired[Literal["fixture", "zetaris"]]  # where documents come from; default fixture when dry_run, else zetaris
     run_id: NotRequired[str]  # default: <date>-<topic>-1
 
 
@@ -121,7 +122,8 @@ class RunState(TypedDict):
     run_id: str
     topic_id: str
     edition_date: str  # YYYY-MM-DD
-    dry_run: bool
+    dry_run: bool  # model axis: stand-ins instead of model calls
+    corpus: str  # corpus axis: fixture | zetaris
     documents: list[DocRef]
     events: list[Event]
     claims: dict[str, Claim]
@@ -133,8 +135,10 @@ class RunState(TypedDict):
     errors: Annotated[list[StepError], operator.add]
 
 
-def run_input(topic_id: str, edition_date: str, *, dry_run: bool, run_id: str | None = None) -> RunInput:
+def run_input(topic_id: str, edition_date: str, *, dry_run: bool, corpus: str | None = None, run_id: str | None = None) -> RunInput:
     inp = RunInput(topic_id=topic_id, edition_date=edition_date, dry_run=dry_run)
+    if corpus:
+        inp["corpus"] = corpus  # type: ignore[typeddict-item]
     if run_id:
         inp["run_id"] = run_id
     return inp
@@ -147,6 +151,7 @@ def initial_state(run_id: str, topic_id: str, edition_date: str, *, dry_run: boo
         topic_id=topic_id,
         edition_date=edition_date,
         dry_run=dry_run,
+        corpus="fixture" if dry_run else "zetaris",
         documents=[],
         events=[],
         claims={},

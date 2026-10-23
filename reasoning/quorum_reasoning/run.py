@@ -1,10 +1,13 @@
 """CLI: one run for one topic and edition day.
 
     python -m quorum_reasoning.run --topic russia-ukraine-war --date 2026-10-22 --dry-run
+    python -m quorum_reasoning.run --date 2026-10-22 --model live --corpus fixture   # try the prompts, no Zetaris needed
+    python -m quorum_reasoning.run --date 2026-10-23 --model live --corpus zetaris   # the real thing
     python -m quorum_reasoning.run --mermaid        # the graph as Mermaid, for docs/ARCHITECTURE.md
 
-Writes the snapshot to <out>/<topic>/<date>.json and prints the trace. With --dry-run (or QUORUM_DRY_RUN=1,
-or no model key in .env) no credits are spent.
+Two axes: --model dry|live (dry = deterministic stand-ins, no credits; also forced by QUORUM_DRY_RUN=1 or a
+missing key) and --corpus fixture|zetaris. --dry-run is the shortcut for --model dry --corpus fixture.
+Writes the snapshot to <out>/<topic>/<date>.json and prints the trace.
 """
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import graph
+from . import graph, llm
 
 
 def print_trace(steps: list[dict], file=sys.stdout) -> None:
@@ -31,7 +34,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run the Quorum reasoning graph for one topic and day.")
     ap.add_argument("--topic", default="russia-ukraine-war")
     ap.add_argument("--date", default="2026-10-22", help="edition date, YYYY-MM-DD")
-    ap.add_argument("--dry-run", action="store_true", help="deterministic stand-ins instead of model calls")
+    ap.add_argument("--dry-run", action="store_true", help="shortcut for --model dry --corpus fixture")
+    ap.add_argument("--model", choices=["dry", "live"], default=None, help="dry: stand-ins, no credits; live: the route in .env")
+    ap.add_argument("--corpus", choices=["fixture", "zetaris"], default=None, help="where the day's documents come from")
     ap.add_argument("--out", default="snapshots", help="directory for the snapshot JSON")
     ap.add_argument("--mermaid", action="store_true", help="print the graph as Mermaid and exit")
     ap.add_argument("--quiet", action="store_true")
@@ -41,7 +46,11 @@ def main(argv: list[str] | None = None) -> int:
         print(graph.mermaid())
         return 0
 
-    state = graph.run_local(args.topic, args.date, dry_run=args.dry_run)
+    model_dry = args.dry_run if args.model is None else args.model == "dry"
+    corpus = args.corpus or ("fixture" if (args.dry_run or model_dry) else "zetaris")
+    if args.model == "live" and llm.is_dry_run(False):
+        print("no model route configured (MODEL_BASE_URL / MODEL_API_KEY in .env, or QUORUM_DRY_RUN=1 is set): running dry", file=sys.stderr)
+    state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus)
     snapshot = state["snapshot"]
     out = Path(args.out) / args.topic / f"{args.date}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -49,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.quiet:
         print_trace(state["steps"])
         print()
+        print(f"corpus: {state['corpus']}; model: {'stand-ins' if llm.is_dry_run(state['dry_run']) else llm.model_name()}")
         print(f"status: {snapshot['status']}; stories: {len(snapshot['stories'])}; roundup: {snapshot['roundup']['count']}; errors: {len(snapshot['errors'])}")
         print(f"summary: {snapshot['summary']}")
         print(f"snapshot: {out}")

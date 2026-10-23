@@ -54,12 +54,16 @@ builder = build()
 graph = builder.compile()  # what langgraph.json points at
 
 
-def run_local(topic_id: str, edition_date: str, *, dry_run: bool, attempt: int = 1) -> RunState:
-    """One full run with an in-memory checkpointer. Returns the final state (snapshot included)."""
+def run_local(topic_id: str, edition_date: str, *, dry_run: bool, corpus: str | None = None, attempt: int = 1) -> RunState:
+    """One full run with an in-memory checkpointer. Returns the final state (snapshot included).
+
+    Two independent axes: `dry_run` (model stand-ins or live calls) and `corpus` (fixture or zetaris; default
+    follows dry_run). Live model on the fixture corpus is how prompts are tried before collection has data.
+    """
     app = builder.compile(checkpointer=InMemorySaver())
     rid = ids.run_id(topic_id, edition_date, attempt)
     cfg = {"configurable": {"thread_id": rid}, "recursion_limit": int(config.get("loops", "recursion_limit", 60))}
-    return app.invoke(run_input(topic_id, edition_date, dry_run=dry_run, run_id=rid), cfg)  # type: ignore[return-value]
+    return app.invoke(run_input(topic_id, edition_date, dry_run=dry_run, corpus=corpus, run_id=rid), cfg)  # type: ignore[return-value]
 
 
 def mermaid() -> str:

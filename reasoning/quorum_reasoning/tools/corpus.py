@@ -1,4 +1,4 @@
-"""The day's corpus for one topic, read through Zetaris. In dry run, from the bundled fixture.
+"""The day's corpus for one topic: through Zetaris (corpus="zetaris") or from the bundled fixture (corpus="fixture").
 
 Zetaris side (collectors/zetaris/01_register_postgres.sql): the collection Postgres is registered as the
 Lightning database QUORUM_COLLECT, so the tables are QUORUM_COLLECT.public.documents and friends. Override the
@@ -60,12 +60,15 @@ def _edition_window(edition_date: str) -> tuple[str, str]:
 _TOPIC_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
-def load_documents(topic_id: str, edition_date: str, *, dry_run: bool) -> list[DocRef]:
+def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture") -> list[DocRef]:
+    """`corpus` is "fixture" (the bundled sample day, no network) or "zetaris" (the day's documents through Lightning SQL)."""
     if not _TOPIC_ID.match(topic_id):
         raise ValueError(f"topic_id must be a slug like russia-ukraine-war, got {topic_id!r}")
     date.fromisoformat(edition_date)  # raises on a malformed date before anything reaches SQL
-    if dry_run:
+    if corpus == "fixture":
         return load_fixture(topic_id, edition_date)
+    if corpus != "zetaris":
+        raise ValueError(f"unknown corpus {corpus!r}")
     db = _zetaris_db()
     start, end = _edition_window(edition_date)
     docs_sql = f"""
