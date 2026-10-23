@@ -1,0 +1,79 @@
+"""fact_check: a blind second verdict per claim.
+
+The fact-checker sees the claim texts and the corpus, nothing the researcher or the verifier produced. It
+has the same access to the documents (same levels, same robots rules), picks its own passages, asks the
+model for stance under its own prompt (prompts/stance.md, role fact_checker: look for reasons the claim could
+be wrong) and applies the same confirmation rule to its own evidence. Its evidence rows carry
+found_by="fact_checker" so the snapshot shows both chains side by side. Route "fact_checker" in
+config/reasoning.toml may point at a different provider when the rules allow.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+
+from .. import llm
+from ..rules.confirmation import verdict
+from ..state import RunState, StepError
+from ..text import best_passage
+from ..tools.fetch_text import fetch_text
+from ..trace import finish, step
+from .research import already_seen, evidence_from
+
+
+def run(state: RunState) -> dict:
+    claims = {cid: dict(c) for cid, c in state["claims"].items()}
+    docs = state["documents"]
+    steps, errors = [], []
+    for e in state["events"]:
+        event_claims = [c for c in claims.values() if c["event_id"] == e["id"]]
+        if not event_claims:
+            continue
+        with step(state, "fact_check", event_id=e["id"], model=llm.model_name("fact_checker")) as s:
+            counts: Counter[str] = Counter()
+            found = 0
+            try:
+                for c in event_claims:
+                    for d in docs:
+                        if d["id"] == c["origin_document_id"] and not d.get("official"):
+                            continue
+                        if already_seen(c, d, "fact_checker"):
+                            continue
+                        passage = best_passage(c["text"], fetch_text(d, dry_run=state["dry_run"]) or "")
+                        if not passage:
+                            continue
+                        ans = llm.json_task(
+                            "stance",
+                            {
+                                "claim": c["text"],
+                                "passage": passage,
+                                "source": d["source_name"],
+                                "source_kind": d["kind"],
+                                "doc_type": d.get("doc_type"),
+                                "role": "fact_checker",
+                            },
+                            dry_run=state["dry_run"],
+                            which="fact_checker",
+                        )
+                        stance = ans.get("stance", "neutral")
+                        if stance == "neutral":
+                            continue
+                        c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker")]
+                        found += 1
+                    own = [ev for ev in c["evidence"] if ev["found_by"] == "fact_checker"]
+                    status, reason = verdict(own)
+                    c["fact_checker_status"] = status
+                    c["fact_checker_reason"] = reason
+                    counts[status] += 1
+                s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages"
+                s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier"
+            except Exception as exc:  # noqa: BLE001
+                errors.append(StepError(node="fact_check", event_id=e["id"], message=str(exc)[:300]))
+                for c in event_claims:
+                    if c["fact_checker_status"] is None:
+                        c["fact_checker_status"] = "unverified"
+                        c["fact_checker_reason"] = "fact-checker failed; treated as unverified"
+                s.decision = "failed; unchecked claims treated as unverified"
+                s.reason = str(exc)[:200]
+        steps.append(finish(state, s))
+    return {"claims": claims, "steps": steps, "errors": errors}

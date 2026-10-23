@@ -1,0 +1,70 @@
+"""roundup: one line per event below the bar, with its sources and its evidence status.
+
+The model writes the line from the event's headline and lead; the status label, the grouping and the order
+are code. Groups are by evidence status (DECISIONS.md › Selecting major news: the roundup says what was
+reported and how well it is supported, nothing more). `empty_day` is true when no story crossed the bar.
+"""
+
+from __future__ import annotations
+
+from .. import llm
+from ..rules.confirmation import independent_support
+from ..rules.writing_rules import check_text
+from ..state import Claim, Event, RunState, StepError
+from ..trace import finish, step
+
+GROUP_ORDER = ["Reported, not confirmed", "Confirmed", "Single source", "Statements only", "Unverified"]
+
+
+def status_label(e: Event, claims: list[Claim]) -> str:
+    if e["needs_review"]:
+        return "Reported, not confirmed"
+    if any(c["final_status"] == "confirmed" for c in claims):
+        return "Confirmed"
+    if claims and all(c["kind"] == "statement" for c in claims):
+        return "Statements only"
+    if any(len(independent_support(c["evidence"])) == 1 for c in claims):
+        return "Single source"
+    return "Unverified"
+
+
+def run(state: RunState) -> dict:
+    by_id = {d["id"]: d for d in state["documents"]}
+    items = []
+    errors = []
+    below = [e for e in state["events"] if not e["above_bar"]]
+    with step(state, "roundup", model=llm.model_name()) as s:
+        for e in below:
+            claims = [c for c in state["claims"].values() if c["event_id"] == e["id"]]
+            docs = [by_id[i] for i in e["document_ids"] if i in by_id]
+            lead = next((d["lead"] for d in docs if d["lead"]), "")
+            label = status_label(e, claims)
+            try:
+                line = llm.json_task("roundup_line", {"headline": e["headline"], "lead": lead, "status": label}, dry_run=state["dry_run"]).get("line", "")
+                if check_text("line", line):
+                    line = e["headline"].rstrip(".") + "."  # the headline is the safe fallback; the critic's rules apply here too
+            except Exception as exc:  # noqa: BLE001
+                errors.append(StepError(node="roundup", event_id=e["id"], message=str(exc)[:300]))
+                line = e["headline"].rstrip(".") + "."
+            items.append(
+                {
+                    "event_id": e["id"],
+                    "line": line,
+                    "status": label.lower(),
+                    "group": label,
+                    "needs_review": e["needs_review"],
+                    "rubric_total": e["rubric"]["total"] if e["rubric"] else 0,
+                    "sources": [{"title": d["source_name"], "url": d["url"]} for d in docs],
+                }
+            )
+        items.sort(key=lambda i: (-i["rubric_total"], i["event_id"]))
+        groups = [
+            {"name": name, "items": [{k: v for k, v in i.items() if k not in ("group", "rubric_total")} for i in items if i["group"] == name]}
+            for name in GROUP_ORDER
+        ]
+        groups = [g for g in groups if g["items"]]
+        empty_day = not any(e["above_bar"] for e in state["events"])
+        roundup = {"empty_day": empty_day, "count": len(items), "groups": groups}
+        s.decision = f"{len(items)} events in {len(groups)} group(s); empty day: {empty_day}"
+        s.reason = "everything below the bar, ordered by rubric total; lines from the model, labels from code"
+    return {"roundup": roundup, "steps": [finish(state, s)], "errors": errors}

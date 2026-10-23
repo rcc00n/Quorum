@@ -1,0 +1,103 @@
+"""frame: how each outlet frames a story above the bar, plus cohort coverage counts.
+
+The model labels one outlet's document at a time (highlights, omits, wording, interpretation label). Cohort
+shares are counted in code from the day's corpus: for each cohort, how many of its sources covered the event
+out of how many published anything on the topic today. Cohorts follow DECISIONS.md › Spectrum ratings and
+cohorts: major/minor × left/right, plus center; agencies and official sources are not a cohort.
+"""
+
+from __future__ import annotations
+
+from collections import Counter, defaultdict
+
+from .. import llm
+from ..state import DocRef, RunState, StepError
+from ..trace import finish, step
+
+COHORTS = ("major_left", "minor_left", "major_right", "minor_right", "center")
+
+
+def cohort_of(doc: DocRef) -> str | None:
+    if doc["kind"] != "outlet":
+        return None
+    flank, tier = doc.get("flank"), doc.get("tier")
+    if flank in ("left", "right"):
+        return f"{tier or 'minor'}_{flank}"
+    return "center"
+
+
+def coverage(all_docs: list[DocRef], event_doc_ids: list[int]) -> dict[str, list[int]]:
+    """{cohort: [sources that covered the event, sources of that cohort active today]}"""
+    active: dict[str, set[str]] = defaultdict(set)
+    covered: dict[str, set[str]] = defaultdict(set)
+    members = set(event_doc_ids)
+    for d in all_docs:
+        c = cohort_of(d)
+        if c is None:
+            continue
+        active[c].add(d["source_id"])
+        if d["id"] in members:
+            covered[c].add(d["source_id"])
+    return {c: [len(covered[c]), len(active[c])] for c in COHORTS}
+
+
+def run(state: RunState) -> dict:
+    by_id = {d["id"]: d for d in state["documents"]}
+    events = [dict(e) for e in state["events"]]
+    steps, errors = [], []
+    for e in events:
+        if not e["above_bar"]:
+            continue
+        with step(state, "frame", event_id=e["id"], model=llm.model_name()) as s:
+            outlets = []
+            try:
+                for did in e["document_ids"]:
+                    d = by_id[did]
+                    if cohort_of(d) is None:
+                        continue
+                    ans = llm.json_task(
+                        "frame",
+                        {"documents": [{"title": d["title"], "lead": d["lead"]}], "source": d["source_name"], "flank": d.get("flank"), "tier": d.get("tier")},
+                        dry_run=state["dry_run"],
+                    )
+                    outlets.append(
+                        {
+                            "source": d["source_name"],
+                            "cohort": cohort_of(d),
+                            "flank": d.get("flank") or "center",
+                            "url": d["url"],
+                            "highlights": ans.get("highlights", ""),
+                            "omits": ans.get("omits", ""),
+                            "wording": ans.get("wording", ""),
+                            "interpretation_label": ans.get("interpretation_label", ""),
+                        }
+                    )
+                labels: Counter[str] = Counter(o["interpretation_label"] for o in outlets if o["interpretation_label"])
+                by_label_flank: dict[str, Counter[str]] = defaultdict(Counter)
+                for o in outlets:
+                    by_label_flank[o["interpretation_label"]][o["flank"]] += 1
+                sides = {}
+                for flank in ("left", "right"):
+                    side = [o for o in outlets if o["flank"] == flank]
+                    side.sort(key=lambda o: 0 if o["cohort"].startswith("major") else 1)
+                    if side:
+                        sides[flank] = {k: side[0][k] for k in ("highlights", "omits", "wording")} | {"example_url": side[0]["url"]}
+                e["framing"] = {
+                    "rating_mode": "average",  # the flank on each source row is the averaged rating; other modes need the sources table
+                    **sides,
+                    "note": "",
+                    "coverage": coverage(state["documents"], e["document_ids"]),
+                    "interpretations": [
+                        {"label": label, "outlets": n, "mostly": by_label_flank[label].most_common(1)[0][0]} for label, n in labels.most_common()
+                    ],
+                    "outlets": outlets,
+                }
+                s.decision = f"{len(outlets)} outlets labelled; {len(labels)} interpretation(s)"
+                s.reason = "labels per outlet from the model; cohort shares counted in code"
+            except Exception as exc:  # noqa: BLE001
+                errors.append(StepError(node="frame", event_id=e["id"], message=str(exc)[:300]))
+                e["framing"] = {"rating_mode": "average", "coverage": coverage(state["documents"], e["document_ids"]), "interpretations": [], "outlets": outlets}
+                s.decision = "failed; coverage counts only"
+                s.reason = str(exc)[:200]
+        steps.append(finish(state, s))
+    return {"events": events, "steps": steps, "errors": errors}

@@ -67,7 +67,7 @@ Schema `analysis` in the shared Postgres. All timestamps UTC. All ids stable acr
 
 ## 5. The graph
 
-One `StateGraph` per topic run. Nodes are plain Python functions that return partial state; the LLM calls live inside them. Loops are conditional edges back into the graph. Every node writes its `run_steps` row before returning.
+One `StateGraph` per topic run. Nodes are plain Python functions that return partial state; the LLM calls live inside them. Loops are conditional edges back into the graph. Every node appends its trace row (`steps`) before returning. Code: `reasoning/quorum_reasoning/graph.py`; the edges below are what `python -m quorum_reasoning.run --mermaid` draws from it (labels added by hand).
 
 ```mermaid
 flowchart TD
@@ -76,35 +76,38 @@ flowchart TD
   S --> X[extract_claims]
   X --> R[research]
   R --> V[verify]
-  V -->|evidence thin and rounds < 2| R
-  V --> F[fact_check]
+  V -.->|a claim is thin and the event has a round left| R
+  V -.-> F[fact_check]
   F --> J[adjudicate]
-  J --> FR[frame]
+  J -.-> FR[frame]
+  J -.->|above the bar on points, no confirmed claim| E[escalate: needs review]
+  E --> FR
   FR --> W[write]
   W --> K[critique]
-  K -->|rejected and drafts < 3| W
-  K --> RU[roundup]
+  K -.->|rejected and drafts < 3| W
+  K -.-> RU[roundup]
   RU --> PUB[publish]
-  J -->|no confirmed claim after all rounds| E[escalate: needs review]
-  E --> RU
 ```
+
+`escalate` continues to `frame` rather than jumping to `roundup` because one run covers every event of the day: the escalated event is dropped from the stories (it is no longer `above_bar`, so `frame` and `write` skip it) while the others go on; `roundup` then carries it as "reported, not confirmed" with the review flag.
 
 ### State
 
 ```python
-class RunState(TypedDict):
+class RunState(TypedDict):                      # reasoning/quorum_reasoning/state.py
     run_id: str
     topic_id: str
     edition_date: str            # YYYY-MM-DD, America/New_York edition day
-    documents: list[DocRef]      # ids, source, times, access level — no text
-    events: list[Event]          # clusters with rubric scores and above_bar
-    claims: dict[str, Claim]     # claim_id -> claim, with evidence and verdicts
+    dry_run: bool                # deterministic stand-ins instead of model calls
+    documents: list[DocRef]      # ids, source, times, access level — no article text
+    events: list[Event]          # clusters with rubric, above_bar, rank, article, drafts, versions, critic verdict, framing
+    claims: dict[str, Claim]     # claim_id -> claim, with evidence (found_by researcher | fact_checker) and three statuses
     research_rounds: dict[str, int]   # event_id -> rounds used
-    drafts: dict[str, list[Article]]  # event_id -> article versions
-    critic_verdicts: dict[str, str]
-    roundup: Roundup | None
-    snapshot_version: int
-    errors: list[StepError]      # recoverable failures, shown in the trace
+    roundup: dict | None
+    summary: str
+    snapshot: dict | None        # section 8, built by publish
+    steps: Annotated[list[StepRecord], operator.add]   # the trace: node, iteration, event, decision, reason, model, ms
+    errors: Annotated[list[StepError], operator.add]   # recoverable failures; any of them makes the snapshot "partial"
 ```
 
 ### Nodes
@@ -115,21 +118,22 @@ class RunState(TypedDict):
 | `cluster` | documents for the day | events; similarity by TF-IDF cosine in code, borderline merges confirmed by the model with the two leads as input | borderline only |
 | `score_importance` | each event's documents and official docs | rubric points with a one-line rationale each; total and `above_bar` by code; cap of ten by code | yes, for points |
 | `extract_claims` | fetched text of up to N documents per event (access level 1), leads only for level 2 | atomic claims with origin quote and offsets | yes |
-| `research` | claims, corpus via Zetaris, official docs; on round 2 also Google News RSS by domain through the collection fetcher | candidate passages per claim with stance | yes, for stance |
-| `verify` | evidence per claim | verifier status by the confirmation rule; "thin" flag when a claim has one group only and rounds remain | no, rule only |
-| `fact_check` | the claims and the corpus, nothing from `research` or `verify` | an independent status per claim with its own evidence | yes, different model when available |
-| `adjudicate` | both statuses | final status; disputed on disagreement; escalation when an event ends with zero confirmed claims | no |
-| `frame` | documents per outlet | highlights, omits, wording, interpretation label per outlet; cohort shares by SQL | yes, labels only |
-| `write` | confirmed claims, statements, open items, context facts | article blocks (section 8) and headline, standfirst | yes |
-| `critique` | the draft and the claim table | approved, or rejected with the offending sentence and the rule it breaks | yes |
+| `research` | claims, corpus via Zetaris, official docs; round 1 the event's own documents, round 2 the rest of the day's corpus and the official documents (Google News RSS by domain through the collection fetcher: planned) | candidate passages per claim with stance | yes, for stance |
+| `verify` | the researcher's evidence per claim | verifier status by the confirmation rule; "thin" flag when a claim has one group only and rounds remain | no, rule only |
+| `fact_check` | the claims and the corpus with the same access as the researcher, nothing from `research` or `verify` | an independent status per claim with its own evidence (`found_by = fact_checker`) | yes, own prompt role; different model when available |
+| `adjudicate` | both statuses | final status; disputed on disagreement; confirmation points per event from its best-supported claim; bar and cap; escalation when an event crosses the bar with zero confirmed claims | no |
+| `escalate` | flagged events | trace row; the event leaves the stories and goes to the roundup flagged `needs_review` | no |
+| `frame` | documents per outlet, stories above the bar only | highlights, omits, wording, interpretation label per outlet; cohort shares counted in code | yes, labels only |
+| `write` | confirmed claims, statements (with speaker), open items (with reason), context facts; on a rewrite also the previous draft and the critic's notes | article blocks (section 8) and headline, standfirst; every draft kept in `versions` | yes |
+| `critique` | the draft and the claim table | approved, or rejected with each violation (block, rule, offending text); the writer fixes only those | no in v0: `rules/writing_rules.py`; a model pass for subtler wording is an addition later |
 | `roundup` | events below the bar | one line per event with source and status, grouped, ordered by rubric total | yes, for the line text |
 | `publish` | everything | snapshot JSON, version +1, stored; summary paragraph for the topic page | yes, for the summary |
 
 ### Loops and limits
 
-- `verify → research`: at most 2 research rounds per event. Round 2 is allowed to pull outside the day's corpus (Google News RSS by domain, official sites). The trace shows what round 2 fetched and whether it changed a verdict.
-- `critique → write`: at most 3 drafts. All drafts are kept in `articles` with the critic's notes. If draft 3 is still rejected the story is published with the critic's notes attached and flagged `needs review`; it is not silently dropped and not silently approved.
-- `adjudicate → escalate`: an event above the bar with zero confirmed claims after all rounds is removed from the stories and put into the roundup as "reported, not confirmed", with a `needs review` flag for the portal.
+- `verify → research`: at most 2 research rounds per event (`loops.research_rounds_max`). Round 2 runs only for thin claims and widens to the rest of the day's corpus and the official documents; pulling outside the corpus (Google News RSS by domain, official sites) is planned. The trace shows round 2 as `research` iteration 2 and whether it changed a verdict.
+- `critique → write`: at most 3 drafts (`loops.drafts_max`). All drafts are kept in the event's `versions` with the critic's notes. If draft 3 is still rejected the story is published with the critic's notes attached and flagged `needs_review`; it is not silently dropped and not silently approved.
+- `adjudicate → escalate`: an event that crosses the bar on points with zero confirmed claims after all rounds is removed from the stories and put into the roundup as "reported, not confirmed", with a `needs_review` flag and a `review_reason` for the portal.
 - Source failure (403, timeout, robots.txt denial): recorded in `errors` and in the trace; the node continues with what it has. The topic summary says which sources were missing.
 - `recursion_limit` is set per run to 60 node executions; hitting it is a failed run, not an infinite loop.
 - Checkpointer: in-memory for development and the demo recording, Postgres (`langgraph-checkpoint-postgres`) when the daily schedule runs unattended, so a crashed run resumes at the failed node.
@@ -213,6 +217,8 @@ Reasoning publishes one snapshot per topic and edition day. The portal's adapter
 }
 ```
 
+Fields the implementation adds on top of the shape above (all optional for the portal): top-level `errors` (the run's recoverable failures) and `trace` (every step record: node, iteration, event_id, decision, reason, model, duration_ms); per story `review_reason`, `critic_notes`, `drafts` and `sources`; per claim `kind`, `speaker` and, on each evidence row, `found_by` (researcher or fact_checker) and `is_document`. `photo` is `null` until the photo tool exists.
+
 Mapping to the portal's current `Event`: `established` ← `article` blocks of kind `fact` and `context`; `statements` ← the `statements` block; `disputed` ← claims with status disputed; `unknown` ← the `not_confirmed` block; `coverage` ← `spectrum.coverage` as lines; `importance.label` ← `rubric.total` with its rationale; `summary` ← `standfirst`; `digests[].summary` ← `roundup` rendered as text. New fields the portal does not render yet: `article` as prose, `photo`, `rubric`, `trace_ref`, `needs_review`, `status: empty` for quiet days. Ordering is upstream: `stories` are already ranked.
 
 Transport, to agree with Vadim: reasoning exposes `GET /snapshots/{topic_id}/{edition_date}` and `GET /snapshots/{topic_id}/latest` on the reasoning host, bearer-token protected, reachable from the VPS over an SSH tunnel bound to loopback. The adapter pulls on request and caches by `version`. No database port is exposed and nothing is pushed into the portal's auth database. Status vocabulary: `ok`, `partial` (a node failed and the trace says which), `empty` (no story above the bar; roundup carries the day). The adapter must not turn a failed pull into an empty edition.
@@ -220,31 +226,36 @@ Transport, to agree with Vadim: reasoning exposes `GET /snapshots/{topic_id}/{ed
 ## 9. Code layout and tooling
 
 ```
-agents/
-  graph.py          # StateGraph assembly, edges, limits; `graph` is what langgraph.json points at
-  state.py          # RunState and dataclasses
-  nodes/            # one file per node: plan.py, cluster.py, score.py, extract.py, research.py,
-                    # verify.py, fact_check.py, adjudicate.py, frame.py, write.py, critique.py, roundup.py, publish.py
-  rules/            # confirmation.py, impact_bar.py, writing_rules.py — pure functions, unit-tested
-  tools/            # zetaris.py (moved from agent/tools_zetaris.py), fetch_text.py (collection's), news_rss.py
-  store/            # analysis schema DDL and upserts
-  prompts/          # one file per agent prompt, versioned
-  server.py         # FastAPI: POST /runs (topic, date), GET /runs/{id}/trace, GET /snapshots/...
-config/
-  reasoning.toml    # thresholds, caps, rounds, models
-  photos.toml       # photo source allow-list
-langgraph.json      # {"graphs": {"quorum": "./agents/graph.py:graph"}, "env": ".env", "dependencies": ["."]}
+reasoning/                      # the package; see reasoning/README.md for commands and module decisions
+  langgraph.json                # {"graphs": {"quorum": "./quorum_reasoning/graph.py:graph"}, "env": "../.env", "dependencies": ["."]}
+  pyproject.toml                # package quorum-reasoning; extras [dev] = langgraph-cli[inmem], pytest, psycopg
+  config/reasoning.toml         # thresholds, caps, rounds, forbidden words, model routes
+  quorum_reasoning/
+    graph.py                    # StateGraph assembly, edges, limits; `graph` is what langgraph.json points at
+    state.py                    # RunState and the TypedDicts
+    nodes/                      # one file per node: plan, cluster, score, extract, research, verify, fact_check,
+                                # adjudicate, escalate, frame, write, critique, roundup, publish; routes beside their node
+    rules/                      # confirmation.py, impact_bar.py, writing_rules.py — pure functions, unit-tested
+    tools/                      # corpus.py (Zetaris SQL via agent/tools_zetaris.py, fixture in dry run), fetch_text.py
+    prompts/                    # one Markdown system prompt per model task
+    dryrun.py                   # deterministic twin of every model task (no credits)
+    fixtures/sample_day.json    # fictional corpus for the dry run and the tests
+    trace.py, ids.py, text.py, llm.py, config.py, run.py
+  tests/                        # rules, end-to-end dry run, escalation path, Mermaid
 ```
+
+Not built yet: `store/` (the `analysis` schema and upserts), `server.py` (POST /runs, GET /runs/{id}/trace, GET /snapshots/…), `config/photos.toml` and the photo tool, `tools/news_rss.py`. Until the store exists, `run.py` writes the snapshot to `reasoning/snapshots/<topic>/<date>.json` (git-ignored).
 
 - **LangGraph Studio** is part of the stack for development and for the demo: `langgraph dev` starts the local server and opens Studio, which renders the graph, runs it step by step, shows the state after each node and lets a run be paused and resumed. The demo video shows the verify → research loop and the critic's rejection in Studio, next to the portal page that results. Studio needs a free LangSmith account for the UI; tracing to LangSmith stays off unless the team wants it, and the `run_steps` table is our own trace regardless.
 - The graph draws itself: `graph.get_graph().draw_mermaid()` regenerates the diagram in section 5 so the document never drifts from the code.
-- Tests: `rules/` is pure and unit-tested; nodes are tested with recorded model outputs; one end-to-end run on a fixed day's documents is the acceptance test before the demo.
+- Tests: `rules/` is pure and unit-tested; the graph is tested end to end in dry run on the fixture day (`tests/test_graph.py`), the escalation path on a synthetic state; nodes against recorded model outputs and one live run on a fixed day are the acceptance tests before the demo.
 
 ## 10. Build plan
 
 | Day | Deliverable | Done when |
 | --- | --- | --- |
-| Oct 23 | Graph skeleton with all nodes as stubs, state, `run_steps`, Studio running; `cluster` and `score_importance` real | A run over yesterday's documents produces events with rubric scores and a trace visible in Studio |
+| Oct 22 (done) | Skeleton of every node in `reasoning/`, state, trace, rules with tests, dry-run twins, fixture day, CLI, `langgraph.json` | `python -m quorum_reasoning.run --dry-run` runs end to end: research round 2, blind fact-check with one disputed claim, critic rejection and rewrite, two stories, roundup; 27 tests pass |
+| Oct 23 | Studio running on the graph; first live run over a real day through Zetaris and Nemotron; `analysis` store | A run over yesterday's documents produces events with rubric scores and a trace visible in Studio |
 | Oct 24 | `extract_claims`, `research`, `verify`, `fact_check`, `adjudicate` | Ten claims of one event get statuses with evidence rows; one disputed claim shows two blind verdicts |
 | Oct 25 | `frame`, `write`, `critique`, `roundup`, `publish` | A snapshot for one topic-day validates against section 8; the critic rejects at least one planted violation |
 | Oct 26 | Transport to the portal with Vadim; end-to-end on the demo event; fixes | The portal renders the story page from a live snapshot |

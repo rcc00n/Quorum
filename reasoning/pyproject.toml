@@ -1,0 +1,32 @@
+[project]
+name = "quorum-reasoning"
+version = "0.1.0"
+description = "Quorum reasoning block: the LangGraph graph that turns collected documents into verified stories."
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=1.0,<2",
+    "langchain-core>=0.3",
+    "python-dotenv>=1.0",
+    "requests>=2.31",
+    "openai>=1.40",
+]
+
+[project.optional-dependencies]
+dev = [
+    "langgraph-cli[inmem]>=0.2",
+    "pytest>=8",
+    "psycopg[binary]>=3.1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["quorum_reasoning*"]
+
+[tool.setuptools.package-data]
+quorum_reasoning = ["fixtures/*.json", "prompts/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -42,3 +42,7 @@ Thumbs.db
 *.der
 *.class
 pgdata/
+# reasoning block: run output and the LangGraph dev server state
+reasoning/snapshots/
+.langgraph_api/
+*.egg-info/

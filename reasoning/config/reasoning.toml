@@ -1,0 +1,30 @@
+# Reasoning block configuration. Changing a threshold here is a product decision: record it in docs/DECISIONS.md.
+
+[impact_bar]
+threshold = 6          # minimum rubric total (legal_force 0-2 + reach 0-3 + irreversibility 0-2 + confirmation 0-2)
+confirmation_min = 1   # a story needs at least one independent source
+cap_per_day = 10       # at most this many stories per topic and day; no minimum
+
+[loops]
+research_rounds_max = 2      # verify -> research, per event
+drafts_max = 3               # critique -> write, per event
+recursion_limit = 60         # LangGraph recursion limit per run
+
+[clustering]
+similarity_threshold = 0.5   # cosine on title word sets; above this two documents join one event
+borderline_band = 0.25       # within this band below the threshold the model is asked to confirm a merge
+
+[writing]
+reading_minutes_max = 4
+forbidden_words = [
+  "alarming", "shocking", "stunning", "historic", "unprecedented", "devastating", "crucial",
+  "controversial", "massive", "huge", "major blow", "landmark", "sweeping", "dramatic",
+  "clearly", "obviously", "undoubtedly", "arguably", "will likely", "could lead to", "may lead to",
+  "why it matters", "this matters", "experts say", "critics say", "some say",
+]
+attribution_verbs = ["says", "said", "states", "stated", "claims", "claimed", "according to", "announced", "told"]
+
+[models]
+default = "nemotron"            # env MODEL_BASE_URL / MODEL_API_KEY / NEMOTRON_MODEL, same route as smoke_test.py
+fact_checker = "nemotron"       # a different provider when the rules allow; same model, blind context otherwise
+temperature = 0.1
