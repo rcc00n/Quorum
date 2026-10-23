@@ -165,27 +165,31 @@ def model_name(which: str = "default") -> str:
     return _route(which)[2]
 
 
-# Nemotron's documented system-prompt switches for the thinking trace: "/no_think" (Nemotron 3 family) and
-# "detailed thinking off" (Llama-Nemotron family). Both lines are harmless for a model that knows only one.
-NO_THINK = "/no_think\ndetailed thinking off"
 _last_call_at = 0.0
 
 
 def _prompt(task: str) -> str:
     p = _PROMPTS / f"{task}.md"
-    text = p.read_text(encoding="utf-8") if p.is_file() else f"Task: {task}. Answer with JSON only."
-    if str(config.get("models", "reasoning", "off")).lower() == "off":
-        text = NO_THINK + "\n" + text
-    return text
+    return p.read_text(encoding="utf-8") if p.is_file() else f"Task: {task}. Answer with JSON only."
 
 
 def _request_extras() -> dict[str, Any]:
+    """Body fields beyond model/messages: the reply ceiling and NVIDIA's thinking switch.
+
+    `chat_template_kwargs.enable_thinking` is the documented control for hosted Nemotron 3.5 / Nemotron 3 Nano
+    endpoints (and vLLM); the OpenAI SDK sends `extra_body` entries as top-level JSON fields, which an
+    OpenAI-compatible proxy forwards. A system-prompt "/no_think" is Qwen3's switch and did nothing here.
+    """
     extras: dict[str, Any] = {}
     max_tokens = int(config.get("models", "max_tokens", 0) or 0)
     if max_tokens > 0:
         extras["max_tokens"] = max_tokens
-    if config.get("models", "thinking_kwarg", False) and str(config.get("models", "reasoning", "off")).lower() == "off":
-        extras["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+    thinking_on = str(config.get("models", "reasoning", "off")).lower() == "on"
+    body: dict[str, Any] = {"chat_template_kwargs": {"enable_thinking": thinking_on}}
+    budget = int(config.get("models", "thinking_token_budget", 0) or 0)
+    if thinking_on and budget > 0:
+        body["thinking_token_budget"] = budget
+    extras["extra_body"] = body
     return extras
 
 
