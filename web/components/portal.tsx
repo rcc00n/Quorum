@@ -14,6 +14,8 @@ import {
   FileSearch,
 } from "lucide-react";
 import { Spectrum } from "./spectrum";
+import { EditionNotes } from "./editorial";
+import { visibleStories, isQuietDay } from "@/lib/editorial";
 import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
 import type { Publication } from "@/lib/analysis";
 import { Brand } from "./brand";
@@ -542,8 +544,8 @@ export function Portal({
                           {view === "history"
                             ? "Daily digests"
                             : view === "topic"
-                              ? "Ten major events"
-                              : "Today’s top events"}
+                              ? "Important stories"
+                              : "Today’s important stories"}
                         </h2>
                         <span className="edition-label">{day}</span>
                       </div>
@@ -572,15 +574,20 @@ export function Portal({
                         )
                       ) : (
                         (() => {
-                          const events = (data?.events || [])
-                            .filter(
-                              (e) =>
-                                e.date === day &&
-                                (topic
-                                  ? e.topic_id === topic
-                                  : user?.topics.includes(e.topic_id)),
-                            )
-                            .slice(0, 10);
+                          const events = visibleStories(
+                            data?.events || [],
+                            day,
+                            topic,
+                            user?.topics || [],
+                          );
+                          const quiet = !!data?.editions?.some(
+                            (e) =>
+                              e.date === day &&
+                              (topic
+                                ? e.topic_id === topic
+                                : !!user?.topics.includes(e.topic_id)) &&
+                              isQuietDay(data, e),
+                          );
                           return events.length ? (
                             events.map((e, i) => (
                               <article className="event-row" key={e.id}>
@@ -604,6 +611,23 @@ export function Portal({
                                 )}
                               </article>
                             ))
+                          ) : quiet ? null : data?.status === "error" ||
+                            data?.publication?.status === "error" ? (
+                            <Empty title="This edition is unavailable">
+                              A data or processing failure prevented this
+                              edition from loading. No completed quiet day is
+                              inferred.
+                            </Empty>
+                          ) : data?.publication?.status === "stale" ? (
+                            <Empty title="This stored edition is out of date">
+                              No stories are available in this stored edition. A
+                              current result has not been supplied.
+                            </Empty>
+                          ) : data?.publication?.status === "partial" ? (
+                            <Empty title="This edition is incomplete">
+                              No completed major-story selection was supplied.
+                              Further results may still be missing.
+                            </Empty>
                           ) : (
                             <Empty title="Space for a clearer picture">
                               No published events are available for this
@@ -612,6 +636,14 @@ export function Portal({
                             </Empty>
                           );
                         })()
+                      )}
+                      {data && view !== "history" && (
+                        <EditionNotes
+                          snapshot={data}
+                          day={day}
+                          topic={topic}
+                          followed={user?.topics || []}
+                        />
                       )}
                     </section>
                     <aside className="brief-aside">

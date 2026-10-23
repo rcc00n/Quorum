@@ -20,6 +20,7 @@ import type {
 } from "@/lib/analysis";
 import { displayTime } from "@/lib/analysis";
 import { Spectrum } from "./spectrum";
+import { StoryArticle } from "./editorial";
 
 const statusNames = {
   established: "Established",
@@ -484,6 +485,7 @@ export function AnalysisWorkspace({
           )}
         </>
       )}
+      <StoryArticle event={event} />
       <nav className="analysis-navigation" aria-label="Analysis sections">
         <a href="#evidence-explorer">
           <SearchCheck size={16} />

@@ -55,3 +55,13 @@ Use [deploy/README.md](../deploy/README.md). Switch only the Quorum release syml
 These deployment gates do not close sponsor or genuine upstream-result gates.
 
 Current release `20261023-web-portals-09f5325` / code `09f5325` passed these deployment gates; rollback is `20261022-web-portals-r2`. See [exact production evidence](PORTAL_VERIFICATION.md#production-release-evidence--integration-readiness). Checkmarks in earlier proposal review sections remain historical; sponsor/contract gates stay open.
+
+## Product reconciliation milestone — no production release
+
+- [x] Explicit permission to merge master into feature only recorded; clean baseline `96eb337`, manual conflict resolution `05e87b4`, both histories preserved.
+- [x] Approved impact/article/roundup flow supported additively; production input schema unchanged, identity conflict documented and held.
+- [x] Existing 38 Django/snapshot regressions, six upgrade tests, Next build/typecheck, contract/tooling/ratings/editorial and old/new HTTP/browser tests pass locally.
+- [x] Completed quiet-day versus pending/error/partial/stale cases, context attribution guards, Unicode code-point offsets and photo prerequisites covered with TEST/DEMO data.
+- [x] Production, accounts, publisher, credentials and remote processing untouched; production release remains `20261023-web-portals-09f5325`.
+- [ ] Hosted CI and draft PR mergeability verified after pushing this implementation.
+- [ ] Real reasoning sample/schema mapping and transport approved; real end-to-end gate remains open.

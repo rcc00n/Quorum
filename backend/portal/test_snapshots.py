@@ -497,3 +497,26 @@ class IndependenceAndAccessTests(SimpleTestCase):
         a["claims"][2]["contradicting"][0]["document_id"] = d["id"]
         with self.assertRaisesRegex(SnapshotError, "coverage_only_evidence"):
             validate_snapshot(p)
+
+
+class ReasoningHandoffTests(SimpleTestCase):
+    def test_unicode_code_point_offsets_not_utf8_bytes(self):
+        p = sample()
+        citation = p["events"][0]["analysis"]["claims"][0]["supporting"][0]
+        citation.update(
+            quote="A😀é", char_start=4, char_end=7, content_hash_at_quote="a" * 64
+        )
+        validate_snapshot(p)
+        citation["char_end"] = 4 + len(citation["quote"].encode("utf-8"))
+        with self.assertRaisesRegex(SnapshotError, "invalid_quote_offsets"):
+            validate_snapshot(p)
+
+    def test_reasoning_version_requires_explicit_mapping(self):
+        from .snapshot_compatibility import compatibility_report
+
+        payload = sample()  # DEMO portal envelope, not a genuine upstream result.
+        payload["schema_version"] = "1.0"
+        report = compatibility_report(json.dumps(payload).encode())
+        self.assertFalse(report["compatible"])
+        self.assertFalse(report["published"])
+        self.assertTrue(any(i["code"] == "schema_const" for i in report["issues"]))

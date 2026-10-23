@@ -25,6 +25,7 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex | Optional reading-first article and edition/roundup presentation; explicit completed quiet-day guard; cap ten per topic, not a target | Adopt approved product flow while preserving legacy snapshots and all evidence appendices; production schema/mapping still awaits reasoning agreement |
 | 2026-10-22 | rcc00n / Codex | Plain shared CSS, Inter from npm, Georgia fallback, Lucide; outside-repository build | Minimal dependency surface, reproducible fonts, no vendored dependencies in public checkout |
 | 2026-10-22 | rcc00n / Codex | Neutral editorial layout; transient entrance/hover/loading transitions with reduced-motion support | Prioritize reading, accessible hierarchy and calm interaction |
 | 2026-10-22 | rcc00n / Codex | Optional structured analysis with native disclosures, comparison and public-safe trace; retain legacy evidence arrays | Make evidence inspectable without fabricated metrics or requiring an approved upstream API prematurely |
@@ -37,3 +38,6 @@ Snapshot implementation and unapproved transport: [portal-owned proposal](../doc
 `web/tests/analysis.cjs` tests the rich UI against an externally projected DEMO snapshot (`QUORUM_ANALYSIS_FIXTURE`); this is not real integration. Exact fixture preparation and test evidence are in the release record.
 
 Integration acceptance: `node web/tests/contract.cjs` checks a production-validated projection against the actual TypeScript model. `node web/tests/boundary.cjs` (with external Playwright/Chromium) starts isolated temporary Django/Next/proxy processes, publishes only a labelled TEST snapshot locally, authenticates a generated test account, checks actual API JSON/types/UI and exercises corrections, dateless links, rollback and three widths. It never points at production or uses provisioned account passwords. Existing `analysis.cjs` retains deterministic hostile-service/stale/missing-state UI cases.
+
+
+`lib/editorial.ts` holds optional presentation-only types and guards, not the reasoning API. Article prose requires resolved claims; photo rendering additionally requires a confirmed-rights flag, approved source hosts and complete credit/license metadata. No photo is synthesized or fetched in tests. The backend schema does not yet emit these fields. `node web/tests/editorial.cjs` and the extended `analysis.cjs` cover the additions; the real local `boundary.cjs` still exercises the original auth/admin/API and rich UI suite. Palette/font reconciliation is held per DECISIONS.md; no new design identity is chosen here.

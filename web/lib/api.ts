@@ -1,3 +1,4 @@
+import type { ArticlePresentation, EditionPresentation } from "./editorial";
 import type { StructuredAnalysis, Publication } from "./analysis";
 export type User = {
   username: string;
@@ -33,6 +34,7 @@ export type Evidence = {
 };
 // Portal view model only: reasoning owners must approve their own upstream contract.
 export type Event = {
+  article?: ArticlePresentation;
   analysis?: StructuredAnalysis;
   id: string;
   topic_id: string;
@@ -48,6 +50,7 @@ export type Event = {
   sources: Source[];
 };
 export type Snapshot = {
+  editions?: EditionPresentation[];
   publication?: Publication;
   errors?: { code: string; message: string; event_id: string | null }[];
   catalog_revision?: string | null;

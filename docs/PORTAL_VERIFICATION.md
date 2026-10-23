@@ -91,3 +91,11 @@ Remaining blockers: no actual reasoning result/schema or verified trace/correcti
 ### Concurrent upstream change / branch-isolation limit
 
 Final fetch found `origin/yelysei/agents@f3a32ec` and master `c3cc5ac` (PR #3 merged by the team during this session). Read-only review found a written reasoning snapshot proposal, still no runtime sample. Its illustrative JSON failed read-only compatibility validation as expected; diagnostics stayed private/value-free and no publication occurred. Updated field gaps/options are in PORTAL_INTEGRATION.md. Draft PR #1 is now CONFLICTING with master. No merge/rebase/cherry-pick or master write was attempted; strict branch isolation takes precedence. Production remains the tested `09f5325` release, unaffected by this remote documentation change.
+
+## Product reconciliation — local-only milestone (2026-10-22 client date)
+
+Authorized merge `05e87b4` incorporates master `c3cc5ac` into feature/web-portals only. README/DECISIONS conflicts were resolved individually, preserving team product changes and portal/auth/security history. New optional UI models do not alter the production input schema. Article/roundup/quiet-day flow is tested; palette/font contradiction is documented and held.
+
+Local evidence: 38 Django/snapshot tests (including Unicode offsets and explicit upstream-version mismatch), six upgrade safety tests, Next production build/typecheck, four tooling checks, ratings/editorial invariants and TypeScript contract check pass. `web/tests/boundary.cjs` passes actual local API/auth/admin/original-route checks plus extended `analysis.cjs` article/roundup/quiet/pending/error/partial/stale and 1440/768/390 tests. Desktop/mobile article screenshots were visually reviewed outside Git. No photo is fetched by the synthetic rights/host unit tests; no real photo license verification is claimed.
+
+Doctor PASS=15 FAIL=0 BLOCKED=1 NOT_TESTED=1; verify PASS=19 FAIL=0 BLOCKED=14 NOT_TESTED=1, no inference. Missing sponsor credentials/runtime remain actual blockers. Anastasia's confirmed semantics are attributed to Issue #2, not presented as an authenticated Zetaris run by this milestone. No genuine reasoning JSON exists yet. Production/account/configuration was not accessed or changed in this milestone; deployed code stays `09f5325`.

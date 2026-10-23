@@ -53,7 +53,32 @@ const assert = require("node:assert/strict");
         .getByRole("heading", { name: "Evidence Explorer", exact: true })
         .waitFor();
     }
+    const claims = response.events[0].analysis.claims;
+    response.events[0].article = {
+      paragraphs: claims
+        .filter((c) => c.status !== "disputed")
+        .map((c) => ({
+          kind:
+            c.status === "established"
+              ? "fact"
+              : c.status === "attributed"
+                ? "statement"
+                : "not_confirmed",
+          text: c.text,
+          claim_ids: [c.id],
+        })),
+    };
     await open();
+    await page
+      .getByRole("article", { name: "Source-backed article" })
+      .waitFor();
+    assert.ok(
+      await page
+        .getByText("Across the spectrum · Evidence and investigation", {
+          exact: true,
+        })
+        .count(),
+    );
     await page
       .getByText(
         "DEMO · Fictional interface fixture. Not verified news or live findings.",
@@ -131,6 +156,63 @@ const assert = require("node:assert/strict");
     await page
       .getByText("No investigation trace supplied.", { exact: false })
       .waitFor();
+    response.events = [];
+    response.errors = [];
+    response.editions = [
+      {
+        topic_id: "demo-topic",
+        date: "2026-10-22",
+        completion: "complete",
+        quiet_day: true,
+        summary: "DEMO — completed fictional edition.",
+        roundup: [
+          {
+            name: "DEMO notes",
+            items: [
+              {
+                event_id: null,
+                text: "DEMO — fictional below-bar item.",
+                status: "unknown",
+                sources: [],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    response.publication.status = "available";
+    response.publication.fallback = false;
+    await page.goto(root + "/topics/demo-topic?date=2026-10-22");
+    await page
+      .getByRole("heading", {
+        name: "A quiet day for major stories",
+        exact: true,
+      })
+      .waitFor();
+    await page
+      .getByRole("heading", { name: "Also today", exact: true })
+      .waitFor();
+    for (const [status, title] of [
+      ["pending", "Space for a clearer picture"],
+      ["error", "This edition is unavailable"],
+      ["partial", "This edition is incomplete"],
+      ["stale", "This stored edition is out of date"],
+    ]) {
+      response.publication.status = status;
+      await page.reload();
+      await page.getByRole("heading", { name: title, exact: true }).waitFor();
+      assert.equal(
+        await page
+          .getByRole("heading", {
+            name: "A quiet day for major stories",
+            exact: true,
+          })
+          .count(),
+        0,
+      );
+    }
+    response = structuredClone(demo);
+    await open();
     fail = true;
     await page.reload();
     await page

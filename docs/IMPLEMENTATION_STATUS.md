@@ -54,3 +54,18 @@ Owners: Vadim for all rows; branch `feature/web-portals`; PR #1. Exact implement
 Release evidence: code commit `09f5325c78fe71677c46a83f952c04b602e6fc7b`, branch `feature/web-portals`, PR #1. [Hosted CI](https://github.com/rcc00n/Quorum/actions/runs/39887513802), 36 Django + six upgrade tests and real local HTTP/browser boundary pass. Website-only release deployed and verified; eight accounts/password hashes/roles and preference rows preserved (normal login timestamps changed). Snapshot publication, transport and machine credentials remain disabled/unconfigured. Genuine processing integration remains BLOCKED.
 
 Concurrent upstream update: reasoning `f3a32ec` now documents an output proposal; matrix and local rejection of its illustrative JSON are recorded in PORTAL_INTEGRATION.md. Real-result integration remains BLOCKED. Master concurrently advanced to `c3cc5ac`; PR #1 conflicts. No merge/rebase/cherry-pick is authorized or attempted. Existing deployed code remains `09f5325`.
+
+## Approved product reconciliation — feature/web-portals only
+
+Owner Vadim; merge `05e87b4`, implementation in PR #1. Production remains `20261023-web-portals-09f5325`, unchanged in this milestone.
+
+| Feature ID | Status | Evidence / remaining dependency |
+| --- | --- | --- |
+| WEB-RECONCILE | TESTED | Manual README/DECISIONS conflict resolution preserves team and portal/auth history; ARCHITECTURE imported from approved master; no history rewrite |
+| WEB-ARTICLE | TESTED | Optional claim-linked prose ahead of analysis appendices; context/attribution guards and responsive DEMO browser checks. Needs real approved editorial mapping; not deployed |
+| WEB-ROUNDUP | TESTED | Also today groups/status/source links, optional edition model, no synthesized rankings; cap ten per topic. Needs real reasoning output; not deployed |
+| WEB-QUIET | TESTED | Explicit completed/available empty selection only; pending/error/partial/stale are distinct in unit/browser cases. No quiet-day inference from missing data |
+| WEB-PHOTO | TESTED | Optional metadata/host/rights guards, attribution and failure handling; no actual photo used or rights independently verified. Upstream license review still required |
+| WEB-IDENTITY | BLOCKED | Approved team red/blue/rounded direction conflicts with earlier explicit neutral palette instruction; only this visual-identity change is held |
+
+38 Django tests, six upgrade tests, Next build/typecheck, four tooling checks, contract/ratings/editorial tests and the HTTP/browser boundary pass locally. See PR #1 for exact implementation commit and hosted CI evidence. No genuine processing integration is claimed. Earlier merge-conflict blocker is superseded by the newly authorized merge; no production account/configuration, transport or publisher changed.

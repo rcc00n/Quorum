@@ -26,5 +26,5 @@ jobs:
       - run: python backend/manage.py check && python backend/manage.py makemigrations --check --dry-run
       - run: python backend/manage.py test portal && python -m unittest discover -s deploy -p 'test_*.py'
       - run: python backend/manage.py portal_snapshot validate --file backend/portal/fixtures/analysis-demo.json
-      - run: bash deploy/build-web.sh && node web/tests/ratings.cjs
+      - run: bash deploy/build-web.sh && node web/tests/ratings.cjs && node web/tests/editorial.cjs
       - run: QUORUM_PYTHON=python node web/tests/contract.cjs
