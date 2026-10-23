@@ -42,3 +42,19 @@ Rules:
 - Inspect actual WSL version. Never convert WSL, replace Docker backends, start a Linux daemon on WSL1, expose Docker over unauthenticated TCP, or enable paid services without authorization.
 - Use the newly downloaded official Zetaris platform bundle (supersedes Freemium), with the organizer's Data layer and Meterless→Nemotron Power layer. Use the bundle's required default services and official preflight/verify scripts after resource/authentication checks; preserve supplied environment values. Never put Meterless keys in Cursor settings. Inference is opt-in (`--inference`); routine diagnostics must spend no provider credits.
 - Disk cleanup must preserve all user projects/data, models needed for the statistics exam, Docker containers/volumes and files created or modified since 2026-04-21. Windows deletions and WSL memory changes require explicit approval.
+
+## Shared Project Tracking and Cross-Agent Handoff
+
+The canonical cross-team release tracker is [GitHub Issue #2](https://github.com/rcc00n/Quorum/issues/2). It is shared across branches and computers; do not create a competing tracker or agent rulebook.
+
+Every coding assistant must:
+
+1. Before development, read Issue #2, the latest canonical `AGENTS.md`, `docs/DECISIONS.md`, its module README and relevant interface contracts. Fetch remote state and inspect other team branches read-only; identify the tracker items it owns.
+2. Work only in its authorized scope/branch: Vadim — `feature/web-portals` (web/platform); Anastasia — `data-collection`; Yelysei — `yelysei/agents`. Do not edit another owner's branch, code or decisions without agreement.
+3. Record progress as work proceeds. Give every feature a stable identifier, owner, explicit status, branch, commit/PR, relevant test evidence, operational evidence when applicable, remaining dependencies and release impact. Update assigned checklists only after verifying completion; preserve existing checked items and their evidence.
+4. Use `NOT_STARTED`, `IN_PROGRESS`, `IMPLEMENTED` (code exists), `TESTED` (relevant tests pass), `INTEGRATED` (actual required components work together), `DEPLOYED` (verified in the intended environment), `BLOCKED` (name the concrete dependency), or `DEFERRED`. These are evidence states, not interchangeable claims. Fixtures, mocks and prepared scripts never establish live integration.
+5. Record interface changes another owner must adopt and concrete integration blockers in Issue #2. Project decisions still follow section 2 above. Never silently remove a feature or overwrite another owner's decision.
+6. Before integration, merge or deployment, recheck completed features and relevant contracts, run regression checks and preserve existing data/accounts. Reopen failed items with evidence. Web releases follow `docs/RELEASE_CHECKLIST.md` on the web branch; its workstream inventory is `docs/IMPLEMENTATION_STATUS.md`. These files supplement, not replace, Issue #2.
+7. Finish each session with a short tracker update and handoff: completed/blocked IDs, branch/commit/PR, tests, actual integration/deployment evidence, next dependencies and recommended actions. Never publish secrets, credentials, private logs or unsupported completion claims.
+
+One-time adoption for old feature branches or already-running assistants: `git fetch origin`, then explicitly read `git show origin/master:AGENTS.md` and Issue #2 and ask the active assistant to apply them. Reading master does not automatically update a running session. Incorporate only the approved coordination commit (or its reviewed documentation diff); do not merge another feature branch's application code. Future sessions must repeat the tracker/rules read.

@@ -139,17 +139,22 @@ The account is built around the topics the user selects. The interface is simple
 
 ## Stack and work blocks
 
-Data flows through Zetaris, reasoning runs on NVIDIA Nemotron and Meterless, and the interface and backend are Next.js + TypeScript. The architecture is an agent system with verification loops, not a linear pipeline; its detailed design is a separate task on the board.
+Data flows through Zetaris and reasoning runs on NVIDIA Nemotron and Meterless. The user-facing frontend is Next.js + TypeScript; Django owns authentication, user management, administration and web-facing API endpoints.
+
+Previous stack decision (superseded 2026-10-22 by explicit human team-approved clarification): interface and backend both used Next.js + TypeScript. Collectors and reasoning ownership and architecture are unchanged. The architecture is an agent system with verification loops, not a linear pipeline; its detailed design is a separate task on the board.
 
 | Layer | Technology | Role |
 | --- | --- | --- |
 | Data | Zetaris | Single data layer. SQL queries across different sources as if they were one database. |
 | Reasoning | NVIDIA Nemotron, Meterless | Claim verification, agent processes. |
 | Independent review | Additional LLMs | Independent review of complex conclusions, if the rules allow. |
-| Interface and backend | Next.js + TypeScript | Portal: account, topic, story and roundup pages. |
-| User accounts | Django | Proposed by Vadim and agreed in the team chat on 2026-10-22 for user management and its built-in security. Whether Django is only the auth layer or the whole backend next to Next.js is open (see "Still to clarify"). |
-| Deployment | quorum.raccncode.com | Temporary host for the user portal, set up by Vadim. |
-| Development | Cursor / Codex / Claude Code — each team member's own | Rules for all assistants are in [AGENTS.md](../AGENTS.md). Verify the track requirements in HackOS: the event page lists NVIDIA, Zetaris, SpaceX AI and Meterless as sponsors. |
+| Reasoning orchestration | Python, LangGraph; LangGraph Studio for development and the demo | The reasoning block is one LangGraph graph with verification loops; agents read only through Zetaris and write their results to Postgres directly; one run per topic per day plus on-demand runs. Design: [ARCHITECTURE.md](ARCHITECTURE.md). |
+| Interface | Next.js + TypeScript | User portal: account, topic, story and roundup pages. |
+| Web backend and administration | Django | Session authentication, preferences, web API, Quorum Control. Dedicated portal database, separate from collector tables. A typed read-only adapter reads published reasoning snapshots; the contract is being agreed (see "Still to clarify"). |
+| Deployment | quorum.raccncode.com | Isolated lightweight VPS for the portal, set up by Vadim. No inference, collectors or Zetaris run there. |
+| Development | Each member's own assistant: Codex (Vadim), Claude Code (Yelysei), Nastya's choice | Rules for all assistants are in [AGENTS.md](../AGENTS.md); the shared tracker is [Issue #2](https://github.com/rcc00n/Quorum/issues/2). Routine checks do not require Cursor; its interactive acceptance is historical opt-in diagnostics. The reported organizer removal of mandatory Cursor is human-reported, not independently verified — see [rules evidence](RULES_CHECK.md). Verify the track requirements in HackOS: the event page lists NVIDIA, Zetaris, SpaceX AI and Meterless as sponsors. |
+
+Previous development-tool listing (superseded 2026-10-22 by explicit human workflow clarification): Cursor / Codex / Claude Code, each team member’s own. Cursor installation/interactive acceptance is now historical opt-in diagnostics, excluded from routine readiness. This does not waive Zetaris/Meterless integration or certify submission compliance. A later wording of the row, "Codex — current team workflow", was superseded the same day: the team does not share one assistant.
 
 **Three work blocks and who owns them** (agreed in the team chat on 2026-10-22; not a strict split, everything is discussed together)
 
@@ -157,7 +162,7 @@ Data flows through Zetaris, reasoning runs on NVIDIA Nemotron and Meterless, and
 2. Analysis and reasoning, the agent architecture — Yelysei.
 3. Frontend, interface, UI/UX — Vadim.
 
-**Git.** Nobody works on `master`. Each member works on their own branch, named `<name>/<area>` (`nastya/data`, `yelysei/agents`, `vadim/frontend`), and merges to `master` through a pull request.
+**Git.** Nobody works on `master`. Each member works on their own branch — `data-collection` (Nastya), `yelysei/agents` (Yelysei), `feature/web-portals` (Vadim), as listed in [AGENTS.md](../AGENTS.md#shared-project-tracking-and-cross-agent-handoff) — and merges to `master` through a pull request.
 
 **What the judges consider a strong submission:** agents that delegate tasks dynamically, critique and validate outputs, work in planner — executor — evaluator loops, share memory, can branch, retry, escalate and recover, and leave reasoning traces. A chain "agent A → agent B → agent C" with no feedback is rated as weak.
 
@@ -186,12 +191,20 @@ Four things are deferred. For the first of them, data accumulates from day one.
 Seven questions the team has not closed yet.
 
 - [ ] Whether the model's own rating is needed as a fifth mode already in the MVP. Default: no.
-- [ ] Django's scope: only user accounts and auth, or the whole backend next to Next.js. Decide before the frontend and the agent layer agree on how they read the database.
+- [ ] The reasoning output contract and its transport to the portal. Reasoning's proposal is [ARCHITECTURE.md § 8](ARCHITECTURE.md); the portal's validated proposal is [SNAPSHOT_PROPOSAL.md](SNAPSHOT_PROPOSAL.md). One schema must come out of the two, owned by reasoning, before either side codes the live bridge.
 - [ ] The impact-bar threshold: start at 6 of 9 with confirmation ≥ 1, then calibrate on the first real days.
 - [ ] Which official government bodies are in the hackathon slice, and which event we take for the demo.
 - [ ] Language of the interface and the demo: the judges are English-speaking.
 - [ ] The track's requirements for sponsor technologies and development tools — verify on the challenge page in HackOS.
 - [ ] Where the audience estimates for the Y axis and cohort shares come from.
+
+## Portal integration proposal
+
+Explicit human authorization permits a portal-owned versioned snapshot **proposal**, strict local validation/publication scaffolding and optional rich evidence presentation, without making it the reasoning API. See [proposal and approval dependencies](SNAPSHOT_PROPOSAL.md). Reasoning retains schema ownership; transport credentials and production publication remain disabled until cross-team agreement. No collector/reasoning architecture is changed.
+
+## Shared development coordination
+
+[GitHub Issue #2](https://github.com/rcc00n/Quorum/issues/2) is the canonical cross-team feature/release tracker. Every assistant follows the tracking/handoff protocol in [AGENTS.md](../AGENTS.md#shared-project-tracking-and-cross-agent-handoff), with evidence-backed states and read-only inspection of other owners' branches. Module inventories and release checklists supplement this tracker; product and architecture decisions remain here. This coordination amendment does not approve unfinished application code or change data/reasoning architecture.
 
 ## Decision log
 
@@ -199,9 +212,15 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | Yelysei / Claude | Reasoning block: Python and LangGraph, LangGraph Studio for development and the demo; agents read only through Zetaris and write results to Postgres directly; one run per topic per day plus on-demand runs; design in ARCHITECTURE.md | Loops, checkpoints and a visible trace come with the library; the data block is Python already |
+| 2026-10-22 | Yelysei / Claude | Merged this file across branches: kept the coordination and portal rows (master, PR #1), the stack rows and superseded notes from PR #1, and restated the Development row as each member's own assistant | Three branches edited this file on the same day; "Codex — current team workflow" implied one tool for the team, but Vadim uses Codex and Yelysei uses Claude Code |
+| 2026-10-22 | rcc00n / Codex, explicit human portal-foundation authorization | Implement the portal-owned snapshot proposal and optional evidence/trace views; upstream schema and production transport remain unapproved. | Prepare a tested integration target without dictating reasoning output or enabling production ingestion. |
+| 2026-10-22 | rcc00n / Codex, explicit human coordination authorization | Issue #2 is the canonical shared tracker; every assistant follows the AGENTS.md tracking/handoff protocol across branches. | Preserve feature ownership, completion evidence and regression checks across independent sessions without merging application work. |
+| 2026-10-22 | rcc00n / Codex, explicit human workflow update | Use Codex; exclude Cursor gates from routine readiness and retain optional historical checks. Treat the reported organizer change as unverified; preserve sponsor requirements. | Match actual development workflow without claiming that conflicting public rules or submission compliance have been resolved. |
+| 2026-10-22 | rcc00n / Codex, explicit human team-approved amendment | Next.js frontend; Django auth, administration and web API; dedicated persistent SQLite portal database. Typed read-only integration adapter pending reasoning contract. | Clarify team ownership without changing data or reasoning architecture; isolated lightweight VPS deployment. |
 | 2026-10-22 | Yelysei / Claude | Ten stories a day is a cap, not a target: an absolute impact bar scored on an open rubric, confirmation as a gate, no minimum, quiet days stated plainly; an "Also today" roundup carries everything below the bar | Padding to ten dilutes the product; saying "nothing important today" builds trust |
 | 2026-10-22 | Yelysei / Claude | Stories are short articles built only from verified claims: facts with sources, attributed statements, "not confirmed" at the end, fixed order, no evaluation and no "why it matters"; photos only from public-domain or openly licensed sources, with credits; the spectrum analysis is an appendix | Readers form their own view from facts; section headings read like a dashboard, and evaluation hides in "why it matters" |
 | 2026-10-22 | Yelysei / Claude | Interface in the manner of Apple News: topic cards with a photo and a rounded display font, text instead of metrics, analysis behind links; type and colors as in "User account and interface" | A few readable elements beat many metrics (agreed with Vadim); a first draft felt like an analytics console |
-| 2026-10-22 | Yelysei, Vadim, Nastya / team chat | Work split: Nastya — data collection, Yelysei — analysis and reasoning, Vadim — interface; one branch per member, `master` only through pull requests; portal temporarily at quorum.raccncode.com; user accounts via Django, scope to confirm | Start building in parallel without stepping on each other |
+| 2026-10-22 | Yelysei, Vadim, Nastya / team chat | Work split: Nastya — data collection, Yelysei — analysis and reasoning, Vadim — interface; one branch per member, `master` only through pull requests; portal temporarily at quorum.raccncode.com; user accounts via Django | Start building in parallel without stepping on each other |
 | 2026-10-22 | Yelysei / Claude | Repository documentation, including this file, is written in English | Readable for the judges and for the whole team |
 | 2026-10-22 | Yelysei / team discussion in chat, written up with Claude | First version: MVP scope, principles for handling facts, four rating modes and cohorts, model-based selection of major news, source list, user account, stack, demo, what comes after the hackathon | Fix the team's agreements before the source audit and the architecture design begin |
