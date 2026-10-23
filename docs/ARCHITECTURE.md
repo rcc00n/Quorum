@@ -1,0 +1,262 @@
+# Quorum — reasoning architecture
+
+Owner: analysis and reasoning (Yelysei). First version 2026-10-22. Product decisions this document implements are in [DECISIONS.md](DECISIONS.md); the data contract it reads is [collectors/README.md](../collectors/README.md) and [collectors/schema.sql](../collectors/schema.sql) on `data-collection`; the portal it feeds is described in [PORTAL_INTEGRATION.md](PORTAL_INTEGRATION.md) on `feature/web-portals`. When this document and DECISIONS.md disagree, DECISIONS.md wins and this one is fixed.
+
+## 1. In one paragraph
+
+The reasoning block is a LangGraph graph in Python. Once a day per topic (and on demand for the demo) it reads the day's documents through Zetaris, groups them into events, extracts checkable claims, hunts for evidence, verifies each claim by fixed rules, lets an independent fact-checker re-verify blind, scores each event against the impact bar, writes a short article for every story above the bar and a roundup for everything below it, has a critic reject anything that breaks the writing rules, and publishes one snapshot per topic and day for the portal. Every step writes a trace row. Code computes; agents judge.
+
+## 2. What is code and what is an agent
+
+| Code (deterministic, SQL or Python) | Agent (an LLM call inside a graph node) |
+| --- | --- |
+| Confirmation rule: signed document, or two independent `independence_group`s | Whether a passage supports, contradicts or is neutral to a claim |
+| Spread (every publication) vs confirmation (independent groups only) | Grouping publications into one event when text similarity is borderline |
+| Impact-bar score from rubric points; the threshold; the cap of ten | The rubric points themselves: legal force, reach, irreversibility, with a one-line rationale each |
+| Cohort shares under the selected rating mode; coverage and silence | Extracting atomic checkable claims from a text |
+| Ordering of the article (facts chronological, then statements, then not confirmed) | Writing the article and the roundup lines |
+| Adjudication: two verdicts agree → final; disagree → disputed | Critique of a draft against the writing rules |
+| Loop limits, retries, idempotent writes | Labeling how an outlet frames a story (highlights, omits, wording) |
+
+Rule of thumb: if a judge could ask "why this number?", it is code. If the answer is "it read the text", it is an agent, and its output is stored with the input it saw.
+
+## 3. Layers and data flow
+
+```mermaid
+flowchart LR
+  subgraph collection["Data collection (Nastya)"]
+    RSS[RSS, APIs, GDELT, official sites] --> PG[(Postgres: sources, topics, documents, official_docs)]
+  end
+  subgraph zetaris["Zetaris (read-only for agents)"]
+    PG --> Z[Lightning SQL over Postgres + CSV ratings + REST sources]
+  end
+  subgraph reasoning["Reasoning (Yelysei) — LangGraph"]
+    Z --> G[Graph: cluster, extract, research, verify, fact-check, score, write, critique]
+    G --> A[(Postgres schema analysis: events, claims, evidence, verdicts, articles, roundups, run_steps, snapshots)]
+    G --> Q[(quotes, coverage — collection schema, reasoning rows)]
+  end
+  subgraph portal["Portal (Vadim) — Django + Next.js"]
+    A --> AD[Read-only adapter: GET snapshots] --> UI[Home, topic, story, roundup]
+  end
+```
+
+- Agents read only through Zetaris. One SQL query joins documents, the source registry with ratings and an official-document feed; this is the sponsor technology doing real work, not a wrapper.
+- Agents write to the `analysis` schema in the same Postgres directly (Zetaris is read-only for us), plus `quotes` and `coverage` rows in the collection schema, exactly as its README allows.
+- Article text is never stored. Reasoning calls the collection block's `fetch_text(url)` at analysis time, which honours robots.txt and the source's access level, and stores only verbatim quotes with offsets and the content hash. Official documents are read in full from `official_docs`.
+- The portal never reads `analysis` tables directly. It pulls published snapshots (section 8). Nothing from reasoning runs on the portal VPS.
+
+## 4. Storage owned by reasoning
+
+Schema `analysis` in the shared Postgres. All timestamps UTC. All ids stable across reruns of the same day (section 6).
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `runs` | `id`, `topic_id`, `edition_date`, `started_at`, `finished_at`, `status`, `graph_version`, `config_json` | One row per graph run. `status`: running, ok, partial, failed. |
+| `run_steps` | `id`, `run_id`, `node`, `iteration`, `event_id`, `input_ref`, `output_ref`, `decision`, `reason`, `model`, `tokens_in`, `tokens_out`, `duration_ms`, `created_at` | The trace. One row per node execution. Loops show as the same `node` with `iteration` 2, 3. |
+| `events` | `id`, `run_id`, `topic_id`, `edition_date`, `headline`, `standfirst`, `rubric_json`, `rubric_total`, `confirmation_level`, `above_bar`, `rank`, `cluster_version` | `id` = `sha1(topic_id, edition_date, sorted document ids)[:12]`, so a rerun of the same day keeps the same id when the cluster is the same. |
+| `event_documents` | `event_id`, `document_id`, `similarity`, `merged_by` | `merged_by`: code or model. |
+| `claims` | `id`, `event_id`, `text`, `origin_document_id`, `origin_quote_id`, `kind` | `kind`: fact, statement, number. `id` = `sha1(event_id, normalized text)[:12]`. |
+| `evidence` | `id`, `claim_id`, `quote_id`, `stance`, `found_by`, `independence_group`, `is_document` | `stance`: supports, contradicts, neutral, statement. `found_by`: researcher, verifier, fact_checker. |
+| `verdicts` | `claim_id`, `verifier_status`, `verifier_reason`, `fact_checker_status`, `fact_checker_reason`, `final_status`, `adjudication` | `final_status`: confirmed, disputed, unverified. |
+| `framings` | `event_id`, `source_id`, `highlights`, `omits`, `wording`, `example_document_id`, `interpretation_label` | One row per outlet that covered the event. |
+| `articles` | `event_id`, `version`, `body_json`, `photo_json`, `reading_minutes`, `critic_status`, `critic_notes` | `body_json` is the block list of section 8. Versions kept: the critic's rejections are evidence for the demo. |
+| `roundups` | `topic_id`, `edition_date`, `body_json`, `empty_day` | One per topic and day. |
+| `snapshots` | `topic_id`, `edition_date`, `version`, `json`, `published_at` | What the portal pulls. Immutable per version. |
+
+`quotes` and `coverage` live in the collection schema; reasoning inserts rows and never alters their schema. A `quotes` insert is rejected by collection if the quote is not found verbatim at the URL; reasoning treats a rejection as "no evidence", never as an error to retry around.
+
+## 5. The graph
+
+One `StateGraph` per topic run. Nodes are plain Python functions that return partial state; the LLM calls live inside them. Loops are conditional edges back into the graph. Every node writes its `run_steps` row before returning.
+
+```mermaid
+flowchart TD
+  P[plan] --> C[cluster]
+  C --> S[score_importance]
+  S --> X[extract_claims]
+  X --> R[research]
+  R --> V[verify]
+  V -->|evidence thin and rounds < 2| R
+  V --> F[fact_check]
+  F --> J[adjudicate]
+  J --> FR[frame]
+  FR --> W[write]
+  W --> K[critique]
+  K -->|rejected and drafts < 3| W
+  K --> RU[roundup]
+  RU --> PUB[publish]
+  J -->|no confirmed claim after all rounds| E[escalate: needs review]
+  E --> RU
+```
+
+### State
+
+```python
+class RunState(TypedDict):
+    run_id: str
+    topic_id: str
+    edition_date: str            # YYYY-MM-DD, America/New_York edition day
+    documents: list[DocRef]      # ids, source, times, access level — no text
+    events: list[Event]          # clusters with rubric scores and above_bar
+    claims: dict[str, Claim]     # claim_id -> claim, with evidence and verdicts
+    research_rounds: dict[str, int]   # event_id -> rounds used
+    drafts: dict[str, list[Article]]  # event_id -> article versions
+    critic_verdicts: dict[str, str]
+    roundup: Roundup | None
+    snapshot_version: int
+    errors: list[StepError]      # recoverable failures, shown in the trace
+```
+
+### Nodes
+
+| Node | Input | Output | Model? |
+| --- | --- | --- | --- |
+| `plan` | topic, date, document counts | which events get a research budget (rounds), which sources failed today | no |
+| `cluster` | documents for the day | events; similarity by TF-IDF cosine in code, borderline merges confirmed by the model with the two leads as input | borderline only |
+| `score_importance` | each event's documents and official docs | rubric points with a one-line rationale each; total and `above_bar` by code; cap of ten by code | yes, for points |
+| `extract_claims` | fetched text of up to N documents per event (access level 1), leads only for level 2 | atomic claims with origin quote and offsets | yes |
+| `research` | claims, corpus via Zetaris, official docs; on round 2 also Google News RSS by domain through the collection fetcher | candidate passages per claim with stance | yes, for stance |
+| `verify` | evidence per claim | verifier status by the confirmation rule; "thin" flag when a claim has one group only and rounds remain | no, rule only |
+| `fact_check` | the claims and the corpus, nothing from `research` or `verify` | an independent status per claim with its own evidence | yes, different model when available |
+| `adjudicate` | both statuses | final status; disputed on disagreement; escalation when an event ends with zero confirmed claims | no |
+| `frame` | documents per outlet | highlights, omits, wording, interpretation label per outlet; cohort shares by SQL | yes, labels only |
+| `write` | confirmed claims, statements, open items, context facts | article blocks (section 8) and headline, standfirst | yes |
+| `critique` | the draft and the claim table | approved, or rejected with the offending sentence and the rule it breaks | yes |
+| `roundup` | events below the bar | one line per event with source and status, grouped, ordered by rubric total | yes, for the line text |
+| `publish` | everything | snapshot JSON, version +1, stored; summary paragraph for the topic page | yes, for the summary |
+
+### Loops and limits
+
+- `verify → research`: at most 2 research rounds per event. Round 2 is allowed to pull outside the day's corpus (Google News RSS by domain, official sites). The trace shows what round 2 fetched and whether it changed a verdict.
+- `critique → write`: at most 3 drafts. All drafts are kept in `articles` with the critic's notes. If draft 3 is still rejected the story is published with the critic's notes attached and flagged `needs review`; it is not silently dropped and not silently approved.
+- `adjudicate → escalate`: an event above the bar with zero confirmed claims after all rounds is removed from the stories and put into the roundup as "reported, not confirmed", with a `needs review` flag for the portal.
+- Source failure (403, timeout, robots.txt denial): recorded in `errors` and in the trace; the node continues with what it has. The topic summary says which sources were missing.
+- `recursion_limit` is set per run to 60 node executions; hitting it is a failed run, not an infinite loop.
+- Checkpointer: in-memory for development and the demo recording, Postgres (`langgraph-checkpoint-postgres`) when the daily schedule runs unattended, so a crashed run resumes at the failed node.
+- Idempotency: a node that is retried runs again from its start, so every write inside a node is an upsert keyed by the stable ids of section 4. Nothing is appended twice.
+
+## 6. Rules the code enforces
+
+**Confirmation.** A claim is `confirmed` when it is stated in an `official_docs` row of type law, order, vote or ruling, or when supporting evidence comes from at least two different `independence_group`s with `counted_in_confirmation = true`. `disputed` when supporting and contradicting evidence both exist, or when the verifier and the fact-checker disagree. Otherwise `unverified`. Statements by interested parties are never evidence for their own content.
+
+**Impact bar.** Points: legal force 0–2, reach 0–3, irreversibility 0–2, confirmation 0–2 (the last one computed, not judged). A story is shown when total ≥ 6 and confirmation ≥ 1. Up to ten per topic and day, ordered by total then confirmation. The threshold lives in `config/reasoning.toml`; changing it is a DECISIONS.md change.
+
+**Writing rules the critic checks.** Every sentence maps to a claim id or a `context` block with a source. A `fact` block contains only confirmed claims and carries their sources. A `statements` block attributes every statement in the sentence. A `not_confirmed` block lists unverified and disputed items. Order is fixed: facts (chronological), context, statements, not confirmed. Forbidden in the writer's voice: evaluative adjectives and adverbs, predictions, causal connectives without a sourced claim, and any variant of "why it matters". The headline has no adjectives. The critic returns the first violating sentence and the rule; the writer fixes only that.
+
+**Photos.** The writer may attach one lead photo and one inline photo only from the allow-list of sources in `config/photos.toml` (US federal sites, Wikimedia Commons with an open license), each with license, credit and a caption that states what is shown. No match → no photo.
+
+## 7. Models and cost
+
+| Use | Model | Notes |
+| --- | --- | --- |
+| Claim extraction, stance, framing labels, writing, critique, roundup lines, summary | NVIDIA Nemotron via Meterless (`meterless/auto` or a named lane) | Same route as `smoke_test.py`; keys only in `.env`. |
+| Fact-checker | A different model when the rules allow; otherwise Nemotron with its own context and tools | Independence comes first from the blind context and separate tools, second from model diversity. |
+| Embeddings for clustering | None in v0: TF-IDF cosine in Python | Good enough for one topic and one day; swap later without touching the graph. |
+
+Cost controls: one topic-day is roughly 40 documents, 5 events above the bar, 10 claims each — on the order of a few hundred model calls. Level-2 documents send leads only. Research round 2 runs only for thin claims. Nothing in routine checks spends credits (`verify-all.sh` stays as is); the graph runs only when started.
+
+## 8. Output contract for the portal
+
+Reasoning publishes one snapshot per topic and edition day. The portal's adapter pulls the latest version. The shape extends the current portal types rather than replacing them: every field the portal renders today can be derived from it, and the new fields (article body, rubric, roundup, trace) are what the product decisions need.
+
+```json
+{
+  "schema_version": "1.0",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-22",
+  "run_id": "…",
+  "version": 3,
+  "status": "ok | partial | empty",
+  "bar": {"threshold": 6, "confirmation_min": 1},
+  "summary": "Three stories crossed the bar out of 17 events. …",
+  "sources_missing": ["newsmax"],
+  "stories": [
+    {
+      "event_id": "a1b2c3d4e5f6",
+      "rank": 1,
+      "headline": "New US military aid package signed into law",
+      "standfirst": "Signed October 21. $… over two fiscal years. Senate 68–30, House 311–112.",
+      "reading_minutes": 3,
+      "rubric": {"legal_force": 2, "reach": 2, "irreversibility": 2, "confirmation": 2, "total": 8,
+                 "rationale": {"legal_force": "signed law", "reach": "national", "irreversibility": "no clawback provision"}},
+      "photo": {"url": "https://…", "credit": "U.S. Department of Defense", "license": "public domain", "caption": "…"},
+      "article": [
+        {"kind": "fact", "text": "On October 21 the President signed the aid bill into law.",
+         "claim_ids": ["c1"], "sources": [{"title": "signed text", "url": "https://…", "quote_id": 118}]},
+        {"kind": "context", "text": "The previous package took eleven weeks to ship.", "claim_ids": ["c7"], "sources": [{"title": "Reuters", "url": "https://…", "quote_id": 131}]},
+        {"kind": "statements", "text": "The White House says the first deliveries will reach the front “within weeks”. …", "claim_ids": ["c2", "c3"], "sources": [{"title": "statements", "url": "https://…"}]},
+        {"kind": "not_confirmed", "text": "A delivery date: no shipping or budget schedule has been published. …", "claim_ids": ["c2", "c9"], "sources": []}
+      ],
+      "claims": [
+        {"id": "c2", "text": "First deliveries will reach the front within weeks", "status": "disputed",
+         "verifier": "confirmed", "fact_checker": "unverified", "reason": "…",
+         "evidence": [{"stance": "supports", "quote": "…", "title": "AP", "url": "https://…", "independence_group": "ap", "quote_id": 120},
+                      {"stance": "contradicts", "quote": "…", "title": "Reuters", "url": "https://…", "independence_group": "reuters", "quote_id": 121}]}
+      ],
+      "spectrum": {
+        "rating_mode": "average",
+        "left": {"highlights": "…", "omits": "…", "wording": "…", "example_url": "https://…"},
+        "right": {"highlights": "…", "omits": "…", "wording": "…", "example_url": "https://…"},
+        "note": "Big and small outlets differ within each side: …",
+        "coverage": {"major_left": [7, 7], "minor_left": [9, 10], "major_right": [2, 2], "minor_right": [9, 13], "center": [1, 1]},
+        "interpretations": [{"label": "A security commitment", "outlets": 19, "mostly": "left"}]
+      },
+      "needs_review": false,
+      "trace_ref": "runs/…/events/a1b2c3d4e5f6"
+    }
+  ],
+  "roundup": {
+    "empty_day": false,
+    "count": 14,
+    "groups": [{"name": "Diplomacy", "items": [{"event_id": "…", "line": "…", "status": "statements only", "sources": [{"title": "Reuters", "url": "https://…"}]}]}]
+  }
+}
+```
+
+Mapping to the portal's current `Event`: `established` ← `article` blocks of kind `fact` and `context`; `statements` ← the `statements` block; `disputed` ← claims with status disputed; `unknown` ← the `not_confirmed` block; `coverage` ← `spectrum.coverage` as lines; `importance.label` ← `rubric.total` with its rationale; `summary` ← `standfirst`; `digests[].summary` ← `roundup` rendered as text. New fields the portal does not render yet: `article` as prose, `photo`, `rubric`, `trace_ref`, `needs_review`, `status: empty` for quiet days. Ordering is upstream: `stories` are already ranked.
+
+Transport, to agree with Vadim: reasoning exposes `GET /snapshots/{topic_id}/{edition_date}` and `GET /snapshots/{topic_id}/latest` on the reasoning host, bearer-token protected, reachable from the VPS over an SSH tunnel bound to loopback. The adapter pulls on request and caches by `version`. No database port is exposed and nothing is pushed into the portal's auth database. Status vocabulary: `ok`, `partial` (a node failed and the trace says which), `empty` (no story above the bar; roundup carries the day). The adapter must not turn a failed pull into an empty edition.
+
+## 9. Code layout and tooling
+
+```
+agents/
+  graph.py          # StateGraph assembly, edges, limits; `graph` is what langgraph.json points at
+  state.py          # RunState and dataclasses
+  nodes/            # one file per node: plan.py, cluster.py, score.py, extract.py, research.py,
+                    # verify.py, fact_check.py, adjudicate.py, frame.py, write.py, critique.py, roundup.py, publish.py
+  rules/            # confirmation.py, impact_bar.py, writing_rules.py — pure functions, unit-tested
+  tools/            # zetaris.py (moved from agent/tools_zetaris.py), fetch_text.py (collection's), news_rss.py
+  store/            # analysis schema DDL and upserts
+  prompts/          # one file per agent prompt, versioned
+  server.py         # FastAPI: POST /runs (topic, date), GET /runs/{id}/trace, GET /snapshots/...
+config/
+  reasoning.toml    # thresholds, caps, rounds, models
+  photos.toml       # photo source allow-list
+langgraph.json      # {"graphs": {"quorum": "./agents/graph.py:graph"}, "env": ".env", "dependencies": ["."]}
+```
+
+- **LangGraph Studio** is part of the stack for development and for the demo: `langgraph dev` starts the local server and opens Studio, which renders the graph, runs it step by step, shows the state after each node and lets a run be paused and resumed. The demo video shows the verify → research loop and the critic's rejection in Studio, next to the portal page that results. Studio needs a free LangSmith account for the UI; tracing to LangSmith stays off unless the team wants it, and the `run_steps` table is our own trace regardless.
+- The graph draws itself: `graph.get_graph().draw_mermaid()` regenerates the diagram in section 5 so the document never drifts from the code.
+- Tests: `rules/` is pure and unit-tested; nodes are tested with recorded model outputs; one end-to-end run on a fixed day's documents is the acceptance test before the demo.
+
+## 10. Build plan
+
+| Day | Deliverable | Done when |
+| --- | --- | --- |
+| Oct 23 | Graph skeleton with all nodes as stubs, state, `run_steps`, Studio running; `cluster` and `score_importance` real | A run over yesterday's documents produces events with rubric scores and a trace visible in Studio |
+| Oct 24 | `extract_claims`, `research`, `verify`, `fact_check`, `adjudicate` | Ten claims of one event get statuses with evidence rows; one disputed claim shows two blind verdicts |
+| Oct 25 | `frame`, `write`, `critique`, `roundup`, `publish` | A snapshot for one topic-day validates against section 8; the critic rejects at least one planted violation |
+| Oct 26 | Transport to the portal with Vadim; end-to-end on the demo event; fixes | The portal renders the story page from a live snapshot |
+| Oct 27 | Demo video, slides, README, sponsor-technology write-up; submission by 23:45 UTC | Submitted |
+
+## 11. Decisions this document records
+
+- Reasoning block: Python, LangGraph for orchestration, LangGraph Studio for development and demo visibility; agents write to Postgres directly and read only through Zetaris; one run per topic per day plus on-demand runs. Decided 2026-10-22 (Yelysei / Claude); to be logged in DECISIONS.md with the next merge.
+- Everything else here is implementation detail owned by this block and can change without a DECISIONS.md entry, except section 6 (rules) and section 8 (contract), which other blocks depend on.
+
+## 12. Open
+
+- The fact-checker's model: does the track allow a second provider? Decide after reading the challenge page in HackOS.
+- Edition-day timezone with the portal: proposed America/New_York, cut at 05:30 local, published by 08:00.
+- Which day's corpus is the demo: pick with Nastya once two days of collection exist.
