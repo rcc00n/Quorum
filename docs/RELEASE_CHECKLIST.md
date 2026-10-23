@@ -83,3 +83,15 @@ Code `0fe73256f468a830c56040abce32cfd07e6fa5f9`, only `feature/web-portals`, PR 
 - [ ] Future deployment requires fresh explicit scope, restricted auth backup, rollback target and all original HTTPS/auth/unrelated-service gates. No deployment attempted here.
 
 Verification/hosted CI: [current evidence](PORTAL_VERIFICATION.md#reasoning-10-fictional-preview-milestone).
+
+## Preview UX refinement — no deployment
+
+Branch `feature/web-portals`, code `4eb44109ef22f0d02bec66a002344ca27fd2e70d`, draft PR #1.
+
+- [x] Actual existing preview inspected before/after at1440/768/390px; original branding preserved.
+- [x] Recorded returns derive only from same-scope trace records; all45 steps and all original article/source/claim fields retained. No live-inference animation or invented graph dependencies.
+- [x] Paired review verdicts/adjudication, exact cohort totals/drilldowns and complete reading journey verified through real local HTTP; every claim link/focus, event/stage/loop filters, keyboard, reduced motion and overflow checked.
+- [x] Existing Django/auth/staff/snapshot/rollback/upgrade, Next/type/contract and old/new browser regressions pass; fixture/sample/schema and production publisher unchanged.
+- [x] One-command isolated preview preserved; no production account, DB/configuration, services or credentials changed.
+- [x] Hosted CI39900552412 succeeded on implementation `4eb4410`; browser/visual evidence verified separately locally.
+- [ ] Real snapshot/provenance/bridge and transport approval remain separate prerequisites; this preview does not satisfy a production release or sponsor E2E gate.

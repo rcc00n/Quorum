@@ -90,3 +90,18 @@ Owner Vadim; branch `feature/web-portals`; implementation `0fe73256f468a830c5604
 Real end-to-end remains WEB-INTEGRATION **BLOCKED**. Canonical reasoning §8 is confirmed; the publication bridge/transport is not. Concrete metadata and owner questions: [handoff](PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Next milestone: one genuine `ukraine-aid` output with retained collector quote/version provenance, validated and rendered locally before any publication authorization. Neutral branding and all existing auth/admin/store/rollback/analysis functionality are preserved.
 
 Hosted CI for this milestone: [39895499332](https://github.com/rcc00n/Quorum/actions/runs/39895499332), **success** on implementation `0fe7325`. Final handoff commit changes documentation only; tested implementation is pinned above.
+
+## Reasoning preview usability refinement
+
+Owner Vadim; `feature/web-portals`, implementation `4eb44109ef22f0d02bec66a002344ca27fd2e70d`, draft PR #1. All rows **TESTED locally with FICTIONAL/TEST snapshots, not INTEGRATED/DEPLOYED**. Production remains `20261023-web-portals-09f5325`; no accounts/configuration/publication change.
+
+| Feature ID | Status | Evidence / remaining dependency |
+| --- | --- | --- |
+| WEB-R1-UX-LOOPS | TESTED | Observed same-event return diagrams, actual iterations, stage/node/event filtering, all45 decisions; pure negative-case and real HTTP/browser tests. No invented causal graph |
+| WEB-R1-UX-REVIEWS | TESTED | Final adjudication/paired verdict hierarchy, stance counts, all article evidence links focus correctly, original quotes/groups/URLs retained; provenance remains missing |
+| WEB-R1-UX-COHORTS | TESTED | Compact 2×2 exact ratios, keyboard outlet drilldowns, four honest missing-rating modes; no denominator/member/rating fabrication |
+| WEB-R1-UX-JOURNEY | TESTED | Persistent DEMO label and active section navigation, filtered-result focus, static loading, desktop/tablet/mobile screenshots, keyboard/reduced-motion/overflow checks |
+
+43 Django, six upgrade, four tooling tests, Next build/typecheck, old/new contract and browser suites pass. Exact before/after and visual evidence: [verification](PORTAL_VERIFICATION.md#reasoning-preview-ux-refinement--local-only). Real-data dependencies and palette/font clarification remain unchanged; no live integration attempted.
+
+Hosted [CI39900552412](https://github.com/rcc00n/Quorum/actions/runs/39900552412) **succeeded** on implementation `4eb44109ef22f0d02bec66a002344ca27fd2e70d`, including the new recorded-loop negative-case checks. The handoff commit changes documentation only. PR remains draft; production is untouched.

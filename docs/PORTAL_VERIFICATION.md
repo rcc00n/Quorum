@@ -139,3 +139,33 @@ Visual evidence (external to Git, **FICTIONAL**): `~/.local/share/quorum/portal-
 **Production not accessed/deployed**: release remains `20261023-web-portals-09f5325`; eight accounts/private auth/configuration untouched. Local TEST sessions do not use those credentials. No collector/reasoning/Zetaris workloads, model requests, machine credentials or publishing transport added. Next real-data milestone and exact missing fields: [handoff](PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview).
 
 Hosted [CI 39895499332](https://github.com/rcc00n/Quorum/actions/runs/39895499332) **succeeded** on implementation `0fe73256f468a830c56040abce32cfd07e6fa5f9` (Python3.10, Django/check/migrations/upgrade/validator, Next/typecheck/ratings/editorial and old/new TypeScript contract). Browser suites remain separately verified locally; CI does not claim sponsor or production execution.
+
+## Reasoning preview UX refinement — local only
+
+Owner Vadim; only `feature/web-portals`; baseline `57f5122`; code `4eb44109ef22f0d02bec66a002344ca27fd2e70d`; PR #1 stays draft. Adapter, canonical reasoning1.0 sample/schema and strict production publication validation are unchanged. All examples below are **FICTIONAL/TEST**.
+
+| Actual browser finding before | Change verified after |
+| --- | --- |
+| 45 similar rows obscure feedback and hide each decision | Interactive recorded research↔verify / write↔critique diagrams, actual iterations/return counts, stage index and decisions visible in rows; reasons remain expandable |
+| Final adjudication below long evidence, repeated warning text, weak reviewer hierarchy | Final status/reason first, explicit agreement and paired verdicts/stance counts, preserved quotes/groups/original links; duplicate explanation removed |
+| Long outlet prose makes the four coverage cells hard to compare | Exact covered/eligible numbers and equal-scale bars in a compact 2×2; native keyboard source drilldowns, explicit missing ratings/0-eligible states |
+| DEMO warning disappears on scroll; reading sections hard to revisit | Persistent fictional label, active reading navigation, article→evidence→timeline→spectrum→roundup links, back-to-article and focused filtered results |
+
+Only consecutive same-event (or run-scope) A→B→A records with an increased A iteration establish a return. Interleaved events are isolated; stage labels alone cannot invent a loop. Diagrams show recorded sequence, **not causal dependencies or live execution**. Exact fixture has three research returns and two writing returns; second story has no research return. All45 steps remain available by default.
+
+Motion: short hover/pressed transitions, disclosure-icon rotation and recorded evidence/details reveals; section navigation scrolls rather than simulating execution. Arrows are static. Reduced motion removes transitions/animation and smooth scrolling. Loading placeholders are static and explicitly load a recorded sample. Fonts/palette unchanged; no new dependency.
+
+Evidence:
+
+- 43 Django regressions, system/migration checks, six upgrade and four tooling tests pass. Next build/typecheck, ratings/editorial and existing JSON→TypeScript contract checks pass.
+- New `node web/tests/reasoning-trace.cjs` passes exact-sample and TEST negative cases: cross-event adjacency, isolated iteration2, missing/intervening stages and non-increasing iteration cannot fabricate returns. Included in branch CI.
+- Original real HTTP/browser boundary passes legacy auth/CSRF/registration/preferences/staff/routes, analysis, corrections/rollback and error states. Extended reasoning HTTP/browser boundary passes both articles, **every article claim link and focus**, all45 steps, stage/loop/event filters, focused keyboard loop actions, source drilldowns and unchanged original hrefs, exact cohort pairs, four rating modes, empty/partial/error/retry/XSS/missing-trace cases. No browser interception in the reasoning path.
+- Final 1440/768/390px screenshot captures and actual visual inspection cover reading, loops, verdicts and cohorts; no overflow. A rotated disclosure icon stretching long open claims was caught and fixed; explicit icon dimensions preserve mobile/tablet widths. Filter checks now wait for committed DOM state instead of timing React updates. Reduced-motion styles and persistent visible DEMO label asserted.
+- Interactive `node web/tests/boundary.cjs --reasoning --serve` verified with isolated local auth, mode600 test credentials, actual45-step API/UI and ordinary feed pending; no production account/configuration is read. Existing setup/build instructions remain in the canonical handoff.
+- Doctor15PASS/0FAIL/1BLOCKED/1NOT_TESTED; verify19PASS/0FAIL/14BLOCKED/1NOT_TESTED, no inference. Registry/provider credentials and local Zetaris headroom remain blockers; no sponsor execution claimed.
+
+Screenshots outside Git: `~/.local/share/quorum/portal-screenshots/ux/`. Before: `before-DEMO-{story,timeline,cohorts}-{1440,768,390}.png` and `before-DEMO-evidence-1440.png`. Final: `after-DEMO-{story,timeline,evidence,disagreement,cohorts}-{1440,768,390}.png`, plus `after-DEMO-recorded-decisions-1440.png`. The latter shows an actual recorded critique rejection, rewrite and approval for the first story. These are visual evidence, not real news or genuine provenance. Original source hrefs are preserved; fictional external pages are not asserted to return HTTP200. No full WCAG audit claimed.
+
+**Production unchanged**, release `20261023-web-portals-09f5325`; eight accounts, auth DB/config, services, credentials and publisher untouched. No canonical contract/data model/transport change. Real integration still BLOCKED on one genuine result and original IDs/hash/Unicode offsets/achieved access/wire/review/freshness/correction metadata; see the existing [handoff](PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). This milestone does not advance those integration gates.
+
+Hosted [CI39900552412](https://github.com/rcc00n/Quorum/actions/runs/39900552412) **succeeded** on implementation `4eb44109ef22f0d02bec66a002344ca27fd2e70d`, including the new recorded-loop negative-case checks. The handoff commit changes documentation only. PR remains draft; production is untouched.
