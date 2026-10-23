@@ -57,7 +57,7 @@ Concurrent upstream update: reasoning `f3a32ec` now documents an output proposal
 
 ## Approved product reconciliation — feature/web-portals only
 
-Owner Vadim; merge `05e87b4`, implementation in PR #1. Production remains `20261023-web-portals-09f5325`, unchanged in this milestone.
+Owner Vadim; merge `05e87b4`, implementation `19f3de300f0479d8f81166e6eccb326ae0eb65cc`, branch `feature/web-portals`, PR #1. Production remains `20261023-web-portals-09f5325`, unchanged in this milestone.
 
 | Feature ID | Status | Evidence / remaining dependency |
 | --- | --- | --- |
@@ -69,3 +69,5 @@ Owner Vadim; merge `05e87b4`, implementation in PR #1. Production remains `20261
 | WEB-IDENTITY | BLOCKED | Approved team red/blue/rounded direction conflicts with earlier explicit neutral palette instruction; only this visual-identity change is held |
 
 38 Django tests, six upgrade tests, Next build/typecheck, four tooling checks, contract/ratings/editorial tests and the HTTP/browser boundary pass locally. See PR #1 for exact implementation commit and hosted CI evidence. No genuine processing integration is claimed. Earlier merge-conflict blocker is superseded by the newly authorized merge; no production account/configuration, transport or publisher changed.
+
+Reconciliation hosted evidence: [CI 39890295440](https://github.com/rcc00n/Quorum/actions/runs/39890295440) succeeded on `19f3de3`; draft PR verified MERGEABLE. Legacy DEMO browser test also passed separately. No deployment in this milestone.

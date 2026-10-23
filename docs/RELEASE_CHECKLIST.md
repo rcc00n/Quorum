@@ -63,5 +63,5 @@ Current release `20261023-web-portals-09f5325` / code `09f5325` passed these dep
 - [x] Existing 38 Django/snapshot regressions, six upgrade tests, Next build/typecheck, contract/tooling/ratings/editorial and old/new HTTP/browser tests pass locally.
 - [x] Completed quiet-day versus pending/error/partial/stale cases, context attribution guards, Unicode code-point offsets and photo prerequisites covered with TEST/DEMO data.
 - [x] Production, accounts, publisher, credentials and remote processing untouched; production release remains `20261023-web-portals-09f5325`.
-- [ ] Hosted CI and draft PR mergeability verified after pushing this implementation.
+- [x] Hosted CI 39890295440 passed on code `19f3de3`; draft PR #1 verified MERGEABLE after merge `05e87b4`.
 - [ ] Real reasoning sample/schema mapping and transport approved; real end-to-end gate remains open.
