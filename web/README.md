@@ -27,5 +27,11 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 | --- | --- | --- | --- |
 | 2026-10-22 | rcc00n / Codex | Plain shared CSS, Inter from npm, Georgia fallback, Lucide; outside-repository build | Minimal dependency surface, reproducible fonts, no vendored dependencies in public checkout |
 | 2026-10-22 | rcc00n / Codex | Neutral editorial layout; transient entrance/hover/loading transitions with reduced-motion support | Prioritize reading, accessible hierarchy and calm interaction |
+| 2026-10-22 | rcc00n / Codex | Optional structured analysis with native disclosures, comparison and public-safe trace; retain legacy evidence arrays | Make evidence inspectable without fabricated metrics or requiring an approved upstream API prematurely |
 
 Optional browser checks use externally installed Playwright/Chromium via `PLAYWRIGHT_MODULE` and `CHROMIUM_PATH`. Run `node web/tests/browser.cjs` against the local portal, `node web/tests/demo.cjs` with `TYPESCRIPT_MODULE` pointing to the external TypeScript package, and `node web/tests/ratings.cjs` on Node 22.19+. `QUORUM_TEST_URL` overrides the test origin. The browser flow creates a temporary account; `QUORUM_SMOKE_ACCOUNT_FILE` records its exact username for cleanup. Demo tests intercept only browser requests and prominently label fictional content.
+
+Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.
+
+
+`web/tests/analysis.cjs` tests the rich UI against an externally projected DEMO snapshot (`QUORUM_ANALYSIS_FIXTURE`); this is not real integration. Exact fixture preparation and test evidence are in the release record.

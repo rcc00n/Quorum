@@ -39,6 +39,9 @@ new Function(
   await page.route("**/api/feed/**", (r) =>
     r.fulfill({ json: fixture.exports.demo }),
   );
+  await page.route("**/api/events/**", (r) =>
+    r.fulfill({ json: fixture.exports.demo }),
+  );
   const root = process.env.QUORUM_TEST_URL || "http://127.0.0.1:3017";
   await page.goto(root + "/topics/demo-civic?date=2026-10-22");
   await page

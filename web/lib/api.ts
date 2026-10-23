@@ -1,3 +1,4 @@
+import type { StructuredAnalysis, Publication } from "./analysis";
 export type User = {
   username: string;
   name: string;
@@ -11,6 +12,16 @@ export type Source = {
   name: string;
   domain: string;
   audience: number | null;
+  audience_source_url?: string | null;
+  audience_as_of?: string | null;
+  kind?: "agency" | "outlet" | "official" | "military";
+  tier?: "major" | "minor" | null;
+  independence_group?: string;
+  rating_provenance?: {
+    allsides: string | null;
+    mbfc: string | null;
+    adfontes: string | null;
+  };
   allsides: number | null;
   mbfc: number | null;
   adfontes: number | null;
@@ -22,6 +33,7 @@ export type Evidence = {
 };
 // Portal view model only: reasoning owners must approve their own upstream contract.
 export type Event = {
+  analysis?: StructuredAnalysis;
   id: string;
   topic_id: string;
   date: string;
@@ -36,6 +48,8 @@ export type Event = {
   sources: Source[];
 };
 export type Snapshot = {
+  publication?: Publication;
+  errors?: { code: string; message: string; event_id: string | null }[];
   catalog_revision?: string | null;
   status: string;
   topics: Topic[];
@@ -76,6 +90,21 @@ export async function feed(day: string, topic: string): Promise<Snapshot> {
   );
   if (!res.ok)
     throw new Error("Your brief could not be loaded. Please try again.");
+  return res.json();
+}
+export async function eventSnapshot(
+  id: string,
+  day?: string,
+  revision?: string,
+): Promise<Snapshot> {
+  const query = new URLSearchParams();
+  if (day) query.set("date", day);
+  if (revision) query.set("revision", revision);
+  const res = await fetch(`/api/events/${encodeURIComponent(id)}/?${query}`, {
+    cache: "no-store",
+  });
+  if (!res.ok)
+    throw new Error("This analysis could not be loaded. Please try again.");
   return res.json();
 }
 export function rating(source: Source, mode: string): number | null {

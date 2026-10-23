@@ -59,3 +59,5 @@ python3 deploy/export-catalog.py origin/data-collection ~/.local/share/quorum/po
 ```
 
 `build-web.sh` refuses existing build directories without its ownership marker and refuses repository/ancestor destinations. It reuses dependencies when the lockfile matches. `package-release.py` refuses existing release directories and packages only standalone assets and portal/deploy source; secrets and runtime data are excluded.
+
+Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.
