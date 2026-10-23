@@ -288,6 +288,73 @@ def upsert_official_doc(conn: psycopg.Connection, *, source_id: str, topic_id: s
     return bool(inserted)
 
 
+# ------------------------------------------------ public contract: fetch_text ----
+
+_P_TAG = re.compile(r"<p[^>]*>(.*?)</p>", re.I | re.S)
+_ANY_TAG = re.compile(r"<[^>]+>")
+_DROP_BLOCKS = re.compile(r"<(script|style|nav|header|footer|aside|noscript|form|svg)\b.*?</\1>", re.I | re.S)
+_MAIN_BLOCK = re.compile(r"<(article|main)\b.*?</\1>", re.I | re.S)
+_SHARED_FETCHER: Fetcher | None = None
+
+
+def extract_text(html: str) -> str:
+    """Article paragraphs from a page, deterministically: the SAME function feeds documents.content_hash at
+    collection time and FetchedText.text at analysis time, so hashes and offsets agree.
+
+    Prefers the <article>/<main> block when present; drops navigation, header, footer, scripts and styles;
+    keeps <p> paragraphs joined by a blank line; strips NUL bytes.
+    """
+    # DECISION(2026-10-22, Anastasia/Claude): one extractor for hashing and for quoting. Why: the first live probe
+    # showed NPR's "Skip to main content" navigation leading the text and hashes differing between the two paths.
+    from html import unescape
+    body = _DROP_BLOCKS.sub(" ", html)
+    main = _MAIN_BLOCK.search(body)
+    scope = main.group(0) if main else body
+    paras = []
+    for raw in _P_TAG.findall(scope):
+        cleaned = " ".join(unescape(_ANY_TAG.sub(" ", raw)).split())
+        if len(cleaned) >= 20:  # skip captions, labels and one-word paragraphs
+            paras.append(cleaned)
+    return clean_text("\n\n".join(paras)) or ""
+
+
+@dataclass
+class FetchedText:
+    url: str
+    text: str            # paragraph text only; Unicode str, offsets in code points
+    content_hash: str    # same formula as documents.content_hash, so a quote can be tied to the version it was cut from
+    access_level: int    # 1 = full text returned; 2 = page not fetchable (robots.txt / error), text is empty
+    fetched_at: datetime
+
+
+def fetch_text(url: str, *, title: str = "", lead: str | None = None, fetcher: Fetcher | None = None) -> FetchedText:
+    """The one function reasoning calls to read an article at analysis time.
+
+    Honours robots.txt and the per-domain delay; never stores the text. Returns the paragraph text, the content hash
+    computed with the same formula as `documents.content_hash` (title + lead + first 2000 chars of body), and the
+    access level actually achieved. Character offsets that reasoning records in `quotes.char_start/char_end` are
+    indexes into `FetchedText.text` as a Python str (Unicode code points, not bytes).
+    """
+    # DECISION(2026-10-22, Anastasia/Claude): fetch_text is the public contract; rss.py's internal helpers are not.
+    # Why: ARCHITECTURE.md (reasoning) calls fetch_text(url); it must exist with stable semantics.
+    global _SHARED_FETCHER
+    if fetcher is None:
+        if _SHARED_FETCHER is None:
+            _SHARED_FETCHER = Fetcher()
+        fetcher = _SHARED_FETCHER
+    now = datetime.now(timezone.utc)
+    resp = fetcher.get(url)
+    if resp is None:
+        return FetchedText(url=url, text="", content_hash=content_hash(title, lead, None), access_level=2, fetched_at=now)
+    text = extract_text(resp.text)
+    return FetchedText(url=url, text=text, content_hash=content_hash(title, lead, text), access_level=1, fetched_at=now)
+
+
+def verify_quote(text: str, quote_text: str, char_start: int, char_end: int) -> bool:
+    """The rule the quotes table enforces: the quote must appear verbatim at the given code-point offsets."""
+    return 0 <= char_start < char_end <= len(text) and text[char_start:char_end] == quote_text
+
+
 def parse_dt(value: str | None) -> datetime | None:
     if not value:
         return None

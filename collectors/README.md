@@ -21,6 +21,15 @@ Contract details:
 - All timestamps are UTC ISO-8601; `lang` is ISO 639-1.
 - A `quotes` row is accepted only if `quote_text` is found verbatim in the text at `url` at insert time; otherwise it is rejected. This is what makes "every conclusion carries its sources" checkable.
 
+Semantics the other blocks rely on (confirmed 2026-10-22 for the portal and reasoning handoffs):
+
+- `fetch_text(url, title=, lead=)` in `collectors/common.py` is the public read contract. It returns `FetchedText(text, content_hash, access_level, fetched_at)`; `text` is paragraph text as a Python `str`.
+- **Offsets are Unicode code points**, not bytes: `quotes.char_start/char_end` index into `FetchedText.text`; `verify_quote(text, quote, start, end)` is the acceptance rule.
+- **`content_hash`** = sha256 of `title + "\n" + lead + "\n" + first 2000 characters of body text`. It detects edits to headline, lead and opening — not edits deeper in a long article. `quotes.content_hash_at_quote` records the hash of the version the quote was cut from; `fetch_text` recomputes the same formula so the two can be compared.
+- **Access level** is per document, decided at collection: 1 full text (robots.txt allowed, no paywall), 2 title + lead only, 3 fact of coverage only. `fetch_text` returns the level it achieved now, which can be lower than the stored one if robots.txt changed.
+- **Provenance of `sources` fields**: `independence_group` is hand-set for all 17 sources (agencies are their own group; outlets their own; reprints are detected per document via `wire_origin`, not via the registry). `allsides`, `mbfc`, `adfontes` and `audience` are **empty for all outlets as of 2026-10-22** — filling them is the source-audit task in `docs/DECISIONS.md`, and the four rating modes on the portal have nothing to compute until it is done. `audience_source_url` must cite where each audience figure came from.
+- **Zetaris retrieval** is live: datasource `QUORUM_COLLECT` (id 807) over this Postgres; `SELECT ... FROM QUORUM_COLLECT.documents` returns collected rows through `agent/tools_zetaris.py`.
+
 ## Access levels
 
 | Level | What is taken | When |

@@ -10,7 +10,7 @@ from html import unescape
 
 import feedparser
 
-from collectors.common import Doc, Fetcher, matches_topic, parse_dt, upsert_document
+from collectors.common import Doc, Fetcher, extract_text, matches_topic, parse_dt, upsert_document
 
 log = logging.getLogger("collectors.rss")
 _TAGS = re.compile(r"<[^>]+>")
@@ -24,9 +24,8 @@ def _strip(html: str | None) -> str | None:
 
 
 def _body_text(html: str) -> str:
-    """Crude article text: paragraphs only. Used for the hash, never stored."""
-    paras = re.findall(r"<p[^>]*>(.*?)</p>", html, flags=re.I | re.S)
-    return " ".join(filter(None, (_strip(p) for p in paras)))[:4000]
+    """Article text for the hash, never stored. Same extractor as fetch_text so hashes agree across time."""
+    return extract_text(html)
 
 
 _SITEMAP_URL = re.compile(r"<url>(.*?)</url>", re.S)
