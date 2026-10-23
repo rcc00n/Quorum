@@ -17,6 +17,14 @@ module.exports = async function ({ browser, root, env, password, temp }) {
     page = await context.newPage({ viewport: { width: 1440, height: 1000 } }),
     errors = [];
   page.on("pageerror", () => errors.push("page error"));
+  async function expectTrace(count) {
+    await page.waitForFunction(
+      (n) => document.querySelectorAll(".r-trace>li").length === n,
+      count,
+    );
+    assert.equal(await page.locator(".r-trace>li").count(), count);
+  }
+
   const session = await (
     await context.request.get(root + "/api/session/")
   ).json();
@@ -50,7 +58,7 @@ module.exports = async function ({ browser, root, env, password, temp }) {
     await page
       .getByRole("heading", { name: group.name, exact: true })
       .waitFor();
-  assert.equal(await page.locator(".r-trace>li").count(), 45);
+  await expectTrace(45);
   assert.equal(await page.locator(".r-trace-body").count(), 45);
   assert.ok(
     (await page.locator(".r-repeat").allTextContents()).some((t) =>
@@ -60,17 +68,48 @@ module.exports = async function ({ browser, root, env, password, temp }) {
   await page
     .getByLabel("Trace node filter", { exact: true })
     .selectOption("research");
-  assert.equal(await page.locator(".r-trace>li").count(), 7);
+  await expectTrace(7);
   await page
     .getByLabel("Trace event filter", { exact: true })
     .selectOption(sample.stories[0].event_id);
-  assert.equal(await page.locator(".r-trace>li").count(), 2);
+  await expectTrace(2);
   await page
     .getByLabel("Trace node filter", { exact: true })
     .selectOption("critique");
-  assert.equal(await page.locator(".r-trace>li").count(), 2);
+  await expectTrace(2);
   await page.getByLabel("Trace event filter", { exact: true }).selectOption("");
   await page.getByLabel("Trace node filter", { exact: true }).selectOption("");
+  await page
+    .getByRole("button", {
+      name: "Show research & verification loop",
+      exact: true,
+    })
+    .focus();
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () => document.activeElement?.id === "reasoning-trace-results",
+  );
+  await expectTrace(14);
+  assert.equal(await page.locator(".r-return-path").count(), 2);
+  await page.getByRole("button", { name: /Clear filters/ }).click();
+  await page
+    .getByRole("button", { name: "Show writing & critique loop", exact: true })
+    .click();
+  await expectTrace(8);
+  await page.getByRole("button", { name: /Clear filters/ }).click();
+  await page
+    .getByLabel("Trace event filter", { exact: true })
+    .selectOption(sample.stories[1].event_id);
+  assert.equal(await page.locator(".r-return-path").count(), 1); // No research return for this event.
+  await page.getByRole("button", { name: /Clear filters/ }).click();
+  await page.locator(".r-stage-disclosure>summary").click();
+  await page
+    .locator(".r-stage-index button")
+    .filter({ hasText: "Extract claims" })
+    .click();
+  await expectTrace(4);
+  await page.getByRole("button", { name: /Clear filters/ }).click();
+  await page.locator(".r-stage-disclosure>summary").click();
   const output =
     process.env.QUORUM_SCREENSHOTS ||
     path.join(os.homedir(), ".local/share/quorum/portal-screenshots");
@@ -98,6 +137,30 @@ module.exports = async function ({ browser, root, env, password, temp }) {
       )
       .click();
     assert.ok((await page.locator(".r-impact dd").count()) === 4);
+    // Every article claim reference opens and keyboard-focuses its actual evidence.
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const ref of await page.locator(".r-claim-links a").all()) {
+      const href = await ref.getAttribute("href");
+      await ref.click();
+      assert.notEqual(await page.locator(href).getAttribute("open"), null);
+      assert.ok(
+        await page
+          .locator(href + ">summary")
+          .evaluate((e) => e === document.activeElement),
+      );
+    }
+    await page
+      .locator(".r-claim")
+      .evaluateAll((rows) => rows.forEach((e) => (e.open = false)));
+    await page
+      .getByRole("button", { name: "This story’s steps", exact: true })
+      .click();
+    assert.equal(
+      await page.getByLabel("Trace event filter", { exact: true }).inputValue(),
+      story.event_id,
+    );
+    await page.getByRole("button", { name: /Clear filters/ }).click();
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     const first = page.locator(".r-claim-links a").first();
     await first.click();
     assert.ok(await page.locator(".r-claim[open]").count());
@@ -107,7 +170,11 @@ module.exports = async function ({ browser, root, env, password, temp }) {
       await detail.locator("summary").focus();
       if ((await detail.getAttribute("open")) === null)
         await page.keyboard.press("Enter");
-      await detail.getByText(/The two reviewers disagree/).waitFor();
+      await detail.getByText(/Reviewers disagree/).waitFor();
+      assert.equal(
+        await detail.locator(".r-final strong").textContent(),
+        disputed.status,
+      );
       assert.equal(await detail.locator(".r-chain").count(), 2);
     }
     for (const mode of ["allsides", "mbfc", "adfontes", "average"]) {
@@ -135,6 +202,27 @@ module.exports = async function ({ browser, root, env, password, temp }) {
         ),
       );
     }
+    for (const detail of await page.locator(".r-cohort-details").all()) {
+      await detail.locator("summary").focus();
+      await page.keyboard.press("Enter");
+      assert.notEqual(await detail.getAttribute("open"), null);
+      assert.ok(await detail.locator(".r-outlet a").count());
+      await page.keyboard.press("Enter");
+    }
+    const actualOutletURLs = await page
+      .locator(".r-outlet a")
+      .evaluateAll((links) => links.map((l) => l.href).sort());
+    assert.deepEqual(
+      actualOutletURLs,
+      (story.spectrum.outlets || [])
+        .filter((o) =>
+          ["major_left", "major_right", "minor_left", "minor_right"].includes(
+            o.cohort,
+          ),
+        )
+        .map((o) => new URL(o.url).href)
+        .sort(),
+    );
     const firstEvidence = story.claims[0].evidence[0];
     const firstClaim = page.locator("#reasoning-claim-" + story.claims[0].id);
     assert.equal(
@@ -175,6 +263,19 @@ module.exports = async function ({ browser, root, env, password, temp }) {
       );
     }
     await page.emulateMedia({ reducedMotion: "reduce" });
+    assert.equal(
+      await page
+        .locator("html")
+        .evaluate((e) => getComputedStyle(e).scrollBehavior),
+      "auto",
+    );
+    assert.equal(
+      await page
+        .locator(".r-disclosure-icon")
+        .first()
+        .evaluate((e) => getComputedStyle(e).transitionDuration),
+      "0s",
+    );
     const animated = page.locator(".r-evidence").first();
     assert.equal(
       await animated.evaluate((e) => getComputedStyle(e).animationName),
@@ -200,23 +301,65 @@ module.exports = async function ({ browser, root, env, password, temp }) {
           animations: "disabled",
         });
       }
+      const ux = path.join(output, "ux");
+      fs.mkdirSync(ux, { recursive: true });
+      for (const width of [1440, 768, 390]) {
+        await page.setViewportSize({ width, height: 1000 });
+        for (const [id, name] of [
+          ["reasoning-article", "story"],
+          ["reasoning-timeline", "timeline"],
+          ["reasoning-evidence", "evidence"],
+          ["reasoning-claim-" + disputed.id, "disagreement"],
+          ["reasoning-perspectives", "cohorts"],
+        ]) {
+          await page.evaluate((id) => {
+            document.activeElement?.blur();
+            document
+              .getElementById(id)
+              .scrollIntoView({ block: "start", behavior: "instant" });
+          }, id);
+          await page.waitForFunction(
+            (id) =>
+              document
+                .querySelector(".r-reader-nav a[aria-current]")
+                ?.getAttribute("href") ===
+              "#" + id,
+            id.startsWith("reasoning-claim-") ? "reasoning-evidence" : id,
+          );
+          await page.screenshot({
+            path: path.join(ux, `after-DEMO-${name}-${width}.png`),
+            animations: "disabled",
+          });
+          assert.ok(
+            await page
+              .getByText("DEMO / FICTIONAL DATA", { exact: true })
+              .evaluate((e) => {
+                const r = e.getBoundingClientRect();
+                return r.top >= 0 && r.bottom <= innerHeight;
+              }),
+          );
+        }
+      }
       await page.setViewportSize({ width: 1440, height: 1000 });
       for (const [selector, name] of [
         ["#reasoning-claim-" + disputed.id, "evidence"],
         ["#reasoning-perspectives", "cohorts"],
         [".r-loop-overview", "feedback"],
       ]) {
-        await page
-          .locator(selector)
-          .screenshot({
-            path: path.join(output, `reasoning-${name}-1440.png`),
-            animations: "disabled",
-          });
+        await page.locator(selector).screenshot({
+          path: path.join(output, `reasoning-${name}-1440.png`),
+          animations: "disabled",
+        });
       }
     }
     await page
-      .getByRole("link", { name: "Topic edition", exact: true })
+      .locator(".r-reader-nav a")
+      .filter({ hasText: "Also today" })
       .click();
+    await page
+      .getByRole("heading", { name: "Also today", exact: true })
+      .waitFor();
+    assert.equal(new URL(page.url()).hash, "#reasoning-roundup");
     await page
       .getByRole("heading", { name: "The daily perspective", exact: true })
       .waitFor();
@@ -272,6 +415,7 @@ module.exports = async function ({ browser, root, env, password, temp }) {
   await page
     .getByText("No execution trace supplied.", { exact: true })
     .waitFor();
+  assert.equal(await page.locator(".r-loop-overview").count(), 0);
   variant = structuredClone(sample);
   variant.stories[0].sources[0].url = "javascript:alert(1)";
   fs.writeFileSync(file, JSON.stringify(variant));

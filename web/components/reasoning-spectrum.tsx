@@ -60,7 +60,7 @@ export function ReasoningSpectrum({
           const pair = sp.coverage[key],
             outlets = sp.outlets?.filter((o) => o.cohort === key) || [];
           return (
-            <article className="r-cohort" key={key + "-" + mode}>
+            <article className="r-cohort" key={key}>
               <h3>{key.replace("_", " ")}</h3>
               <p className="r-cohort-number">
                 {pair ? (
@@ -86,18 +86,36 @@ export function ReasoningSpectrum({
                   No eligible sources in this recorded cohort.
                 </p>
               )}
+              {outlets.length > 0 && (
+                <p className="r-cohort-names">
+                  {outlets.map((o) => o.source).join(" · ")}
+                </p>
+              )}
               {outlets.length ? (
-                outlets.map((o, i) => (
-                  <div className="r-outlet" key={i}>
-                    <Sources sources={[{ title: o.source, url: o.url }]} />
-                    <p>{o.highlights || "No emphasis supplied."}</p>
-                    {o.interpretation_label && (
-                      <small>Interpretation: {o.interpretation_label}</small>
-                    )}
-                    {o.omits && <p>Omissions reported: {o.omits}</p>}
-                    {o.wording && <small>Wording: “{o.wording}”</small>}
+                <details className="r-cohort-details">
+                  <summary>
+                    Inspect {outlets.length} supplied{" "}
+                    {outlets.length === 1 ? "outlet" : "outlets"}
+                    <span className="r-disclosure-icon" aria-hidden="true">
+                      +
+                    </span>
+                  </summary>
+                  <div>
+                    {outlets.map((o, i) => (
+                      <div className="r-outlet" key={i}>
+                        <Sources sources={[{ title: o.source, url: o.url }]} />
+                        <p>{o.highlights || "No emphasis supplied."}</p>
+                        {o.interpretation_label && (
+                          <small>
+                            Interpretation: {o.interpretation_label}
+                          </small>
+                        )}
+                        {o.omits && <p>Omissions reported: {o.omits}</p>}
+                        {o.wording && <small>Wording: “{o.wording}”</small>}
+                      </div>
+                    ))}
                   </div>
-                ))
+                </details>
               ) : (
                 <p className="help">
                   No covered outlet names supplied for this cohort.

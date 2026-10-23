@@ -13,6 +13,65 @@ import {
 } from "./reasoning-evidence";
 import { ReasoningSpectrum } from "./reasoning-spectrum";
 import { ReasoningTimeline, previewHref } from "./reasoning-timeline";
+function ReadingNavigation({
+  run,
+  story,
+  eventId,
+}: {
+  run: ReasoningRun;
+  story: boolean;
+  eventId: string;
+}) {
+  const [active, setActive] = useState("");
+  const items = story
+    ? [
+        ["reasoning-article", "Article"],
+        ["reasoning-evidence", "Evidence"],
+        ["reasoning-timeline", "Agent timeline"],
+        ["reasoning-perspectives", "Spectrum"],
+      ]
+    : [
+        ["reasoning-stories", "Stories"],
+        ["reasoning-roundup", "Also today"],
+        ["reasoning-timeline", "Agent timeline"],
+      ];
+  const ids = items.map(([id]) => id).join(",");
+  useEffect(() => {
+    const targets = ids
+      .split(",")
+      .map((id) => document.getElementById(id))
+      .filter((e): e is HTMLElement => !!e);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          if (entry.isIntersecting) setActive(entry.target.id);
+      },
+      { rootMargin: "-125px 0px -55% 0px" },
+    );
+    targets.forEach((e) => observer.observe(e));
+    // A date/event navigation may render its anchor after the recorded edition loads.
+    const target = document.getElementById(location.hash.slice(1));
+    if (target) target.scrollIntoView({ behavior: "instant" });
+    return () => observer.disconnect();
+  }, [ids, eventId]);
+  return (
+    <nav className="r-reader-nav" aria-label="Read and investigate">
+      {items.map(([id, title]) => (
+        <a
+          key={id}
+          href={"#" + id}
+          aria-current={active === id ? "location" : undefined}
+          onClick={() => setActive(id)}
+        >
+          {title}
+        </a>
+      ))}
+      {story && (
+        <Link href={previewHref(run) + "#reasoning-roundup"}>Also today ↗</Link>
+      )}
+    </nav>
+  );
+}
 function Impact({ story: s }: { story: ReasoningStory }) {
   return (
     <details className="r-impact">
@@ -38,7 +97,11 @@ function Impact({ story: s }: { story: ReasoningStory }) {
 }
 function Article({ story: s }: { story: ReasoningStory }) {
   return (
-    <article className="r-article" aria-label="Reasoning article">
+    <article
+      id="reasoning-article"
+      className="r-article"
+      aria-label="Reasoning article"
+    >
       <p className="eyebrow">
         STORY / {s.event_id} · {s.reading_minutes} MIN READ
       </p>
@@ -94,17 +157,16 @@ function Article({ story: s }: { story: ReasoningStory }) {
         Post-publication correction history is not supplied. Draft iterations
         are not publication corrections.
       </p>
-      <nav className="r-analysis-nav" aria-label="Deeper analysis">
-        <a href="#reasoning-evidence">Evidence Explorer ↓</a>
-        <a href="#reasoning-perspectives">Across the spectrum ↓</a>
-        <a href="#reasoning-timeline">Recorded investigation ↓</a>
-      </nav>
     </article>
   );
 }
 function Roundup({ run }: { run: ReasoningRun }) {
   return (
-    <section className="r-section" aria-label="Also today">
+    <section
+      id="reasoning-roundup"
+      className="r-section"
+      aria-label="Also today"
+    >
       <p className="eyebrow">BELOW THE IMPACT BAR</p>
       <h2>Also today</h2>
       <p>
@@ -185,16 +247,23 @@ export function ReasoningPreviewPage({
           {run && <Link href={previewHref(run)}>Topic edition</Link>}
         </nav>
       </header>
-      <div className="r-demo" role="note">
-        <strong>DEMO / FICTIONAL DATA</strong>
-        <span>
-          Recorded development sample · not real news, live inference or
-          publication-grade evidence.
-        </span>
+      <div className="r-preview-chrome">
+        <div className="r-demo" role="note">
+          <strong>DEMO / FICTIONAL DATA</strong>
+          <span>Recorded snapshot · not real news or live inference.</span>
+        </div>
+        {run && !loading && !error && (
+          <ReadingNavigation run={run} story={!!story} eventId={eventId} />
+        )}
       </div>
       <main id="main" className="r-main">
         {loading ? (
-          <p role="status">Loading the recorded reasoning sample…</p>
+          <section className="r-preview-loading" role="status" aria-busy="true">
+            <p>Loading the recorded reasoning sample…</p>
+            <span />
+            <span />
+            <span />
+          </section>
         ) : error ? (
           <section role="alert">
             <h1>Reasoning preview unavailable</h1>
@@ -245,12 +314,23 @@ export function ReasoningPreviewPage({
                 <>
                   <Article story={story} />
                   <ReasoningEvidence story={story} />
+                  <ReasoningTimeline
+                    key={eventId}
+                    run={run}
+                    currentEvent={eventId}
+                  />
                   <ReasoningSpectrum
                     story={story}
                     sources={
                       data.events.find((e) => e.id === eventId)?.sources || []
                     }
                   />
+                  <div className="r-next-reading">
+                    <span>Continue with the rest of the edition</span>
+                    <Link href={previewHref(run) + "#reasoning-roundup"}>
+                      Also today →
+                    </Link>
+                  </div>
                 </>
               ) : roundup ? (
                 <section className="r-section">
@@ -277,7 +357,7 @@ export function ReasoningPreviewPage({
               )
             ) : (
               <>
-                <section className="r-topic">
+                <section id="reasoning-stories" className="r-topic">
                   <p className="eyebrow">TOPIC EDITION / {run.topic_id}</p>
                   <h1>The daily perspective</h1>
                   <p className="r-topic-summary">{run.summary}</p>
@@ -321,7 +401,13 @@ export function ReasoningPreviewPage({
                 <Roundup run={run} />
               </>
             )}
-            <ReasoningTimeline run={run} />
+            {!story && (
+              <ReasoningTimeline
+                key={eventId}
+                run={run}
+                currentEvent={eventId}
+              />
+            )}
             <section className="r-section">
               <h2>Preview provenance limits</h2>
               <ul>

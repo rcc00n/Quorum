@@ -35,13 +35,21 @@ export function ClaimReference({
   return (
     <a
       href={"#reasoning-claim-" + id}
-      onClick={() => {
+      onClick={(event) => {
         const el = document.getElementById(
           "reasoning-claim-" + id,
         ) as HTMLDetailsElement | null;
         if (el) {
+          event.preventDefault();
           el.open = true;
-          el.querySelector("summary")?.focus();
+          history.replaceState(history.state, "", "#reasoning-claim-" + id);
+          el.querySelector("summary")?.focus({ preventScroll: true });
+          el.scrollIntoView({
+            block: "start",
+            behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+              ? "instant"
+              : "smooth",
+          });
         }
       }}
     >
@@ -60,15 +68,35 @@ function Chain({
 }) {
   return (
     <section className="r-chain">
-      <p className="eyebrow">{title}</p>
-      <h4>{verdict}</h4>
-      <p className="help">
-        Separate review reason and review timestamp not supplied.
-      </p>
+      <header className="r-review-heading">
+        <p className="eyebrow">{title}</p>
+        <h4>{verdict}</h4>
+        <p className="r-evidence-counts">
+          {evidence.length} evidence {evidence.length === 1 ? "row" : "rows"}
+          {(["supports", "contradicts", "neutral", "statement"] as const).map(
+            (stance) => {
+              const count = evidence.filter((e) => e.stance === stance).length;
+              return count ? (
+                <span key={stance}>
+                  {count}{" "}
+                  {
+                    {
+                      supports: "supporting",
+                      contradicts: "contradicting",
+                      neutral: "neutral",
+                      statement: "attributed",
+                    }[stance]
+                  }
+                </span>
+              ) : null;
+            },
+          )}
+        </p>
+      </header>
       {evidence.length ? (
         evidence.map((e, i) => (
           <div
-            className="r-evidence"
+            className={"r-evidence r-stance-" + e.stance}
             key={i}
             style={
               { "--reveal": Math.min(i, 5) * 35 + "ms" } as React.CSSProperties
@@ -114,25 +142,37 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
     <details className="r-claim" id={"reasoning-claim-" + c.id}>
       <summary>
         <span>
-          <small>
+          <small className="r-claim-status">
             {c.kind === "statement" ? "Attributed statement · " : ""}
             {c.status}
           </small>
           <strong>{c.text}</strong>
+          <span className="r-agreement">
+            {c.verifier === c.fact_checker
+              ? "Reviewers agree"
+              : "Reviewers disagree"}{" "}
+            · {c.evidence.length} evidence rows
+          </span>
         </span>
-        <span aria-hidden="true">+</span>
+        <span className="r-disclosure-icon" aria-hidden="true">
+          +
+        </span>
       </summary>
       <div className="r-claim-body">
+        <div className="r-final">
+          <div>
+            <small>Final claim status</small>
+            <strong>{c.status}</strong>
+          </div>
+          <div>
+            <small>Supplied adjudication</small>
+            <p>{c.reason || "No final rationale supplied."}</p>
+          </div>
+        </div>
         {c.speaker && (
           <p>
             Speaker: {c.speaker}. Attribution does not establish the statement’s
             truth.
-          </p>
-        )}
-        {c.verifier !== c.fact_checker && (
-          <p className="r-disagreement" role="note">
-            The two reviewers disagree: primary {c.verifier}, independent{" "}
-            {c.fact_checker}. Final status: {c.status}.
           </p>
         )}
         <div className="r-chains">
@@ -164,15 +204,15 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
             ))}
           </section>
         )}
-        <div className="r-final">
-          <small>Final {c.status} · supplied adjudication</small>
-          <p>{c.reason || "No final rationale supplied."}</p>
-        </div>
         <p className="help">
           Review independence is separate from source independence. Original
           document IDs, content hashes, quote offsets, achieved access levels
-          and review timestamps are unavailable in this preview.
+          and review timestamps are unavailable in this preview. Separate review
+          reasons are not supplied.
         </p>
+        <a className="r-return-link" href="#reasoning-article">
+          Back to article ↑
+        </a>
       </div>
     </details>
   );
@@ -186,6 +226,24 @@ export function ReasoningEvidence({ story }: { story: ReasoningStory }) {
         Compare the recorded primary and blind fact-checking paths. These
         fictional findings are not independently verified.
       </p>
+      <div className="r-evidence-guide">
+        <span>
+          {story.claims.length} claims ·{" "}
+          {story.claims.filter((c) => c.verifier !== c.fact_checker).length}{" "}
+          reviewer{" "}
+          {story.claims.filter((c) => c.verifier !== c.fact_checker).length ===
+          1
+            ? "disagreement"
+            : "disagreements"}
+        </span>
+        {story.claims.find((c) => c.verifier !== c.fact_checker) && (
+          <ClaimReference
+            id={story.claims.find((c) => c.verifier !== c.fact_checker)!.id}
+          >
+            Inspect a disagreement ↓
+          </ClaimReference>
+        )}
+      </div>
       {story.claims.map((c) => (
         <ClaimChains key={c.id} claim={c} />
       ))}
