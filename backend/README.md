@@ -27,7 +27,8 @@ All JSON; `/api/` is same-origin. GET `/session/` returns `{user, csrfToken}`. S
 | profile | GET, POST | `name`, `email`; user |
 | preferences | POST | `topics: string[]` from the connected catalog |
 | password | POST | `old_password`, `new_password1`, `new_password2` |
-| feed | GET | `?date=YYYY-MM-DD&topic=id`; portal snapshot |
+| feed | GET | `?date=YYYY-MM-DD&topic=id&revision=id`; portal snapshot |
+| events/&lt;id&gt; | GET | Optional `date`/`revision`; matching event snapshot (web branch addition) |
 
 Unauthenticated protected endpoints return 401, invalid input 400, rate limits 429. Registration, portal login and staff login share 20 attempts/address/15 minutes stored in SQLite. Behind the supplied Nginx config, only the loopback proxy's overwritten `X-Real-IP` is trusted. Staff login retains Django's CSRF-protected login form. Add edge limits before scaling beyond this small deployment. Purge expired sessions with `clearsessions`; periodically remove old AuthAttempt rows. This is a small deployment, not a distributed auth service.
 
@@ -50,5 +51,8 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
 | 2026-10-22 | rcc00n / Codex | Unfold 0.81 with branded pages; superuser-only account management; read-only preferences/source views | Reuse Django security while preventing staff self-escalation and cross-workstream writes |
-
 | 2026-10-22 | rcc00n / Codex | Optional external catalog export pinned to collector commit, with provenance; live events/digests remain empty | Enable real preference selection and source inspection before runtime integration, without duplicating team registry data in this branch |
+| 2026-10-22 | rcc00n / Codex | Pinned jsonschema with explicit format checks; private local immutable snapshot store and CLI, opt-in publication | Validate the portal-owned proposal without exposing ingestion or giving processing access to auth data; team transport/schema approval remains required |
+
+
+Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.

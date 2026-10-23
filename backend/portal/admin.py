@@ -26,10 +26,13 @@ class ControlSite(UnfoldAdminSite):
         ] + super().get_urls()
 
     def page(self, request, title, section):
+        from .snapshot_store import SnapshotStore
+
         context = {
             **self.each_context(request),
             "title": title,
             "section": section,
+            "operational": SnapshotStore().status(),
             "snapshot": adapter.snapshot(),
             "user_count": User.objects.count(),
             "preference_count": Preference.objects.count(),

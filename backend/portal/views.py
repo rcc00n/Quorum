@@ -21,7 +21,7 @@ def endpoint(methods, auth=False):
     def decorate(fn):
         @require_http_methods(methods)
         @wraps(fn)
-        def wrapped(request):
+        def wrapped(request, *args, **kwargs):
             if auth and not request.user.is_authenticated:
                 return response({"error": "Sign in to continue."}, 401)
             try:
@@ -30,7 +30,7 @@ def endpoint(methods, auth=False):
                     raise ValueError()
             except (ValueError, UnicodeDecodeError):
                 return response({"error": "Invalid JSON object."}, 400)
-            return fn(request)
+            return fn(request, *args, **kwargs)
 
         return wrapped
 
@@ -158,7 +158,33 @@ def password(request):
 def feed(request):
     day = request.GET.get("date", date.today().isoformat())
     try:
-        date.fromisoformat(day)
+        if date.fromisoformat(day).isoformat() != day:
+            raise ValueError()
     except ValueError:
         return response({"error": "Use a date in YYYY-MM-DD format."}, 400)
-    return response(adapter.snapshot(day, request.GET.get("topic", "")))
+    revision = request.GET.get("revision")
+    if revision:
+        import re
+
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}", revision):
+            return response({"error": "Invalid revision identifier."}, 400)
+    return response(
+        adapter.snapshot(day, request.GET.get("topic", ""), revision=revision)
+    )
+
+
+@endpoint(["GET"], auth=True)
+def event_detail(request, event_id):
+    day = request.GET.get("date", "")
+    if day:
+        try:
+            if date.fromisoformat(day).isoformat() != day:
+                raise ValueError()
+        except ValueError:
+            return response({"error": "Use a date in YYYY-MM-DD format."}, 400)
+    revision = request.GET.get("revision")
+    import re
+
+    if revision and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}", revision):
+        return response({"error": "Invalid revision identifier."}, 400)
+    return response(adapter.event(event_id, day, revision))

@@ -1,0 +1,356 @@
+{
+  "schema_version": "quorum.portal.snapshot.v1-proposal",
+  "revision": "demo-r1",
+  "parent_revision": null,
+  "run_id": "demo-run",
+  "edition": "2026-10-22",
+  "generated_at": "2026-10-22T14:00:00Z",
+  "expires_at": "2026-10-23T14:00:00Z",
+  "source_revision": "DEMO-only-registry",
+  "mode": "demo",
+  "completeness": "partial",
+  "errors": [
+    {
+      "code": "demo_gap",
+      "message": "DEMO ONLY \u2014 one fictional outcome remains unavailable.",
+      "event_id": "demo-event"
+    }
+  ],
+  "topics": [
+    {
+      "id": "demo-topic",
+      "name": "DEMO \u2014 Civic life"
+    }
+  ],
+  "sources": [
+    {
+      "id": "demo-office",
+      "name": "DEMO \u2014 Public records office",
+      "domain": "example.com",
+      "audience": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "kind": "official",
+      "tier": null,
+      "independence_group": "demo-office",
+      "audience_source_url": null,
+      "audience_as_of": null,
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      }
+    },
+    {
+      "id": "demo-outlet",
+      "name": "DEMO \u2014 The Civic Record",
+      "domain": "example.com",
+      "audience": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "kind": "outlet",
+      "tier": null,
+      "independence_group": "demo-outlet",
+      "audience_source_url": null,
+      "audience_as_of": null,
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "demo-event",
+      "topic_id": "demo-topic",
+      "date": "2026-10-22",
+      "title": "DEMO \u2014 A fictional community decision",
+      "summary": "Fictional interface test: inspect a claim, compare two accounts and follow the verification sequence. Not verified news.",
+      "importance": null,
+      "source_ids": [
+        "demo-office",
+        "demo-outlet"
+      ],
+      "analysis": {
+        "documents": [
+          {
+            "id": "demo-notice",
+            "source_id": "demo-office",
+            "title": "DEMO \u2014 fictional official",
+            "url": "https://example.com/demo-notice",
+            "content_hash": "33a7a85cdb8ffd28b42ac7146484d54ab37584ab2397ae2171f701bb9893d552",
+            "revision": null,
+            "published_at": "2026-10-22T14:00:00Z",
+            "fetched_at": "2026-10-22T14:00:00Z",
+            "access_level": 1,
+            "kind": "official",
+            "primary": true
+          },
+          {
+            "id": "demo-article",
+            "source_id": "demo-outlet",
+            "title": "DEMO \u2014 fictional article",
+            "url": "https://example.com/demo-article",
+            "content_hash": "12673905600ee5ace0b1e138eee2f5e35c188a07b10928d514e2718056bd50cf",
+            "revision": null,
+            "published_at": "2026-10-22T14:00:00Z",
+            "fetched_at": "2026-10-22T14:00:00Z",
+            "access_level": 2,
+            "kind": "article",
+            "primary": false
+          }
+        ],
+        "claims": [
+          {
+            "id": "demo-confirmed",
+            "text": "DEMO \u2014 an illustrative document was adopted",
+            "status": "established",
+            "explanation": "DEMO ONLY \u2014 fictional explanation; this is not a real news finding.",
+            "attribution": null,
+            "supporting": [
+              {
+                "document_id": "demo-notice",
+                "summary": "DEMO ONLY \u2014 illustrative citation, not actual evidence.",
+                "quote": null,
+                "char_start": null,
+                "char_end": null,
+                "content_hash_at_quote": null
+              }
+            ],
+            "contradicting": [],
+            "primary_verification": {
+              "status": "confirmed",
+              "summary": "DEMO ONLY \u2014 fictional verification summary.",
+              "actor": "DEMO verifier",
+              "checked_at": "2026-10-22T14:00:00Z"
+            },
+            "independent_verification": {
+              "status": "confirmed",
+              "summary": "DEMO ONLY \u2014 fictional verification summary.",
+              "actor": "DEMO verifier",
+              "checked_at": "2026-10-22T14:00:00Z"
+            },
+            "disagreement": "none",
+            "confidence_explanation": null
+          },
+          {
+            "id": "demo-statement",
+            "text": "DEMO \u2014 a speaker describes the next step",
+            "status": "attributed",
+            "explanation": "DEMO ONLY \u2014 fictional explanation; this is not a real news finding.",
+            "attribution": {
+              "speaker": "DEMO speaker",
+              "statement_at": "2026-10-22T14:00:00Z"
+            },
+            "supporting": [
+              {
+                "document_id": "demo-article",
+                "summary": "DEMO ONLY \u2014 illustrative citation, not actual evidence.",
+                "quote": null,
+                "char_start": null,
+                "char_end": null,
+                "content_hash_at_quote": null
+              }
+            ],
+            "contradicting": [],
+            "primary_verification": {
+              "status": "not_run",
+              "summary": null,
+              "actor": null,
+              "checked_at": null
+            },
+            "independent_verification": {
+              "status": "not_run",
+              "summary": null,
+              "actor": null,
+              "checked_at": null
+            },
+            "disagreement": "not_assessed",
+            "confidence_explanation": null
+          },
+          {
+            "id": "demo-dispute",
+            "text": "DEMO \u2014 accounts disagree about implementation",
+            "status": "disputed",
+            "explanation": "DEMO ONLY \u2014 fictional explanation; this is not a real news finding.",
+            "attribution": null,
+            "supporting": [
+              {
+                "document_id": "demo-notice",
+                "summary": "DEMO ONLY \u2014 illustrative citation, not actual evidence.",
+                "quote": null,
+                "char_start": null,
+                "char_end": null,
+                "content_hash_at_quote": null
+              }
+            ],
+            "contradicting": [
+              {
+                "document_id": "demo-article",
+                "summary": "DEMO ONLY \u2014 illustrative citation, not actual evidence.",
+                "quote": null,
+                "char_start": null,
+                "char_end": null,
+                "content_hash_at_quote": null
+              }
+            ],
+            "primary_verification": {
+              "status": "confirmed",
+              "summary": "DEMO ONLY \u2014 fictional verification summary.",
+              "actor": "DEMO verifier",
+              "checked_at": "2026-10-22T14:00:00Z"
+            },
+            "independent_verification": {
+              "status": "contradicted",
+              "summary": "DEMO ONLY \u2014 fictional verification summary.",
+              "actor": "DEMO independent verifier",
+              "checked_at": "2026-10-22T14:00:00Z"
+            },
+            "disagreement": "present",
+            "confidence_explanation": null
+          },
+          {
+            "id": "demo-unknown",
+            "text": "DEMO \u2014 the final outcome has not been supplied",
+            "status": "unknown",
+            "explanation": "DEMO ONLY \u2014 fictional explanation; this is not a real news finding.",
+            "attribution": null,
+            "supporting": [],
+            "contradicting": [],
+            "primary_verification": {
+              "status": "not_run",
+              "summary": null,
+              "actor": null,
+              "checked_at": null
+            },
+            "independent_verification": {
+              "status": "not_run",
+              "summary": null,
+              "actor": null,
+              "checked_at": null
+            },
+            "disagreement": "not_assessed",
+            "confidence_explanation": null
+          }
+        ],
+        "frames": [
+          {
+            "source_id": "demo-office",
+            "document_id": "demo-notice",
+            "summary": "DEMO \u2014 emphasizes the wording of the fictional notice.",
+            "emphasized_claim_ids": [
+              "demo-confirmed"
+            ],
+            "interpretations": [
+              "DEMO \u2014 an attributed description of implementation."
+            ]
+          },
+          {
+            "source_id": "demo-outlet",
+            "document_id": "demo-article",
+            "summary": "DEMO \u2014 emphasizes questions about the fictional schedule.",
+            "emphasized_claim_ids": [
+              "demo-dispute",
+              "demo-unknown"
+            ],
+            "interpretations": []
+          }
+        ],
+        "trace": [
+          {
+            "id": "demo-step-0",
+            "timestamp": "2026-10-22T14:00:00Z",
+            "action": "collection",
+            "actor": "DEMO agent",
+            "summary": "DEMO ONLY \u2014 A fictional record is supplied.",
+            "evidence_refs": [
+              "demo-notice"
+            ],
+            "outcome": "Fictional demonstration only.",
+            "revision": "demo-r1"
+          },
+          {
+            "id": "demo-step-1",
+            "timestamp": "2026-10-22T14:00:00Z",
+            "action": "zetaris_query",
+            "actor": "DEMO agent",
+            "summary": "DEMO ONLY \u2014 A fictional query step is illustrated; no real query is claimed.",
+            "evidence_refs": [
+              "demo-notice"
+            ],
+            "outcome": "Fictional demonstration only.",
+            "revision": "demo-r1"
+          },
+          {
+            "id": "demo-step-2",
+            "timestamp": "2026-10-22T14:00:00Z",
+            "action": "primary_verification",
+            "actor": "DEMO agent",
+            "summary": "DEMO ONLY \u2014 The demonstration primary review is recorded.",
+            "evidence_refs": [
+              "demo-notice"
+            ],
+            "outcome": "Fictional demonstration only.",
+            "revision": "demo-r1"
+          },
+          {
+            "id": "demo-step-3",
+            "timestamp": "2026-10-22T14:00:00Z",
+            "action": "independent_verification",
+            "actor": "DEMO agent",
+            "summary": "DEMO ONLY \u2014 The demonstration independent review disagrees on a different claim.",
+            "evidence_refs": [
+              "demo-notice"
+            ],
+            "outcome": "Fictional demonstration only.",
+            "revision": "demo-r1"
+          },
+          {
+            "id": "demo-step-4",
+            "timestamp": "2026-10-22T14:00:00Z",
+            "action": "contradiction_detection",
+            "actor": "DEMO agent",
+            "summary": "DEMO ONLY \u2014 The disputed demonstration claim remains disputed.",
+            "evidence_refs": [
+              "demo-notice"
+            ],
+            "outcome": "Fictional demonstration only.",
+            "revision": "demo-r1"
+          },
+          {
+            "id": "demo-step-5",
+            "timestamp": "2026-10-22T14:00:00Z",
+            "action": "publication",
+            "actor": "DEMO agent",
+            "summary": "DEMO ONLY \u2014 The labelled demonstration edition is prepared.",
+            "evidence_refs": [
+              "demo-notice"
+            ],
+            "outcome": "Fictional demonstration only.",
+            "revision": "demo-r1"
+          }
+        ],
+        "corrections": [],
+        "coverage": {
+          "covered_source_ids": [
+            "demo-office",
+            "demo-outlet"
+          ],
+          "eligible_source_ids": null,
+          "publication_count": 2,
+          "independent_confirmation_count": 1
+        }
+      }
+    }
+  ],
+  "digests": [
+    {
+      "date": "2026-10-22",
+      "topic_id": "demo-topic",
+      "summary": "DEMO ONLY \u2014 a fictional daily digest."
+    }
+  ]
+}

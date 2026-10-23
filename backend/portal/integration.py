@@ -11,7 +11,12 @@ class Topic(TypedDict):
     name: str
 
 
-class PortalSnapshot(TypedDict):
+class SnapshotExtensions(TypedDict, total=False):
+    publication: dict
+    errors: list[dict]
+
+
+class PortalSnapshot(SnapshotExtensions):
     status: str
     topics: list[Topic]
     sources: list[dict]
@@ -21,7 +26,13 @@ class PortalSnapshot(TypedDict):
 
 
 class DataAdapter(Protocol):
-    def snapshot(self, day: str, topic: str) -> PortalSnapshot: ...
+    def snapshot(
+        self, day: str = "", topic: str = "", revision: str | None = None
+    ) -> PortalSnapshot: ...
+
+    def event(
+        self, event_id: str, day: str = "", revision: str | None = None
+    ) -> PortalSnapshot: ...
 
 
 class CatalogAdapter:
@@ -94,4 +105,59 @@ class CatalogAdapter:
         return snapshot
 
 
-adapter: DataAdapter = CatalogAdapter()
+class PublishedAdapter:
+    def snapshot(self, day: str = "", topic: str = "", revision: str | None = None):
+        from .snapshot_store import SnapshotStore
+        from .snapshot_projection import project
+
+        catalog = CatalogAdapter().snapshot()
+        payload, publication = SnapshotStore().read(day, revision)
+        if payload:
+            result = project(payload, publication, topic)
+            result["catalog_revision"] = catalog["catalog_revision"]
+            return result
+        catalog["publication"] = publication
+        if publication["status"] == "error":
+            catalog["status"] = "error"
+        return catalog
+
+    def event(self, event_id: str, day: str = "", revision: str | None = None):
+        from .snapshot_store import SnapshotStore
+
+        if day or revision:
+            result = self.snapshot(day, revision=revision)
+        else:
+            store = SnapshotStore()
+            heads = {}
+            days = []
+            if store.root:
+                try:
+                    heads = store.heads()
+                    days = sorted(heads, reverse=True)
+                except (ValueError, OSError):
+                    pass
+            result = self.snapshot()
+            for edition in days:
+                try:
+                    revision_id = heads[edition]
+                    import json
+                    from .snapshot_store import read_bounded
+
+                    metadata = json.loads(
+                        read_bounded(
+                            store.root / "revisions" / f"{revision_id}.meta.json", 65536
+                        )
+                    )
+                    if event_id not in metadata.get("event_ids", []):
+                        continue
+                    candidate = self.snapshot(edition)
+                    if any(e["id"] == event_id for e in candidate["events"]):
+                        result = candidate
+                        break
+                except (ValueError, OSError, KeyError, TypeError):
+                    continue
+        result["events"] = [e for e in result["events"] if e["id"] == event_id]
+        return result
+
+
+adapter: DataAdapter = PublishedAdapter()
