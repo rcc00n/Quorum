@@ -1,0 +1,31 @@
+{
+  "_note": "Fictional use-case day (workstream D): a story covered only by level-2 and level-3 sources. Confirmation must still be possible from leads alone (two independence groups); the level-3 source counts as coverage and contributes no evidence.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-03",
+  "documents": [
+    {
+      "id": 9301, "source_id": "nyt", "source_name": "The New York Times", "independence_group": "nyt", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.nytimes.com/fiction/2026/11/03/winter-fuel-reserves.html",
+      "title": "Ministry outlines winter fuel reserves plan", "lead": "The ministry outlined a winter fuel reserves plan for the heating season.",
+      "published_at": "2026-11-02T09:00:00Z", "access_level": 2, "wire_origin": null
+    },
+    {
+      "id": 9302, "source_id": "reuters", "source_name": "Reuters", "independence_group": "reuters", "kind": "agency",
+      "flank": null, "tier": null, "url": "https://www.reuters.com/fiction/winter-fuel-reserves-2026-11-03/",
+      "title": "Winter fuel reserves plan outlined by ministry", "lead": "The ministry outlines a winter fuel reserves plan covering the heating season.",
+      "published_at": "2026-11-02T10:00:00Z", "access_level": 2, "wire_origin": null
+    },
+    {
+      "id": 9303, "source_id": "wsj", "source_name": "The Wall Street Journal", "independence_group": "wsj", "kind": "outlet",
+      "flank": "center", "tier": null, "url": "https://www.wsj.com/fiction/winter-fuel-reserves-plan",
+      "title": "Ministry sets out winter fuel reserves plan", "lead": "A winter fuel reserves plan was outlined by the ministry for the heating season.",
+      "published_at": "2026-11-02T11:00:00Z", "access_level": 2, "wire_origin": null
+    },
+    {
+      "id": 9304, "source_id": "ap", "source_name": "Associated Press", "independence_group": "ap", "kind": "agency",
+      "flank": null, "tier": null, "url": "https://apnews.com/fiction/winter-fuel-reserves-plan",
+      "title": "Ministry outlines winter fuel reserves plan", "lead": "",
+      "published_at": "2026-11-02T12:00:00Z", "access_level": 3, "wire_origin": null
+    }
+  ]
+}

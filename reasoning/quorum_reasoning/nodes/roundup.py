@@ -10,20 +10,28 @@ from __future__ import annotations
 from .. import llm, untrusted
 from ..rules.confirmation import independent_support
 from ..rules.writing_rules import check_text
-from ..state import Claim, Event, RunState, StepError
+from ..state import Claim, DocRef, Event, RunState, StepError
 from ..trace import finish, step
 
-GROUP_ORDER = ["Reported, not confirmed", "Confirmed", "Single source", "Statements only", "Unverified"]
+GROUP_ORDER = ["Reported, not confirmed", "Confirmed", "Disputed", "Single source", "Statements only", "Unverified"]
 
 
-def status_label(e: Event, claims: list[Claim]) -> str:
+def status_label(e: Event, claims: list[Claim], docs: list[DocRef]) -> str:
+    """DECISIONS.md › Selecting major news names the statuses: confirmed, disputed, statements only,
+    single source (plus "reported, not confirmed" for escalated events). Review 2026-10-23 (D1, D2):
+    a disputed claim must show as disputed, and an event covered by one independence group is a
+    single source even when no claim gathered evidence (a scoop's own text is not evidence). A wire
+    reprint counts in the wire's group here too (same rule as research.evidence_from)."""
     if e["needs_review"]:
         return "Reported, not confirmed"
     if any(c["final_status"] == "confirmed" for c in claims):
         return "Confirmed"
+    if any(c["final_status"] == "disputed" for c in claims):
+        return "Disputed"
     if claims and all(c["kind"] == "statement" for c in claims):
         return "Statements only"
-    if any(len(independent_support(c["evidence"])) == 1 for c in claims):
+    groups = {(d.get("wire_origin") or "").strip().lower() or d["independence_group"] for d in docs}
+    if len(groups) == 1 or any(len(independent_support(c["evidence"])) == 1 for c in claims):
         return "Single source"
     return "Unverified"
 
@@ -38,7 +46,7 @@ def run(state: RunState) -> dict:
             claims = [c for c in state["claims"].values() if c["event_id"] == e["id"]]
             docs = [by_id[i] for i in e["document_ids"] if i in by_id]
             lead = next((d["lead"] for d in docs if d["lead"]), "")
-            label = status_label(e, claims)
+            label = status_label(e, claims, docs)
             try:
                 ans = llm.json_task(
                     "roundup_line",
