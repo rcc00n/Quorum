@@ -171,6 +171,12 @@ Reasoning publishes one snapshot per topic and edition day. The portal's adapter
   "run_id": "…",
   "version": 3,
   "status": "ok | partial | empty",
+  "generated_at": "2026-10-22T12:05:30Z",
+  "published_at": "2026-10-22T12:05:41Z",
+  "expires_at": "2026-10-23T12:00:00Z",
+  "edition_timezone": "America/New_York",
+  "window": {"start": "2026-10-21T09:30:00Z", "end": "2026-10-22T09:30:00Z"},
+  "provenance": {"corpus": "zetaris", "model": "meterless/auto", "fictional": false},
   "bar": {"threshold": 6, "confirmation_min": 1},
   "summary": "Three stories crossed the bar out of 17 events. …",
   "sources_missing": ["newsmax"],
@@ -216,6 +222,12 @@ Reasoning publishes one snapshot per topic and edition day. The portal's adapter
   }
 }
 ```
+
+**Envelope.** `topic_id` is the canonical topic slug from the `topics` table (`russia-ukraine-war` for the MVP topic; the portal uses the same id, see DECISIONS.md › Decision log 2026-10-23). `generated_at` is when reasoning built the snapshot; `published_at` is set by the store when a version is published (null before); `expires_at` is a freshness hint — the next edition of the topic is due at 08:00 local the following day; until a newer version or edition arrives the snapshot is current, after that the adapter may show it as stale. `window` is the edition window in UTC (24 hours ending 05:30 `edition_timezone`, DST-aware). `provenance.fictional` is true when the corpus is a fixture (demo data; the portal labels it); `provenance.model` is `stand-ins` for a dry run.
+
+**Status mapping.** `ok` → available; `empty` → available and a completed quiet day (`roundup.empty_day`), which is not the same as no edition; `partial` → partial, with `errors` (node, event_id, message) as the recorded gaps and the affected stories published with what they have; a failed pull is the adapter's own error state and never an empty edition.
+
+**Versions and corrections.** A rerun of the same topic-day yields `version + 1` with the same `edition_date`; versions are immutable. Corrections enter through collection (`documents.supersedes_id`): a superseded document is dropped from the corpus of the next run, so a claim it alone supported falls back to `unverified` in the next version. There is no claim-level correction envelope (prior claim → replacement claim) yet; that is an open item, not an implied feature. Ids: `event_id` and claim ids are stable hashes (ids.py); `document_id` and `official_doc_id` on evidence rows are the collectors' own numeric ids, kept in two fields so the two sequences never collide.
 
 Fields the implementation adds on top of the shape above (all optional for the portal): top-level `errors` (the run's recoverable failures) and `trace` (every step record: node, iteration, event_id, decision, reason, model, duration_ms); per story `review_reason`, `critic_notes`, `drafts` and `sources`; per claim `kind`, `speaker` and, on each evidence row, `found_by` (researcher or fact_checker) and `is_document`. `photo` is `null` until the photo tool exists.
 

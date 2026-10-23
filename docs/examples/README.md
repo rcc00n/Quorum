@@ -1,7 +1,11 @@
 # Examples
 
-| File | What it is |
-| --- | --- |
-| `snapshot.sample.json` | One reasoning snapshot (ARCHITECTURE.md § 8) for one topic and day, produced by the dry run on the fictional fixture corpus. Shape is real, content is not news. Regenerate with `cd reasoning && python -m quorum_reasoning.run --dry-run --out /tmp/out` and copy `/tmp/out/russia-ukraine-war/2026-10-22.json` here. |
+Reasoning snapshots (ARCHITECTURE.md § 8) produced by the dry run on fictional fixture corpora. Shape is real, content is not news; every file carries `provenance.fictional: true`, and the portal labels such data as demo. The canonical contract stays § 8; these files follow it, never the other way round.
 
-The sample is the test dataset for the portal: adapter, story page, topic page, roundup and trace views can be built against it before the first live run. The canonical contract stays § 8 of `docs/ARCHITECTURE.md`; this file follows it, never the other way round.
+| File | What it is | Regenerate (from `reasoning/`, venv active) |
+| --- | --- | --- |
+| `snapshot.sample.json` | A normal day: two stories above the bar, two events in the roundup, one disputed claim, the critic's rejection and rewrite in `trace`. | `python -m quorum_reasoning.run --dry-run --out /tmp/out`, copy `/tmp/out/russia-ukraine-war/2026-10-22.json` |
+| `snapshot.empty-day.sample.json` | A completed quiet day: `status: empty`, no stories, `roundup.empty_day: true` with every event listed. Not the same as "no edition". | `python -m quorum_reasoning.run --dry-run --fixture usecases/quiet_day --out /tmp/out` |
+| `snapshot.partial.sample.json` | A run in which one node failed on a model call and the run went on: `status: partial`, `errors` names the node and event, the affected stories carry coverage counts but no framing labels. | one-off: `llm.json_task` made to raise for the `frame` task, then `graph.run_local(...)`; see the commit that added the file |
+
+Status mapping for the portal: `ok` → available; `empty` → available, quiet day (not pending); `partial` → partial, with `errors` as the recorded gaps; a failed pull → the adapter's own error state, never an empty edition. Freshness: `generated_at` is when reasoning built it, `published_at` is set by the store when a version is published (null in these files), `expires_at` is the next edition's due time (08:00 America/New_York the following day) — a hint for marking an edition stale when nothing newer has arrived.

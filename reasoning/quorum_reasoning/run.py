@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -37,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="shortcut for --model dry --corpus fixture")
     ap.add_argument("--model", choices=["dry", "live"], default=None, help="dry: stand-ins, no credits; live: the route in .env")
     ap.add_argument("--corpus", choices=["fixture", "zetaris"], default=None, help="where the day's documents come from")
+    ap.add_argument("--fixture", default=None, help="fixture day for --corpus fixture: sample_day (default) or e.g. usecases/quiet_day")
     ap.add_argument("--out", default="snapshots", help="directory for the snapshot JSON")
     ap.add_argument("--mermaid", action="store_true", help="print the graph as Mermaid and exit")
     ap.add_argument("--quiet", action="store_true")
@@ -46,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
         print(graph.mermaid())
         return 0
 
+    if args.fixture:
+        os.environ["QUORUM_FIXTURE"] = args.fixture
     model_dry = args.dry_run if args.model is None else args.model == "dry"
     corpus = args.corpus or ("fixture" if (args.dry_run or model_dry) else "zetaris")
     if args.model == "live" and llm.is_dry_run(False):

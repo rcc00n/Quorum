@@ -8,12 +8,45 @@ crossed the bar, "ok" otherwise. The adapter must not turn a failed pull into an
 from __future__ import annotations
 
 import math
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from .. import config, llm, untrusted
 from ..state import Claim, Event, RunState
+from ..tools.corpus import _edition_window, fixture_name
 from ..trace import finish, step
 
 SCHEMA_VERSION = "1.0"
+EDITION_TZ = "America/New_York"
+PUBLISH_LOCAL_TIME = time(8, 0)  # DECISIONS › Demo: cut at 05:30, out by 08:00 local
+
+
+def envelope(state: RunState) -> dict:
+    """Timing and provenance of the edition, for the portal's freshness and labelling (ARCHITECTURE.md § 8).
+
+    `expires_at` is a hint, not a promise: the next edition of the topic is due at 08:00 local the following
+    day; until a newer version or edition arrives the snapshot is current, after that the adapter may call it
+    stale. `provenance.fictional` is true whenever the corpus is a fixture: such a snapshot is demo data and
+    the portal shows it as such.
+    """
+    start, end = _edition_window(state["edition_date"])
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    tz = ZoneInfo(EDITION_TZ)
+    next_day = date.fromisoformat(state["edition_date"]) + timedelta(days=1)
+    expires = datetime.combine(next_day, PUBLISH_LOCAL_TIME, tz).astimezone(timezone.utc)
+    fictional = state["corpus"] != "zetaris"
+    return {
+        "generated_at": now.isoformat().replace("+00:00", "Z"),
+        "published_at": None,  # set by the store when a version is published
+        "expires_at": expires.isoformat().replace("+00:00", "Z"),
+        "edition_timezone": EDITION_TZ,
+        "window": {"start": start, "end": end},
+        "provenance": {
+            "corpus": state["corpus"] + (f":{fixture_name()}" if fictional else ""),
+            "model": "stand-ins" if llm.is_dry_run(state["dry_run"]) else llm.model_name(),
+            "fictional": fictional,
+        },
+    }
 
 
 def reading_minutes(e: Event) -> int:
@@ -95,6 +128,7 @@ def run(state: RunState) -> dict:
             "run_id": state["run_id"],
             "version": 1,  # the store assigns the real version on insert
             "status": status,
+            **envelope(state),
             "bar": {"threshold": config.get("impact_bar", "threshold", 6), "confirmation_min": config.get("impact_bar", "confirmation_min", 1)},
             "summary": summary,
             "sources_missing": [],  # filled once plan can compare the sources table with the day's corpus

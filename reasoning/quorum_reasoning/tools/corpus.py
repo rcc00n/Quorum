@@ -1,8 +1,12 @@
-"""The day's corpus for one topic: through Zetaris (corpus="zetaris") or from the bundled fixture (corpus="fixture").
+"""The day's corpus for one topic: through Zetaris (corpus="zetaris") or from a bundled fixture (corpus="fixture").
 
-Zetaris side (collectors/zetaris/01_register_postgres.sql): the collection Postgres is registered as the
-Lightning database QUORUM_COLLECT, so the tables are QUORUM_COLLECT.public.documents and friends. Override the
-database name with ZETARIS_COLLECTION_DB if yours differs.
+Zetaris side (collectors/zetaris/01_register_postgres.sql): the collection Postgres is registered with
+`CREATE DATASOURCE QUORUM_COLLECT` and `REGISTER DATASOURCE TABLES (...) FROM QUORUM_COLLECT`, so the tables
+are QUORUM_COLLECT.documents and friends — no schema segment. Override the datasource name with
+ZETARIS_COLLECTION_DB; set ZETARIS_COLLECTION_SCHEMA only if your registration exposes a schema level.
+
+Fixture side: `fixtures/<name>.json`, name from QUORUM_FIXTURE (default sample_day; use-case days live under
+usecases/, e.g. QUORUM_FIXTURE=usecases/quiet_day).
 """
 
 from __future__ import annotations
@@ -27,7 +31,10 @@ OFFICIAL_ID_OFFSET = 1_000_000_000
 
 
 def _zetaris_db() -> str:
-    return os.getenv("ZETARIS_COLLECTION_DB", "QUORUM_COLLECT")
+    """Table prefix as registered in Lightning: `QUORUM_COLLECT` (tables QUORUM_COLLECT.documents, ...)."""
+    db = os.getenv("ZETARIS_COLLECTION_DB", "QUORUM_COLLECT")
+    schema = os.getenv("ZETARIS_COLLECTION_SCHEMA", "").strip()
+    return f"{db}.{schema}" if schema else db
 
 
 def _run_sql(sql: str, limit: int):
@@ -74,8 +81,8 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
     docs_sql = f"""
         SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
                d.url, d.title, d.lead, d.published_at, d.access_level, d.wire_origin, d.supersedes_id
-        FROM {db}.public.documents d
-        JOIN {db}.public.sources s ON s.id = d.source_id
+        FROM {db}.documents d
+        JOIN {db}.sources s ON s.id = d.source_id
         WHERE d.topic_id = '{topic_id}'
           AND d.published_at >= TIMESTAMP '{start}' AND d.published_at < TIMESTAMP '{end}'
         ORDER BY d.published_at DESC
@@ -84,8 +91,8 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
         SELECT o.id, o.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
                o.url, o.title, '' AS lead, COALESCE(o.signed_at, o.published_at) AS published_at, 1 AS access_level,
                NULL AS wire_origin, o.doc_type, o.full_text AS text
-        FROM {db}.public.official_docs o
-        JOIN {db}.public.sources s ON s.id = o.source_id
+        FROM {db}.official_docs o
+        JOIN {db}.sources s ON s.id = o.source_id
         WHERE o.topic_id = '{topic_id}'
           AND COALESCE(o.signed_at, o.published_at) >= TIMESTAMP '{start}'
           AND COALESCE(o.signed_at, o.published_at) < TIMESTAMP '{end}'
@@ -130,8 +137,22 @@ def _docref(row: dict, *, official: bool) -> DocRef:
     return ref
 
 
+_FIXTURE_NAME = re.compile(r"^[a-z0-9_]+(/[a-z0-9_]+)?$")
+
+
+def fixture_name() -> str:
+    name = os.getenv("QUORUM_FIXTURE", "sample_day").strip() or "sample_day"
+    if not _FIXTURE_NAME.match(name):
+        raise ValueError(f"QUORUM_FIXTURE must be a name like sample_day or usecases/quiet_day, got {name!r}")
+    return name
+
+
 def load_fixture(topic_id: str, edition_date: str) -> list[DocRef]:
-    path = _FIXTURES / "sample_day.json"
+    """The bundled day named by QUORUM_FIXTURE. The fixture's own topic/date are not checked against the
+    arguments: a dry run of any date replays the same day on purpose (deterministic demos and tests)."""
+    path = _FIXTURES / f"{fixture_name()}.json"
+    if not path.is_file():
+        raise FileNotFoundError(f"no fixture {path.name} under {path.parent}; see fixtures/ and fixtures/usecases/")
     data = json.loads(path.read_text(encoding="utf-8"))
     docs = [d for d in data["documents"] if d.get("topic_id", topic_id) == topic_id]
     return [DocRef(**{k: v for k, v in d.items() if k != "topic_id"}) for d in docs]

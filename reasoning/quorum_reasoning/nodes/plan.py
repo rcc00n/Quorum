@@ -9,6 +9,7 @@ from __future__ import annotations
 from .. import config, ids, llm
 from ..state import RunState
 from ..tools.corpus import load_documents
+from ..tools.fetch_text import clear_cache, fetcher_name
 from ..trace import finish, step
 
 
@@ -21,6 +22,7 @@ def run(state: RunState) -> dict:
     corpus = state.get("corpus") or ("fixture" if dry_run else "zetaris")
     if corpus not in ("fixture", "zetaris"):
         raise ValueError(f"corpus must be fixture or zetaris, got {corpus!r}")
+    clear_cache()  # article texts live for one run only
     with step(state, "plan") as s:
         docs = state.get("documents") or load_documents(topic_id, edition_date, corpus=corpus)
         official = sum(1 for d in docs if d.get("official"))
@@ -29,6 +31,8 @@ def run(state: RunState) -> dict:
         model_mode = "stand-ins (dry run)" if llm.is_dry_run(dry_run) else f"live, {llm.model_name()}"
         s.decision = f"{len(docs)} documents from {len(sources)} sources, {official} official; research budget {rounds} rounds per event"
         s.reason = f"corpus: {corpus}, edition window ending 05:30 America/New_York; model: {model_mode}; every event gets the same budget"
+        if corpus == "zetaris":
+            s.reason += f"; article text via {fetcher_name()}"
     return {
         "run_id": state.get("run_id") or ids.run_id(topic_id, edition_date),
         "dry_run": dry_run,
