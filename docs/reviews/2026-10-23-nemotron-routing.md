@@ -65,6 +65,9 @@ trial-tier model list.** Three findings bound the problem:
 1. Set `NEMOTRON_MODEL_FACT_CHECKER=nvidia/nemotron-3-ultra-550b-a55b` and run
    `python -m quorum_reasoning.run --test-connection`. Ultra was serving while Super-120B 404ed, and we have
    already seen it answer through Nightshift. Alternative: `nvidia/nemotron-3.5-super-vl-120b-a12b`.
+   **Verified 2026-10-23 (Yelysei's machine): Super-120B 404ed as predicted; Ultra-550B answered as itself
+   ("ready") on the fact-checker lane with Lightning on the default lane. The development route now runs
+   two different Nemotrons.**
 2. If 404: generate a fresh key at build.nvidia.com/settings/api-keys, enabling every scope offered
    ("Catalog", "Public API Endpoints"), and repeat once.
 3. If still 404, the only channel is the NVIDIA developer forum's accounts category; there is no documented
