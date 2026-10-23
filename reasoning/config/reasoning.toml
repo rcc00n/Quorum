@@ -30,3 +30,13 @@ attribution_verbs = ["says", "said", "states", "stated", "claims", "claimed", "a
 default = "env:NEMOTRON_MODEL"
 fact_checker = "env:NEMOTRON_MODEL_FACT_CHECKER"
 temperature = 0.1
+# DECISION(2026-10-23, Yelysei Shkirpan/Claude Code): reasoning mode off for every task. Why: on the first live
+# run Nemotron 3.5 Lightning spent 10-70 s per call writing a thinking trace before a 30-token JSON answer, and
+# the biggest payload (extract_claims) ended in a 500 after 137 s; our tasks are judgments on quoted text,
+# not multi-step problems. "/no_think" is the Nemotron 3 family's system-prompt switch; the chat_template
+# kwarg is the NIM-level switch and is sent only when `thinking_kwarg = true`, because a hotspot may reject
+# unknown body fields.
+reasoning = "off"                 # off | on
+thinking_kwarg = false            # also send extra_body chat_template_kwargs.enable_thinking=false
+max_tokens = 1500                 # ceiling per reply; every task answers in far fewer
+min_interval_ms = 0               # pause between live calls; raise (e.g. 1500) if the provider's per-minute cap bites

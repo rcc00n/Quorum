@@ -105,7 +105,8 @@ def test_connection(which: str = "default") -> dict[str, str]:
     completion = _client().chat.completions.create(
         model=model,
         temperature=0,
-        messages=[{"role": "user", "content": "Reply with the single word: ready"}],
+        messages=[{"role": "system", "content": _prompt("connection_test")}, {"role": "user", "content": "Reply with the single word: ready"}],
+        **_request_extras(),
     )
     return {"lane": which, "route": model, "answered_by": getattr(completion, "model", "") or "", "reply": (completion.choices[0].message.content or "").strip()[:40]}
 
@@ -121,9 +122,37 @@ def model_name(which: str = "default") -> str:
     return _route(which)[2]
 
 
+NO_THINK = "/no_think"  # Nemotron 3 family: first line of the system prompt switches the thinking trace off
+_last_call_at = 0.0
+
+
 def _prompt(task: str) -> str:
     p = _PROMPTS / f"{task}.md"
-    return p.read_text(encoding="utf-8") if p.is_file() else f"Task: {task}. Answer with JSON only."
+    text = p.read_text(encoding="utf-8") if p.is_file() else f"Task: {task}. Answer with JSON only."
+    if str(config.get("models", "reasoning", "off")).lower() == "off":
+        text = NO_THINK + "\n" + text
+    return text
+
+
+def _request_extras() -> dict[str, Any]:
+    extras: dict[str, Any] = {}
+    max_tokens = int(config.get("models", "max_tokens", 0) or 0)
+    if max_tokens > 0:
+        extras["max_tokens"] = max_tokens
+    if config.get("models", "thinking_kwarg", False) and str(config.get("models", "reasoning", "off")).lower() == "off":
+        extras["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+    return extras
+
+
+def _throttle() -> None:
+    """Keeps at least models.min_interval_ms between two live calls (the provider's per-minute cap)."""
+    global _last_call_at
+    gap = int(config.get("models", "min_interval_ms", 0) or 0) / 1000.0
+    if gap > 0:
+        wait = _last_call_at + gap - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+    _last_call_at = time.monotonic()
 
 
 def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str = "default") -> dict[str, Any]:
@@ -139,6 +168,7 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
 
     _, _, model = _route(which)
     temperature = float(config.get("models", "temperature", 0.1))
+    _throttle()
     started = time.perf_counter()
     try:
         completion = _client().chat.completions.create(
@@ -148,6 +178,7 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
                 {"role": "system", "content": _prompt(task)},
                 {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
             ],
+            **_request_extras(),
         )
     except Exception as exc:
         ms = int((time.perf_counter() - started) * 1000)
