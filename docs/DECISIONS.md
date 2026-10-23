@@ -171,12 +171,17 @@ Six questions the team has not closed yet.
 - [ ] The track's requirements for sponsor technologies and development tools — verify on the challenge page in HackOS.
 - [ ] Where the audience estimates for the Y axis and cohort shares come from.
 
+## Shared development coordination
+
+[GitHub Issue #2](https://github.com/rcc00n/Quorum/issues/2) is the canonical cross-team feature/release tracker. Every assistant follows the tracking/handoff protocol in [AGENTS.md](../AGENTS.md#shared-project-tracking-and-cross-agent-handoff), with evidence-backed states and read-only inspection of other owners' branches. Module inventories and release checklists supplement this tracker; product and architecture decisions remain here. This coordination amendment does not approve unfinished application code or change data/reasoning architecture.
+
 ## Decision log
 
 Every change to this document gets a row here. Newest rows on top. Rules are in [AGENTS.md](../AGENTS.md), section "Decisions".
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex, explicit human coordination authorization | Issue #2 is the canonical shared tracker; every assistant follows the AGENTS.md tracking/handoff protocol across branches. | Preserve feature ownership, completion evidence and regression checks across independent sessions without merging application work. |
 | 2026-10-22 | rcc00n / Codex, explicit human workflow update | Use Codex; exclude Cursor gates from routine readiness and retain optional historical checks. Treat the reported organizer change as unverified; preserve sponsor requirements. | Match actual development workflow without claiming that conflicting public rules or submission compliance have been resolved. |
 | 2026-10-22 | rcc00n / Codex, explicit human team-approved amendment | Next.js frontend; Django auth, administration and web API; dedicated persistent SQLite portal database. Typed read-only integration adapter pending reasoning contract. | Clarify team ownership without changing data or reasoning architecture; isolated lightweight VPS deployment. |
 | 2026-10-22 | Yelysei / Claude | Repository documentation, including this file, is written in English | Readable for the judges and for the whole team |
