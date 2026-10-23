@@ -20,7 +20,7 @@ python -m quorum_reasoning.run --mermaid              # the graph as Mermaid (do
 langgraph dev                                         # LangGraph Studio on the same graph
 ```
 
-Output: `snapshots/<topic>/<date>.json` (git-ignored) and the trace printed as a table. Exit code 2 when the snapshot is `partial` (a node recorded an error).
+Output: `snapshots/<topic>/<date>.json` (git-ignored) and the trace printed as a table. A committed copy of the dry-run output is `docs/examples/snapshot.sample.json`, the test dataset for the portal. Exit code 2 when the snapshot is `partial` (a node recorded an error).
 
 Environment, all read from the repo-level `.env` (see `.env.example`): `MODEL_BASE_URL`, `MODEL_API_KEY`, `NEMOTRON_MODEL` (or the `METERLESS_*` names) for the model; `ZETARIS_REST_URL`, `ZETARIS_ORG_ID`, `ZETARIS_API_KEY` for the corpus; `ZETARIS_COLLECTION_DB` when the Lightning database is not `QUORUM_COLLECT`; `COLLECTOR_USER_AGENT` for fetching article text; `QUORUM_DRY_RUN=1` to force the dry run. With no model key configured the graph runs dry on its own.
 
@@ -28,7 +28,7 @@ Environment, all read from the repo-level `.env` (see `.env.example`): `MODEL_BA
 
 ```
 reasoning/
-  langgraph.json              what `langgraph dev` loads: quorum_reasoning/graph.py:graph
+  langgraph.json              what `langgraph dev` loads: quorum_reasoning.graph:graph (module path; see Decisions)
   config/reasoning.toml       thresholds, caps, loop limits, forbidden words, model routes
   quorum_reasoning/
     graph.py                  StateGraph assembly, conditional edges, run_local(), mermaid()
@@ -64,4 +64,5 @@ Module-level decisions (AGENTS.md § 2). Project-level ones are in `docs/DECISIO
 | 2026-10-22 | Yelysei / Claude Code | Every model task has a deterministic twin in `dryrun.py`; `QUORUM_DRY_RUN=1` or a missing key selects it. Draft 1 of every dry-run article carries a planted forbidden word. | The graph, its loops and the tests run without credits (AGENTS.md § 3: routine checks spend nothing), and the critic → writer loop is exercised on every run, not only when a model slips. |
 | 2026-10-22 | Yelysei / Claude Code | Clustering uses cosine on title word sets with the model confirming a borderline band (`config/reasoning.toml › clustering`); no IDF, no leads. | See the `DECISION` note in `nodes/cluster.py`: leads carry each outlet's angle, and IDF in a one-topic corpus penalises the words that define an event. |
 | 2026-10-22 | Yelysei / Claude Code | The snapshot carries `trace`, `errors`, `review_reason`, `critic_notes`, `drafts` and per-claim `found_by` on evidence, on top of ARCHITECTURE.md § 8. | The portal and the demo show how a story was arrived at; a `trace_ref` alone needs a second endpoint that does not exist yet. § 8 updated in the same commit. |
+| 2026-10-23 | Yelysei / Claude Code | `langgraph.json` names the graph by module path (`quorum_reasoning.graph:graph`), not by file path. | `langgraph dev` loads a file path as a top-level module, so the package's relative imports fail (`attempted relative import with no known parent package`); the module path works because `dependencies: ["."]` installs the package. |
 | 2026-10-22 | Yelysei / Claude Code | Storage is not in this version: `publish` builds the snapshot, `run.py` writes it to `snapshots/`; the `analysis` schema and the snapshot endpoint come next. | A snapshot file is enough for the portal adapter to start against; the Postgres store is additive. |

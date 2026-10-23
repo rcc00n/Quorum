@@ -227,7 +227,7 @@ Transport, to agree with Vadim: reasoning exposes `GET /snapshots/{topic_id}/{ed
 
 ```
 reasoning/                      # the package; see reasoning/README.md for commands and module decisions
-  langgraph.json                # {"graphs": {"quorum": "./quorum_reasoning/graph.py:graph"}, "env": "../.env", "dependencies": ["."]}
+  langgraph.json                # {"graphs": {"quorum": "quorum_reasoning.graph:graph"}, "env": "../.env", "dependencies": ["."]}
   pyproject.toml                # package quorum-reasoning; extras [dev] = langgraph-cli[inmem], pytest, psycopg
   config/reasoning.toml         # thresholds, caps, rounds, forbidden words, model routes
   quorum_reasoning/
@@ -243,6 +243,8 @@ reasoning/                      # the package; see reasoning/README.md for comma
     trace.py, ids.py, text.py, llm.py, config.py, run.py
   tests/                        # rules, end-to-end dry run, escalation path, Mermaid
 ```
+
+A committed dry-run snapshot for the portal to build against: `docs/examples/snapshot.sample.json`.
 
 Not built yet: `store/` (the `analysis` schema and upserts), `server.py` (POST /runs, GET /runs/{id}/trace, GET /snapshots/…), `config/photos.toml` and the photo tool, `tools/news_rss.py`. Until the store exists, `run.py` writes the snapshot to `reasoning/snapshots/<topic>/<date>.json` (git-ignored).
 

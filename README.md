@@ -37,6 +37,7 @@ The full set of decisions — scope, principles, source list, cohort rules, UI, 
 | `docs/DECISIONS.md` | Product and architecture decisions, with a change log at the end |
 | `docs/ARCHITECTURE.md` | Reasoning block: the LangGraph graph, rules, analysis schema, snapshot contract for the portal, build plan |
 | `docs/SETUP.md`, `docs/SPONSOR_SETUP.md`, `docs/MANUAL_ACTIONS.md` | Local environment: WSL2, Docker, the official Zetaris platform bundle, remaining manual steps |
+| `docs/examples/snapshot.sample.json` | A dry-run reasoning snapshot (fictional content, real shape): the test dataset for the portal |
 | `reasoning/` | The reasoning block: LangGraph graph, rules, prompts, dry-run fixture, tests; `reasoning/README.md` says how to run it |
 | `agent/tools_zetaris.py` | Read-only Lightning SQL against the local Zetaris REST API |
 | `smoke_test.py` | Checks the Data (Zetaris) and Power (Nemotron via Meterless/NVIDIA) layers from the participant setup guide |
