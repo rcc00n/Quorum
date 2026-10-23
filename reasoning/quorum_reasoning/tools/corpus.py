@@ -11,8 +11,9 @@ import json
 import os
 import re
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from ..state import DocRef
 
@@ -40,12 +41,20 @@ def _run_sql(sql: str, limit: int):
 
 
 def _edition_window(edition_date: str) -> tuple[str, str]:
-    """24 hours ending at 05:30 America/New_York on the edition day, expressed in UTC (DECISIONS: cut at 05:30, out by 08:00)."""
+    """The window ending at 05:30 America/New_York on the edition day, expressed in UTC.
+
+    DECISION(2026-10-23, Yelysei Shkirpan/Claude Code): the 05:30 cut is converted per date with
+    zoneinfo, not a fixed offset. Why: a hardcoded EDT offset (09:30Z) goes wrong when DST ends on
+    2026-11-01 — documents published 09:30–10:30Z would fall between two editions; the transition
+    day itself is a 25-hour local day and that is the correct window.
+    """
+    tz = ZoneInfo("America/New_York")
     d = date.fromisoformat(edition_date)
-    # 05:30 New York is 09:30 UTC during EDT (Oct) and 10:30 UTC during EST; keep it simple and explicit.
-    end = f"{d.isoformat()}T09:30:00Z"
-    start = f"{(d - timedelta(days=1)).isoformat()}T09:30:00Z"
-    return start, end
+    cut = time(5, 30)
+    end = datetime.combine(d, cut, tz).astimezone(timezone.utc)
+    start = datetime.combine(d - timedelta(days=1), cut, tz).astimezone(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    return start.strftime(fmt), end.strftime(fmt)
 
 
 _TOPIC_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")

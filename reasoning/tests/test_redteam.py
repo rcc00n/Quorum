@@ -370,3 +370,15 @@ def test_a11_contradiction_alone_is_unverified_not_disputed():
     stays unverified."""
     con = research.evidence_from(make_doc(3, "guardian", text="x"), "x", "contradicts", "researcher")
     assert confirmation.verdict([con])[0] == "unverified"
+
+
+def test_a12_edition_window_follows_new_york_dst():
+    """A12: the 05:30 America/New_York cut must move with DST, or documents published between 09:30Z
+    and 10:30Z after 2026-11-01 fall between two editions and never enter any corpus."""
+    from quorum_reasoning.tools.corpus import _edition_window
+
+    assert _edition_window("2026-10-22") == ("2026-10-21T09:30:00Z", "2026-10-22T09:30:00Z")  # EDT
+    assert _edition_window("2026-12-01") == ("2026-11-30T10:30:00Z", "2026-12-01T10:30:00Z")  # EST
+    # the transition day is a 25-hour local day; its window covers both offsets with no gap
+    assert _edition_window("2026-11-01") == ("2026-10-31T09:30:00Z", "2026-11-01T10:30:00Z")
+    assert _edition_window("2026-11-02")[0] == "2026-11-01T10:30:00Z"
