@@ -87,3 +87,7 @@ Doctor: PASS=15 FAIL=0 BLOCKED=1 NOT_TESTED=1. Verify: PASS=19 FAIL=0 BLOCKED=14
 - Production read-only `portal_snapshot validate` successfully checked the labelled fixture with `published:false`. Snapshot root is unset; publication flag remains off. No machine credential, transport, remote processing, inference, DEMO feed or live upstream result was enabled.
 
 Remaining blockers: no actual reasoning result/schema or verified trace/correction semantics; collector hash/offset/provenance agreement; approved transport/authorization, freshness/ranking/timezone/retention and genuine sponsor execution. Next owner handoff: Yelysei provides one real result, Anastasia confirms provenance/access/independence, all approve transport before publishing. The code is DEPLOYED; external result integration is still BLOCKED.
+
+### Concurrent upstream change / branch-isolation limit
+
+Final fetch found `origin/yelysei/agents@f3a32ec` and master `c3cc5ac` (PR #3 merged by the team during this session). Read-only review found a written reasoning snapshot proposal, still no runtime sample. Its illustrative JSON failed read-only compatibility validation as expected; diagnostics stayed private/value-free and no publication occurred. Updated field gaps/options are in PORTAL_INTEGRATION.md. Draft PR #1 is now CONFLICTING with master. No merge/rebase/cherry-pick or master write was attempted; strict branch isolation takes precedence. Production remains the tested `09f5325` release, unaffected by this remote documentation change.
