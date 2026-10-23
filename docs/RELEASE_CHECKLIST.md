@@ -4,7 +4,7 @@ Owner: Vadim. Shared release tracker: [Issue #2](https://github.com/rcc00n/Quoru
 
 ## Current proposal review
 
-Local gates below refer to [PORTAL_VERIFICATION.md](PORTAL_VERIFICATION.md), PR #1, 29 passing Django tests and the built/browser-tested proposal. No deployment is approved by these local checks; production/contract gates remain open.
+Historical gates below refer to their pinned milestone in [PORTAL_VERIFICATION.md](PORTAL_VERIFICATION.md) and PR #1; latest results are in its current compatibility section. No deployment is approved by these local checks; production/contract gates remain open.
 
 ## Before integration or deployment
 
@@ -95,3 +95,16 @@ Branch `feature/web-portals`, code `4eb44109ef22f0d02bec66a002344ca27fd2e70d`, d
 - [x] One-command isolated preview preserved; no production account, DB/configuration, services or credentials changed.
 - [x] Hosted CI39900552412 succeeded on implementation `4eb4410`; browser/visual evidence verified separately locally.
 - [ ] Real snapshot/provenance/bridge and transport approval remain separate prerequisites; this preview does not satisfy a production release or sponsor E2E gate.
+
+## Current 1.0 envelope and handoff — local-only gate
+
+Owner Vadim; `feature/web-portals`, implementation `67b4cf7f8a1c41b2ebc27b41a519b840d43e1ee1`, draft PR #1. This is not a deployment authorization.
+
+- [x] Compare latest canonical §8 and all three exact examples at reasoning `6ea8243`; pin bytes/hashes and inspect latest collector read-only.
+- [x] Validate UTC timestamps/nullability/DST windows/provenance types, retain unpublished/expired distinction, safely project structured partial errors and absent framing without fake content.
+- [x] Pass 48 Django, six upgrade, four tooling, Next build/typecheck, strict internal validation, all-three TS contract and both actual HTTP/browser regressions including keyboard/reduced motion/three widths.
+- [x] Audit web architecture, API/auth, projection/store/revisions/corrections, preview, data/provenance, test setup and safe release/rollback docs; canonical links and notification format included.
+- [x] Preserve strict production schema/validator/store, preview security gates, all existing website features and production isolation; no migrations, credentials, inference or production access.
+- [ ] Receive explicit acknowledgement from Yelysei/Anastasia that their active coding agents follow the Issue #2 notification procedure.
+- [ ] Resolve original evidence/review/correction export, topic ID and genuine corpus/model proof with owners; approve production bridge/transport separately.
+- [ ] Future production release still needs explicit scope, private backup, rollback and fresh live verification. No deployment attempted.

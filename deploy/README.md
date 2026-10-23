@@ -1,5 +1,7 @@
 # Isolated VPS deployment
 
+[Web Integration: Start Here](../docs/TEAM_HANDOFF.md) · Deployment owner: **Vadim (@rcc00n)**. Teammates must not run portal releases, migrations, account provisioning or transport activation themselves. Publication/transport approval requires all three owners; release execution remains Vadim's responsibility. Current known release: `20261023-web-portals-09f5325`, verified previously; this compatibility milestone does not access production. [Evidence](STATUS.md).
+
 Target: `quorum.raccncode.com` / `144.202.24.190`. Existing Nginx hosts and Docker workloads must remain untouched. Remote data/processing integration is described in the canonical [portal handoff](../docs/PORTAL_INTEGRATION.md#transport-proposal--not-implemented-or-approved); its transport is still a proposal. Only Quorum services may be restarted. No inference, collectors, data workers or Zetaris run here.
 
 ## Build and package locally
@@ -9,7 +11,7 @@ bash deploy/build-web.sh
 python3 deploy/package-release.py <unique-release-label>
 scp ~/.local/share/quorum/<unique-release-label>.tar.gz root@144.202.24.190:/opt/quorum/
 # On VPS: tar -xzf /opt/quorum/<unique-release-label>.tar.gz -C /opt/quorum/releases
-# After the gates below: bash /opt/quorum/releases/<unique-release-label>/deploy/install-release.sh /opt/quorum/releases/<unique-release-label>
+# Existing deployment: follow Guarded upgrades below; never use install-release.sh to update.
 ```
 
 Use `/opt/quorum/releases/<release>/`, symlinked by `/opt/quorum/current`. Node 22 belongs only in `/opt/quorum/runtime/node`; Python environment only in `/opt/quorum/venv`. Do not install or replace a global Node/Python. Create dedicated `quorum` system user, `/var/lib/quorum` (owner quorum, mode 750), and root-only `/etc/quorum/portal.env` (mode 600):
@@ -26,7 +28,7 @@ QUORUM_CATALOG_PATH=/etc/quorum/catalog.json
 
 Install `backend/requirements.txt` in the isolated venv, load the private environment without printing it, then run `manage.py migrate`, `check --deploy`, `collectstatic --noinput`, and optionally `createsuperuser` interactively. Source/migrations create no default administrator. The authorized production account provisioning is recorded in [status](STATUS.md#account-and-email-follow-up). Keep auth database backups private and take one before every subsequent migration. Stop only Quorum API briefly for a consistent SQLite copy, or use SQLite's backup API.
 
-## First installation gates
+## First installation gates (historical setup; not the update path)
 
 Inspect `free -m`, `df -h`, `ss -ltn`, existing Nginx configs, services, certificate names and containers first. Ports 3017 and 8017 must be unused; application servers bind loopback. Preserve supplied runtime configuration of other projects. Upload the two service files to `/etc/systemd/system/`; they cap memory/CPU and run as the dedicated user.
 

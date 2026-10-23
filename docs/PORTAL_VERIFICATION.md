@@ -2,6 +2,45 @@
 
 Latest release: **20261023-web-portals-09f5325**, deployed and verified with publication disabled. Code SHA `09f5325c78fe71677c46a83f952c04b602e6fc7b`; see [current release evidence](#production-release-evidence--integration-readiness). Earlier sections below retain historical milestone evidence.
 
+## Current reproducible checks
+
+Run from the repo root on `feature/web-portals`. [Backend setup](../backend/README.md#local-setup) and [Next setup](../web/README.md#run) own installation/start commands. Dependencies/build/runtime remain outside Git. **Do not target production with local account-creating/browser tests.** Existing fixtures never establish real integration.
+
+```bash
+export DJANGO_DEBUG=1
+export QUORUM_PORTAL_DATA="$HOME/.local/share/quorum/portal-local-auth"
+PY="$HOME/.local/share/quorum/portal-venv/bin/python"
+"$PY" backend/manage.py check
+"$PY" backend/manage.py makemigrations --check --dry-run
+"$PY" backend/manage.py test portal
+"$PY" backend/manage.py test portal.test_reasoning_preview
+python3 -m unittest discover -s deploy -p 'test_*.py'
+python3 -m unittest discover -s scripts -p 'test_*.py'
+"$PY" backend/manage.py portal_snapshot validate --file backend/portal/fixtures/analysis-demo.json
+bash deploy/build-web.sh  # includes production build + TypeScript typecheck
+node web/tests/ratings.cjs
+node web/tests/editorial.cjs
+node web/tests/reasoning-trace.cjs
+node web/tests/contract.cjs  # production projection + all three reasoning JSON -> actual TS types
+export PLAYWRIGHT_MODULE="$HOME/.local/share/quorum/portal-browser/node_modules/playwright"
+export CHROMIUM_PATH="$HOME/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome"
+node web/tests/boundary.cjs
+node web/tests/boundary.cjs --reasoning  # exact main/empty/partial via actual authenticated Django/Next
+node web/tests/boundary.cjs --reasoning --serve
+# The last command prints a localhost URL + PRIVATE LOCAL test-account file path, not passwords.
+# Sign in using that file. Ctrl+C deletes only its owned temporary runtime.
+bash scripts/doctor.sh
+bash scripts/verify-all.sh  # no --inference; credential/resource blockers stay BLOCKED
+```
+
+`boundary.cjs` starts disposable loopback Django/Next/proxy services and a separate temporary auth DB; it never uses the eight production accounts. Ordinary boundary tests exercise the TEST snapshot store plus original browser/analysis/demo suites; `--reasoning` keeps publishing disabled and tests the preview through real HTTP, including all45 main trace steps,29 empty steps, both articles, partial frame gaps, keyboard/reduced-motion and1440/768/390px. No API interception is used for reasoning. Screenshots default outside Git to `~/.local/share/quorum/portal-screenshots`; override `QUORUM_SCREENSHOTS`. Independently run `browser.cjs`, `analysis.cjs` or `demo.cjs` only against a disposable local `QUORUM_TEST_URL`; they create TEST users and require the documented external browser packages. `TYPESCRIPT_MODULE` and `QUORUM_ANALYSIS_FIXTURE` select external TS/projected TEST fixture for those standalone scripts; boundary supplies them automatically.
+
+To test an upstream contract change: fetch/read the new canonical §8 and publisher, record branch/SHA/sample hashes, copy exact public-safe samples with `git show <sha>:docs/examples/<name> > backend/portal/fixtures/reasoning-demo/<name>`, then deliberately update consumer/tests if the contract changed. Reject unknown fields rather than guessing. `QUORUM_REASONING_PREVIEW_FILE` selects a candidate when starting a manually configured local Django server with `DJANGO_DEBUG=1`, `QUORUM_ENABLE_REASONING_PREVIEW=1` and nonproduction `QUORUM_PORTAL_DATA`; authenticate on the same origin. Read-only reasoning validation without a server: `PYTHONPATH=backend "$PY" -c 'from portal.reasoning_preview import load_preview; load_preview("/path/to/candidate.json"); print("compatible development preview; not published")'`. It prints no input contents. Raw reasoning files deliberately fail the **internal production** `portal_snapshot validate` command; do not weaken it to pass them.
+
+Relevant environment names: Django `DJANGO_DEBUG`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_ORIGINS`, `QUORUM_PORTAL_DATA`, `QUORUM_STATIC_ROOT`; integration `QUORUM_CATALOG_PATH`, `QUORUM_SNAPSHOT_ROOT`, `QUORUM_ENABLE_SNAPSHOT_PUBLICATION`; preview `QUORUM_ENABLE_REASONING_PREVIEW`, `QUORUM_REASONING_PREVIEW_FILE`; tools `QUORUM_PYTHON`, `QUORUM_WEB_BUILD`, `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`, `QUORUM_SCREENSHOTS`. Names are configuration documentation, **not authorization to enable production publication**. Secrets are private, never passed in example values or committed.
+
+Hosted CI: `.github/workflows/portal.yml`, push to `feature/web-portals` for backend/web/deploy/workflow changes or manual `workflow_dispatch`; job also refuses other branches. Python3.10 regression/check/migration/upgrade/security/validator + Node22 build/typecheck/static fixtures; no browser download, sponsor service or paid model required. Reproduce browser tests locally as above. Inspect `gh run list --workflow portal.yml --branch feature/web-portals` / `gh run view <id>` for actual hosted results, never assume a green local run is hosted CI.
+
 ## Previous proposal milestone — 2026-10-22 local / 2026-10-23 UTC
 
 Backend foundation: `6d70d1a`; shared master coordination: `d5fe6bf`. UI/tests and documentation are reviewed together in PR #1.
@@ -169,3 +208,37 @@ Screenshots outside Git: `~/.local/share/quorum/portal-screenshots/ux/`. Before:
 **Production unchanged**, release `20261023-web-portals-09f5325`; eight accounts, auth DB/config, services, credentials and publisher untouched. No canonical contract/data model/transport change. Real integration still BLOCKED on one genuine result and original IDs/hash/Unicode offsets/achieved access/wire/review/freshness/correction metadata; see the existing [handoff](PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). This milestone does not advance those integration gates.
 
 Hosted [CI39900552412](https://github.com/rcc00n/Quorum/actions/runs/39900552412) **succeeded** on implementation `4eb44109ef22f0d02bec66a002344ca27fd2e70d`, including the new recorded-loop negative-case checks. The handoff commit changes documentation only. PR remains draft; production is untouched.
+
+## Current reasoning envelope and web documentation audit
+
+Owner Vadim; branch `feature/web-portals`; implementation `67b4cf7f8a1c41b2ebc27b41a519b840d43e1ee1`; PR #1 draft. Reasoning read-only pin `6ea82434d0f06cefb51f5536732ceac68e9780ef`; collector `18fb009b4b36e995e765563203edbf742475a20b`; master `c3cc5ac4a65855769ab48e36a1d59d5cc1ae261d`. Fixture hash manifest: [fixture README](../backend/portal/fixtures/reasoning-demo/README.md).
+
+| Exact canonical sample | Parser / authenticated Django / TS / Next HTTP browser | Stories / trace | Honesty guarantees |
+| --- | --- | --- | --- |
+| snapshot.sample.json | PASS | 2 / 45 | FICTIONAL, published_at null, preview unpublished |
+| snapshot.empty-day.sample.json | PASS | 0 / 29 | Completed fictional quiet selection, three roundup items; not a missing/pending run |
+| snapshot.partial.sample.json | PASS | 2 / 45 | Structured frame failures, framing unavailable, recorded coverage counts retained |
+
+Regression evidence: **48 Django tests pass** (38 original +10 reasoning), system check and migration drift clean; six upgrade and four tooling tests pass; Next production build/typecheck and ratings/editorial/recorded-loop/JSON→actual TypeScript checks pass. Strict internal `portal_snapshot validate` passes the TEST proposal without publication; all three raw reasoning samples are deliberately rejected by that production schema. New tests cover invalid/missing timestamps, publication-before-generation, expired hint, 23/25-hour DST windows, unknown/unsafe error shapes/references and raw-message redaction. Self-declared published_at or fictional:false never activates publication.
+
+Both real HTTP/browser suites pass: existing auth/CSRF/staff/routes/preferences plus immutable store/corrections/rollback; new reasoning suite renders all three exact envelopes, both articles/claim links/review verdicts/cohorts/roundup and all recorded steps, keyboard/reduced-motion/1440/768/390 layouts and hostile/error/missing-state cases. Screenshot capture now uses actual navigation and settled responsive layout, avoiding a race with prior smooth claim-anchor scrolling; assertions retained. Failure diagnostics print only test file/line locations, never candidate values or credentials. Interactive `--reasoning --serve` was started and stopped, local authenticated API/reading navigation inspected, and owned temporary runtime removed.
+
+Actual screenshots outside Git: `~/.local/share/quorum/portal-screenshots/reasoning-reading-{1440,390}.png` and `ux/after-DEMO-{story,timeline,evidence,disagreement,cohorts}-{1440,768,390}.png`. Desktop metadata/article and mobile evidence were visually inspected; no redesign or full WCAG audit claimed. All data remains FICTIONAL.
+
+Documentation audit and canonical ownership:
+
+| Audited document(s) | Outcome |
+| --- | --- |
+| Local + master AGENTS.md, local/master DECISIONS.md | Existing team coordination and decision history preserved; module compatibility decision recorded in backend README; no new master rule installed |
+| docs/ARCHITECTURE.md vs latest reasoning §8/publisher/state/corpus/fetcher | Branch-local architecture is an older copy; integration guide pins latest owner branch instead of editing a competing specification |
+| docs/PORTAL_INTEGRATION.md | Consolidated obsolete review sections into current architecture/API/model/mapping/provenance/status/security/real-acceptance guide; exact missing export fields and topic mismatch retained; supplied dates/DST/QUORUM_COLLECT/shared-extractor preference no longer called missing |
+| docs/TEAM_HANDOFF.md + root README | Discoverable Start Here, owner responsibilities, required agent read list, bidirectional change notification and explicit pending acknowledgement |
+| backend/README.md, web/README.md | Setup/API/roles and current consumer decision preserved; preview endpoint added; testing commands link canonical verification; Next dev binds loopback |
+| docs/SNAPSHOT_PROPOSAL.md | Strict proposal unchanged; confirmed offset semantics and superseded agreement checklist clarified through current handoff link |
+| docs/IMPLEMENTATION_STATUS.md, docs/RELEASE_CHECKLIST.md | Current feature/test/dependency/production states explicit; historical sections labelled, no real integration gates closed |
+| deploy/README.md + deploy/STATUS.md | Existing release evidence retained; deployment owner/restrictions/backups/rollback documented; misleading first-install-as-update example removed; status evidence not rewritten or re-verified against VPS |
+| docs/PORTAL_VERIFICATION.md | One current reproducible command/config-name index plus dated evidence; changed relative links, staged paths/diff/sizes and secret-pattern index checks pass |
+
+Doctor:15PASS/0FAIL/1BLOCKED/1NOT_TESTED; verify:19PASS/0FAIL/14BLOCKED/1NOT_TESTED, no inference. Actual WSL2 confirmed. Local Zetaris headroom/registry/runtime prerequisites and absent model route remain blockers; optional Docker Desktop integration is not a required gate. This milestone makes no external sponsor or production claims.
+
+**Production untouched**, known release `20261023-web-portals-09f5325`; all eight accounts, DB/preferences/configuration/services remain unaccessed. Production validator/publisher/store and deployment code unchanged. Model/corpus declarations are supplied but no genuine result is established. Next: receive one actual complete public-safe reasoning result with collector evidence binding, validate locally, resolve registry/revision/bridge/transport decisions in Issue #2 before any activation.

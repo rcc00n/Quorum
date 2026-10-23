@@ -18,6 +18,10 @@ Built by team **Quorum** for the [Open Agent Hackathon 2026](https://hackathon.g
 
 The full set of decisions — scope, principles, source list, cohort rules, UI, stack, demo plan, open questions — is in [docs/DECISIONS.md](docs/DECISIONS.md). That file is the source of truth; code that contradicts it is a bug.
 
+## Web Integration: Start Here
+
+[Web handoff and owner notifications](docs/TEAM_HANDOFF.md) → [current adapter/contract](docs/PORTAL_INTEGRATION.md) → [reproducible tests](docs/PORTAL_VERIFICATION.md#current-reproducible-checks). Reasoning 1.0 preview is FICTIONAL/local-only; production publication remains disabled.
+
 ## Stack
 
 | Layer | Technology |

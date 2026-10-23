@@ -2,6 +2,8 @@
 
 Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum/issues/2). Owner for this inventory: Vadim; branch: `feature/web-portals`; baseline: `f3d568a`; backend proposal: `6d70d1a`; UI revision: this PR / [PR #1](https://github.com/rcc00n/Quorum/pull/1). This is a module inventory, not a second cross-team tracker. Status meanings are in AGENTS.md. Baseline deployment evidence is in [deploy/STATUS.md](../deploy/STATUS.md); fixtures are never upstream integration evidence.
 
+**Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. Production remains `20261023-web-portals-09f5325`; this milestone is local-only.
+
 | Feature ID | Feature / implementation | Status | Test evidence / deployment | Dependencies |
 | --- | --- | --- | --- | --- |
 | WEB-LANDING | `/`, editorial landing; `web/app/page.tsx` | DEPLOYED | Prior desktop/mobile browser checks; HTTPS smoke | None |
@@ -105,3 +107,17 @@ Owner Vadim; `feature/web-portals`, implementation `4eb44109ef22f0d02bec66a00234
 43 Django, six upgrade, four tooling tests, Next build/typecheck, old/new contract and browser suites pass. Exact before/after and visual evidence: [verification](PORTAL_VERIFICATION.md#reasoning-preview-ux-refinement--local-only). Real-data dependencies and palette/font clarification remain unchanged; no live integration attempted.
 
 Hosted [CI39900552412](https://github.com/rcc00n/Quorum/actions/runs/39900552412) **succeeded** on implementation `4eb44109ef22f0d02bec66a002344ca27fd2e70d`, including the new recorded-loop negative-case checks. The handoff commit changes documentation only. PR remains draft; production is untouched.
+
+## Current canonical envelope and complete web handoff
+
+Owner Vadim; branch `feature/web-portals`; implementation **`67b4cf7f8a1c41b2ebc27b41a519b840d43e1ee1`**, draft PR #1. Upstream reasoning inspected at `6ea82434d0f06cefb51f5536732ceac68e9780ef`, collector at `18fb009b4b36e995e765563203edbf742475a20b`. No production access/deployment/account change; release remains `20261023-web-portals-09f5325`.
+
+| Feature ID | Status | Evidence / dependencies |
+| --- | --- | --- |
+| WEB-R1-ENVELOPE | TESTED | Canonical generated/published/expiry/timezone/window/corpus/model fields, DST calendar checks, null publication and expired hint; structured errors with safe redaction. Existing strict publisher untouched |
+| WEB-R1-THREE | TESTED | Exact main/empty/partial fixtures via parser, authenticated API, actual TypeScript and Next browser boundary: 2/0/2 stories, 45/29/45 trace steps; partial missing-framing state retains coverage |
+| WEB-HANDOFF | TESTED | Canonical architecture, field mapping/missing-provenance matrix, commands, security/release boundaries and owner read lists audited; relative links, diff and public-index checks pass |
+| WEB-NOTIFY | IMPLEMENTED | Bidirectional Issue #2 interface-change protocol, owner tags and required example/evidence/action format; other assistants' acknowledgement **pending**, no adoption claimed |
+| WEB-INTEGRATION | BLOCKED | Genuine run and production bridge; original provenance/review/correction export, topic registry alignment and approved transport. Dates/DST/namespace/extractor delegation now supplied, not stale blockers |
+
+All previous auth/admin/session/CSRF/store/rollback/UI guarantees remain covered. 48 Django + six upgrade + four tooling tests, Next build/typecheck, static contract/ratings/editorial/trace checks and both real HTTP/browser suites pass. Current commands and audit evidence: [verification](PORTAL_VERIFICATION.md#current-reproducible-checks). The short [Start Here](TEAM_HANDOFF.md) links canonical specs rather than asking teammates to implement UI types as reasoning API. No real integration or new deployment checkbox is closed.

@@ -2,13 +2,15 @@
 
 Next.js App Router + TypeScript, locally packaged Inter, system Georgia editorial headlines, Lucide icons and plain responsive CSS. No external font request or generated news. Production starts with honest empty states.
 
+[Web Integration: Start Here](../docs/TEAM_HANDOFF.md) is the owner/contract/documentation index.
+
 ## Run
 
 ```bash
 # From repository root: builds and installs dependencies outside this public repo
 bash deploy/build-web.sh
 cd ~/.local/share/quorum/portal-web-build
-npm run dev -- --port 3017
+npm run dev -- --hostname 127.0.0.1 --port 3017
 ```
 
 Start Django on `127.0.0.1:8017` first (see [backend setup](../backend/README.md)). Development rewrites `/api/`, `/staff/` and `/staff-static/` to Django. Open `http://127.0.0.1:3017`. In production Nginx provides same-origin routing. `npm run build` and `npm run typecheck` run in the external build directory.
@@ -32,16 +34,8 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 | 2026-10-22 | rcc00n / Codex | Neutral editorial layout; transient entrance/hover/loading transitions with reduced-motion support | Prioritize reading, accessible hierarchy and calm interaction |
 | 2026-10-22 | rcc00n / Codex | Optional structured analysis with native disclosures, comparison and public-safe trace; retain legacy evidence arrays | Make evidence inspectable without fabricated metrics or requiring an approved upstream API prematurely |
 
-Optional browser checks use externally installed Playwright/Chromium via `PLAYWRIGHT_MODULE` and `CHROMIUM_PATH`. Run `node web/tests/browser.cjs` against the local portal, `node web/tests/demo.cjs` with `TYPESCRIPT_MODULE` pointing to the external TypeScript package, and `node web/tests/ratings.cjs` on Node 22.19+. `QUORUM_TEST_URL` overrides the test origin. The browser flow creates a temporary account; `QUORUM_SMOKE_ACCOUNT_FILE` records its exact username for cleanup. Demo tests intercept only browser requests and prominently label fictional content.
+All reproducible regression/HTTP/browser/preview commands and environment names are maintained in [PORTAL_VERIFICATION.md → Current reproducible checks](../docs/PORTAL_VERIFICATION.md#current-reproducible-checks). Tests install nothing in Git, use isolated local accounts and label fixtures; standalone browser scripts must only target a disposable local environment. The reasoning boundary uses real Django HTTP, not intercepted API responses. CI does not need Zetaris or model credentials.
 
-Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.
-
-
-`web/tests/analysis.cjs` tests the rich UI against an externally projected DEMO snapshot (`QUORUM_ANALYSIS_FIXTURE`); this is not real integration. Exact fixture preparation and test evidence are in the release record.
-
-Integration acceptance: `node web/tests/contract.cjs` checks a production-validated projection against the actual TypeScript model. `node web/tests/boundary.cjs` (with external Playwright/Chromium) starts isolated temporary Django/Next/proxy processes, publishes only a labelled TEST snapshot locally, authenticates a generated test account, checks actual API JSON/types/UI and exercises corrections, dateless links, rollback and three widths. It never points at production or uses provisioned account passwords. Existing `analysis.cjs` retains deterministic hostile-service/stale/missing-state UI cases.
-
-
-`lib/editorial.ts` holds optional presentation-only types and guards, not the reasoning API. Article prose requires resolved claims; photo rendering additionally requires a confirmed-rights flag, approved source hosts and complete credit/license metadata. No photo is synthesized or fetched in tests. The backend schema does not yet emit these fields. `node web/tests/editorial.cjs` and the extended `analysis.cjs` cover the additions; the real local `boundary.cjs` still exercises the original auth/admin/API and rich UI suite. Palette/font reconciliation is held per DECISIONS.md; no new design identity is chosen here.
+`lib/editorial.ts` holds optional presentation-only types and guards, not the reasoning API. Article prose requires resolved claims; photo rendering additionally requires a confirmed-rights flag, approved source hosts and complete credit/license metadata. No photo is synthesized or fetched in tests. The internal production projection does not yet emit these editorial extensions; the separate reasoning consumer renders its own upstream article fields. `node web/tests/editorial.cjs` and the extended `analysis.cjs` cover the additions; the real local `boundary.cjs` still exercises the original auth/admin/API and rich UI suite. Palette/font reconciliation is held per DECISIONS.md; no new design identity is chosen here.
 
 Canonical reasoning 1.0 **FICTIONAL local preview** and exact sample pin: [integration handoff](../docs/PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Start with `node web/tests/boundary.cjs --reasoning --serve` after the external Next build; this isolates local test auth and keeps the production publisher unused. `--reasoning` without `--serve` runs the real HTTP/browser acceptance suite. Neither command accesses production credentials.
