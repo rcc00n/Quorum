@@ -22,7 +22,7 @@ try {
           "--verbosity",
           "0",
           "-c",
-          `import json; from pathlib import Path; from portal.snapshot_validation import parse_snapshot; from portal.snapshot_projection import project; p=parse_snapshot(Path('backend/portal/fixtures/analysis-demo.json').read_bytes()); print(json.dumps(project(p, {'status':'partial'})))`,
+          `import json; from pathlib import Path; from portal.snapshot_validation import parse_snapshot; from portal.snapshot_projection import project; p=parse_snapshot(Path('backend/portal/fixtures/analysis-demo.json').read_bytes()); from portal.reasoning_preview import load_preview; print(json.dumps([project(p, {'status':'partial'}), load_preview()]))`,
         ],
         {
           cwd: repo,
@@ -34,7 +34,7 @@ try {
   const file = path.join(temp, "contract.ts");
   fs.writeFileSync(
     file,
-    `import type { Snapshot } from ${JSON.stringify(path.join(repo, "web/lib/api"))};\nconst candidate = ${JSON.stringify(snapshot)} satisfies Snapshot;\n`,
+    `import type { Snapshot } from ${JSON.stringify(path.join(repo, "web/lib/api"))};\nconst candidate = ${JSON.stringify(snapshot)} satisfies ${process.env.QUORUM_SNAPSHOT_FILE ? "Snapshot" : "Snapshot[]"};\n`,
   );
   execFileSync(
     process.execPath,
@@ -54,7 +54,7 @@ try {
     { stdio: "pipe" },
   );
   console.log(
-    "PASS: validated projection/API JSON satisfies current TypeScript Snapshot and structured analysis models (TEST only)",
+    "PASS: validated projection/API JSON satisfies current TypeScript Snapshot and structured analysis + reasoning 1.0 preview models (TEST only)",
   );
 } catch {
   console.error(

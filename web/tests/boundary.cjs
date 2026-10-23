@@ -5,7 +5,6 @@ const fs = require("node:fs"),
   http = require("node:http"),
   net = require("node:net");
 const { spawn, execFileSync } = require("node:child_process");
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const repo = path.resolve(__dirname, "../.."),
   python =
     process.env.QUORUM_PYTHON ||
@@ -16,6 +15,9 @@ const build =
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "quorum-boundary-")),
   children = [];
 let proxy, browser;
+const reasoningMode = process.argv.includes("--reasoning");
+const serveMode = reasoningMode && process.argv.includes("--serve");
+fs.chmodSync(temp, 0o700);
 const freePort = () =>
   new Promise((resolve) => {
     const s = net.createServer();
@@ -61,11 +63,22 @@ const run = (args, env) =>
     DJANGO_CSRF_ORIGINS: root,
     QUORUM_PORTAL_DATA: path.join(temp, "auth"),
     QUORUM_CATALOG_PATH: "",
-    QUORUM_SNAPSHOT_ROOT: path.join(temp, "snapshots"),
-    QUORUM_ENABLE_SNAPSHOT_PUBLICATION: "1",
+    QUORUM_SNAPSHOT_ROOT: reasoningMode ? "" : path.join(temp, "snapshots"),
+    QUORUM_ENABLE_SNAPSHOT_PUBLICATION: reasoningMode ? "" : "1",
+    QUORUM_ENABLE_REASONING_PREVIEW: reasoningMode ? "1" : "",
+    QUORUM_REASONING_PREVIEW_FILE: path.join(temp, "reasoning.json"),
+    QUORUM_TEST_REASONING_ONLY: reasoningMode ? "1" : "",
     PYTHONPATH: path.join(repo, "backend"),
     QUORUM_TEST_PASSWORD: password,
   };
+  if (reasoningMode)
+    fs.copyFileSync(
+      path.join(
+        repo,
+        "backend/portal/fixtures/reasoning-demo/snapshot.sample.json",
+      ),
+      env.QUORUM_REASONING_PREVIEW_FILE,
+    );
   run(["backend/manage.py", "migrate", "--noinput"], env);
   run(
     [
@@ -77,6 +90,8 @@ from pathlib import Path
 from datetime import datetime,timezone,timedelta
 User.objects.create_user('DEMO-boundary-reader',password=os.environ['QUORUM_TEST_PASSWORD'])
 User.objects.create_superuser('DEMO-boundary-admin',password=os.environ['QUORUM_TEST_PASSWORD'])
+if os.getenv('QUORUM_TEST_REASONING_ONLY'):
+ import sys;sys.exit(0)
 p=json.loads(Path('backend/portal/fixtures/analysis-demo.json').read_text())
 p['generated_at']=datetime.now(timezone.utc).isoformat().replace('+00:00','Z')
 p['expires_at']=(datetime.now(timezone.utc)+timedelta(days=1)).isoformat().replace('+00:00','Z')
@@ -120,10 +135,37 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     if (i === 59) throw Error("local startup failed");
     await new Promise((r) => setTimeout(r, 500));
   }
+  if (serveMode) {
+    const accountFile = path.join(temp, "LOCAL-DEMO-accounts.txt");
+    fs.writeFileSync(
+      accountFile,
+      `LOCAL FICTIONAL PREVIEW ONLY\nUsername: DEMO-boundary-reader\nPassword: ${password}\nUsername: DEMO-boundary-admin (local staff)\nPassword: ${password}\n`,
+      { mode: 0o600 },
+    );
+    console.log(
+      `FICTIONAL local preview: ${root}/preview/reasoning\nPrivate LOCAL test credentials: ${accountFile}\nSign in using that file; Ctrl+C removes all temporary runtime data. No production account or publisher is used.`,
+    );
+    await new Promise((resolve) => {
+      process.once("SIGINT", resolve);
+      process.once("SIGTERM", resolve);
+    });
+    return;
+  }
+  const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH,
     args: ["--no-sandbox"],
   });
+  if (reasoningMode) {
+    await require("./reasoning-checks.cjs")({
+      browser,
+      root,
+      env,
+      password,
+      temp,
+    });
+    return;
+  }
   const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
     }),
@@ -249,6 +291,9 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
     });
   }
   await browserScript("analysis.cjs", { QUORUM_ANALYSIS_FIXTURE: output });
+  await browserScript("demo.cjs", {
+    TYPESCRIPT_MODULE: path.join(build, "node_modules/typescript"),
+  });
   // Remove only this temporary TEST store's heads for the existing pending/auth suite.
   for (const file of ["current.json", "previous.json"])
     fs.rmSync(path.join(temp, "snapshots", file), { force: true });

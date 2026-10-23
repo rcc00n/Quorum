@@ -51,3 +51,5 @@ No exposed databases, public unauthenticated ingestion, browser/provider credent
 ## Agreement required
 
 Yelysei: upstream schema, ID lifetime/merges, independent reviewer evidence, safe trace and correction semantics. Anastasia: original/quote hashes and offsets, access levels, independence groups, rating/audience provenance and Zetaris views. All: schema/version negotiation, edition timezone/ranking/expiry, transport permissions, retention, topic preference synchronization and a real end-to-end sample. Reconcile the newer reasoning-branch product decisions (`49e6d1f`: impact bar, maximum ten, article/roundup presentation) with canonical master before changing product behavior. No other owner's decisions were merged or overwritten.
+
+Development-only consumer of the human-confirmed upstream reasoning 1.0 contract: [canonical handoff](PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). It is a separate fictional preview, not an amendment to this strict publication schema or permission to publish without provenance/transport approval.

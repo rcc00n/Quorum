@@ -25,6 +25,7 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex | Typed reasoning 1.0 reading page with paired evidence, cohort grid and recorded feedback loops; neutral identity retained | Make the canonical fictional sample inspectable without inventing scores, times or production results |
 | 2026-10-22 | rcc00n / Codex | Optional reading-first article and edition/roundup presentation; explicit completed quiet-day guard; cap ten per topic, not a target | Adopt approved product flow while preserving legacy snapshots and all evidence appendices; production schema/mapping still awaits reasoning agreement |
 | 2026-10-22 | rcc00n / Codex | Plain shared CSS, Inter from npm, Georgia fallback, Lucide; outside-repository build | Minimal dependency surface, reproducible fonts, no vendored dependencies in public checkout |
 | 2026-10-22 | rcc00n / Codex | Neutral editorial layout; transient entrance/hover/loading transitions with reduced-motion support | Prioritize reading, accessible hierarchy and calm interaction |
@@ -41,3 +42,5 @@ Integration acceptance: `node web/tests/contract.cjs` checks a production-valida
 
 
 `lib/editorial.ts` holds optional presentation-only types and guards, not the reasoning API. Article prose requires resolved claims; photo rendering additionally requires a confirmed-rights flag, approved source hosts and complete credit/license metadata. No photo is synthesized or fetched in tests. The backend schema does not yet emit these fields. `node web/tests/editorial.cjs` and the extended `analysis.cjs` cover the additions; the real local `boundary.cjs` still exercises the original auth/admin/API and rich UI suite. Palette/font reconciliation is held per DECISIONS.md; no new design identity is chosen here.
+
+Canonical reasoning 1.0 **FICTIONAL local preview** and exact sample pin: [integration handoff](../docs/PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Start with `node web/tests/boundary.cjs --reasoning --serve` after the external Next build; this isolates local test auth and keeps the production publisher unused. `--reasoning` without `--serve` runs the real HTTP/browser acceptance suite. Neither command accesses production credentials.

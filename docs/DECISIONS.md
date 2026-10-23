@@ -191,7 +191,7 @@ Four things are deferred. For the first of them, data accumulates from day one.
 Seven questions the team has not closed yet.
 
 - [ ] Whether the model's own rating is needed as a fifth mode already in the MVP. Default: no.
-- [ ] The reasoning output contract and its transport to the portal. Reasoning's proposal is [ARCHITECTURE.md § 8](ARCHITECTURE.md); the portal's validated proposal is [SNAPSHOT_PROPOSAL.md](SNAPSHOT_PROPOSAL.md). One schema must come out of the two, owned by reasoning, before either side codes the live bridge.
+- [ ] Production bridge metadata and transport to the portal. Reasoning 1.0 is human-confirmed in upstream ARCHITECTURE.md §8 (see the development-presentation amendment below); the portal's strict publication proposal remains [SNAPSHOT_PROPOSAL.md](SNAPSHOT_PROPOSAL.md). Agree missing provenance and the bridge before either side enables live publication.
 - [ ] The impact-bar threshold: start at 6 of 9 with confirmation ≥ 1, then calibrate on the first real days.
 - [ ] Which official government bodies are in the hackathon slice, and which event we take for the demo.
 - [ ] Language of the interface and the demo: the judges are English-speaking.
@@ -206,6 +206,10 @@ Explicit human authorization permits a portal-owned versioned snapshot **proposa
 
 The story/impact/roundup product flow is adopted on `feature/web-portals` through the authorized merge of PR #3. Existing evidence/comparison/timeline tools remain as analysis appendices. The prior explicit human portal palette instruction (neutral teal, no red/blue branding) conflicts with the red/blue visual identity in “User account and interface”; typography also differs. Both instructions/history are preserved. Visual-identity changes are pending team/human clarification; this milestone makes no palette/font changes. This does not block additive article/roundup presentation or approve the reasoning transport/schema.
 
+## Reasoning 1.0 development presentation
+
+Explicit human confirmation makes Yelysei's `origin/yelysei/agents:docs/ARCHITECTURE.md` §8 the canonical reasoning 1.0 contract. The portal consumes that format through a separate **development-only**, authenticated localhost preview of the explicitly fictional sample. This supersedes the need to guess its presentation shape; it does not approve transport or make the sample publication-grade. Preserve the strict portal publication validator/store until a production bridge and missing provenance are agreed. No source hashes, quote offsets, review times, corrections or ratings may be synthesized. Context and interested-party statements are not promoted to established facts. Module mapping/gates are in PORTAL_INTEGRATION.md; the upstream specification remains reasoning-owned.
+
 ## Shared development coordination
 
 [GitHub Issue #2](https://github.com/rcc00n/Quorum/issues/2) is the canonical cross-team feature/release tracker. Every assistant follows the tracking/handoff protocol in [AGENTS.md](../AGENTS.md#shared-project-tracking-and-cross-agent-handoff), with evidence-backed states and read-only inspection of other owners' branches. Module inventories and release checklists supplement this tracker; product and architecture decisions remain here. This coordination amendment does not approve unfinished application code or change data/reasoning architecture.
@@ -216,6 +220,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex, explicit human reasoning-1.0 authorization | Consume canonical upstream §8 in an isolated fictional development preview; keep strict production publication unchanged. | Build against the actual sample without fabricating missing provenance, competing with reasoning ownership or publishing demo news. |
 | 2026-10-22 | rcc00n / Codex, explicit human reconciliation authorization | Merge approved team product decisions into feature/web-portals, preserving portal/auth/security history; hold conflicting visual-identity changes for clarification. | Adopt impact-bar/article/roundup direction without silently replacing either owner’s decisions or approving a live bridge. |
 | 2026-10-22 | Yelysei / Claude | Reasoning block: Python and LangGraph, LangGraph Studio for development and the demo; agents read only through Zetaris and write results to Postgres directly; one run per topic per day plus on-demand runs; design in ARCHITECTURE.md | Loops, checkpoints and a visible trace come with the library; the data block is Python already |
 | 2026-10-22 | Yelysei / Claude | Merged this file across branches: kept the coordination and portal rows (master, PR #1), the stack rows and superseded notes from PR #1, and restated the Development row as each member's own assistant | Three branches edited this file on the same day; "Codex — current team workflow" implied one tool for the team, but Vadim uses Codex and Yelysei uses Claude Code |

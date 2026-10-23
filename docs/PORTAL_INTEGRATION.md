@@ -1,8 +1,8 @@
 # Portal integration handoff
 
-Reviewed 2026-10-22 against the portal code and `origin/data-collection` at `46b0d00a962960891a320b18f41ed64cfd649119`. Fetch before comparing contracts; the pinned [collector schema](https://github.com/rcc00n/Quorum/blob/46b0d00a962960891a320b18f41ed64cfd649119/collectors/schema.sql) is authoritative for its tables. Collector files are not merged into this branch.
+Initial review (historical): 2026-10-22 against the portal code and `origin/data-collection` at `46b0d00a962960891a320b18f41ed64cfd649119`. Fetch before comparing contracts; the pinned [collector schema](https://github.com/rcc00n/Quorum/blob/46b0d00a962960891a320b18f41ed64cfd649119/collectors/schema.sql) is authoritative for its tables. Collector files are not merged into this branch.
 
-**Current state:** Django sessions/preferences and the portal work. `CatalogAdapter` can expose an operator-configured local export of topic/source definitions; production events and digests remain empty/pending. Production release `20261023-web-portals-09f5325` includes the tested, disabled-by-default `PublishedAdapter` with strict validation and rich presentation; see the [snapshot proposal](SNAPSHOT_PROPOSAL.md). This export is not a live Zetaris connection. No approved agent API, result transport, ingestion endpoint or operational processing integration exists. Fictional examples below are documentation/test data only.
+**Current state:** Django sessions/preferences and the portal work. `CatalogAdapter` can expose an operator-configured local export of topic/source definitions; production events and digests remain empty/pending. Production release `20261023-web-portals-09f5325` includes the tested, disabled-by-default `PublishedAdapter` with strict validation and rich presentation; see the [snapshot proposal](SNAPSHOT_PROPOSAL.md). This export is not a live Zetaris connection. Reasoning §8 is now human-confirmed as the canonical 1.0 contract, with a tested fictional local preview described below. No approved production bridge, result transport, ingestion endpoint or operational processing integration exists. Fictional examples below are documentation/test data only.
 
 ## Shared architecture and ownership
 
@@ -300,3 +300,60 @@ Smallest **proposed** bridge, to implement only after a real payload and team ap
 The documented pull-over-bearer/loopback-tunnel option and local staging/SFTP option remain alternatives, not operational endpoints. New optional `Event.article` / `Snapshot.editions` fields in `web/lib/editorial.ts` are **presentation types only**, not changes to the production JSON Schema or an agreed agent API. The server currently emits neither. Quiet-day copy requires explicitly complete edition metadata, available/non-error/non-stale publication, no errors and no important stories for that topic; absence of data never implies a quiet day. Roundups preserve supplied status/source links. Article fact/context paragraphs require established claim references; statements require named attribution; unresolved items come last. These structural guards do not verify prose truth, chronology, critic quality or image rights: the approved upstream mapping must do that.
 
 Approved impact/article/roundup product flow is now incorporated. Only the contradictory palette/font instructions remain pending clarification (DECISIONS.md › Portal reconciliation limits). Existing neutral identity stays untouched. No runtime schema, reasoning ranking, machine credential, remote processing, publication, production config or account was changed.
+
+
+## Reasoning 1.0 fictional development preview
+
+Current read-only pins: reasoning `8a4d453e0ab1f1338abcf77c5eac62d18d9ec2d6`, collection `18fb009`. This section supersedes historical “no sample” observations above. Yelysei's **ARCHITECTURE.md §8** is the human-confirmed canonical contract, not the portal proposal. `docs/examples/snapshot.sample.json` is a deterministic **FICTIONAL dry-run** output, not real Zetaris/Nemotron execution. Exact bytes/version/hash are pinned in [fixture README](../backend/portal/fixtures/reasoning-demo/README.md); no teammate code is imported or changed.
+
+### Current mapping (implemented locally; not a production bridge)
+
+`reasoning_preview.parse_reasoning(bytes)` → `present_reasoning(bytes)` → authenticated **GET `/api/preview/reasoning/`** → optional `Snapshot.reasoning/preview`, `Event.reasoning` → `/preview/reasoning`. These are presentation extensions, not a competing upstream API/schema. `DataAdapter.snapshot(day, topic)` and GET `/api/feed/` remain unchanged. No store/publisher call occurs in preview mode. The full source envelope/story objects are retained so optional supplied fields are not silently discarded.
+
+| Upstream field | Portal presentation | Status / transformation | Missing information / owner |
+| --- | --- | --- | --- |
+| `schema_version/topic_id/edition_date/run_id/version/status/summary/sources_missing` | `Snapshot.reasoning`; preview metadata, topic summary and digest | TESTED; version 1.0 only; raw IDs preserved, `ok → available`, failures/missing sources → partial, outer status always `demo` | Sample topic differs from actual `ukraine-aid`; choose canonical topic, freshness/expiry, parent revisions and timezone — Yelysei/team |
+| `stories[].event_id/rank/headline/standfirst/reading_minutes/rubric` | `Event.id/title/summary/importance`, exact `Event.reasoning`, reading page and impact disclosure | TESTED; actual rank, up to ten, no padding or recomputed impact | Production source/edition revision mapping — Yelysei |
+| `article[].kind/text/claim_ids/sources` | Coherent article, inline original links, keyboard evidence anchors | TESTED; facts require confirmed non-statement claim references; context retains source links and never becomes a verified fact; statements remain attributed; not-confirmed prose retained | Publication-grade claim→quote/document records — Yelysei; collector verification — Anastasia |
+| `claims[].id/text/kind/speaker/status/verifier/fact_checker/reason/evidence` | Claim disclosures and paired primary/independent evidence chains | TESTED; confirmed/disputed/unverified, speaker, stance, found_by and supplied adjudication retained. Reviewer independence does not imply independent original news | Separate review rationales/actor IDs/times and claim correction history — Yelysei |
+| Evidence `title/url/quote/independence_group/found_by/is_document/quote_id?` | Quote, original URL, recorded group, reviewer column and document flag | TESTED; missing found_by stays unassigned; quote_id preserved if present. Presentation source key is URL, never a synthesized collector ID | Original document/source/quote IDs, achieved access, retrieved/verified time, content hash/version, Unicode offsets, wire origin and confirmation eligibility — Yelysei + Anastasia |
+| `spectrum.coverage/outlets/interpretations/left/right/note/rating_mode` | Major/minor × left/right grid, text numerators/denominators, structurally listed outlets, framing appendix | TESTED; no inferred membership/denominator. Four rating controls remain, but cannot recalculate cohorts without individual ratings; recorded Average counts stay labelled | Actual rated registry, audience provenance, cohort eligibility/thresholds per mode — Anastasia/team |
+| `roundup.empty_day/count/groups[].items` | Grouped Also today and stable preview event links, original status/source links | TESTED; only explicit completed empty output can show quiet day; roundup-only events have no fabricated article/claims | Genuine empty-day and partial failure sample — Yelysei |
+| `trace[].node/iteration/event_id/decision/reason/model/duration_ms` | All 45 expandable steps, event/node filters, research⇄verify and write⇄critique repeat counts | TESTED; array order only, 0ms retained, all four events accessible. No timestamps, private reasoning or inferred claim→step links | Approved public-safe runtime trace and explicit claim links if desired — Yelysei |
+| `needs_review/critic_notes/review_reason/drafts/trace_ref/photo` | Review notices/draft count; complete raw story preserved | TESTED; drafts are not published corrections. Photo null yields no image; non-null photo withheld without independently verified rights metadata. trace_ref is retained but never fetched | Photo rights/host review; public trace endpoint; genuine correction revisions — Yelysei/team |
+
+### Safe local workflow
+
+From repository root, with the existing external Python environment and Node dependencies installed:
+
+```bash
+bash deploy/build-web.sh
+node web/tests/boundary.cjs --reasoning --serve
+```
+
+Open the **localhost URL printed by the command**, then sign in with the generated **LOCAL test credentials file** printed alongside it. Passwords are not printed. The launcher creates a temporary mode-700 directory, mode-600 credentials, a separate SQLite DB and loopback-only Django/Next/proxy processes. Ctrl+C stops only those children and deletes their runtime data. No production configuration, account file, DB, catalog or credentials are read. This is a developer launcher, not a deployment script.
+
+The preview endpoint requires **all** of: `DJANGO_DEBUG=1`, `QUORUM_ENABLE_REASONING_PREVIEW=1`, localhost/127.0.0.1 Host and a data directory outside `/var/lib/quorum`, plus an authenticated Django session. Otherwise it returns 404 (disabled) or 401 (no session). Optional `QUORUM_REASONING_PREVIEW_FILE` selects a local candidate; default is the bundled fictional fixture. Invalid input → safe generic 422; unavailable date/version → 404; responses are no-store. No production fallback exists. Registration, password reset and production auth remain unchanged. The page route alone never embeds or loads a fixture.
+
+For an independent mapping check without a server:
+
+```bash
+DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py shell -c 'from portal.reasoning_preview import load_preview; p=load_preview(); print(p["status"], len(p["events"]), len(p["reasoning"]["trace"]))'
+node web/tests/contract.cjs
+```
+
+This checks **presentation compatibility only**. The strict `portal_snapshot validate --file ...` tool still checks the existing publication proposal and deliberately rejects the raw reasoning sample. Do not weaken that validator or label preview validation “publication-grade.” Unknown fields, unsafe/private URLs, unbounded/duplicate/non-finite JSON and unresolved references fail closed. Supported optional metadata is retained; unsupported error objects are rejected rather than forwarded as private operational logs. Agree a public error shape before a real partial-run bridge.
+
+### Production metadata still required
+
+Anastasia's latest contract confirms `collectors.common.fetch_text(...)` → `FetchedText.text`; `verify_quote(...)` validates Unicode **code-point** offsets in that exact text, never browser-re-extracted HTML. Hash = SHA-256(`title + "\n" + lead + "\n" + body[:2000]`); it is **not** a full-body hash. Quote hash must reference that collected version. Levels 1/2/3 are achieved per document: full allowed text / title+lead only / coverage only. Level 3 must not substantiate claims; level 2 must not be shown as full-text verification. Registry groups and document-level wire origin are separate; reprints count for reach, not independent confirmations. Collector README reports live `QUORUM_COLLECT` id807; this milestone did not query it and does not claim that operational evidence.
+
+Before a live adapter, Yelysei must include resolvable original source/document/official-document/quote IDs, content hash and hash semantics/version, quote bounds and verified time, achieved access level, retrieval time, wire origin/independence and counted-in-confirmation metadata; separate reviewer provenance, generated/expiry/publication times, stable correction/parent references and public-safe trace. Anastasia must provide one genuine retained version/quote example, including a non-BMP Unicode offset case and level2/3/wire examples, and confirm the official-doc hash rule. No hashes/offsets are backfilled by the portal.
+
+`AVAILABLE` means genuinely published validated output; `PARTIAL` retains recorded gaps; `STALE` requires actual agreed expiry; `PENDING` is no completed published analysis; `ERROR` is a genuine failure. The preview calls itself recorded/fictional, with **freshness unknown**, because those dates are absent. Existing production adapter/UI tests cover stale/pending/error independently; inventing sample expiry would be misleading.
+
+Next real acceptance: one authorized, structured `ukraine-aid` result with real Zetaris provenance and Meterless/Nemotron evidence, mapped locally before publication. The proposed bearer-protected SSH-loopback snapshot pull remains **UNAPPROVED/NOT IMPLEMENTED**. Agree transport, authorization, safe caching/versioning/failure semantics and production bridge before any credentials are created. No collectors, inference, Zetaris, exposed DB or unauthenticated ingestion on the website VPS.
+
+Read before integration: Yelysei/Anastasia read their upstream §8/collector contracts, this section, `backend/portal/reasoning_preview.py`, `backend/portal/test_reasoning_preview.py`, `web/lib/reasoning.ts`, `web/lib/api.ts`, `web/tests/reasoning-checks.cjs`, plus existing `snapshot_validation.py`, `snapshot_projection.py`, SNAPSHOT_PROPOSAL.md and RELEASE_CHECKLIST.md. The latter remain the production safety boundary.
+
+Read-only boundary follow-up at `8a4d453`: reasoning `tools/corpus.py` still queries `QUORUM_COLLECT.public.*`, while the collector registers `QUORUM_COLLECT.<table>`; `tools/fetch_text.py` still performs its own whitespace/tag extraction rather than using collector FetchedText. Yelysei must reconcile these on real processing infrastructure before provenance can be accepted; the portal does not work around them or fetch article HTML. The fixed 09:30 UTC cutoff also needs DST-aware agreement if New York edition time is retained.

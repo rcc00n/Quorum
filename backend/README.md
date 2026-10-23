@@ -34,7 +34,7 @@ Unauthenticated protected endpoints return 401, invalid input 400, rate limits 4
 
 ## Integration boundary — pending, not operational
 
-See the canonical [portal integration handoff](../docs/PORTAL_INTEGRATION.md) for Anastasia/Yelysei instructions, collector ownership, exact presentation fields, examples, security/validation gaps and proposed transport. `portal/integration.py` defines the adapter; `web/lib/api.ts` defines current UI types. The optional external catalog is definitions only; no live processing integration or approved reasoning API is claimed. Do not create collector tables in this database.
+See the canonical [portal integration handoff](../docs/PORTAL_INTEGRATION.md) for Anastasia/Yelysei instructions, collector ownership, exact presentation fields, examples, security/validation gaps and proposed transport. `portal/integration.py` defines the adapter; `web/lib/api.ts` defines current UI types. The optional external catalog is definitions only; reasoning 1.0 is consumed only in the development preview, and no live processing integration or approved production bridge is claimed. Do not create collector tables in this database.
 
 ## Control and checks
 
@@ -50,6 +50,7 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex | Reasoning-owned canonical 1.0 consumer in a separate gated localhost preview; production validator/store/adapter unchanged | Support the actual fictional sample without fabricating collector provenance or enabling publication |
 | 2026-10-22 | rcc00n / Codex | Unfold 0.81 with branded pages; superuser-only account management; read-only preferences/source views | Reuse Django security while preventing staff self-escalation and cross-workstream writes |
 | 2026-10-22 | rcc00n / Codex | Optional external catalog export pinned to collector commit, with provenance; live events/digests remain empty | Enable real preference selection and source inspection before runtime integration, without duplicating team registry data in this branch |
 | 2026-10-22 | rcc00n / Codex | Pinned jsonschema with explicit format checks; private local immutable snapshot store and CLI, opt-in publication | Validate the portal-owned proposal without exposing ingestion or giving processing access to auth data; team transport/schema approval remains required |
@@ -59,3 +60,5 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.
 
 Read-only upstream compatibility: `portal_snapshot validate --file /path/to/candidate.json`. The [canonical handoff](../docs/PORTAL_INTEGRATION.md#read-only-compatibility-command) specifies the JSON report, exit codes and limits. It checks the same production validator/projection without creating a snapshot store or touching auth records.
+
+Canonical reasoning 1.0 **FICTIONAL local preview** and exact sample pin: [integration handoff](../docs/PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Start with `node web/tests/boundary.cjs --reasoning --serve` after the external Next build; this isolates local test auth and keeps the production publisher unused. `--reasoning` without `--serve` runs the real HTTP/browser acceptance suite. Neither command accesses production credentials.

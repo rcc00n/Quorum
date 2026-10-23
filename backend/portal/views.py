@@ -188,3 +188,41 @@ def event_detail(request, event_id):
     if revision and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}", revision):
         return response({"error": "Invalid revision identifier."}, 400)
     return response(adapter.event(event_id, day, revision))
+
+
+@endpoint(["GET"])
+def reasoning_preview(request):
+    """Explicit opt-in loopback development fixture; never a production data source."""
+    import os
+    from django.conf import settings
+    from .reasoning_preview import load_preview
+    from .snapshot_validation import SnapshotError
+
+    if not (
+        settings.DEBUG
+        and os.getenv("QUORUM_ENABLE_REASONING_PREVIEW") == "1"
+        and request.get_host().split(":")[0] in ("localhost", "127.0.0.1")
+        and not settings.DATA_DIR.resolve().is_relative_to("/var/lib/quorum")
+    ):
+        return response({"error": "Not found."}, 404)
+    if not request.user.is_authenticated:
+        return response({"error": "Sign in to preview."}, 401)
+    try:
+        snapshot = load_preview(os.getenv("QUORUM_REASONING_PREVIEW_FILE"))
+        if (
+            request.GET.get("date")
+            and request.GET["date"] != snapshot["reasoning"]["edition_date"]
+        ):
+            return response({"error": "This preview edition is unavailable."}, 404)
+        if request.GET.get("version") and request.GET["version"] != str(
+            snapshot["reasoning"]["version"]
+        ):
+            return response({"error": "This preview version is unavailable."}, 404)
+        return response(snapshot)
+    except (SnapshotError, OSError, ValueError, TypeError):
+        return response(
+            {
+                "error": "Reasoning preview unavailable: input failed compatibility checks."
+            },
+            422,
+        )

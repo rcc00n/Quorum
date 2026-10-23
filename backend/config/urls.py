@@ -3,6 +3,7 @@ from portal import views
 from portal.admin import control
 
 urlpatterns = [
+    path("api/preview/reasoning/", views.reasoning_preview),
     path("api/events/<str:event_id>/", views.event_detail),
     path("staff/", control.urls),
     path("api/session/", views.session),

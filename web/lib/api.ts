@@ -1,3 +1,8 @@
+import type {
+  ReasoningStory,
+  ReasoningRun,
+  ReasoningPreview,
+} from "./reasoning";
 import type { ArticlePresentation, EditionPresentation } from "./editorial";
 import type { StructuredAnalysis, Publication } from "./analysis";
 export type User = {
@@ -32,8 +37,9 @@ export type Evidence = {
   explanation: string;
   sources: { title: string; url: string }[];
 };
-// Portal view model only: reasoning owners must approve their own upstream contract.
+// Portal view model; reasoning-owned 1.0 consumer types live in reasoning.ts.
 export type Event = {
+  reasoning?: ReasoningStory;
   article?: ArticlePresentation;
   analysis?: StructuredAnalysis;
   id: string;
@@ -50,6 +56,8 @@ export type Event = {
   sources: Source[];
 };
 export type Snapshot = {
+  reasoning?: ReasoningRun;
+  preview?: ReasoningPreview;
   editions?: EditionPresentation[];
   publication?: Publication;
   errors?: { code: string; message: string; event_id: string | null }[];
