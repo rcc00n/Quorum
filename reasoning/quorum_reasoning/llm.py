@@ -186,9 +186,9 @@ def _request_extras() -> dict[str, Any]:
         extras["max_tokens"] = max_tokens
     thinking_on = str(config.get("models", "reasoning", "off")).lower() == "on"
     body: dict[str, Any] = {"chat_template_kwargs": {"enable_thinking": thinking_on}}
-    budget = int(config.get("models", "thinking_token_budget", 0) or 0)
+    budget = int(config.get("models", "reasoning_budget", 0) or 0)
     if thinking_on and budget > 0:
-        body["thinking_token_budget"] = budget
+        body["reasoning_budget"] = budget  # NVIDIA's name for the thinking-token cap (build.nvidia.com sample code)
     extras["extra_body"] = body
     return extras
 

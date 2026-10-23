@@ -37,6 +37,6 @@ temperature = 0.1
 # are judgments on quoted text, not multi-step problems. A system-prompt "/no_think" was tried first and did
 # nothing: that switch belongs to Qwen3, not Nemotron (superseded the same day).
 reasoning = "off"                 # off | on
-thinking_token_budget = 0         # when reasoning = "on": cap on thinking tokens (0 = provider default)
+reasoning_budget = 0              # when reasoning = "on": cap on thinking tokens, NVIDIA's `reasoning_budget` (0 = provider default)
 max_tokens = 1500                 # ceiling per reply; every task answers in far fewer
 min_interval_ms = 0               # pause between live calls; raise (e.g. 1500) if the provider's per-minute cap bites
