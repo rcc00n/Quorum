@@ -2,6 +2,8 @@
 
 Django 5.2 LTS, session authentication, Unfold-based **Quorum Control**. This database owns only auth, sessions, preferences and login attempts. It never opens collector tables. Architecture: [approved clarification](../docs/DECISIONS.md#stack-and-work-blocks).
 
+[Web Integration: Start Here](../docs/TEAM_HANDOFF.md) indexes architecture, current contracts, testing and owner notifications.
+
 ## Local setup
 
 ```bash
@@ -29,6 +31,7 @@ All JSON; `/api/` is same-origin. GET `/session/` returns `{user, csrfToken}`. S
 | password | POST | `old_password`, `new_password1`, `new_password2` |
 | feed | GET | `?date=YYYY-MM-DD&topic=id&revision=id`; portal snapshot |
 | events/&lt;id&gt; | GET | Optional `date`/`revision`; matching event snapshot (web branch addition) |
+| preview/reasoning | GET | Development-only, authenticated localhost/DEBUG/opt-in gates; optional `date`/`version`; never ordinary feed or publication |
 
 Unauthenticated protected endpoints return 401, invalid input 400, rate limits 429. Registration, portal login and staff login share 20 attempts/address/15 minutes stored in SQLite. Behind the supplied Nginx config, only the loopback proxy's overwritten `X-Real-IP` is trusted. Staff login retains Django's CSRF-protected login form. Add edge limits before scaling beyond this small deployment. Purge expired sessions with `clearsessions`; periodically remove old AuthAttempt rows. This is a small deployment, not a distributed auth service.
 
@@ -50,6 +53,7 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-23 | rcc00n / Codex, explicit compatibility authorization | Require the current canonical 1.0 envelope in the development consumer, validate UTC/calendar-window semantics, retain declarations without publication authority, and redact arbitrary partial-error messages | Support all three upstream fixtures without exporting private logs or weakening the strict production schema |
 | 2026-10-22 | rcc00n / Codex | Reasoning-owned canonical 1.0 consumer in a separate gated localhost preview; production validator/store/adapter unchanged | Support the actual fictional sample without fabricating collector provenance or enabling publication |
 | 2026-10-22 | rcc00n / Codex | Unfold 0.81 with branded pages; superuser-only account management; read-only preferences/source views | Reuse Django security while preventing staff self-escalation and cross-workstream writes |
 | 2026-10-22 | rcc00n / Codex | Optional external catalog export pinned to collector commit, with provenance; live events/digests remain empty | Enable real preference selection and source inspection before runtime integration, without duplicating team registry data in this branch |
@@ -59,6 +63,6 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 
 Snapshot implementation and unapproved transport: [portal-owned proposal](../docs/SNAPSHOT_PROPOSAL.md). Release gates: [checklist](../docs/RELEASE_CHECKLIST.md); workstream evidence: [inventory](../docs/IMPLEMENTATION_STATUS.md). No production snapshot publisher is enabled.
 
-Read-only upstream compatibility: `portal_snapshot validate --file /path/to/candidate.json`. The [canonical handoff](../docs/PORTAL_INTEGRATION.md#read-only-compatibility-command) specifies the JSON report, exit codes and limits. It checks the same production validator/projection without creating a snapshot store or touching auth records.
+Read-only **internal portal proposal** compatibility: `portal_snapshot validate --file /path/to/candidate.json`. The [canonical handoff](../docs/PORTAL_INTEGRATION.md#read-only-compatibility-command) specifies the JSON report, exit codes and limits. It checks the same production validator/projection without creating a snapshot store or touching auth records.
 
 Canonical reasoning 1.0 **FICTIONAL local preview** and exact sample pin: [integration handoff](../docs/PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Start with `node web/tests/boundary.cjs --reasoning --serve` after the external Next build; this isolates local test auth and keeps the production publisher unused. `--reasoning` without `--serve` runs the real HTTP/browser acceptance suite. Neither command accesses production credentials.

@@ -5,6 +5,19 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "ok",
+  "generated_at": "2026-10-23T04:19:08Z",
+  "published_at": null,
+  "expires_at": "2026-10-23T12:00:00Z",
+  "edition_timezone": "America/New_York",
+  "window": {
+    "start": "2026-10-21T09:30:00Z",
+    "end": "2026-10-22T09:30:00Z"
+  },
+  "provenance": {
+    "corpus": "fixture:sample_day",
+    "model": "stand-ins",
+    "fictional": true
+  },
   "bar": {
     "threshold": 6,
     "confirmation_min": 1
@@ -1244,16 +1257,11 @@
                 "url": "https://www.npr.org/2026/10/21/ceasefire-talks-next-week"
               }
             ]
-          }
-        ]
-      },
-      {
-        "name": "Unverified",
-        "items": [
+          },
           {
             "event_id": "150fcfcd869a",
             "line": "Grain corridor shipments resume; port authority logs show grain corridor departures resumed on Monday.",
-            "status": "unverified",
+            "status": "single source",
             "needs_review": false,
             "sources": [
               {
@@ -1273,7 +1281,7 @@
       "iteration": 1,
       "event_id": null,
       "decision": "14 documents from 12 sources, 3 official; research budget 2 rounds per event",
-      "reason": "corpus is the edition window ending 05:30 America/New_York; every event gets the same budget",
+      "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
       "duration_ms": 0
     },
@@ -1329,7 +1337,7 @@
       "decision": "10 claims extracted",
       "reason": "from 8 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "meterless/auto",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "extract_claims",
@@ -1365,7 +1373,7 @@
       "decision": "round 1: 29 passages with a stance for 10 claims",
       "reason": "event documents only",
       "model": "meterless/auto",
-      "duration_ms": 5
+      "duration_ms": 3
     },
     {
       "node": "research",
@@ -1446,7 +1454,7 @@
       "decision": "round 2: 0 passages with a stance for 4 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
       "model": "meterless/auto",
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "research",
@@ -1455,7 +1463,7 @@
       "decision": "round 2: 0 passages with a stance for 2 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
       "model": "meterless/auto",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "verify",
@@ -1491,7 +1499,7 @@
       "decision": "6 confirmed, 0 disputed, 4 unverified from 20 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "meterless/auto",
-      "duration_ms": 6
+      "duration_ms": 5
     },
     {
       "node": "fact_check",
@@ -1500,7 +1508,7 @@
       "decision": "2 confirmed, 0 disputed, 1 unverified from 5 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "meterless/auto",
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "fact_check",
@@ -1509,7 +1517,7 @@
       "decision": "0 confirmed, 0 disputed, 4 unverified from 2 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "meterless/auto",
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "fact_check",
@@ -1518,7 +1526,7 @@
       "decision": "0 confirmed, 0 disputed, 2 unverified from 0 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "meterless/auto",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "adjudicate",
@@ -1644,7 +1652,7 @@
       "decision": "draft 2 approved",
       "reason": "order, attribution, sourcing and wording rules all hold",
       "model": null,
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "critique",
@@ -1659,7 +1667,7 @@
       "node": "roundup",
       "iteration": 1,
       "event_id": null,
-      "decision": "2 events in 2 group(s); empty day: False",
+      "decision": "2 events in 1 group(s); empty day: False",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
       "model": "meterless/auto",
       "duration_ms": 0
@@ -1671,7 +1679,7 @@
       "decision": "snapshot ok: 2 stories, roundup of 2",
       "reason": "built from state; the store versions it",
       "model": "meterless/auto",
-      "duration_ms": 0
+      "duration_ms": 1
     }
   ]
 }

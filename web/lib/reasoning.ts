@@ -68,19 +68,19 @@ export type ReasoningStory = {
   claims: ReasoningClaim[];
   spectrum: {
     rating_mode: "average" | "allsides" | "mbfc" | "adfontes";
-    left: {
+    left?: {
       highlights: string;
       omits: string;
       wording: string;
       example_url: string;
     };
-    right: {
+    right?: {
       highlights: string;
       omits: string;
       wording: string;
       example_url: string;
     };
-    note: string;
+    note?: string;
     coverage: Partial<
       Record<
         "major_left" | "minor_left" | "major_right" | "minor_right" | "center",
@@ -127,18 +127,27 @@ export type ReasoningRun = {
   run_id: string;
   version: number;
   status: "ok" | "partial" | "empty";
+  generated_at: string;
+  published_at: string | null;
+  expires_at: string;
+  edition_timezone: string;
+  window: { start: string; end: string };
+  provenance: { corpus: string; model: string; fictional: boolean };
   bar?: { threshold: number; confirmation_min: number };
   summary: string;
   sources_missing: string[];
   stories: ReasoningStory[];
   roundup: ReasoningRoundup;
-  errors?: string[];
+  errors?: (
+    string | { node: string; event_id: string | null; message: string }
+  )[];
   trace?: ReasoningStep[];
 };
 export type ReasoningPreview = {
   schema_version: "1.0";
   status: "available" | "partial";
   published: false;
+  expiry_hint: "expired" | "within_hint";
   sha256: string;
   missing_provenance: string[];
   warnings: string[];

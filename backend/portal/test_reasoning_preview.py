@@ -5,6 +5,7 @@ import json
 import os
 import hashlib
 from pathlib import Path
+from datetime import datetime, timezone
 from unittest.mock import patch
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.contrib.auth.models import User
@@ -21,7 +22,7 @@ class ReasoningMappingTests(SimpleTestCase):
         raw = SAMPLE.read_bytes()
         self.assertEqual(
             hashlib.sha256(raw).hexdigest(),
-            "4662e8aa1616f39cad3663ce2963aaf9eec0eac82929b1637d6419168a7287d1",
+            "2dd7510a618c584ee3925efb9de3c745417a6abe549a10f3042271ce22ab0366",
         )
         result = present_reasoning(raw)
         self.assertEqual(result["reasoning"], json.loads(raw))
@@ -43,6 +44,133 @@ class ReasoningMappingTests(SimpleTestCase):
             )
         with self.assertRaises(SnapshotError):
             parse_snapshot(raw)
+
+    def test_three_exact_canonical_fixtures(self):
+        cases = [
+            (
+                "snapshot.sample.json",
+                "2dd7510a618c584ee3925efb9de3c745417a6abe549a10f3042271ce22ab0366",
+                "available",
+                2,
+                45,
+            ),
+            (
+                "snapshot.empty-day.sample.json",
+                "014cc695491181a61012559aeb97ddd878938571b21bb749597bc55190ea97e7",
+                "available",
+                0,
+                29,
+            ),
+            (
+                "snapshot.partial.sample.json",
+                "df0c03e5903b5dd2238eb03233a10f25ac0515e6a3ed65ea4d059b1de1769495",
+                "partial",
+                2,
+                45,
+            ),
+        ]
+        for name, digest, status, stories, trace in cases:
+            with self.subTest(name=name):
+                raw = SAMPLE.with_name(name).read_bytes()
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), digest)
+                result = present_reasoning(raw)
+                self.assertEqual(result["reasoning"], json.loads(raw))
+                self.assertEqual(result["preview"]["status"], status)
+                self.assertFalse(result["preview"]["published"])
+                self.assertIsNone(result["reasoning"]["published_at"])
+                self.assertEqual(len(result["events"]), stories)
+                self.assertEqual(len(result["reasoning"]["trace"]), trace)
+                with self.assertRaises(SnapshotError):
+                    parse_snapshot(raw)
+
+    def test_envelope_timestamps_null_publication_and_expiry(self):
+        p = sample()
+        raw = json.dumps(p).encode()
+        before = present_reasoning(
+            raw, now=datetime(2026, 10, 23, 10, tzinfo=timezone.utc)
+        )
+        after = present_reasoning(
+            raw, now=datetime(2026, 10, 23, 13, tzinfo=timezone.utc)
+        )
+        self.assertEqual(before["preview"]["expiry_hint"], "within_hint")
+        self.assertEqual(after["preview"]["expiry_hint"], "expired")
+        self.assertFalse(before["preview"]["published"])
+        self.assertFalse(after["preview"]["published"])
+        # Even self-declared live provenance and publication cannot activate preview publication.
+        p["provenance"] = dict(
+            corpus="zetaris", model="meterless/auto", fictional=False
+        )
+        p["published_at"] = "2026-10-23T04:20:00Z"
+        result = present_reasoning(json.dumps(p).encode())
+        self.assertFalse(result["preview"]["published"])
+        self.assertEqual(result["status"], "demo")
+        self.assertFalse(result["reasoning"]["provenance"]["fictional"])
+
+    def test_dst_calendar_windows(self):
+        for day, start, end, expires in [
+            (
+                "2026-03-08",
+                "2026-03-07T10:30:00Z",
+                "2026-03-08T09:30:00Z",
+                "2026-03-09T12:00:00Z",
+            ),
+            (
+                "2026-11-01",
+                "2026-10-31T09:30:00Z",
+                "2026-11-01T10:30:00Z",
+                "2026-11-02T13:00:00Z",
+            ),
+        ]:
+            p = sample()
+            p.update(
+                edition_date=day, window=dict(start=start, end=end), expires_at=expires
+            )
+            parse_reasoning(json.dumps(p).encode())
+
+    def test_invalid_envelope_and_private_partial_errors(self):
+        mutations = [
+            lambda p: p.pop("generated_at"),
+            lambda p: p.update(generated_at="2026-02-31T01:00:00Z"),
+            lambda p: p.update(generated_at="2026-10-23T01:00:00"),
+            lambda p: p.update(published_at="2026-10-20T00:00:00Z"),
+            lambda p: p.update(expires_at="2026-10-20T00:00:00Z"),
+            lambda p: p.update(edition_timezone="Unknown/Zone"),
+            lambda p: p["window"].update(start=p["window"]["end"]),
+            lambda p: p["provenance"].update(fictional="false"),
+            lambda p: p.update(
+                errors=[dict(node="frame", event_id="unknown", message="error")]
+            ),
+            lambda p: p.update(
+                errors=[
+                    dict(
+                        node="frame",
+                        event_id=None,
+                        message="error",
+                        traceback="private",
+                    )
+                ]
+            ),
+        ]
+        for i, mutation in enumerate(mutations):
+            p = sample()
+            mutation(p)
+            with self.subTest(i=i), self.assertRaises(SnapshotError):
+                parse_reasoning(json.dumps(p).encode())
+        p = sample()
+        private = "TEST private internal endpoint https://example.com/?credential=private-value"
+        p.update(
+            status="partial",
+            errors=[
+                dict(
+                    node="frame", event_id=p["stories"][0]["event_id"], message=private
+                ),
+                private,
+            ],
+        )
+        result = present_reasoning(json.dumps(p).encode())
+        self.assertNotIn(private, json.dumps(result))
+        self.assertIn("internal details withheld", json.dumps(result))
+        self.assertEqual(result["preview"]["status"], "partial")
 
     def test_context_is_not_promoted_and_speakers_stay_attributed(self):
         p = sample()
@@ -130,6 +258,30 @@ class ReasoningMappingTests(SimpleTestCase):
 class ReasoningPreviewAPITests(TestCase):
     def setUp(self):
         self.reader = User.objects.create_user("TEST-preview-reader")
+
+    def test_all_canonical_samples_through_authenticated_api(self):
+        self.client.force_login(self.reader)
+        for name in (
+            "snapshot.sample.json",
+            "snapshot.empty-day.sample.json",
+            "snapshot.partial.sample.json",
+        ):
+            with self.subTest(name=name), patch.dict(
+                os.environ,
+                {
+                    "QUORUM_ENABLE_REASONING_PREVIEW": "1",
+                    "QUORUM_REASONING_PREVIEW_FILE": str(SAMPLE.with_name(name)),
+                },
+            ):
+                response = self.client.get(
+                    "/api/preview/reasoning/", HTTP_HOST="localhost"
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    response.json()["reasoning"],
+                    json.loads(SAMPLE.with_name(name).read_bytes()),
+                )
+                self.assertFalse(response.json()["preview"]["published"])
 
     def test_opt_in_session_localhost_and_no_production_fallback(self):
         path = "/api/preview/reasoning/"

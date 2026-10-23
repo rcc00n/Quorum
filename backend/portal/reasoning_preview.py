@@ -4,6 +4,8 @@ import hashlib
 import json
 import re
 from copy import deepcopy
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
 from urllib.parse import urlsplit
 from .snapshot_validation import (
@@ -17,14 +19,13 @@ from .snapshot_validation import (
 from .snapshot_store import read_bounded
 
 SAMPLE = Path(__file__).parent / "fixtures/reasoning-demo/snapshot.sample.json"
-SAMPLE_REVISION = "8a4d453e0ab1f1338abcf77c5eac62d18d9ec2d6"
+SAMPLE_REVISION = "6ea82434d0f06cefb51f5536732ceac68e9780ef"
 MISSING = [
     "original document/source IDs",
     "collector content hashes and document versions",
     "Unicode quote offsets and verified quote hashes",
     "achieved access levels and retrieval timestamps",
     "review actor IDs and timestamps",
-    "freshness/publication timestamps",
     "correction history",
 ]
 
@@ -66,6 +67,65 @@ def source(value):
         fail(type(value["quote_id"]) in (str, int) or value["quote_id"] is None)
 
 
+def timestamp(value):
+    fail(
+        isinstance(value, str)
+        and bool(
+            re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+]00:00)",
+                value,
+            )
+        ),
+        "invalid_reasoning_timestamp",
+    )
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise SnapshotError("invalid_reasoning_timestamp") from None
+
+
+def envelope(p):
+    generated = timestamp(p["generated_at"])
+    expires = timestamp(p["expires_at"])
+    published = p["published_at"]
+    if published is not None:
+        fail(timestamp(published) >= generated, "publication_before_generation")
+    text(p["edition_timezone"])
+    try:
+        zone = ZoneInfo(p["edition_timezone"])
+    except (ZoneInfoNotFoundError, ValueError):
+        raise SnapshotError("invalid_edition_timezone") from None
+    obj(p["window"], ["start", "end"])
+    start, end = (timestamp(p["window"][key]) for key in ("start", "end"))
+    day = datetime.strptime(p["edition_date"], "%Y-%m-%d").date()
+    # Local calendar boundaries: DST editions are 23/25 hours, not always 24.
+    expected_end = datetime.combine(day, time(5, 30), zone)
+    try:
+        expected_start = datetime.combine(day - timedelta(days=1), time(5, 30), zone)
+    except OverflowError:
+        raise SnapshotError("invalid_reasoning_date") from None
+    fail(start == expected_start and end == expected_end, "inconsistent_edition_window")
+    fail(expires > end, "expiry_before_edition_end")
+    # Historical reruns may be generated after expiry. Never manufacture freshness.
+    obj(p["provenance"], ["corpus", "model", "fictional"])
+    for key in ("corpus", "model"):
+        text(p["provenance"][key])
+        fail(bool(p["provenance"][key]), "missing_reasoning_provenance")
+    fail(type(p["provenance"]["fictional"]) is bool)
+
+
+def public_error(error):
+    # Raw failure messages may contain private logs, URLs or credentials. Export
+    # only this documented non-sensitive diagnostic; everything else is withheld.
+    message = error if isinstance(error, str) else error["message"]
+    safe = (
+        message
+        if re.fullmatch(r"model route returned HTTP [45]\d{2}", message)
+        else "Recorded upstream failure; internal details withheld."
+    )
+    return safe if isinstance(error, str) else {**error, "message": safe}
+
+
 def parse_reasoning(raw):
     fail(len(raw) <= MAX_BYTES, "payload_too_large")
 
@@ -102,6 +162,12 @@ def parse_reasoning(raw):
             "sources_missing",
             "stories",
             "roundup",
+            "generated_at",
+            "published_at",
+            "expires_at",
+            "edition_timezone",
+            "window",
+            "provenance",
         ],
         ["bar", "errors", "trace"],
     )
@@ -109,6 +175,7 @@ def parse_reasoning(raw):
     identifier(p["topic_id"])
     identifier(p["run_id"])
     fail(edition_date(p["edition_date"]), "invalid_reasoning_date")
+    envelope(p)
     fail(type(p["version"]) is int and p["version"] > 0)
     fail(p["status"] in ("ok", "partial", "empty"))
     text(p["summary"])
@@ -270,12 +337,19 @@ def parse_reasoning(raw):
         spectrum = s["spectrum"]
         obj(
             spectrum,
-            ["rating_mode", "left", "right", "note", "coverage", "interpretations"],
-            ["outlets"],
+            ["rating_mode", "coverage", "interpretations"],
+            ["left", "right", "note", "outlets"],
         )
         fail(spectrum["rating_mode"] in ("average", "allsides", "mbfc", "adfontes"))
-        text(spectrum["note"])
+        fail(
+            p["status"] == "partial" or {"left", "right", "note"} <= spectrum.keys(),
+            "missing_completed_framing",
+        )
+        if "note" in spectrum:
+            text(spectrum["note"])
         for side in ("left", "right"):
+            if side not in spectrum:
+                continue
             obj(spectrum[side], ["highlights", "omits", "wording", "example_url"])
             for key, value in spectrum[side].items():
                 text(value)
@@ -376,14 +450,26 @@ def parse_reasoning(raw):
         text(step["model"], True)
         fail(type(step["duration_ms"]) in (int, float) and step["duration_ms"] >= 0)
     for error in rows(p.get("errors", [])):
-        # Error shapes are not fully specified yet; don't forward arbitrary objects/private logs.
-        fail(isinstance(error, str), "unsupported_reasoning_error_shape")
-        text(error)
+        if isinstance(error, str):
+            text(error)  # Older public error strings remain readable, with redaction.
+        else:
+            obj(error, ["node", "event_id", "message"])
+            identifier(error["node"])
+            fail(
+                error["event_id"] is None
+                or isinstance(error["event_id"], str)
+                and error["event_id"] in event_ids,
+                "invalid_error_event_reference",
+            )
+            text(error["message"])
     return p
 
 
-def present_reasoning(raw):
+def present_reasoning(raw, *, now=None):
     p = parse_reasoning(raw)
+    if "errors" in p:
+        p["errors"] = [public_error(e) for e in p["errors"]]
+    now = now or datetime.now(timezone.utc)
     state = (
         "partial"
         if p["status"] == "partial" or p.get("errors") or p["sources_missing"]
@@ -460,12 +546,14 @@ def present_reasoning(raw):
             schema_version="1.0",
             status=state,
             published=False,
+            expiry_hint=(
+                "expired" if now >= timestamp(p["expires_at"]) else "within_hint"
+            ),
             sha256=hashlib.sha256(raw).hexdigest(),
             missing_provenance=MISSING,
             warnings=[
                 "FICTIONAL data; links and quotations are illustrative, not verified news.",
-                "No publication/freshness timestamps supplied. No expiry is inferred.",
-                "Sample topic differs from collector ukraine-aid; no automatic remapping.",
+                "Unpublished preview. Reported timestamps and provenance do not prove publication or a genuine sponsor run.",
                 "Trace order is array order, not a fabricated timestamp sequence.",
             ],
         ),

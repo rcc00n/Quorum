@@ -142,21 +142,29 @@ export function ReasoningSpectrum({
           </p>
         ))}
       </div>
-      {(["left", "right"] as const).map((side) => (
-        <details key={side}>
-          <summary>{side} — supplied framing summary</summary>
-          <p>{sp[side].highlights || "Highlights unavailable."}</p>
-          <p>{sp[side].omits || "Omissions not supplied."}</p>
-          <p>{sp[side].wording}</p>
-          {sp[side].example_url && (
-            <Sources
-              sources={[
-                { title: "Original example", url: sp[side].example_url },
-              ]}
-            />
-          )}
-        </details>
-      ))}
+      {(!sp.left || !sp.right) && (
+        <p role="status">
+          Framing analysis unavailable in this partial result. Recorded coverage
+          counts remain available.
+        </p>
+      )}
+      {(["left", "right"] as const).map((side) =>
+        sp[side] ? (
+          <details key={side}>
+            <summary>{side} — supplied framing summary</summary>
+            <p>{sp[side].highlights || "Highlights unavailable."}</p>
+            <p>{sp[side].omits || "Omissions not supplied."}</p>
+            <p>{sp[side].wording}</p>
+            {sp[side].example_url && (
+              <Sources
+                sources={[
+                  { title: "Original example", url: sp[side].example_url },
+                ]}
+              />
+            )}
+          </details>
+        ) : null,
+      )}
       {sp.note && <p>{sp.note}</p>}
       <Spectrum sources={sources} />
     </section>

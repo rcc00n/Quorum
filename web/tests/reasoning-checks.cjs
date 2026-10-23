@@ -283,13 +283,19 @@ module.exports = async function ({ browser, root, env, password, temp }) {
     );
     await page.emulateMedia({ reducedMotion: "no-preference" });
     if (story === sample.stories[0]) {
+      // Static captures must not race a prior smooth claim-anchor scroll on resize.
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.evaluate(() =>
+        history.replaceState(null, "", location.pathname + location.search),
+      );
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 });
-        await page.evaluate(() => {
+        await page.evaluate(async () => {
           document.activeElement?.blur();
+          await new Promise(requestAnimationFrame);
           scrollTo({ top: 0, behavior: "instant" });
         });
-        await page.waitForFunction(() => scrollY === 0);
+        await page.waitForFunction(() => Math.abs(scrollY) <= 1);
         await page.screenshot({
           path: path.join(output, `reasoning-reading-${width}.png`),
           fullPage: false,
@@ -312,8 +318,16 @@ module.exports = async function ({ browser, root, env, password, temp }) {
           ["reasoning-claim-" + disputed.id, "disagreement"],
           ["reasoning-perspectives", "cohorts"],
         ]) {
-          await page.evaluate((id) => {
+          console.log("CHECK: capture", width, name);
+          const section = id.startsWith("reasoning-claim-")
+            ? "reasoning-evidence"
+            : id;
+          // Use the real reader navigation, then allow responsive layout to commit.
+          await page.locator(`.r-reader-nav a[href="#${section}"]`).click();
+          await page.evaluate(async (id) => {
             document.activeElement?.blur();
+            await new Promise(requestAnimationFrame);
+            await new Promise(requestAnimationFrame);
             document
               .getElementById(id)
               .scrollIntoView({ block: "start", behavior: "instant" });
@@ -364,6 +378,68 @@ module.exports = async function ({ browser, root, env, password, temp }) {
       .getByRole("heading", { name: "The daily perspective", exact: true })
       .waitFor();
   }
+  console.log("CHECK: all three exact canonical envelopes through Django/Next");
+  for (const name of [
+    "snapshot.sample.json",
+    "snapshot.empty-day.sample.json",
+    "snapshot.partial.sample.json",
+  ]) {
+    const bytes = fs.readFileSync(
+      path.resolve(
+        __dirname,
+        "../../backend/portal/fixtures/reasoning-demo",
+        name,
+      ),
+    );
+    const canonical = JSON.parse(bytes);
+    fs.writeFileSync(file, bytes);
+    const response = await context.request.get(
+      root + "/api/preview/reasoning/",
+    );
+    assert.equal(response.status(), 200);
+    const mapped = await response.json();
+    assert.deepEqual(mapped.reasoning, canonical);
+    assert.equal(mapped.preview.published, false);
+    await page.goto(root + "/preview/reasoning");
+    await page.getByText("DEMO / FICTIONAL DATA", { exact: true }).waitFor();
+    await page.getByText(/Not published · Generated/).waitFor();
+    assert.ok(
+      (await page.locator(".r-preview-limits").innerText()).includes(
+        canonical.expires_at,
+      ),
+    );
+    await expectTrace(canonical.trace.length);
+    assert.equal(
+      await page.locator(".r-story-row").count(),
+      canonical.stories.length,
+    );
+    if (canonical.status === "partial") {
+      await page
+        .getByText("This preview is incomplete", { exact: true })
+        .waitFor();
+      assert.equal(
+        await page
+          .getByText(/frame · .*: model route returned HTTP 502/)
+          .count(),
+        2,
+      );
+      await page.goto(
+        root + "/preview/reasoning?event=" + canonical.stories[0].event_id,
+      );
+      await page
+        .getByText(/Framing analysis unavailable in this partial result/)
+        .waitFor();
+      assert.equal(await page.locator(".r-cohort").count(), 4);
+    }
+    if (canonical.status === "empty")
+      await page
+        .getByRole("heading", {
+          name: "No featured stories crossed the bar",
+          exact: true,
+        })
+        .waitFor();
+  }
+  fs.writeFileSync(file, original);
   console.log("CHECK: reasoning TEST variants");
   // Native context block is absent from the upstream fixture; test it as an explicit TEST variant.
   let variant = structuredClone(sample);
@@ -398,7 +474,11 @@ module.exports = async function ({ browser, root, env, password, temp }) {
   fs.writeFileSync(file, JSON.stringify(variant));
   await page.goto(root + "/preview/reasoning");
   await page.getByText("This preview is incomplete", { exact: true }).waitFor();
-  await page.getByText("TEST recorded failure", { exact: true }).waitFor();
+  await page
+    .getByText("Recorded upstream failure; internal details withheld.", {
+      exact: true,
+    })
+    .waitFor();
   variant = structuredClone(sample);
   variant.status = "empty";
   variant.stories = [];

@@ -303,7 +303,13 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
     "PASS: TEST candidate → validation/store → authenticated HTTP API → TypeScript → rich UI; dateless links, disagreement, corrections, missing trace, rollback, three widths; no sponsor integration claimed",
   );
 })()
-  .catch(() => {
+  .catch((error) => {
+    // Value-free locations help diagnose local checks without printing inputs/passwords.
+    const locations =
+      String(error.stack || "").match(/web\/tests\/[A-Za-z0-9_.-]+:\d+:\d+/g) ||
+      [];
+    if (locations.length)
+      console.error("Check location: " + locations.join(", "));
     console.error(
       "FAIL: isolated portal HTTP boundary; input and credentials withheld",
     );

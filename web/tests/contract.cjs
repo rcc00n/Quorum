@@ -22,7 +22,7 @@ try {
           "--verbosity",
           "0",
           "-c",
-          `import json; from pathlib import Path; from portal.snapshot_validation import parse_snapshot; from portal.snapshot_projection import project; p=parse_snapshot(Path('backend/portal/fixtures/analysis-demo.json').read_bytes()); from portal.reasoning_preview import load_preview; print(json.dumps([project(p, {'status':'partial'}), load_preview()]))`,
+          `import json; from pathlib import Path; from portal.snapshot_validation import parse_snapshot; from portal.snapshot_projection import project; p=parse_snapshot(Path('backend/portal/fixtures/analysis-demo.json').read_bytes()); from portal.reasoning_preview import load_preview; print(json.dumps([project(p, {'status':'partial'}), *[load_preview(Path('backend/portal/fixtures/reasoning-demo')/name) for name in ('snapshot.sample.json','snapshot.empty-day.sample.json','snapshot.partial.sample.json')]]))`,
         ],
         {
           cwd: repo,

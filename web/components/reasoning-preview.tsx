@@ -292,8 +292,19 @@ export function ReasoningPreviewPage({
               </span>
             </div>
             <p className="r-preview-limits">
-              Not published · freshness unknown: no generated, expiry or
-              publication timestamps supplied.
+              {run.published_at === null
+                ? "Not published"
+                : `Reported publication: ${run.published_at} (unverified)`}
+              {" · "}Generated {run.generated_at}
+              {" · "}
+              {data.preview.expiry_hint === "expired"
+                ? "Expired hint"
+                : "Expiry hint"}
+              : {run.expires_at}. Edition timezone: {run.edition_timezone}.
+              Recorded window: {run.window.start} → {run.window.end}. Declared
+              corpus: {run.provenance.corpus}; model: {run.provenance.model}.{" "}
+              These declarations do not establish a genuine sponsor run or
+              publication.
             </p>
             {(run.status === "partial" ||
               run.errors?.length ||
@@ -305,7 +316,11 @@ export function ReasoningPreviewPage({
                   {run.sources_missing.join(", ") || "None listed"}
                 </p>
                 {run.errors?.map((e, i) => (
-                  <p key={i}>{e}</p>
+                  <p key={i}>
+                    {typeof e === "string"
+                      ? e
+                      : `${e.node}${e.event_id ? ` · ${e.event_id}` : ""}: ${e.message}`}
+                  </p>
                 ))}
               </aside>
             )}
