@@ -65,3 +65,21 @@ Current release `20261023-web-portals-09f5325` / code `09f5325` passed these dep
 - [x] Production, accounts, publisher, credentials and remote processing untouched; production release remains `20261023-web-portals-09f5325`.
 - [x] Hosted CI 39890295440 passed on code `19f3de3`; draft PR #1 verified MERGEABLE after merge `05e87b4`.
 - [ ] Real reasoning sample/schema mapping and transport approved; real end-to-end gate remains open.
+
+## Reasoning 1.0 preview milestone — no production release
+
+Code `0fe73256f468a830c56040abce32cfd07e6fa5f9`, only `feature/web-portals`, PR #1. Historical release checkmarks do not authorize deployment of this preview.
+
+- [x] Pin exact canonical FICTIONAL sample/schema/version/hash; preserve upstream ownership and original bytes.
+- [x] Hosted CI 39895499332 succeeded on code `0fe7325`; local browser evidence is separate.
+- [x] Gate preview behind DEBUG, explicit opt-in, localhost, nonproduction data directory and session; ordinary feed remains pending and production validator rejects raw sample.
+- [x] Real isolated HTTP→API→Next checks cover both articles, actual claims/reviewer paths, impact/cohorts/roundup and all 45 recorded steps; labelled TEST derivatives cover absent context, partial/empty/error/missing trace/XSS.
+- [x] Preserve 38 original Django regressions plus five preview tests, upgrade/contract/build/type/old/new browser checks; no migrations or new dependencies.
+- [x] Inspect 1440/768/390px layouts, source links, keyboard disclosure, reduced motion and screenshots outside Git.
+- [x] Verify local launcher uses mode-700 temporary directory/mode-600 local credentials and cleans up; no production file/account read.
+- [x] Production, all eight accounts, private configuration, publisher, credentials and transport untouched.
+- [ ] Genuine versioned reasoning output with collector IDs/quotes/hash/access/review/freshness/correction metadata validated locally.
+- [ ] Agree production bridge, safe public error shape, topic ID, revision/freshness rules and transport before enabling any credentials/publication.
+- [ ] Future deployment requires fresh explicit scope, restricted auth backup, rollback target and all original HTTPS/auth/unrelated-service gates. No deployment attempted here.
+
+Verification/hosted CI: [current evidence](PORTAL_VERIFICATION.md#reasoning-10-fictional-preview-milestone).

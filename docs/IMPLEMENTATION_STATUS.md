@@ -71,3 +71,22 @@ Owner Vadim; merge `05e87b4`, implementation `19f3de300f0479d8f81166e6eccb326ae0
 38 Django tests, six upgrade tests, Next build/typecheck, four tooling checks, contract/ratings/editorial tests and the HTTP/browser boundary pass locally. See PR #1 for exact implementation commit and hosted CI evidence. No genuine processing integration is claimed. Earlier merge-conflict blocker is superseded by the newly authorized merge; no production account/configuration, transport or publisher changed.
 
 Reconciliation hosted evidence: [CI 39890295440](https://github.com/rcc00n/Quorum/actions/runs/39890295440) succeeded on `19f3de3`; draft PR verified MERGEABLE. Legacy DEMO browser test also passed separately. No deployment in this milestone.
+
+## Canonical reasoning 1.0 preview — local-only
+
+Owner Vadim; branch `feature/web-portals`; implementation `0fe73256f468a830c56040abce32cfd07e6fa5f9`; PR #1. This milestone does not modify production release `20261023-web-portals-09f5325` or its eight accounts. The rows below are **TESTED against FICTIONAL data**, never INTEGRATED/DEPLOYED. They supersede older statements that no sample/typed reasoning consumer exists.
+
+| Feature ID | Status | Exact evidence | Deployment / dependency |
+| --- | --- | --- | --- |
+| WEB-R1-ADAPTER | TESTED | Exact `8a4d453` reasoning-1.0 fixture → bounded/reference-safe `reasoning_preview` mapping → existing optional Snapshot/Event types; raw output retained; production validator still rejects it | Local-only; original collector provenance/production bridge pending |
+| WEB-R1-PREVIEW | TESTED | Authenticated real Django/Next HTTP; DEBUG + explicit opt-in + localhost + nonproduction DATA_DIR gates; `--reasoning --serve` separate temporary DB/private credentials/cleanup verified | No publisher/store/transport, no production credentials |
+| WEB-R1-ARTICLE | TESTED | Both stories, all supplied block kinds, claim anchors/original links, rubric/rank, attributed statements and unknown passages; TEST-derived sourced context and escaped XSS | No real articles/photos or post-publication corrections supplied |
+| WEB-R1-CHAINS | TESTED | Actual found_by evidence split, per-review verdicts, adjudication/disagreement and recorded source groups; keyboard disclosures, reduced motion | Missing document IDs/hash/offset/access/review records shown explicitly |
+| WEB-R1-COHORTS | TESTED | Exact 2×2 numerator/denominator pairs, structural outlet membership, interpretations/links; four modes retain missing-rating state | No source ratings/audience; cannot recompute cohorts from demo prose |
+| WEB-R1-TRACE | TESTED | All 45 actual steps, all four event IDs, filters, iteration-2 research/critique and two feedback loop summaries; zero durations/null models retained | No invented times, private reasoning or claim→step links |
+| WEB-R1-ROUNDUP | TESTED | Two actual groups/events, stable preview deep links; TEST partial/empty/missing-trace/error/retry | Real empty-day/failure/revision metadata still pending |
+| WEB-R1-ACCEPT | TESTED | 43 Django tests, six upgrade tests, build/typecheck, static old/new JSON→TypeScript, ratings/editorial, four tooling checks, original and new real-HTTP/browser suites; desktop/tablet/mobile | Deterministic local evidence only; hosted CI recorded in PORTAL_VERIFICATION |
+
+Real end-to-end remains WEB-INTEGRATION **BLOCKED**. Canonical reasoning §8 is confirmed; the publication bridge/transport is not. Concrete metadata and owner questions: [handoff](PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Next milestone: one genuine `ukraine-aid` output with retained collector quote/version provenance, validated and rendered locally before any publication authorization. Neutral branding and all existing auth/admin/store/rollback/analysis functionality are preserved.
+
+Hosted CI for this milestone: [39895499332](https://github.com/rcc00n/Quorum/actions/runs/39895499332), **success** on implementation `0fe7325`. Final handoff commit changes documentation only; tested implementation is pinned above.

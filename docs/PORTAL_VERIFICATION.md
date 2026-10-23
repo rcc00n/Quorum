@@ -101,3 +101,41 @@ Local evidence: 38 Django/snapshot tests (including Unicode offsets and explicit
 Doctor PASS=15 FAIL=0 BLOCKED=1 NOT_TESTED=1; verify PASS=19 FAIL=0 BLOCKED=14 NOT_TESTED=1, no inference. Missing sponsor credentials/runtime remain actual blockers. Anastasia's confirmed semantics are attributed to Issue #2, not presented as an authenticated Zetaris run by this milestone. No genuine reasoning JSON exists yet. Production/account/configuration was not accessed or changed in this milestone; deployed code stays `09f5325`.
 
 Reconciliation final evidence: code `19f3de300f0479d8f81166e6eccb326ae0eb65cc`, branch `feature/web-portals`, merge `05e87b4`. [Hosted CI 39890295440](https://github.com/rcc00n/Quorum/actions/runs/39890295440) passed Python 3.10 / 38 Django tests / six upgrade tests / Next build-typecheck / ratings-editorial / contract fixture checks. The real local HTTP/browser harness and separate legacy DEMO browser test passed; new documentation links and secret/scope scans passed. PR #1 verified MERGEABLE and remains draft. Later handoff commits are documentation only.
+
+## Reasoning 1.0 fictional preview milestone
+
+Owner Vadim; branch `feature/web-portals`; baseline `6934298`; code `0fe73256f468a830c56040abce32cfd07e6fa5f9`; PR #1. No merge/rebase/teammate-branch or production change. Canonical upstream pin: `yelysei/agents@8a4d453e0ab1f1338abcf77c5eac62d18d9ec2d6`, sample `docs/examples/snapshot.sample.json`, schema1.0/version1, edition2026-10-22, run `2026-10-22-russia-ukraine-war-1`; exact SHA in fixture README. Collector read-only pin `18fb009`. Sample is **FICTIONAL**, not genuine integration evidence.
+
+Local results:
+
+- **43 Django tests** pass (all 38 original auth/CSRF/roles/snapshot/store/rollback/API regressions + five new preview tests); system check and migration drift check pass. Production publication rejects raw reasoning sample; preview mapping preserves the exact envelope, stable IDs and 45 steps without forged provenance. Targeted five preview tests rerun after additional hostile-trace checks pass.
+- **Six upgrade safety tests**, **four tooling tests**, production proposal read-only validation, ratings/editorial tests, actual old/new projected JSON→TypeScript checks pass.
+- **Next production build and typecheck pass**, including dynamic `/preview/reasoning`; no new dependencies.
+- Original `boundary.cjs` passes actual authenticated HTTP/API→TypeScript→UI, then existing `analysis.cjs`, `demo.cjs`, `browser.cjs`: corrections/rollback, missing/stale/partial/error, level2/3 restrictions, auth/registration/preferences/staff and original routes.
+- New `boundary.cjs --reasoning` passes actual sample→Django→Next with **no interception** and publication disabled: both stories, all supplied blocks/claim statuses/source links, reviewer disagreements/groups, rubric, exact four cohort pairs/all four missing-rating modes, all45 trace steps/repeated research+critique, roundup groups, three widths, keyboard and reduced motion. TEST-only derivatives exercise sourced context (absent from exact sample), escaped XSS, completed empty day, partial failures, missing trace, unsafe URL422/error/retry and unavailable edition version404. Existing suites cover stale/pending/error rather than inventing preview freshness timestamps.
+- `--reasoning --serve` verified independently: mode700 runtime/mode600 credentials, actual session login and fixture API, ordinary feed pending, signal cleanup removes temporary credentials/runtime.
+- Changed Markdown relative links, staged diff/size/secret checks pass. No runtime/private/binary artifacts committed. Doctor: PASS15/FAIL0/BLOCKED1/NOT_TESTED1; verify: PASS19/FAIL0/BLOCKED14/NOT_TESTED1, no inference. Missing registry/provider credentials and local Zetaris startup headroom remain actual blockers; Docker Desktop integration is unrequired historical diagnostic, not a claimed sponsor success.
+
+Reproduce from repository root using externally installed Python/Next/Playwright/Chromium:
+
+```bash
+DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py test portal
+python3 -m unittest discover -s deploy -p 'test_*.py'
+python3 -m unittest discover -s scripts -p 'test_*.py'
+bash deploy/build-web.sh
+node web/tests/contract.cjs
+node web/tests/ratings.cjs
+node web/tests/editorial.cjs
+export PLAYWRIGHT_MODULE="$HOME/.local/share/quorum/portal-browser/node_modules/playwright"
+export CHROMIUM_PATH="$HOME/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome"
+node web/tests/boundary.cjs
+node web/tests/boundary.cjs --reasoning
+# Interactive isolated preview; no browser dependency required:
+node web/tests/boundary.cjs --reasoning --serve
+```
+
+Visual evidence (external to Git, **FICTIONAL**): `~/.local/share/quorum/portal-screenshots/reasoning-topic-1440.png`, `reasoning-reading-{1440,390}.png`, `reasoning-story-{1440,390}.png`, `reasoning-evidence-1440.png`, `reasoning-cohorts-1440.png`, `reasoning-feedback-1440.png`. Desktop reading/evidence/cohorts/feedback and mobile reading were visually inspected. Tablet overflow tested at768px. Screenshots demonstrate layout, not factual/source validity; no comprehensive WCAG audit claimed.
+
+**Production not accessed/deployed**: release remains `20261023-web-portals-09f5325`; eight accounts/private auth/configuration untouched. Local TEST sessions do not use those credentials. No collector/reasoning/Zetaris workloads, model requests, machine credentials or publishing transport added. Next real-data milestone and exact missing fields: [handoff](PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview).
+
+Hosted [CI 39895499332](https://github.com/rcc00n/Quorum/actions/runs/39895499332) **succeeded** on implementation `0fe73256f468a830c56040abce32cfd07e6fa5f9` (Python3.10, Django/check/migrations/upgrade/validator, Next/typecheck/ratings/editorial and old/new TypeScript contract). Browser suites remain separately verified locally; CI does not claim sponsor or production execution.
