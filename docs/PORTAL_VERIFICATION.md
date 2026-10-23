@@ -1,4 +1,8 @@
-# Portal proposal verification — 2026-10-22 local / 2026-10-23 UTC
+# Portal verification
+
+Latest release: **20261023-web-portals-09f5325**, deployed and verified with publication disabled. Code SHA `09f5325c78fe71677c46a83f952c04b602e6fc7b`; see [current release evidence](#production-release-evidence--integration-readiness). Earlier sections below retain historical milestone evidence.
+
+## Previous proposal milestone — 2026-10-22 local / 2026-10-23 UTC
 
 Backend foundation: `6d70d1a`; shared master coordination: `d5fe6bf`. UI/tests and documentation are reviewed together in PR #1.
 
@@ -70,3 +74,16 @@ python3 -m unittest discover -s deploy -p 'test_*.py'
 ```
 
 Doctor: PASS=15 FAIL=0 BLOCKED=1 NOT_TESTED=1. Verify: PASS=19 FAIL=0 BLOCKED=14 NOT_TESTED=1. Same actual resource/registry/model prerequisites; no Cursor gate and no inference. A compact branch-only CI workflow is added; a local pass is not a claim that hosted CI has run. Guarded production plan/backup/deploy and authenticated HTTPS results are recorded below when actually completed.
+
+
+## Production release evidence — integration readiness
+
+- Owner Vadim; **only branch `feature/web-portals`**. Deployed code SHA `09f5325c78fe71677c46a83f952c04b602e6fc7b`, release `20261023-web-portals-09f5325`; rollback `20261022-web-portals-r2`. The later handoff/documentation commit does not change deployed application code.
+- [Hosted CI 39887513802](https://github.com/rcc00n/Quorum/actions/runs/39887513802) **success**: Python 3.10, 36 Django tests, six upgrade tests, schema fixture command, Next build/typecheck, rating and actual TypeScript contract checks. Local real-HTTP/browser boundary, old auth/routes/admin and rich responsive/recovery tests also passed. No external sponsor service was mocked into a PASS.
+- Guarded read-only plan passed. Apply created root-private SQLite backups before dependency installation and a final cutover backup after stopping only Quorum. Backup directory mode 700, DB/rollback metadata mode 600; integrity checked. Existing dependency pins were unchanged; only five missing pinned validator dependencies were added. Isolated tests also passed on the VPS Python 3.10.12. No auth migrations were pending/applied.
+- Both Quorum services restarted successfully on loopback; Node v22.19.0 retained. Target-host and external HTTPS home/login/register/session/staff checks passed, unauthenticated feed remains 401. All other Docker container IDs/start timestamps stayed unchanged; no Nginx, SSH, firewall or other project runtime configuration changed. Code/static automatic rollback was tested with a simulated health failure, not forced on live production.
+- Actual HTTPS checks authenticated all eight existing accounts, verified four admin accesses and four regular-user staff denials, Secure/HttpOnly cookies, CSRF denial and logout. Staff overview/users/add/topics/sources/status/integrations and all existing protected routes were checked; desktop/mobile layouts did not overflow. Existing catalog remains 19 sources/one topic, events/digests empty/pending. Event-page JS assets include all three rich UI modules; no invented analysis was served.
+- Registration/onboarding/persistent topic selection/logout were tested using exact temporary accounts, then cleaned up. Initial automation stopped on the two desktop settings logout controls; scoping the test selector resolved this, with no application patch required. A final read-only audit against the cutover backup proved all eight original account records/password hashes/roles (except expected login timestamps) and every original preference row unchanged; no temporary accounts remain.
+- Production read-only `portal_snapshot validate` successfully checked the labelled fixture with `published:false`. Snapshot root is unset; publication flag remains off. No machine credential, transport, remote processing, inference, DEMO feed or live upstream result was enabled.
+
+Remaining blockers: no actual reasoning result/schema or verified trace/correction semantics; collector hash/offset/provenance agreement; approved transport/authorization, freshness/ranking/timezone/retention and genuine sponsor execution. Next owner handoff: Yelysei provides one real result, Anastasia confirms provenance/access/independence, all approve transport before publishing. The code is DEPLOYED; external result integration is still BLOCKED.

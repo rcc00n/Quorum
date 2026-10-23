@@ -47,9 +47,11 @@ Use [deploy/README.md](../deploy/README.md). Switch only the Quorum release syml
 - [x] Baseline branch `9a79ea9` and clean tree verified before edits; remote contracts/tracker read without branch changes.
 - [x] Read-only compatibility report, immutable-head/auth no-write tests, full existing regressions and actual local HTTP/type/browser boundary pass.
 - [x] Upgrade tool safety tests pass, including simulated failed-health code/static rollback; no migrations or publishing permitted.
-- [ ] Hosted branch CI result verified.
-- [ ] Target-host plan, restricted auth backups, previous release and Python 3.10 compatibility verified before cutover.
-- [ ] Guarded Quorum-only release switch, HTTPS/auth/staff/catalog/pending/new-asset checks and unrelated workload preservation verified.
-- [ ] Exact code/release SHA, rollback, tracker and draft PR updated with real outcomes.
+- [x] Hosted branch CI result verified: run 39887513802, code SHA `09f5325`.
+- [x] Target-host plan, restricted auth backups, previous release and Python 3.10 compatibility verified before cutover.
+- [x] Guarded Quorum-only release switch, HTTPS/auth/staff/catalog/pending/new-asset checks and unrelated workload preservation verified.
+- [x] Exact code/release SHA, rollback, tracker and draft PR updated with real outcomes (milestone handoff references code `09f5325`).
 
 These deployment gates do not close sponsor or genuine upstream-result gates.
+
+Current release `20261023-web-portals-09f5325` / code `09f5325` passed these deployment gates; rollback is `20261022-web-portals-r2`. See [exact production evidence](PORTAL_VERIFICATION.md#production-release-evidence--integration-readiness). Checkmarks in earlier proposal review sections remain historical; sponsor/contract gates stay open.

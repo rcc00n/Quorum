@@ -32,3 +32,10 @@ Evaluated [Resend's free plan](https://resend.com/pricing), [authenticated API a
 Registration/login remain unchanged. Email verification, reset endpoints and associated frontend pages were intentionally not implemented or deployed, as required when authenticated delivery cannot be proven. A successful provider API acceptance alone would not satisfy the delivery gate.
 
 Repository doctor/verify scripts were rerun without inference; sponsor readiness remains blocked on existing registry/provider credentials and runtime prerequisites. These blockers do not affect the verified production account flows.
+
+
+## Integration-readiness release — 2026-10-23 UTC
+
+Current: `20261023-web-portals-09f5325`, code SHA `09f5325c78fe71677c46a83f952c04b602e6fc7b`, branch `feature/web-portals`; rollback `20261022-web-portals-r2`. Guarded upgrade/private backups, production Python 3.10 tests, HTTPS/auth/role/topic/registration/browser/new-asset checks and final account/preference preservation audit passed. No pending migrations were applied. Only Quorum services restarted; unrelated container start identities were preserved.
+
+The rich UI and read-only compatibility CLI are installed, but publication flag remains off and no snapshot root is configured. Production serves the existing catalog and honest pending analysis, never DEMO results. No machine credentials/transport/inference were enabled. Full current evidence, hosted CI and remaining upstream dependencies: [PORTAL_VERIFICATION.md](../docs/PORTAL_VERIFICATION.md#production-release-evidence--integration-readiness). Private backup contents and credentials remain outside Git.

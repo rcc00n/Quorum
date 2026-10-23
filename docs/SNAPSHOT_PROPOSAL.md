@@ -1,6 +1,6 @@
 # Portal snapshot proposal — not an approved reasoning API
 
-Owner: Vadim, `feature/web-portals`. Yelysei owns reasoning output; Anastasia owns collection/provenance. This is a tested portal implementation and negotiation target, **not an operational integration**. Production publication remains disabled. Track agreement and evidence in [Issue #2](https://github.com/rcc00n/Quorum/issues/2).
+Owner: Vadim, `feature/web-portals`. Yelysei owns reasoning output; Anastasia owns collection/provenance. This is a tested portal implementation and negotiation target, **not an operational processing integration**. The code is shipped in production release `20261023-web-portals-09f5325`, with snapshot root unset and publication disabled. Production publication remains disabled. Track agreement and evidence in [Issue #2](https://github.com/rcc00n/Quorum/issues/2).
 
 ## Executable specification
 
