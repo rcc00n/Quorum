@@ -17,9 +17,7 @@ Routes: `/`, `/login`, `/register`, `/onboarding`, `/dashboard`, `/topics/[slug]
 
 ## Integration contract
 
-Canonical integration seam and current availability: [backend README](../backend/README.md#integration-boundary--pending-not-operational). `lib/api.ts` defines portal-only `Snapshot`, `Event`, `Evidence` and `Source` types. These await upstream agreement, rather than imposing an API on reasoning. Live adapter is pending; an optional, revision-labelled external team catalog enables topic selection and registry inspection today. Event IDs and narratives cannot be derived from collector documents in this workstream.
-
-AllSides/MBFC/Ad Fontes values arrive normalized and nullable. Average uses only available values; unrated sources stay unrated. Spectrum thresholds/formulas: [project decisions](../docs/DECISIONS.md#spectrum-ratings-and-cohorts). No invented rating, audience, health status, or importance value is substituted. No cohort shares are claimed without complete denominators. The source list uses neutral colors throughout.
+The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL_INTEGRATION.md): owner-specific read lists, current field inventory/examples, API behavior, validation gaps, secure transport proposals and real end-to-end acceptance. `lib/api.ts` remains the executable view-model definition; it is not an approved agent API. Architecture/formulas remain in [project decisions](../docs/DECISIONS.md).
 
 `fixtures/demo.ts` is a fictional view-model test fixture, never imported by production pages or the live adapter. Browser tests explicitly label demo responses; screenshots of the shipped empty workspace show actual pending state.
 

@@ -108,11 +108,8 @@ def doctor():
     rc, out = run(['docker', 'info', '--format', '{{.OperatingSystem}}'])
     emit('PASS' if rc == 0 and 'Docker Desktop' in out else 'NOT_TESTED', 'Docker Desktop WSL2 integration',
          'Desktop backend identified' if rc == 0 and 'Docker Desktop' in out else 'Current backend is Linux Engine; Desktop integration not demonstrated or required')
-    ps = r'''$p=$env:QUORUM_CURSOR_EXE; if(!$p){$p="$env:LOCALAPPDATA\Programs\cursor\Cursor.exe"}; if(Test-Path -LiteralPath $p){Write-Output (Get-Item -LiteralPath $p).VersionInfo.ProductVersion; exit 0}; exit 2'''
-    env = dict(os.environ, QUORUM_CURSOR_EXE=val('CURSOR_EXE'))
-    rc, out = run(['powershell.exe', '-NoProfile', '-Command', ps], env=env)
-    emit('PASS' if rc == 0 else 'BLOCKED', 'Cursor installation', 'Windows executable '+out if rc == 0 else 'Windows executable unavailable')
-    cursor_acceptance()
+    # DECISION(2026-10-22, rcc00n/Codex): Codex workflow; legacy Cursor
+    # acceptance runs only in cursor-history mode, never routine readiness.
     rc, out = run(['df', '-Pk', str(ROOT)])
     if rc == 0:
         fields = out.splitlines()[-1].split()
@@ -179,6 +176,15 @@ def meterless():
         emit('PASS' if rc == 0 else 'FAIL', 'Meterless persistence/state smoke', 'Memory, ledger and state survive reload' if rc == 0 else 'Run persistence script with external tsx for details')
     else:
         emit('BLOCKED', 'Meterless smoke tests', 'Official reference dependencies missing')
+
+
+def cursor_history():
+    """Optional historical diagnostics; excluded from doctor/verify summaries."""
+    ps = r'''$p=$env:QUORUM_CURSOR_EXE; if(!$p){$p="$env:LOCALAPPDATA\Programs\cursor\Cursor.exe"}; if(Test-Path -LiteralPath $p){Write-Output (Get-Item -LiteralPath $p).VersionInfo.ProductVersion; exit 0}; exit 2'''
+    env = dict(os.environ, QUORUM_CURSOR_EXE=val('CURSOR_EXE'))
+    rc, out = run(['powershell.exe', '-NoProfile', '-Command', ps], env=env)
+    emit('PASS' if rc == 0 else 'BLOCKED', 'Cursor installation', 'Windows executable '+out if rc == 0 else 'Windows executable unavailable')
+    cursor_acceptance()
 
 
 def cursor_acceptance():
@@ -310,7 +316,7 @@ def nemotron(allow_inference=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['doctor', 'verify'])
+    parser.add_argument('mode', choices=['doctor', 'verify', 'cursor-history'])
     parser.add_argument('--inference', action='store_true', help='Explicitly send one capped Meterless request when real credentials are supplied')
     args = parser.parse_args()
     if args.inference and args.mode != 'verify':
@@ -319,7 +325,10 @@ def main():
     if 'FAIL' in RESULTS:
         print('FAIL | diagnostics | Correct private configuration before running checks')
         return 1
-    doctor()
+    if args.mode == 'cursor-history':
+        cursor_history()
+    else:
+        doctor()
     if args.mode == 'verify':
         meterless()
         zetaris()

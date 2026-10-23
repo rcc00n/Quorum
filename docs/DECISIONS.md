@@ -128,7 +128,9 @@ Previous stack decision (superseded 2026-10-22 by explicit human team-approved c
 | Independent review | Additional LLMs | Independent review of complex conclusions, if the rules allow. |
 | Interface | Next.js + TypeScript | User portal: account, topic and event pages. |
 | Web backend and administration | Django | Session authentication, preferences, web API, Quorum Control. Dedicated portal database, separate from collector tables. |
-| Development | Cursor / Codex / Claude Code — each team member's own | Rules for all assistants are in [AGENTS.md](../AGENTS.md). Verify the track requirements in HackOS: the event page lists NVIDIA, Zetaris, SpaceX AI and Meterless as sponsors. |
+| Development | Codex — current team workflow | Routine checks do not require Cursor. The claimed organizer removal of mandatory Cursor is human-reported, not independently verified; see [rules evidence](RULES_CHECK.md). Shared rules remain in [AGENTS.md](../AGENTS.md). |
+
+Previous development-tool listing (superseded 2026-10-22 by explicit human workflow clarification): Cursor / Codex / Claude Code, each team member’s own. Cursor installation/interactive acceptance is now historical opt-in diagnostics, excluded from routine readiness. This does not waive Zetaris/Meterless integration or certify submission compliance.
 
 **Three work blocks**
 
@@ -175,6 +177,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex, explicit human workflow update | Use Codex; exclude Cursor gates from routine readiness and retain optional historical checks. Treat the reported organizer change as unverified; preserve sponsor requirements. | Match actual development workflow without claiming that conflicting public rules or submission compliance have been resolved. |
 | 2026-10-22 | rcc00n / Codex, explicit human team-approved amendment | Next.js frontend; Django auth, administration and web API; dedicated persistent SQLite portal database. Typed read-only integration adapter pending reasoning contract. | Clarify team ownership without changing data or reasoning architecture; isolated lightweight VPS deployment. |
 | 2026-10-22 | Yelysei / Claude | Repository documentation, including this file, is written in English | Readable for the judges and for the whole team |
 | 2026-10-22 | Yelysei / team discussion in chat, written up with Claude | First version: MVP scope, principles for handling facts, four rating modes and cohorts, model-based selection of major news, source list, user account, stack, demo, what comes after the hackathon | Fix the team's agreements before the source audit and the architecture design begin |

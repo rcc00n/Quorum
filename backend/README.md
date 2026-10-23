@@ -33,11 +33,7 @@ Unauthenticated protected endpoints return 401, invalid input 400, rate limits 4
 
 ## Integration boundary — pending, not operational
 
-`portal/integration.py:DataAdapter.snapshot(day, topic)` is the sole read-only seam. It returns `status: pending`, empty events/digests, and optionally the reviewed catalog definitions from an external `QUORUM_CATALOG_PATH` JSON export. Catalog provenance is returned as `catalog_revision`; it does not imply a live connection. Wire it to authorized Zetaris access after credentials, reachability and schema mapping are approved. `deploy/export-catalog.py` reads the chosen collector Git revision without checking it out or executing it, exporting only existing topic/source definitions to a path outside the repository. No topic names or ratings are invented. No direct collector DB connection, provider call, or inferred reasoning contract exists.
-
-Available on `data-collection`: `sources` (normalized nullable ratings, audience, independence group), `topics`, `documents` (title, lead, URLs, timestamps, access level; no full text), `official_docs`, `quotes`, `coverage`. Do not create or migrate these tables here.
-
-Reasoning must supply event grouping/IDs, date and topic membership, neutral summaries, importance with rubric/explanation, established facts, attributed statements, disputes, unknowns, evidence links and verification explanations, coverage differences and daily digests. Confirm the upstream contract with Yelysei before implementing a live adapter. Frontend types are a **portal view model**, not an authoritative reasoning API. The adapter must validate incoming values, filter by authorized query, preserve attribution/access levels, and avoid sending secrets. Collection ratings are already normalized; never normalize them twice.
+See the canonical [portal integration handoff](../docs/PORTAL_INTEGRATION.md) for Anastasia/Yelysei instructions, collector ownership, exact presentation fields, examples, security/validation gaps and proposed transport. `portal/integration.py` defines the adapter; `web/lib/api.ts` defines current UI types. The optional external catalog is definitions only; no live processing integration or approved reasoning API is claimed. Do not create collector tables in this database.
 
 ## Control and checks
 

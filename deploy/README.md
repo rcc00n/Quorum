@@ -1,6 +1,6 @@
 # Isolated VPS deployment
 
-Target: `quorum.raccncode.com` / `144.202.24.190`. Existing Nginx hosts and Docker workloads must remain untouched. Only Quorum services may be restarted. No inference, collectors, data workers or Zetaris run here.
+Target: `quorum.raccncode.com` / `144.202.24.190`. Existing Nginx hosts and Docker workloads must remain untouched. Remote data/processing integration is described in the canonical [portal handoff](../docs/PORTAL_INTEGRATION.md#transport-proposal--not-implemented-or-approved); its transport is still a proposal. Only Quorum services may be restarted. No inference, collectors, data workers or Zetaris run here.
 
 ## Build and package locally
 
