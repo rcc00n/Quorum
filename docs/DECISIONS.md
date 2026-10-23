@@ -166,11 +166,16 @@ Six questions the team has not closed yet.
 - [ ] The track's requirements for sponsor technologies and development tools — verify on the challenge page in HackOS.
 - [ ] Where the audience estimates for the Y axis and cohort shares come from.
 
+## Shared development coordination
+
+[GitHub Issue #2](https://github.com/rcc00n/Quorum/issues/2) is the canonical cross-team feature/release tracker. Every assistant follows the tracking/handoff protocol in [AGENTS.md](../AGENTS.md#shared-project-tracking-and-cross-agent-handoff), with evidence-backed states and read-only inspection of other owners' branches. Module inventories and release checklists supplement this tracker; product and architecture decisions remain here. This coordination amendment does not approve unfinished application code or change data/reasoning architecture.
+
 ## Decision log
 
 Every change to this document gets a row here. Newest rows on top. Rules are in [AGENTS.md](../AGENTS.md), section "Decisions".
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-22 | rcc00n / Codex, explicit human coordination authorization | Issue #2 is the canonical shared tracker; every assistant follows the AGENTS.md tracking/handoff protocol across branches. | Preserve feature ownership, completion evidence and regression checks across independent sessions without merging application work. |
 | 2026-10-22 | Yelysei / Claude | Repository documentation, including this file, is written in English | Readable for the judges and for the whole team |
 | 2026-10-22 | Yelysei / team discussion in chat, written up with Claude | First version: MVP scope, principles for handling facts, four rating modes and cohorts, model-based selection of major news, source list, user account, stack, demo, what comes after the hackathon | Fix the team's agreements before the source audit and the architecture design begin |
