@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 
-from .. import config, llm
+from .. import config, llm, untrusted
 from ..state import Claim, Event, RunState
 from ..trace import finish, step
 
@@ -78,11 +78,11 @@ def run(state: RunState) -> dict:
             "events": len(state["events"]),
             "above_bar": len(stories),
             "needs_review": sum(1 for e in state["events"] if e["needs_review"]),
-            "headlines": [e["headline"] for e in stories],
+            "headlines": [untrusted.clip(e["headline"], untrusted.CAP_HEADLINE) for e in stories],
             "sources_missing": [],
         }
         try:
-            summary = llm.json_task("summary", payload, dry_run=state["dry_run"]).get("summary", "")
+            summary = untrusted.clip(llm.json_task("summary", payload, dry_run=state["dry_run"]).get("summary", ""), untrusted.CAP_SUMMARY)
         except Exception as exc:  # noqa: BLE001
             summary = f"{len(stories)} of {len(state['events'])} events crossed the bar today."
             s.reason = f"summary model call failed: {str(exc)[:120]}; fallback text"

@@ -2,12 +2,13 @@
 
 Round 1 searches the event's own documents. Round 2 (requested by `verify` for thin claims) widens to every
 document of the day and all official documents. Stance per passage is a model judgment; which passages
-exist, which groups they belong to and how many rounds run are code.
+exist, which groups they belong to and how many rounds run are code. The model's stance answer is untrusted:
+only the four allowed stance words are accepted, anything else counts as neutral (untrusted.valid_stance).
 """
 
 from __future__ import annotations
 
-from .. import config, llm
+from .. import config, llm, untrusted
 from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin
 from ..state import Claim, DocRef, Evidence, RunState, StepError
 from ..text import best_passage, clip_sentences
@@ -83,8 +84,8 @@ def run(state: RunState) -> dict:
                         ans = llm.json_task(
                             "stance",
                             {
-                                "claim": c["text"],
-                                "passage": passage,
+                                "claim": untrusted.clip(c["text"], untrusted.CAP_CLAIM),
+                                "passage": untrusted.clip(passage, untrusted.CAP_PASSAGE),
                                 "source": d["source_name"],
                                 "source_kind": d["kind"],
                                 "doc_type": d.get("doc_type"),
@@ -92,7 +93,7 @@ def run(state: RunState) -> dict:
                             },
                             dry_run=state["dry_run"],
                         )
-                        stance = ans.get("stance", "neutral")
+                        stance = untrusted.valid_stance(ans.get("stance"))
                         if stance == "neutral":
                             continue
                         c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher")]

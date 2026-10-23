@@ -5,14 +5,15 @@ has the same access to the documents (same levels, same robots rules), picks its
 model for stance under its own prompt (prompts/stance.md, role fact_checker: look for reasons the claim could
 be wrong) and applies the same confirmation rule to its own evidence. Its evidence rows carry
 found_by="fact_checker" so the snapshot shows both chains side by side. Route "fact_checker" in
-config/reasoning.toml may point at a different provider when the rules allow.
+config/reasoning.toml may point at a different provider when the rules allow. The model's stance answer is
+untrusted: only the four allowed stance words are accepted, anything else counts as neutral.
 """
 
 from __future__ import annotations
 
 from collections import Counter
 
-from .. import llm
+from .. import llm, untrusted
 from ..rules.confirmation import verdict
 from ..state import RunState, StepError
 from ..text import best_passage
@@ -45,8 +46,8 @@ def run(state: RunState) -> dict:
                         ans = llm.json_task(
                             "stance",
                             {
-                                "claim": c["text"],
-                                "passage": passage,
+                                "claim": untrusted.clip(c["text"], untrusted.CAP_CLAIM),
+                                "passage": untrusted.clip(passage, untrusted.CAP_PASSAGE),
                                 "source": d["source_name"],
                                 "source_kind": d["kind"],
                                 "doc_type": d.get("doc_type"),
@@ -55,7 +56,7 @@ def run(state: RunState) -> dict:
                             dry_run=state["dry_run"],
                             which="fact_checker",
                         )
-                        stance = ans.get("stance", "neutral")
+                        stance = untrusted.valid_stance(ans.get("stance"))
                         if stance == "neutral":
                             continue
                         c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker")]

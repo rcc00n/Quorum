@@ -15,6 +15,7 @@ from typing import Any
 from dotenv import load_dotenv
 
 from . import config, dryrun
+from .untrusted import DATA_NOTE, parse_json_object
 
 _PROMPTS = Path(__file__).resolve().parent / "prompts"
 _loaded = False
@@ -57,7 +58,10 @@ def _prompt(task: str) -> str:
 def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str = "default") -> dict[str, Any]:
     """Runs one named task. `payload` is what the model sees; the reply is parsed JSON.
 
-    Every task has a dry-run twin in dryrun.py with the same input and output shape.
+    Every task has a dry-run twin in dryrun.py with the same input and output shape. The payload's text
+    fields are quoted outside material: the user message labels them as data (untrusted.DATA_NOTE) and the
+    prompts repeat the rule. The reply is parsed as the last balanced JSON object, so hostile text that
+    baits the model into echoing JSON-shaped material before its answer does not break or hijack the parse.
     """
     if is_dry_run(dry_run):
         return getattr(dryrun, task)(payload)
@@ -72,12 +76,12 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         temperature=temperature,
         messages=[
             {"role": "system", "content": _prompt(task)},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
         ],
         extra_headers={"X-Quorum-Task": task},
     )
     text = completion.choices[0].message.content or "{}"
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
+    obj = parse_json_object(text)
+    if obj is None:
         raise ValueError(f"{task}: model did not return JSON")
-    return json.loads(text[start : end + 1])
+    return obj

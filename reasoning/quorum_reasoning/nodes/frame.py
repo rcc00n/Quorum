@@ -3,14 +3,16 @@
 The model labels one outlet's document at a time (highlights, omits, wording, interpretation label). Cohort
 shares are counted in code from the day's corpus: for each cohort, how many of its sources covered the event
 out of how many published anything on the topic today. Cohorts follow DECISIONS.md › Spectrum ratings and
-cohorts: major/minor × left/right, plus center; agencies and official sources are not a cohort.
+cohorts: major/minor × left/right, plus center; agencies and official sources are not a cohort. The model's
+labels are untrusted free text built from untrusted titles and leads: they are bounded before they reach the
+snapshot.
 """
 
 from __future__ import annotations
 
 from collections import Counter, defaultdict
 
-from .. import llm
+from .. import llm, untrusted
 from ..state import DocRef, RunState, StepError
 from ..trace import finish, step
 
@@ -57,7 +59,12 @@ def run(state: RunState) -> dict:
                         continue
                     ans = llm.json_task(
                         "frame",
-                        {"documents": [{"title": d["title"], "lead": d["lead"]}], "source": d["source_name"], "flank": d.get("flank"), "tier": d.get("tier")},
+                        {
+                            "documents": [{"title": untrusted.clip(d["title"], untrusted.CAP_TITLE), "lead": untrusted.clip(d["lead"], untrusted.CAP_LEAD)}],
+                            "source": d["source_name"],
+                            "flank": d.get("flank"),
+                            "tier": d.get("tier"),
+                        },
                         dry_run=state["dry_run"],
                     )
                     outlets.append(
@@ -66,10 +73,10 @@ def run(state: RunState) -> dict:
                             "cohort": cohort_of(d),
                             "flank": d.get("flank") or "center",
                             "url": d["url"],
-                            "highlights": ans.get("highlights", ""),
-                            "omits": ans.get("omits", ""),
-                            "wording": ans.get("wording", ""),
-                            "interpretation_label": ans.get("interpretation_label", ""),
+                            "highlights": untrusted.clip(ans.get("highlights", ""), untrusted.CAP_LABEL),
+                            "omits": untrusted.clip(ans.get("omits", ""), untrusted.CAP_LABEL),
+                            "wording": untrusted.clip(ans.get("wording", ""), untrusted.CAP_LABEL),
+                            "interpretation_label": untrusted.clip(ans.get("interpretation_label", ""), untrusted.CAP_LABEL),
                         }
                     )
                 labels: Counter[str] = Counter(o["interpretation_label"] for o in outlets if o["interpretation_label"])

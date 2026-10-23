@@ -7,7 +7,7 @@ reported and how well it is supported, nothing more). `empty_day` is true when n
 
 from __future__ import annotations
 
-from .. import llm
+from .. import llm, untrusted
 from ..rules.confirmation import independent_support
 from ..rules.writing_rules import check_text
 from ..state import Claim, Event, RunState, StepError
@@ -40,7 +40,12 @@ def run(state: RunState) -> dict:
             lead = next((d["lead"] for d in docs if d["lead"]), "")
             label = status_label(e, claims)
             try:
-                line = llm.json_task("roundup_line", {"headline": e["headline"], "lead": lead, "status": label}, dry_run=state["dry_run"]).get("line", "")
+                ans = llm.json_task(
+                    "roundup_line",
+                    {"headline": untrusted.clip(e["headline"], untrusted.CAP_HEADLINE), "lead": untrusted.clip(lead, untrusted.CAP_LEAD), "status": label},
+                    dry_run=state["dry_run"],
+                )
+                line = untrusted.clip(ans.get("line", ""), untrusted.CAP_LINE)
                 if check_text("line", line):
                     line = e["headline"].rstrip(".") + "."  # the headline is the safe fallback; the critic's rules apply here too
             except Exception as exc:  # noqa: BLE001
