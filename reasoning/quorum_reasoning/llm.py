@@ -127,10 +127,12 @@ def probe(which: str = "default") -> dict[str, Any]:
     ms = int((time.perf_counter() - started) * 1000)
     text = completion.choices[0].message.content or ""
     usage = getattr(completion, "usage", None)
+    served, receipt_id = _served_and_receipt(completion, model)
     return {
         "lane": which,
         "route": model,
-        "answered_by": getattr(completion, "model", "") or "",
+        "answered_by": served,
+        "receipt_id": receipt_id,
         "ms": ms,
         "tokens_in": int(getattr(usage, "prompt_tokens", 0) or 0),
         "tokens_out": int(getattr(usage, "completion_tokens", 0) or 0),
@@ -165,6 +167,24 @@ def model_name(which: str = "default") -> str:
     return _route(which)[2]
 
 
+def _served_and_receipt(completion: Any, route: str) -> tuple[str, str]:
+    """The model that answered, and Nightshift's receipt id when the response carries one.
+
+    Nightshift's chat response body carries a `meterless` object (requested/provider/routed model,
+    receipt_id, signed receipt envelope). The OpenAI SDK keeps unknown response fields in `model_extra`.
+    `routed_model` beats a `meterless/*` value in the standard `model` field as evidence of what answered;
+    the receipt id goes into the call ledger so the demo can point at Console › Proof per request.
+    """
+    served = str(getattr(completion, "model", None) or route)
+    met = (getattr(completion, "model_extra", None) or {}).get("meterless") or {}
+    if not isinstance(met, dict):
+        return served, ""
+    routed = str(met.get("routed_model") or met.get("provider_model") or "")
+    if routed and (served.startswith("meterless/") or not served):
+        served = routed
+    return served, str(met.get("receipt_id") or "")
+
+
 _last_call_at = 0.0
 
 
@@ -179,14 +199,26 @@ def _request_extras() -> dict[str, Any]:
     `chat_template_kwargs.enable_thinking` is the documented control for hosted Nemotron 3.5 / Nemotron 3 Nano
     endpoints (and vLLM); the OpenAI SDK sends `extra_body` entries as top-level JSON fields, which an
     OpenAI-compatible proxy forwards. A system-prompt "/no_think" is Qwen3's switch and did nothing here.
+
+    DECISION(2026-10-23, Yelysei Shkirpan/Claude Code): with thinking off, `force_nonempty_content: true`
+    rides along in chat_template_kwargs (NVIDIA's Lightning cookbook and NVIDIA's own client configs send it
+    so the answer lands in `content`, never only in the reasoning field); with thinking on, `max_tokens` is
+    lifted to reasoning_budget + 1000 when it is lower. Why: the trace counts against max_tokens and is
+    forcibly cut only at budget + 500 (Lightning usage cookbook), so a lower ceiling returns
+    `finish_reason: length` with no answer at all.
     """
     extras: dict[str, Any] = {}
     max_tokens = int(config.get("models", "max_tokens", 0) or 0)
+    thinking_on = str(config.get("models", "reasoning", "off")).lower() == "on"
+    budget = int(config.get("models", "reasoning_budget", 0) or 0)
+    if thinking_on and budget > 0 and max_tokens > 0:
+        max_tokens = max(max_tokens, budget + 1000)
     if max_tokens > 0:
         extras["max_tokens"] = max_tokens
-    thinking_on = str(config.get("models", "reasoning", "off")).lower() == "on"
-    body: dict[str, Any] = {"chat_template_kwargs": {"enable_thinking": thinking_on}}
-    budget = int(config.get("models", "reasoning_budget", 0) or 0)
+    kwargs: dict[str, Any] = {"enable_thinking": thinking_on}
+    if not thinking_on:
+        kwargs["force_nonempty_content"] = True
+    body: dict[str, Any] = {"chat_template_kwargs": kwargs}
     if thinking_on and budget > 0:
         body["reasoning_budget"] = budget  # NVIDIA's name for the thinking-token cap (build.nvidia.com sample code)
     extras["extra_body"] = body
@@ -236,11 +268,14 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
             print(f"  · {task:<15} {which:<13} {model:<42} FAILED {ms:>6} ms  {type(exc).__name__}", file=sys.stderr, flush=True)
         raise
     ms = int((time.perf_counter() - started) * 1000)
-    served = getattr(completion, "model", None) or model
+    served, receipt_id = _served_and_receipt(completion, model)
     usage = getattr(completion, "usage", None)
     tokens_in = int(getattr(usage, "prompt_tokens", 0) or 0)
     tokens_out = int(getattr(usage, "completion_tokens", 0) or 0)
-    calls.append({"task": task, "lane": which, "route": model, "served": served, "ms": ms, "tokens_in": tokens_in, "tokens_out": tokens_out})
+    entry = {"task": task, "lane": which, "route": model, "served": served, "ms": ms, "tokens_in": tokens_in, "tokens_out": tokens_out}
+    if receipt_id:
+        entry["receipt_id"] = receipt_id
+    calls.append(entry)
     if _verbose():
         flag = "" if served == model or model.startswith("meterless/") else "  (substituted)"
         print(f"  · {task:<15} {which:<13} {served:<42} {ms:>6} ms  {tokens_in:>5}>{tokens_out:<5}{flag}", file=sys.stderr, flush=True)

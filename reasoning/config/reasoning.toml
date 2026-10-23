@@ -39,4 +39,4 @@ temperature = 0.1
 reasoning = "off"                 # off | on
 reasoning_budget = 0              # when reasoning = "on": cap on thinking tokens, NVIDIA's `reasoning_budget` (0 = provider default)
 max_tokens = 1500                 # ceiling per reply; every task answers in far fewer
-min_interval_ms = 0               # pause between live calls; raise (e.g. 1500) if the provider's per-minute cap bites
+min_interval_ms = 0               # pause between live calls; 1600 stays under the direct route's 40-requests/min trial cap
