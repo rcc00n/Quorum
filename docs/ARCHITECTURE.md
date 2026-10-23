@@ -263,6 +263,23 @@ Not built yet: `store/` (the `analysis` schema and upserts), `server.py` (POST /
 | Oct 26 | Transport to the portal with Vadim; end-to-end on the demo event; fixes | The portal renders the story page from a live snapshot |
 | Oct 27 | Demo video, slides, README, sponsor-technology write-up; submission by 23:45 UTC | Submitted |
 
+**Status after the review of 2026-10-23** (evidence states per AGENTS.md § 4; review report:
+[docs/reviews/2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-review.md)):
+
+- TESTED, in dry run (66 tests passed, 2 xfailed = the recorded proposals A7 and D3): the rules layer
+  (confirmation, impact bar, writing rules); the graph's loops end to end (research round 2, blind
+  fact-check with a disputed claim, critic rejection and rewrite, escalation); the red-team hardening (wire
+  reprints share the wire's independence group, official ids namespaced, superseded rows dropped,
+  sentence-boundary quotes, DST-correct edition window); the untrusted-text layer (`untrusted.py`: payload
+  labels and caps, stance/origin/URL/claim validation, last-balanced-object reply parsing); roundup labels
+  incl. `Disputed` and `Single source`; eight use-case days (`fixtures/usecases/`); the eval harness
+  (`tests/eval.py`, 28 real claims — dry baseline: false confirmed 0, missed confirmed 7, disputed rate 5%).
+- IMPLEMENTED, not yet exercised live: the model route (`llm.py`), the Zetaris corpus SQL
+  (`tools/corpus.py`), the live `fetch_text` path, Studio wiring (`langgraph.json`). Dry-run tests do not
+  establish live integration; the Oct 23–24 live run remains the evidence gate.
+- NOT_STARTED: the `analysis` store, `server.py` (snapshot endpoint), `config/photos.toml` and the photo
+  tool, `tools/gdelt.py`, a live eval run (`tests/eval.py --live`, opt-in).
+
 ## 11. Decisions this document records
 
 - Reasoning block: Python, LangGraph for orchestration, LangGraph Studio for development and demo visibility; agents write to Postgres directly and read only through Zetaris; one run per topic per day plus on-demand runs. Decided 2026-10-22 (Yelysei / Claude); to be logged in DECISIONS.md with the next merge.
