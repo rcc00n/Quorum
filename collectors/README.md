@@ -48,7 +48,8 @@ Semantics the other blocks rely on (confirmed 2026-10-22 for the portal and reas
 | Guardian | Open Platform API, free key, full text | key in `.env` |
 | NYT, WSJ | RSS, level 2 | section feed URLs |
 | WaPo, ISW | no feed reachable by bots (502 / 403 on 2026-10-22); level 3 via GDELT only | retry later |
-| CNN, NPR, Fox News, NY Post, Vox, Slate, Daily Wire, Breitbart, Washington Examiner, Newsmax | RSS + page fetch at level 1 | robots.txt per domain |
+| CNN, NPR, Fox News, NY Post, Daily Wire, Breitbart; Vox, Mother Jones, The Intercept, Slate, The Daily Beast, The New Republic, The Nation, Salon, Common Dreams | RSS + page fetch at level 1 | robots.txt per domain (all allow as of 2026-10-22) |
+| The Atlantic | RSS, level 2 (paywall) | — |
 | ISW, DeepState, Oryx | RSS or update page; stored as attributed statements | update frequency |
 | federalregister.gov | JSON API, no key | which sections map to the topic |
 | congress.gov | API with a free api.data.gov key: bills, votes, texts | key in `.env` |
@@ -57,6 +58,16 @@ Semantics the other blocks rely on (confirmed 2026-10-22 for the portal and reas
 | GDELT DOC 2.0 API | fallback for everything: URL, title, time, tone by domain and query, 15-minute lag, no key | request limits |
 
 ## Running
+
+Continuous (the normal way; survives terminal close, sleep and reboot while Docker Desktop runs):
+
+```
+docker compose -f collectors/docker-compose.yml up -d --build   # Postgres on host port 5433 + collector loop, every 15 min
+docker compose -f collectors/docker-compose.yml logs -f collector
+docker compose -f collectors/docker-compose.yml up -d --build   # again after any change to collectors/ or sources.csv
+```
+
+Manual, for development:
 
 ```
 pip install -r collectors/requirements.txt
@@ -107,3 +118,5 @@ Tested end-to-end against a mock feed and a local Postgres: topic filter, robots
 | 2026-10-22 | Anastasia / Claude | Google News RSS is not used for article discovery: its links cannot be resolved to publisher URLs without executing Google's JavaScript (no redirect, no token in HTML as of 2026-10-22). Sources without a bot-readable feed (WaPo, ISW) drop to level 3. | A `documents.url` that points at news.google.com is not a citation the user can verify. |
 | 2026-10-22 | Anastasia / Claude | US-centred corpus: US outlets get 3–4 section feeds each, Guardian is capped at 50 `us-news` items, AFP comes via France24 at level 2. | The demo is a US event on a US spectrum; the first live run was 100 Guardian items vs 2–3 per US outlet. |
 | 2026-10-22 | Anastasia / Claude | Postgres is registered in Zetaris with `CREATE DATASOURCE` (JDBC) + `REGISTER DATASOURCE TABLES`, not `CREATE LIGHTNING DATABASE`, which Zetaris reserves for file and REST sources. Tables are addressed as `QUORUM_COLLECT.<table>`. | Per zetaris/getting-started `zetaris-lightning-sql-commands.md`; verified live. |
+| 2026-10-22 | Anastasia / Claude | Collectors run continuously as a Docker Compose service next to the Postgres (`collectors/docker-compose.yml`), one pass every 15 minutes, `restart: unless-stopped`. Not on the portal VPS. | ARCHITECTURE.md needs two days of corpus before the demo day is chosen; the VPS is Vadim's production and changes there need all three owners' approval. Same image moves to a server later. |
+| 2026-10-22 | Anastasia / Claude | All ten minor-left outlets from DECISIONS.md added with their native RSS (probe: all reachable, robots allow); minor-right still only Daily Wire and Breitbart. | Cohort diagram needs both minor cohorts populated; right side is the next addition. |

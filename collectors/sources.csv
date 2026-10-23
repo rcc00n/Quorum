@@ -7,6 +7,16 @@ nyt,The New York Times,nytimes.com,outlet,left,major,nyt,,,,,,https://rss.nytime
 wapo,The Washington Post,washingtonpost.com,outlet,left,major,wapo,,,,,,,3,US,en
 cnn,CNN,cnn.com,outlet,left,major,cnn,,,,,,http://rss.cnn.com/rss/cnn_allpolitics.rss|http://rss.cnn.com/rss/cnn_world.rss|http://rss.cnn.com/rss/cnn_us.rss|http://rss.cnn.com/rss/cnn_latest.rss,1,US,en
 npr,NPR,npr.org,outlet,left,major,npr,,,,,,https://feeds.npr.org/1014/rss.xml|https://feeds.npr.org/1004/rss.xml|https://feeds.npr.org/1001/rss.xml,1,US,en
+vox,Vox,vox.com,outlet,left,minor,vox,,,,,,https://www.vox.com/rss/index.xml,1,US,en
+mother-jones,Mother Jones,motherjones.com,outlet,left,minor,mother-jones,,,,,,https://www.motherjones.com/feed/|https://www.motherjones.com/politics/feed/,1,US,en
+intercept,The Intercept,theintercept.com,outlet,left,minor,intercept,,,,,,https://theintercept.com/feed/?rss,1,US,en
+slate,Slate,slate.com,outlet,left,minor,slate,,,,,,https://slate.com/feeds/news-and-politics.rss|https://slate.com/feeds/all.rss,1,US,en
+daily-beast,The Daily Beast,thedailybeast.com,outlet,left,minor,daily-beast,,,,,,https://www.thedailybeast.com/arc/outboundfeeds/rss/?outputType=xml,1,US,en
+new-republic,The New Republic,newrepublic.com,outlet,left,minor,new-republic,,,,,,https://newrepublic.com/rss.xml,1,US,en
+nation,The Nation,thenation.com,outlet,left,minor,nation,,,,,,https://www.thenation.com/feed/?post_type=article,1,US,en
+salon,Salon,salon.com,outlet,left,minor,salon,,,,,,https://www.salon.com/feed/,1,US,en
+common-dreams,Common Dreams,commondreams.org,outlet,left,minor,common-dreams,,,,,,https://www.commondreams.org/feeds/news.rss|https://www.commondreams.org/feeds/feed.rss,1,US,en
+atlantic,The Atlantic,theatlantic.com,outlet,left,minor,atlantic,,,,,,https://www.theatlantic.com/feed/all/|https://www.theatlantic.com/feed/channel/politics/,2,US,en
 fox-news,Fox News,foxnews.com,outlet,right,major,fox-news,,,,,,https://moxie.foxnews.com/google-publisher/politics.xml|https://moxie.foxnews.com/google-publisher/world.xml|https://moxie.foxnews.com/google-publisher/us.xml|https://moxie.foxnews.com/google-publisher/latest.xml,1,US,en
 ny-post,New York Post,nypost.com,outlet,right,major,ny-post,,,,,,https://nypost.com/politics/feed/|https://nypost.com/world-news/feed/|https://nypost.com/us-news/feed/,1,US,en
 daily-wire,The Daily Wire,dailywire.com,outlet,right,minor,daily-wire,,,,,,https://www.dailywire.com/feeds/rss.xml,1,US,en

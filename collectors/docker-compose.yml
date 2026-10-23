@@ -1,0 +1,40 @@
+# Data-collection runtime: Postgres + the collector loop. Run from the repository root:
+#   docker compose -f collectors/docker-compose.yml up -d --build
+# Both services restart with Docker; the loop survives terminal close, sleep and reboot (while Docker Desktop runs).
+# Zetaris on the same machine reaches the database at host.docker.internal:5433 (collectors/zetaris/register.py).
+name: quorum-collect
+services:
+  db:
+    image: postgres:16
+    container_name: quorum-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quorum
+      POSTGRES_PASSWORD: quorum
+      POSTGRES_DB: quorum
+    ports:
+      - "5433:5432"
+    volumes:
+      - quorum_pg:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quorum -d quorum"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  collector:
+    build:
+      context: ..
+      dockerfile: collectors/Dockerfile
+    container_name: quorum-collector
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      # Inside the compose network the database is reached by service name, not by the host port.
+      DATABASE_URL: postgresql://quorum:quorum@db:5432/quorum
+volumes:
+  quorum_pg:
