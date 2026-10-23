@@ -29,6 +29,28 @@ def _body_text(html: str) -> str:
     return " ".join(filter(None, (_strip(p) for p in paras)))[:4000]
 
 
+_SITEMAP_URL = re.compile(r"<url>(.*?)</url>", re.S)
+
+
+def _entries(content: bytes) -> list[dict]:
+    """RSS/Atom via feedparser; Google news-sitemap XML (Reuters) via a small regex parser."""
+    parsed = feedparser.parse(content)
+    if parsed.entries:
+        return [dict(e) for e in parsed.entries]
+    text = content.decode("utf-8", "replace")
+    if "<urlset" not in text:
+        return []
+    out = []
+    for block in _SITEMAP_URL.findall(text):
+        loc = re.search(r"<loc>(.*?)</loc>", block, re.S)
+        title = re.search(r"<news:title>(.*?)</news:title>", block, re.S)
+        date = re.search(r"<news:publication_date>(.*?)</news:publication_date>", block, re.S)
+        if loc and title:
+            out.append({"link": loc.group(1).strip(), "title": unescape(title.group(1).strip()),
+                        "summary": None, "author": None, "published": date.group(1).strip() if date else None})
+    return out
+
+
 def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> dict:
     """Walk every feed of one source. Returns counters."""
     stats = {"seen": 0, "matched": 0, "inserted": 0, "level2": 0}
@@ -37,8 +59,7 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> 
         resp = fetcher.get(feed_url, respect_robots=False)  # feeds are published for machines
         if resp is None:
             continue
-        parsed = feedparser.parse(resp.content)
-        for entry in parsed.entries:
+        for entry in _entries(resp.content):
             stats["seen"] += 1
             title = _strip(entry.get("title")) or ""
             lead = _strip(entry.get("summary") or entry.get("description"))
@@ -52,6 +73,7 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> 
             published = parse_dt(entry.get("published") or entry.get("updated"))
             level = int(source["access_level_default"])
             body = None
+            link = fetcher.resolve(link)  # Google News wrapper -> publisher URL, so documents.url is the real one
             if level == 1:
                 page = fetcher.get(link)
                 if page is None:

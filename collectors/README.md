@@ -34,9 +34,11 @@ Contract details:
 | Group | Access route | First-day check |
 | --- | --- | --- |
 | AP | apnews.com has no official RSS; headlines by domain through the GDELT DOC 2.0 API; page fetch only if robots.txt allows | robots.txt |
-| Reuters, AFP | Google News RSS by domain (`news.google.com/rss/search?q=site:reuters.com+<topic>`) | feed stability |
+| Reuters | Google news-sitemap XML (`reuters.com/arc/outboundfeeds/news-sitemap/`), ~30 latest, level 2 | sitemap still served |
+| AFP | France24 English RSS (AFP's own outlet), level 2 | — |
 | Guardian | Open Platform API, free key, full text | key in `.env` |
-| NYT, WaPo, WSJ, The Atlantic | RSS, level 2 | section feed URLs |
+| NYT, WSJ | RSS, level 2 | section feed URLs |
+| WaPo, ISW | no feed reachable by bots (502 / 403 on 2026-10-22); level 3 via GDELT only | retry later |
 | CNN, NPR, Fox News, NY Post, Vox, Slate, Daily Wire, Breitbart, Washington Examiner, Newsmax | RSS + page fetch at level 1 | robots.txt per domain |
 | ISW, DeepState, Oryx | RSS or update page; stored as attributed statements | update frequency |
 | federalregister.gov | JSON API, no key | which sections map to the topic |
@@ -93,3 +95,5 @@ Tested end-to-end against a mock feed and a local Postgres: topic filter, robots
 | 2026-10-22 | Anastasia / Claude | Collectors are plain Python modules run by `collectors/run.py` (cron or `--loop`), writing to Postgres with psycopg; no Django, Celery or framework yet. | The portal does not exist yet; a Django app can wrap these tables later with `inspectdb` without rewriting the collectors. |
 | 2026-10-22 | Anastasia / Claude | Topic matching at collection is a whole-word match of `topics.query_terms` against title + lead; no model call. | Cheap gate that keeps the demo corpus small; reasoning re-clusters anyway. |
 | 2026-10-22 | Anastasia / Claude | Federal Register and Congress.gov are collected both by Python (into `official_docs`, for the hash-and-quote pipeline) and exposed as live Zetaris REST tables (for the judges' cross-source SQL demo). | Satisfies the "SQL across sources" requirement without making collection depend on an untested connector. |
+| 2026-10-22 | Anastasia / Claude | Google News RSS is not used for article discovery: its links cannot be resolved to publisher URLs without executing Google's JavaScript (no redirect, no token in HTML as of 2026-10-22). Sources without a bot-readable feed (WaPo, ISW) drop to level 3. | A `documents.url` that points at news.google.com is not a citation the user can verify. |
+| 2026-10-22 | Anastasia / Claude | US-centred corpus: US outlets get 3–4 section feeds each, Guardian is capped at 50 `us-news` items, AFP comes via France24 at level 2. | The demo is a US event on a US spectrum; the first live run was 100 Guardian items vs 2–3 per US outlet. |

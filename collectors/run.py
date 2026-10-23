@@ -65,6 +65,8 @@ def main() -> int:
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    # httpx logs every request URL, including api-key query parameters; keep those out of terminals and screenshots.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     while True:
         report = run_once(args.only)
         total = sum(r.get("inserted", 0) for r in report.values())

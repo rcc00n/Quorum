@@ -198,7 +198,14 @@ class Fetcher:
             time.sleep(self.min_interval - elapsed)
         self._last_hit[domain] = time.monotonic()
 
+    def resolve(self, url: str) -> str:
+        """Hook for aggregator links. Google News RSS links cannot be resolved without executing Google's
+        JavaScript (checked 2026-10-22: no redirect, no decodable token in the HTML), so they are left as-is and
+        such sources are collected at level 3 only (fact of coverage). See collectors/README.md › Decisions."""
+        return url
+
     def get(self, url: str, *, respect_robots: bool = True, **kwargs: Any) -> httpx.Response | None:
+        url = self.resolve(url)
         if respect_robots and not self.allowed(url):
             log.info("robots.txt disallows %s", url)
             return None
@@ -230,6 +237,7 @@ class Doc:
 def upsert_document(conn: psycopg.Connection, d: Doc) -> int | None:
     """Insert a document row; returns its id, or None if this exact (url, hash) already exists."""
     canon = canonicalize(d.url)
+    d.title, d.lead, d.byline = clean_text(d.title) or "", clean_text(d.lead), clean_text(d.byline)
     h = content_hash(d.title, d.lead, d.body_for_hash)
     wire = detect_wire_origin(d.byline, d.lead)
     with conn.cursor() as cur:
@@ -254,9 +262,15 @@ def upsert_document(conn: psycopg.Connection, d: Doc) -> int | None:
     return new_id
 
 
+def clean_text(value: str | None) -> str | None:
+    """Postgres TEXT rejects NUL bytes; some Federal Register raw texts contain them."""
+    return value.replace("\x00", "") if value else value
+
+
 def upsert_official_doc(conn: psycopg.Connection, *, source_id: str, topic_id: str | None, url: str, doc_type: str,
                         doc_number: str | None, title: str, full_text: str, signed_at: datetime | None,
                         published_at: datetime | None, lang: str = "en") -> bool:
+    title, full_text = clean_text(title) or "", clean_text(full_text) or ""
     with conn.cursor() as cur:
         cur.execute(
             """

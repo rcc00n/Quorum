@@ -6,10 +6,10 @@
 CREATE LIGHTNING DATABASE QUORUM_COLLECT
   DESCRIPTION 'Quorum data-collection block: sources, documents, official_docs, quotes, coverage'
   OPTIONS (
-    jdbc.url      'jdbc:postgresql://host.docker.internal:5432/quorum',
+    jdbc.url      'jdbc:postgresql://host.docker.internal:5433/quorum',
     jdbc.driver   'org.postgresql.Driver',
     jdbc.user     'quorum',
-    jdbc.password '<password from .env>'
+    jdbc.password 'quorum'
   );
 
 -- Then confirm (each on its own):

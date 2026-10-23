@@ -12,7 +12,9 @@ log = logging.getLogger("collectors.guardian")
 API = "https://content.guardianapis.com/search"
 
 
-def collect(conn, fetcher: Fetcher, topic: dict, *, pages: int = 2) -> dict:
+# DECISION(2026-10-22, Anastasia/Claude): one page of 50, US-facing sections only. Why: the corpus is US-centred;
+# two pages of Guardian outweighed every US outlet combined in the first live run (100 vs 2–3 each).
+def collect(conn, fetcher: Fetcher, topic: dict, *, pages: int = 1) -> dict:
     key = env("GUARDIAN_API_KEY")
     stats = {"seen": 0, "inserted": 0}
     if not key:
@@ -22,8 +24,9 @@ def collect(conn, fetcher: Fetcher, topic: dict, *, pages: int = 2) -> dict:
     for page in range(1, pages + 1):
         resp = fetcher.get(
             API, respect_robots=False,
-            params={"q": query, "section": "world|us-news|politics", "order-by": "newest", "page-size": 50,
-                    "page": page, "show-fields": "trailText,byline,bodyText", "api-key": key},
+            params={"q": query, "section": "us-news", "order-by": "newest", "page-size": 50,
+                    "page": page, "show-fields": "trailText,byline,bodyText"},
+            headers={"api-key": key},  # header, not query string: keeps the key out of URLs and logs
         )
         if resp is None:
             break
