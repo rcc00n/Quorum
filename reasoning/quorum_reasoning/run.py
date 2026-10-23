@@ -23,14 +23,22 @@ from pathlib import Path
 from . import graph, llm
 
 
+def format_step(s: dict) -> str:
+    ev = (s["event_id"] or "-")[:12]
+    line = f"{s['node']:<18}{s['iteration']:>3}  {ev:<14}{s['duration_ms']:>6}  {s['decision']}"
+    if s["reason"]:
+        line += f" — {s['reason']}"
+    return line
+
+
+def print_header(file=sys.stdout) -> None:
+    print(f"{'node':<18}{'it':>3}  {'event':<14}{'ms':>6}  decision — reason", file=file, flush=True)
+
+
 def print_trace(steps: list[dict], file=sys.stdout) -> None:
-    print(f"{'node':<18}{'it':>3}  {'event':<14}{'ms':>6}  decision — reason", file=file)
+    print_header(file)
     for s in steps:
-        ev = (s["event_id"] or "-")[:12]
-        line = f"{s['node']:<18}{s['iteration']:>3}  {ev:<14}{s['duration_ms']:>6}  {s['decision']}"
-        if s["reason"]:
-            line += f" — {s['reason']}"
-        print(line, file=file)
+        print(format_step(s), file=file)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--models", action="store_true", help="list the routes the configured hotspot offers (GET /v1/models) and exit")
     ap.add_argument("--test-connection", action="store_true", help="one small completion per lane (default, fact_checker) and exit")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--verbose", action="store_true", help="also print every live model call as it happens (task, lane, model that answered, ms)")
     args = ap.parse_args(argv)
 
     if args.mermaid:
@@ -71,15 +80,24 @@ def main(argv: list[str] | None = None) -> int:
     corpus = args.corpus or ("fixture" if (args.dry_run or model_dry) else "zetaris")
     if args.model == "live" and llm.is_dry_run(False):
         print("no model route configured (MODEL_BASE_URL / MODEL_API_KEY in .env, or QUORUM_DRY_RUN=1 is set): running dry", file=sys.stderr)
-    state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus)
+    if args.verbose:
+        os.environ["QUORUM_VERBOSE"] = "1"
+    on_step = None
+    if not args.quiet:
+        print_header()
+        on_step = lambda rec: print(format_step(rec), flush=True)  # noqa: E731 — progress as each node finishes
+    state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, on_step=on_step)
     snapshot = state["snapshot"]
     out = Path(args.out) / args.topic / f"{args.date}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
     if not args.quiet:
-        print_trace(state["steps"])
         print()
-        print(f"corpus: {state['corpus']}; model: {'stand-ins' if llm.is_dry_run(state['dry_run']) else llm.model_name()}")
+        prov = snapshot["provenance"]
+        print(f"corpus: {state['corpus']}; model: {'stand-ins' if llm.is_dry_run(state['dry_run']) else llm.model_name()}; fact-checker: {prov['fact_checker_model']}")
+        if prov["model_calls"]:
+            answered = ", ".join(f"{m} ×{n}" for m, n in prov["answered_by"].items())
+            print(f"model calls: {prov['model_calls']} ({prov['model_errors']} failed); answered by: {answered}")
         print(f"status: {snapshot['status']}; stories: {len(snapshot['stories'])}; roundup: {snapshot['roundup']['count']}; errors: {len(snapshot['errors'])}")
         print(f"summary: {snapshot['summary']}")
         print(f"snapshot: {out}")

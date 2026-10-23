@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +35,26 @@ def _env() -> None:
 
 APP_NAME = "quorum-reasoning"  # the meterless-app header: how the request shows up in Nightshift's receipts
 TIMEOUT_S = 180  # a model load on the hotspot can take minutes (Setup Guide › Power)
+
+# Ledger of live calls in the current run: what was asked and which model actually answered. The hotspot may
+# substitute a model (its routing modes rank lanes, they do not pin them), so the answering model is the
+# evidence, not the route in .env. Reset by `plan`, summarised into the snapshot's provenance by `publish`.
+calls: list[dict[str, Any]] = []
+
+
+def reset_calls() -> None:
+    calls.clear()
+
+
+def served_counts() -> dict[str, int]:
+    out: dict[str, int] = {}
+    for c in calls:
+        out[c["served"]] = out.get(c["served"], 0) + 1
+    return dict(sorted(out.items(), key=lambda kv: -kv[1]))
+
+
+def _verbose() -> bool:
+    return os.getenv("QUORUM_VERBOSE") == "1"
 
 
 def _route(which: str = "default") -> tuple[str, str, str]:
@@ -117,14 +139,28 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
 
     _, _, model = _route(which)
     temperature = float(config.get("models", "temperature", 0.1))
-    completion = _client().chat.completions.create(
-        model=model,
-        temperature=temperature,
-        messages=[
-            {"role": "system", "content": _prompt(task)},
-            {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
-        ],
-    )
+    started = time.perf_counter()
+    try:
+        completion = _client().chat.completions.create(
+            model=model,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": _prompt(task)},
+                {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
+            ],
+        )
+    except Exception as exc:
+        ms = int((time.perf_counter() - started) * 1000)
+        calls.append({"task": task, "lane": which, "route": model, "served": "error", "ms": ms, "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+        if _verbose():
+            print(f"  · {task:<15} {which:<13} {model:<42} FAILED {ms:>6} ms  {type(exc).__name__}", file=sys.stderr, flush=True)
+        raise
+    ms = int((time.perf_counter() - started) * 1000)
+    served = getattr(completion, "model", None) or model
+    calls.append({"task": task, "lane": which, "route": model, "served": served, "ms": ms})
+    if _verbose():
+        flag = "" if served == model or model.startswith("meterless/") else "  (substituted)"
+        print(f"  · {task:<15} {which:<13} {served:<42} {ms:>6} ms{flag}", file=sys.stderr, flush=True)
     text = completion.choices[0].message.content or "{}"
     obj = parse_json_object(text)
     if obj is None:

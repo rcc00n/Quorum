@@ -23,6 +23,7 @@ def run(state: RunState) -> dict:
     if corpus not in ("fixture", "zetaris"):
         raise ValueError(f"corpus must be fixture or zetaris, got {corpus!r}")
     clear_cache()  # article texts live for one run only
+    llm.reset_calls()  # the ledger of live model calls is per run
     with step(state, "plan") as s:
         docs = state.get("documents") or load_documents(topic_id, edition_date, corpus=corpus)
         official = sum(1 for d in docs if d.get("official"))

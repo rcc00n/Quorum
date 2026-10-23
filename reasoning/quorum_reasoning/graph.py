@@ -12,7 +12,9 @@ from langgraph.graph import END, START, StateGraph
 
 from . import config, ids
 from .nodes import adjudicate, cluster, critique, escalate, extract, fact_check, frame, plan, publish, research, roundup, score, verify, write
-from .state import RunInput, RunState, run_input
+from typing import Callable
+
+from .state import RunInput, RunState, StepRecord, run_input
 
 
 def build() -> StateGraph:
@@ -54,16 +56,32 @@ builder = build()
 graph = builder.compile()  # what langgraph.json points at
 
 
-def run_local(topic_id: str, edition_date: str, *, dry_run: bool, corpus: str | None = None, attempt: int = 1) -> RunState:
+def run_local(
+    topic_id: str,
+    edition_date: str,
+    *,
+    dry_run: bool,
+    corpus: str | None = None,
+    attempt: int = 1,
+    on_step: Callable[[StepRecord], None] | None = None,
+) -> RunState:
     """One full run with an in-memory checkpointer. Returns the final state (snapshot included).
 
     Two independent axes: `dry_run` (model stand-ins or live calls) and `corpus` (fixture or zetaris; default
     follows dry_run). Live model on the fixture corpus is how prompts are tried before collection has data.
+    With `on_step`, every trace row is handed over as soon as its node finishes (the CLI prints progress).
     """
     app = builder.compile(checkpointer=InMemorySaver())
     rid = ids.run_id(topic_id, edition_date, attempt)
     cfg = {"configurable": {"thread_id": rid}, "recursion_limit": int(config.get("loops", "recursion_limit", 60))}
-    return app.invoke(run_input(topic_id, edition_date, dry_run=dry_run, corpus=corpus, run_id=rid), cfg)  # type: ignore[return-value]
+    inp = run_input(topic_id, edition_date, dry_run=dry_run, corpus=corpus, run_id=rid)
+    if on_step is None:
+        return app.invoke(inp, cfg)  # type: ignore[return-value]
+    for update in app.stream(inp, cfg, stream_mode="updates"):
+        for delta in update.values():
+            for rec in (delta or {}).get("steps") or []:
+                on_step(rec)
+    return app.get_state(cfg).values  # type: ignore[return-value]
 
 
 def mermaid() -> str:

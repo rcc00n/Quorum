@@ -44,7 +44,12 @@ def envelope(state: RunState) -> dict:
         "provenance": {
             "corpus": state["corpus"] + (f":{fixture_name()}" if fictional else ""),
             "model": "stand-ins" if llm.is_dry_run(state["dry_run"]) else llm.model_name(),
+            "fact_checker_model": "stand-ins" if llm.is_dry_run(state["dry_run"]) else llm.model_name("fact_checker"),
             "fictional": fictional,
+            # what actually answered, counted from the responses — the evidence that Nemotron powered the run
+            "model_calls": len(llm.calls),
+            "answered_by": llm.served_counts(),
+            "model_errors": sum(1 for c in llm.calls if c["served"] == "error"),
         },
     }
 
