@@ -105,6 +105,7 @@ Owner Vadim; `feature/web-portals`, implementation `67b4cf7f8a1c41b2ebc27b41a519
 - [x] Pass 48 Django, six upgrade, four tooling, Next build/typecheck, strict internal validation, all-three TS contract and both actual HTTP/browser regressions including keyboard/reduced motion/three widths.
 - [x] Audit web architecture, API/auth, projection/store/revisions/corrections, preview, data/provenance, test setup and safe release/rollback docs; canonical links and notification format included.
 - [x] Preserve strict production schema/validator/store, preview security gates, all existing website features and production isolation; no migrations, credentials, inference or production access.
+- [x] Hosted [CI39903475716](https://github.com/rcc00n/Quorum/actions/runs/39903475716) passed on `1d27894`; [team announcement](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6357796090) posted with all owners tagged.
 - [ ] Receive explicit acknowledgement from Yelysei/Anastasia that their active coding agents follow the Issue #2 notification procedure.
 - [ ] Resolve original evidence/review/correction export, topic ID and genuine corpus/model proof with owners; approve production bridge/transport separately.
 - [ ] Future production release still needs explicit scope, private backup, rollback and fresh live verification. No deployment attempted.

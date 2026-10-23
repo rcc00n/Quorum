@@ -44,7 +44,7 @@ The same duty applies to **Vadim's agent**: document changed portal acceptance, 
 
 | Owner | Notification | Explicit acknowledgement |
 | --- | --- | --- |
-| Yelysei @Sor1na | Team-wide Issue #2 announcement linked in the verification record | Pending; no adoption claimed |
+| Yelysei @Sor1na | [Team-wide Issue #2 announcement](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6357796090) | Pending; no adoption claimed |
 | Anastasia @AnastasiaShkirpan | Same announcement | Pending; no adoption claimed |
 | Vadim @rcc00n | Own web agent follows this procedure in this milestone | User requested; implementation/evidence in Issue #2 |
 
