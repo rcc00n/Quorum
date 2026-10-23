@@ -1,0 +1,30 @@
+{
+  "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-10",
+  "expected_above_bar": 1,
+  "expected_above_bar_reason": "Diesel deal: legal_force 1 (official action announced, no adopted document in the corpus), reach 3 (US, Russia, global fuel market), irreversibility 0 (a temporary license is revocable), confirmation 2 (two independence groups) = 6, at the threshold.",
+  "documents": [
+    {
+      "id": 91001, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/09/nx-s1-5996912/trump-says-u-s-to-get-diesel-from-russia-relaxing-pressure-on-moscow-to-ease-prices-before-midterms",
+      "title": "Trump says U.S. to get diesel from Russia, relaxing pressure on Moscow to ease prices before midterms",
+      "lead": "President Trump announced the United States will get diesel from Russia after a phone call with President Putin. The Treasury Department issued a temporary license allowing Russian diesel to be supplied to the global market.",
+      "published_at": "2026-10-09T18:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 91002, "source_id": "fox-news", "source_name": "Fox News", "independence_group": "fox-news", "kind": "outlet",
+      "flank": "right", "tier": "major", "url": "https://www.foxnews.com/politics/trump-tries-different-approach-russia-bring-americans-relief-amid-ongoing-war-ukraine",
+      "title": "Trump eases Russia sanctions to lure Putin toward Ukraine peace deal",
+      "lead": "The Treasury Department issued a temporary license allowing Russian diesel to be supplied to the global market, running through April 7, 2027. The deal is valued at 7 billion dollars.",
+      "published_at": "2026-10-09T20:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 91003, "source_id": "new-republic", "source_name": "The New Republic", "independence_group": "new-republic", "kind": "outlet",
+      "flank": "left", "tier": "minor", "url": "https://newrepublic.com/post/216496/putin-trump-oil-deal-russia",
+      "title": "Putin Cons Trump Into Making Massive Oil Deal With Russia",
+      "lead": "The deal announced by President Trump eases sanctions on Russian diesel after a phone call with President Putin.",
+      "published_at": "2026-10-09T22:00:00Z", "access_level": 1, "wire_origin": null
+    }
+  ]
+}

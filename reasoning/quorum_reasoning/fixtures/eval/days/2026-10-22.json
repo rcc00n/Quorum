@@ -1,0 +1,23 @@
+{
+  "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-22",
+  "expected_above_bar": 0,
+  "expected_above_bar_reason": "Kyiv strike after Putin's talks signal: legal_force 0, reach 2 (a capital under a country-wide attack), irreversibility 2 (people killed), confirmation 1 (one independence group in this corpus slice) = 5, below the threshold. Early-warning resumption: a statement by one party, confirmation 0.",
+  "documents": [
+    {
+      "id": 92201, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.cnn.com/2026/10/21/europe/us-envoy-witkoff-putin-talks-russia-ukraine-intl",
+      "title": "Massive strikes hit Kyiv hours after Putin agrees to fresh peace talks",
+      "lead": "Russia launched 21 missiles and 210 drones at Ukraine overnight, Ukrainian officials said. Putin said he would be willing to resume talks with Ukraine and the United States after November 10.",
+      "published_at": "2026-10-22T06:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 92202, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/21/g-s1-149026/zelenskyy-russian-missiles-warning",
+      "title": "Zelenskyy says early warning system for Russian missile attacks resumes",
+      "lead": "President Zelenskyy said Ukraine is again receiving early warnings from partners about incoming Russian missiles, after a call with Secretary of State Marco Rubio.",
+      "published_at": "2026-10-21T18:00:00Z", "access_level": 1, "wire_origin": null
+    }
+  ]
+}
