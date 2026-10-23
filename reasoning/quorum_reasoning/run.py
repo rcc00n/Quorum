@@ -5,6 +5,7 @@
     python -m quorum_reasoning.run --date 2026-10-23 --model live --corpus zetaris   # the real thing
     python -m quorum_reasoning.run --models         # routes the hotspot offers; pin Nemotron ones in .env
     python -m quorum_reasoning.run --test-connection # one completion per lane, shows which model answered
+    python -m quorum_reasoning.run --probe           # one real task: raw reply and token counts (is thinking off?)
     python -m quorum_reasoning.run --mermaid        # the graph as Mermaid, for docs/ARCHITECTURE.md
 
 Two axes: --model dry|live (dry = deterministic stand-ins, no credits; also forced by QUORUM_DRY_RUN=1 or a
@@ -53,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mermaid", action="store_true", help="print the graph as Mermaid and exit")
     ap.add_argument("--models", action="store_true", help="list the routes the configured hotspot offers (GET /v1/models) and exit")
     ap.add_argument("--test-connection", action="store_true", help="one small completion per lane (default, fact_checker) and exit")
+    ap.add_argument("--probe", action="store_true", help="one real stance task on the default lane: raw reply, token counts, latency — shows whether the model still thinks aloud")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--verbose", action="store_true", help="also print every live model call as it happens (task, lane, model that answered, ms)")
     args = ap.parse_args(argv)
@@ -60,9 +62,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.mermaid:
         print(graph.mermaid())
         return 0
-    if args.models or args.test_connection:
+    if args.models or args.test_connection or args.probe:
         try:
-            if args.models:
+            if args.probe:
+                r = llm.probe()
+                print(f"route {r['route']}  answered by {r['answered_by'] or '?'}  {r['ms']} ms  tokens in>out {r['tokens_in']}>{r['tokens_out']}  reply {r['reply_chars']} chars")
+                print(f"parsed: {r['parsed']}")
+                print("reply head:")
+                print(r["reply_head"])
+            elif args.models:
                 for m in llm.list_models():
                     print(m + ("   <- Nemotron" if "nemotron" in m.lower() else ""))
             else:

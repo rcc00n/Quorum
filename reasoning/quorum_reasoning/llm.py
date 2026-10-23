@@ -97,6 +97,49 @@ def list_models() -> list[str]:
     return sorted(m.id for m in _client().models.list())
 
 
+def probe(which: str = "default") -> dict[str, Any]:
+    """One small real task (stance) on a lane; returns the raw reply, its token counts and the parsed JSON.
+
+    What to read in it: a reply of a few dozen completion tokens that is pure JSON means the thinking trace is
+    off; hundreds of tokens of prose before the JSON means the model still thinks aloud on this route.
+    """
+    base, key, model = _route(which)
+    if not (base and key):
+        raise RuntimeError("no model route configured: set MODEL_BASE_URL and MODEL_API_KEY (or METERLESS_*) in .env")
+    payload = {
+        "claim": "The Senate passed the bill 68-30",
+        "passage": "The Senate passed the bill 68-30 and the House passed the bill 311-112.",
+        "source": "Example Wire",
+        "source_kind": "agency",
+        "doc_type": None,
+        "role": "researcher",
+    }
+    started = time.perf_counter()
+    completion = _client().chat.completions.create(
+        model=model,
+        temperature=float(config.get("models", "temperature", 0.1)),
+        messages=[
+            {"role": "system", "content": _prompt("stance")},
+            {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
+        ],
+        **_request_extras(),
+    )
+    ms = int((time.perf_counter() - started) * 1000)
+    text = completion.choices[0].message.content or ""
+    usage = getattr(completion, "usage", None)
+    return {
+        "lane": which,
+        "route": model,
+        "answered_by": getattr(completion, "model", "") or "",
+        "ms": ms,
+        "tokens_in": int(getattr(usage, "prompt_tokens", 0) or 0),
+        "tokens_out": int(getattr(usage, "completion_tokens", 0) or 0),
+        "reply_chars": len(text),
+        "reply_head": text[:400],
+        "parsed": parse_json_object(text),
+    }
+
+
 def test_connection(which: str = "default") -> dict[str, str]:
     """One small chat completion on a lane. Returns the route asked for and the model that answered."""
     base, key, model = _route(which)
@@ -122,7 +165,9 @@ def model_name(which: str = "default") -> str:
     return _route(which)[2]
 
 
-NO_THINK = "/no_think"  # Nemotron 3 family: first line of the system prompt switches the thinking trace off
+# Nemotron's documented system-prompt switches for the thinking trace: "/no_think" (Nemotron 3 family) and
+# "detailed thinking off" (Llama-Nemotron family). Both lines are harmless for a model that knows only one.
+NO_THINK = "/no_think\ndetailed thinking off"
 _last_call_at = 0.0
 
 
@@ -188,10 +233,13 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         raise
     ms = int((time.perf_counter() - started) * 1000)
     served = getattr(completion, "model", None) or model
-    calls.append({"task": task, "lane": which, "route": model, "served": served, "ms": ms})
+    usage = getattr(completion, "usage", None)
+    tokens_in = int(getattr(usage, "prompt_tokens", 0) or 0)
+    tokens_out = int(getattr(usage, "completion_tokens", 0) or 0)
+    calls.append({"task": task, "lane": which, "route": model, "served": served, "ms": ms, "tokens_in": tokens_in, "tokens_out": tokens_out})
     if _verbose():
         flag = "" if served == model or model.startswith("meterless/") else "  (substituted)"
-        print(f"  · {task:<15} {which:<13} {served:<42} {ms:>6} ms{flag}", file=sys.stderr, flush=True)
+        print(f"  · {task:<15} {which:<13} {served:<42} {ms:>6} ms  {tokens_in:>5}>{tokens_out:<5}{flag}", file=sys.stderr, flush=True)
     text = completion.choices[0].message.content or "{}"
     obj = parse_json_object(text)
     if obj is None:
