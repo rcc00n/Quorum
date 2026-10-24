@@ -259,7 +259,9 @@ def test_lane_pacing_reads_lane_config_then_env_then_shared(monkeypatch):
     monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER", "0")
     assert llm.min_interval_ms("fact_checker") == 0, "the lane's env override wins (Nightshift paces upstream)"
     monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS", "0")
-    assert llm.min_interval_ms() == 0 and llm.min_interval_ms("reviewer") == int(llm.config.get("models", "min_interval_ms_reviewer"))
+    assert llm.min_interval_ms() == 0 and llm.min_interval_ms("reviewer") == 0, "an explicit shared 0 (Nightshift) turns every lane off"
+    monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS", "1000")
+    assert llm.min_interval_ms("reviewer") == int(llm.config.get("models", "min_interval_ms_reviewer")), "a non-zero shared value leaves the lane's TOML value"
 
 
 def test_throttle_waits_per_route_not_only_per_process(monkeypatch):

@@ -73,10 +73,16 @@ max_tokens = 1500                 # ceiling per reply; every task answers in far
 # still answers 429). Why: with no spacing the first live fixture run hit HTTP 429 after 61 calls and finished
 # only at 3500 ms (Vadim, NVIDIA-FIRST-01); the one explicit retry in llm.py honours Retry-After, so the
 # documented cap is the starting point and the observed 3500 ms the fallback. Verified only by the first live
-# run on this branch: until then this value is IMPLEMENTED, not TESTED.
-min_interval_ms = 1600            # pause between live calls; env QUORUM_MIN_INTERVAL_MS overrides
+# run on this branch: until then this value is IMPLEMENTED, not TESTED. (superseded 2026-10-24, next entry)
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): base pace of the default (Lightning) lane raised to 2400 ms
+# (25 requests/min); llm.py doubles a route's interval on every 429 and pauses it after two in a row (decisions
+# there). Why: the journals of two live runs showed a 429 whenever a 60 s window held 31 or more requests (about
+# one per 33 calls at 1600 ms) and none below that; the 429 carries no Retry-After, and staying at the limit for
+# ~30-35 min pushed the provider into a stricter state that refused even ~8 requests/min for minutes.
+min_interval_ms = 2400            # base pause between live calls; env QUORUM_MIN_INTERVAL_MS overrides
 # Per-lane pause, measured per model route (llm.min_interval_ms; decision there): the Ultra-550B lane answered 429 to a
-# 1600 ms cadence on the first genuine run while Lightning never did. Env QUORUM_MIN_INTERVAL_MS_FACT_CHECKER /
-# QUORUM_MIN_INTERVAL_MS_REVIEWER override; 0 through Nightshift.
+# 1600 ms cadence most often on the first genuine run. Env QUORUM_MIN_INTERVAL_MS_FACT_CHECKER /
+# QUORUM_MIN_INTERVAL_MS_REVIEWER override. Through Nightshift QUORUM_MIN_INTERVAL_MS=0 alone turns these lanes off
+# too (an explicit shared 0 wins over the values below unless a lane's own env is set; decision in llm.min_interval_ms).
 min_interval_ms_fact_checker = 4000
 min_interval_ms_reviewer = 4000

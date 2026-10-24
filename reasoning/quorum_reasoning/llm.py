@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import sys
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -48,25 +50,53 @@ calls: list[dict[str, Any]] = []
 journal_path: Path | None = None
 current_run_id: str | None = None  # set by run.py; stamped on every ledger row and journal line
 
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a resumed run replays answers from its own journal: every
+# served call journals its raw reply (`reply`) and a `request_key` (sha256 over task, lane, route, the rendered
+# prompt, the sampling parameters and the payload), `load_journal` queues the replies per key, and `json_task`
+# answers a request with the next queued reply before any pacing or network. Why: the checkpoint is per node, so
+# `--resume` re-ran a half-finished node and repeated every call it had already paid for (Vadim,
+# CANONICAL-DURABLE-01). The reply text lives only in the private journal (git-ignored, never in the snapshot or the
+# ledger). A queue, not a single value: identical requests legitimately repeat within a run (~20 per run) and each
+# repeat consumes its own journalled answer in order. A replay adds no ledger row: the restored journal row already
+# counts that call, so the provenance counts stay one row per paid call. The queues are keyed across the whole run, not
+# per node, so an identical later request may be answered from an earlier node's queued reply; the answer is the same
+# request's answer and the counts stay exact, so this is accepted.
+replay: dict[str, deque[str]] = {}
+
 
 def reset_calls() -> None:
     calls.clear()
+    replay.clear()
 
 
-def _journal(entry: dict[str, Any], payload: dict[str, Any]) -> None:
+def _journal(entry: dict[str, Any], payload: dict[str, Any], reply: str | None = None) -> None:
     if journal_path is None:
         return
+    line: dict[str, Any] = {**entry, "payload": payload}
+    if reply is not None:
+        line["reply"] = reply
     try:
         journal_path.parent.mkdir(parents=True, exist_ok=True)
+        # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a journal whose last byte is not a newline (the process
+        # died mid-write) gets one before the next row. Why: otherwise the new row is glued to the truncated tail and
+        # `load_journal` skips both, losing a paid call and its reply.
+        needs_newline = False
+        if journal_path.is_file() and journal_path.stat().st_size > 0:
+            with journal_path.open("rb") as tail:
+                tail.seek(-1, os.SEEK_END)
+                needs_newline = tail.read(1) != b"\n"
         with journal_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({**entry, "payload": payload}, ensure_ascii=False) + "\n")
+            fh.write(("\n" if needs_newline else "") + json.dumps(line, ensure_ascii=False) + "\n")
     except OSError as exc:  # the journal must never break a run
         print(f"journal write failed: {exc}", file=sys.stderr)
 
 
 def load_journal(path: Path) -> int:
-    """Restores the ledger from a journal (payloads dropped). Returns the number of rows loaded. Used on --resume
-    so the snapshot's provenance counts cover the whole run, not only the resumed part."""
+    """Restores the ledger from a journal (payloads and reply texts dropped). Returns the number of rows loaded.
+    Used on --resume so the snapshot's provenance counts cover the whole run, not only the resumed part. Rows of
+    served calls that carry `reply` and `request_key` also fill the replay queues (decision at `replay`); journals
+    written before 2026-10-24 have neither and replay nothing."""
+    replay.clear()
     if not path.is_file():
         return 0
     n = 0
@@ -79,6 +109,10 @@ def load_journal(path: Path) -> int:
             print("journal: one truncated line skipped (the process died while writing it)", file=sys.stderr)
             continue
         row.pop("payload", None)
+        reply = row.pop("reply", None)
+        key = row.get("request_key")
+        if isinstance(reply, str) and isinstance(key, str) and not row.get("error"):
+            replay.setdefault(key, deque()).append(reply)
         calls.append(row)
         n += 1
     return n
@@ -292,20 +326,31 @@ def _request_extras() -> dict[str, Any]:
 
 
 def min_interval_ms(which: str = "default") -> int:
-    """Pause before a live call on a lane. The lane's own value wins when configured (`QUORUM_MIN_INTERVAL_MS_<LANE>`
-    env, else `models.min_interval_ms_<lane>` in config/reasoning.toml); otherwise the shared value
-    (`QUORUM_MIN_INTERVAL_MS`, else `models.min_interval_ms`). Nightshift runs set the shared value to 0.
+    """Pause before a live call on a lane, resolved in this order: the lane's own env (`QUORUM_MIN_INTERVAL_MS_<LANE>`);
+    0 when the shared env `QUORUM_MIN_INTERVAL_MS` is set to 0; the lane's `models.min_interval_ms_<lane>` in
+    config/reasoning.toml; the shared env; `models.min_interval_ms`. Nightshift runs set only the shared env to 0,
+    which turns every lane off unless that lane's own env says otherwise.
 
     DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): the fact-checker and reviewer lanes pace themselves
     separately, and the pause is measured per model route, not per process. Why: on the first genuine run
-    (edition 2026-10-24, direct route) every HTTP 429 came from the Ultra-550B lane — the fact-checker fires up
-    to eight Ultra calls per claim back to back — while Lightning never refused; one shared 1600 ms pause
+    (edition 2026-10-24, direct route) the Ultra-550B lane refused most often — the fact-checker fires up
+    to eight Ultra calls per claim back to back — and Lightning refused too (54 HTTP 429s in that run's journal,
+    corrected 2026-10-24: an earlier version of this note said Lightning never refused); one shared 1600 ms pause
     cannot respect two different per-minute caps.
+
+    This is the lane's base interval; the interval actually kept between calls adapts to 429s
+    (`_effective_interval_ms`).
     """
     for name in ((f"QUORUM_MIN_INTERVAL_MS_{which.upper()}",) if which != "default" else ()):
         raw = os.getenv(name, "").strip()
         if raw:
             return max(0, int(raw))
+    shared_raw = os.getenv("QUORUM_MIN_INTERVAL_MS", "").strip()
+    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): an explicit shared 0 wins over the lanes' TOML values. Why:
+    # the documented Nightshift setup sets only QUORUM_MIN_INTERVAL_MS=0 (the hotspot paces upstream), and the 4000 ms
+    # TOML value of the fact-checker lane kept pacing it and gave it the direct route's pause and breaker.
+    if shared_raw and int(shared_raw) <= 0:
+        return 0
     if which != "default":
         lane_value = config.get("models", f"min_interval_ms_{which}", None)
         if lane_value is not None:
@@ -318,14 +363,79 @@ def min_interval_ms(which: str = "default") -> int:
 
 _last_call_by_route: dict[str, float] = {}
 
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): the interval between calls adapts per model route: an HTTP 429
+# doubles the route's interval (capped at LANE_INTERVAL_CAP_MS) for every later call on it, and each run of
+# LANE_STEP_DOWN_AFTER consecutive successful calls halves it once, never below the lane's configured base. Lanes
+# paced at 0 (Nightshift) and dry runs are not adapted. Why: the NVIDIA direct route answers 429 with no Retry-After;
+# the old handling (one retry, then straight back to the fixed cadence) kept the key pressed against the limit, and
+# after ~30-35 min the provider switched to a stricter state that refused even ~8 requests/min for minutes. 15 clean
+# calls per step down, so a raised lane recovers within minutes once the provider accepts calls again.
+LANE_INTERVAL_CAP_MS = 10_000
+LANE_STEP_DOWN_AFTER = 15
+_lane_interval_by_route: dict[str, int] = {}  # raised interval (ms) per route; absent = the lane's base
+_clean_streak_by_route: dict[str, int] = {}  # consecutive successful calls since the last 429 or step-down
+_pause_next_by_route: dict[str, bool] = {}  # the last call on this route failed on 429: pause before the next one
+_failed_429_calls_by_route: dict[str, int] = {}  # consecutive calls on this route that failed on a 429 (the breaker)
+
+
+def reset_pacing() -> None:
+    """Forgets every route's adapted interval, streaks and last-call times (tests; a fresh process starts clean)."""
+    global _last_call_at
+    _last_call_at = 0.0
+    _last_call_by_route.clear()
+    _lane_interval_by_route.clear()
+    _clean_streak_by_route.clear()
+    _pause_next_by_route.clear()
+    _failed_429_calls_by_route.clear()
+
+
+def _effective_interval_ms(which: str = "default", route: str = "") -> int:
+    """The lane's interval as currently adapted for `route`: the configured base, or the raised value after 429s."""
+    base = min_interval_ms(which)
+    if base <= 0:
+        return 0
+    return max(base, _lane_interval_by_route.get(route, base))
+
+
+def _note_rate_limited(which: str, route: str) -> tuple[int, int]:
+    """Records one 429 on `route`; returns (interval before, interval after) in ms."""
+    _clean_streak_by_route[route] = 0
+    before = _effective_interval_ms(which, route)
+    if before <= 0:
+        return before, before
+    after = min(before * 2, max(LANE_INTERVAL_CAP_MS, min_interval_ms(which)))
+    _lane_interval_by_route[route] = after
+    return before, after
+
+
+def _note_success(which: str, route: str) -> None:
+    """Records one served call on `route`; every LANE_STEP_DOWN_AFTER in a row halve a raised interval once."""
+    _pause_next_by_route.pop(route, None)
+    _failed_429_calls_by_route.pop(route, None)
+    base = min_interval_ms(which)
+    current = _lane_interval_by_route.get(route)
+    if base <= 0 or current is None or current <= base:
+        _lane_interval_by_route.pop(route, None)
+        _clean_streak_by_route[route] = 0
+        return
+    streak = _clean_streak_by_route.get(route, 0) + 1
+    if streak >= LANE_STEP_DOWN_AFTER:
+        lowered = max(base, current // 2)
+        if lowered <= base:
+            _lane_interval_by_route.pop(route, None)
+        else:
+            _lane_interval_by_route[route] = lowered
+        streak = 0
+    _clean_streak_by_route[route] = streak
+
 
 def _throttle(which: str = "default", route: str = "") -> None:
-    """Keeps at least min_interval_ms(which) since the last call to the same model route (the provider's
-    per-minute cap is per model), and at least the shared pause since any call at all."""
+    """Keeps at least the lane's current interval (`_effective_interval_ms`) since the last call to the same model
+    route (the provider's per-minute cap is per model), and at least the shared pause since any call at all."""
     global _last_call_at
     now = time.monotonic()
     shared = min_interval_ms() / 1000.0
-    lane = min_interval_ms(which) / 1000.0
+    lane = _effective_interval_ms(which, route) / 1000.0
     wait = max(_last_call_at + shared - now, _last_call_by_route.get(route, 0.0) + lane - now, 0.0)
     if wait > 0:
         time.sleep(wait)
@@ -336,10 +446,66 @@ RETRY_STATUSES = {429, 500, 502, 503, 504}
 RETRY_DEFAULT_WAIT_S = 5.0
 RETRY_RATE_LIMIT_WAIT_S = 15.0  # a 429 without Retry-After: the first live run showed 5 s was not enough on the Ultra lane
 RETRY_MAX_WAIT_S = 60.0
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a call whose first two attempts were both answered 429 waits
+# max(RATE_LIMIT_PAUSE_S, the raw Retry-After in seconds) capped at RATE_LIMIT_PAUSE_MAX_S (an HTTP-date Retry-After
+# is ignored here; the first wait keeps `_retry_wait` and its 60 s cap), and gets a third and last attempt;
+# a call that fails on 429 makes the next call on the same route start behind one RATE_LIMIT_PAUSE_S pause, and that
+# call gets the usual two attempts only (no second long pause). Paced lanes only: a lane at 0 ms (Nightshift) keeps
+# the plain single retry. Why: on the NVIDIA direct route (the only route this evidence is from) the stricter state
+# reached after ~30-35 min at the limit refused calls for 2.5-10+ min and the single 15 s retry rescued only ~55%;
+# a third attempt is allowed only behind the long pause.
+RATE_LIMIT_PAUSE_S = 150.0
+RATE_LIMIT_PAUSE_MAX_S = 600.0  # cap on a Retry-After that asks for a longer long pause
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): three consecutive calls on one route that failed on 429, each
+# already behind its long pause, stop the run with RateLimitAbort; run.py turns it into exit code 3 and the run is
+# continued later with --resume. RateLimitAbort derives from BaseException. Why: the nodes catch `Exception` per
+# passage so one failed call skips one passage; a provider that keeps refusing would otherwise turn every remaining
+# passage into a silent skip and publish an edition of failures. Three, because one or two failed calls in a row
+# can still be a recoverable episode, while three in a row already sit behind ~8 min of refusals.
+RATE_LIMIT_ABORT_AFTER = 3
+
+
+class RateLimitAbort(BaseException):
+    """A route refused RATE_LIMIT_ABORT_AFTER consecutive calls with HTTP 429: stop the run (run.py: exit 3)."""
+
+    def __init__(self, route: str, count: int):
+        super().__init__(f"route {route} refused {count} consecutive calls")
+        self.route = route
+        self.count = count
+
+
+RATE_HEADER_PREFIXES = ("x-ratelimit", "ratelimit")
+
+
+def _rate_headers(exc: Exception) -> dict[str, str] | None:
+    """The rate-limit headers of a refused call (names lower-cased), or None when the exception has no response.
+    Only `x-ratelimit*`, `ratelimit*` and `retry-after` are kept: never Authorization or any other header."""
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None) if response is not None else None
+    if headers is None:
+        return None
+    kept: dict[str, str] = {}
+    for name, value in headers.items():
+        low = str(name).lower()
+        if low == "retry-after" or low.startswith(RATE_HEADER_PREFIXES):
+            kept[low] = str(value)
+    return kept
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    """The raw Retry-After header in seconds, uncapped; None when absent or in HTTP-date form."""
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None) if response is not None else None
+    header = headers.get("retry-after") if headers is not None else None
+    try:
+        value = float(header) if header else None
+        return value if value is not None and math.isfinite(value) else None  # "nan"/"inf" count as absent
+    except ValueError:
+        return None
 
 
 def _retry_wait(exc: Exception) -> float | None:
-    """Seconds to wait before the single retry, or None when the failure is not retryable (4xx other than 429,
+    """Seconds to wait before a retry, or None when the failure is not retryable (4xx other than 429,
     malformed replies, anything that is not a transport or server-side failure)."""
     from openai import APIConnectionError, APIStatusError, APITimeoutError  # imported lazily: not needed in dry run
 
@@ -352,7 +518,8 @@ def _retry_wait(exc: Exception) -> float | None:
         header = exc.response.headers.get("retry-after") if getattr(exc, "response", None) is not None else None
         if header:
             try:
-                wait = float(header)
+                parsed = float(header)
+                wait = parsed if math.isfinite(parsed) else wait  # "nan"/"inf": as if no Retry-After was sent
             except ValueError:
                 from datetime import datetime, timezone
                 from email.utils import parsedate_to_datetime
@@ -368,28 +535,78 @@ def _retry_wait(exc: Exception) -> float | None:
 
 
 def _create(model: str, messages: list[dict[str, str]], temperature: float, entry: dict[str, Any]) -> tuple[Any, int]:
-    """One chat completion with at most one explicit retry. Returns (completion, HTTP status).
+    """One chat completion with explicit, recorded retries. Returns (completion, HTTP status).
 
-    The retry fires only on 429 / 5xx / timeouts / dropped connections, after Retry-After when the server
-    sends it (floored at 1 s, capped at 60 s), and is recorded in the ledger row (`attempts`, `retried_after`).
-    Two attempts in total: the external-operation rule of AGENTS.md § 3.
+    A retry fires only on 429 / 5xx / timeouts / dropped connections, after Retry-After when the server
+    sends it (floored at 1 s, capped at 60 s), and is recorded in the ledger row (`attempts`, `retried_after`;
+    every 429 attempt also appends the response's rate-limit headers to `rate_headers`). Two attempts in total
+    (the external-operation rule of AGENTS.md § 3), except on a paced lane whose call was refused 429 on both
+    attempts: a third and last attempt after RATE_LIMIT_PAUSE_S (decision there). Every 429 on a paced lane also
+    raises the route's interval for later calls (decision at LANE_INTERVAL_CAP_MS).
     """
+    lane = entry.get("lane", "default")
+    paced = min_interval_ms(lane) > 0
+    started_paused = paced and _pause_next_by_route.pop(model, False)
+    if started_paused:
+        if _verbose():
+            print(f"  · {entry['task']:<15} {lane:<13} {model:<42} last call refused; lane paused {RATE_LIMIT_PAUSE_S:.0f} s", file=sys.stderr, flush=True)
+        time.sleep(RATE_LIMIT_PAUSE_S)
     attempt = 0
+    refusals = 0  # 429 answers to this call
     while True:
         attempt += 1
         entry["attempts"] = attempt
-        _throttle(entry.get("lane", "default"), model)
+        _throttle(lane, model)
         try:
             raw = _client().chat.completions.with_raw_response.create(model=model, temperature=temperature, messages=messages, **_request_extras())
-            return raw.parse(), int(raw.status_code)
+            result = raw.parse(), int(raw.status_code)
         except Exception as exc:  # noqa: BLE001 — classified by _retry_wait
+            status = getattr(exc, "status_code", None)
             wait = _retry_wait(exc) if attempt == 1 else None
+            note = f"one retry in {wait:.0f} s" if wait is not None else ""
+            if status == 429:
+                refusals += 1
+                headers = _rate_headers(exc)
+                if headers is not None:
+                    entry.setdefault("rate_headers", []).append(headers)
+                if paced:
+                    before, after = _note_rate_limited(lane, model)
+                    if attempt == 2 and refusals == 2 and not started_paused:
+                        wait = min(max(_retry_after_seconds(exc) or 0.0, RATE_LIMIT_PAUSE_S), RATE_LIMIT_PAUSE_MAX_S)
+                        note = f"429 again; lane paused {wait:.0f} s"
+                    elif wait is not None:
+                        note = f"429; retry in {wait:.0f} s"
+                    if wait is not None and after != before:
+                        note += f"; lane interval now {after} ms"
+                    if wait is None:
+                        _pause_next_by_route[model] = True
+                        _failed_429_calls_by_route[model] = _failed_429_calls_by_route.get(model, 0) + 1
             if wait is None:
                 raise
-            entry["retried_after"] = f"{type(exc).__name__}: HTTP {getattr(exc, 'status_code', '-')}, waited {wait:.0f} s"
+            step = f"{type(exc).__name__}: HTTP {status if status is not None else '-'}, waited {wait:.0f} s"
+            entry["retried_after"] = f"{entry['retried_after']}; then {step}" if entry.get("retried_after") else step
             if _verbose():
-                print(f"  · {entry['task']:<15} {entry['lane']:<13} {model:<42} {type(exc).__name__}; one retry in {wait:.0f} s", file=sys.stderr, flush=True)
+                print(f"  · {entry['task']:<15} {lane:<13} {model:<42} {type(exc).__name__}; {note}", file=sys.stderr, flush=True)
             time.sleep(wait)
+            continue
+        _note_success(lane, model)
+        return result
+
+
+def _request_key(task: str, which: str, model: str, messages: list[dict[str, str]], temperature: float, payload: dict[str, Any]) -> str:
+    """sha256 of the canonical JSON of everything that shapes a reply (decision at `replay`)."""
+    prompt = "\n".join(f"{m['role']}:{m['content']}" for m in messages)
+    material = {
+        "task": task,
+        "lane": which,
+        "route": model,
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        "temperature": temperature,
+        "extras": _request_extras(),
+        "payload": payload,
+    }
+    canonical = json.dumps(material, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str = "default") -> dict[str, Any]:
@@ -413,7 +630,15 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         {"role": "system", "content": _prompt(task)},
         {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
     ]
-    entry: dict[str, Any] = {"task": task, "lane": which, "route": model, "served": "error", "ms": 0, "attempts": 0, "run_id": current_run_id}
+    key = _request_key(task, which, model, messages, temperature, payload)
+    queued = replay.get(key)
+    if queued:
+        obj = parse_json_object(queued.popleft())  # the live path's own extraction (decision at `replay`)
+        if obj is not None:
+            if _verbose():
+                print(f"  · {task:<15} replayed from journal", file=sys.stderr, flush=True)
+            return obj
+    entry: dict[str, Any] = {"task": task, "lane": which, "route": model, "served": "error", "ms": 0, "attempts": 0, "run_id": current_run_id, "request_key": key}
     started = time.perf_counter()
     try:
         completion, status = _create(model, messages, temperature, entry)
@@ -425,6 +650,10 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         _journal(entry, payload)
         if _verbose():
             print(f"  · {task:<15} {which:<13} {model:<42} FAILED {entry['ms']:>6} ms  {type(exc).__name__}", file=sys.stderr, flush=True)
+        failed = _failed_429_calls_by_route.get(model, 0)
+        if failed >= RATE_LIMIT_ABORT_AFTER:  # decision at RATE_LIMIT_ABORT_AFTER
+            _failed_429_calls_by_route.pop(model, None)
+            raise RateLimitAbort(model, failed) from exc
         raise
     entry["ms"] = int((time.perf_counter() - started) * 1000)
     served, receipt_id = _served_and_receipt(completion, model)
@@ -457,7 +686,7 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
     if obj is not None:
         entry["reply_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()  # the reply's fingerprint; the text itself stays private
     calls.append(entry)
-    _journal(entry, payload)
+    _journal(entry, payload, reply=text if obj is not None else None)
     if _verbose():
         flag = "" if served == model or model.startswith("meterless/") else "  (substituted)"
         if entry.get("error"):
