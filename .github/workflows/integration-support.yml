@@ -12,7 +12,7 @@ permissions:
 jobs:
   offline-rehearsal:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,6 +20,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Check conflict safety and reproduce pinned disposable merges
         run: |
           git config user.name 'Quorum offline rehearsal'
@@ -48,3 +51,32 @@ jobs:
           python backend/manage.py makemigrations --check --dry-run
           python backend/manage.py portal_snapshot validate --file backend/portal/fixtures/analysis-demo.json
           python scripts/checks.py verify --offline || test "$?" -eq 2
+
+      # DECISION(2026-10-24, rcc00n/Codex): test proposed web patches on the reconstructed owner tree.
+      # Why: support-only path filters otherwise leave browser and compiled-output changes untested.
+      - name: Build combined web and verify compiled receipt
+        env:
+          QUORUM_WEB_BUILD: ${{ runner.temp }}/quorum-web-build
+        run: |
+          cd "$RUNNER_TEMP/quorum-rehearsal"
+          bash deploy/build-web.sh
+          python -c "from deploy.build_integrity import validate_build; import os; validate_build('.',os.environ['QUORUM_WEB_BUILD'])"
+          node web/tests/ratings.cjs
+          node web/tests/editorial.cjs
+          node web/tests/reasoning-trace.cjs
+          QUORUM_PYTHON=python node web/tests/contract.cjs
+      - name: Install isolated browser tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/quorum-browser" --no-audit --no-fund --ignore-scripts playwright@1.64.1
+          node "$RUNNER_TEMP/quorum-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Exercise authenticated combined product and keyboard journey
+        env:
+          QUORUM_WEB_BUILD: ${{ runner.temp }}/quorum-web-build
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/quorum-browser/node_modules/playwright
+          QUORUM_SCREENSHOTS: ${{ runner.temp }}/quorum-screenshots
+          QUORUM_PYTHON: python
+        run: |
+          cd "$RUNNER_TEMP/quorum-rehearsal"
+          node web/tests/boundary.cjs
+          node web/tests/boundary.cjs --reasoning
+          node web/tests/boundary.cjs --reasoning --roundup-checks
