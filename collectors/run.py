@@ -23,9 +23,12 @@ from collectors.common import Fetcher, connect, ensure_topic, load_sources_csv  
 
 # DECISION(2026-10-22, Anastasia/Claude): topics are a small dict in code until the portal exists; the demo event
 # gets added here by the team. Why: the portal (topic picker) is not built yet and a YAML file is one more format.
+# DECISION(2026-10-23, Anastasia/Claude Code): topic id is `russia-ukraine-war`, not `ukraine-aid`. Why: reasoning's
+# README, CLI and its 28-claim evaluation set already use `russia-ukraine-war`; the id is shared across blocks and
+# the collector is the cheaper side to rename. Rows collected under `ukraine-aid` are re-keyed by one UPDATE.
 TOPICS = {
-    "ukraine-aid": {
-        "name": "US aid to Ukraine",
+    "russia-ukraine-war": {
+        "name": "Russia–Ukraine war and US aid",
         "query_terms": ["Ukraine", "Zelensky", "Zelenskyy", "Kyiv", "Ukrainian"],
     },
 }
