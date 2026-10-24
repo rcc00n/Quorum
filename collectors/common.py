@@ -171,9 +171,9 @@ def content_hash(title: str, lead: str | None, text: str | None) -> str:
 # It does NOT fire on a mere mention inside the lead ("..., Reuters reported Tuesday") — that is citation,
 # not reprint. Reprints with the wire credit only deep in the body (level 2 documents: no body) are missed.
 # DECISION(2026-10-24, Anastasia/Claude Code): the dateline place may carry commas and slashes ("KYIV, Ukraine (AP) —",
-# "WASHINGTON/KYIV, Oct 22 (Reuters) -"); the rule label stays wire-v2 (no live row was marked under the narrower
-# class: 0 wire marks on 2026-10-24). Why: AP's city-country form is the standard dateline on this topic; without
-# the comma every such reprint was counted as an independent outlet.
+# "WASHINGTON/KYIV, Oct 22 (Reuters) -"); the rule label is bumped to wire-v3 so wire_origin_version says which class
+# marked a row. Why: AP's city-country form is the standard dateline on this topic; without the comma every such
+# reprint was counted as an independent outlet. No live row had been marked under wire-v2 (0 marks on 2026-10-24).
 _WIRE_NAMES = {
     "AP": r"(?:the\s+)?associated\s+press|\bAP\b",
     "Reuters": r"\breuters\b",
@@ -199,7 +199,7 @@ def detect_wire_origin(byline: str | None, lead: str | None) -> str | None:
     return None
 
 
-WIRE_RULE_VERSION = "wire-v2"
+WIRE_RULE_VERSION = "wire-v3"
 
 # --------------------------------------------------------- polite HTTP ----
 

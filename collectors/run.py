@@ -47,21 +47,42 @@ def run_once(only: str | None = None) -> dict:
         rss_sources = cur.fetchall()
         cur.execute("SELECT * FROM sources WHERE kind = 'official' AND cardinality(rss_urls) > 0")
         official_feeds = cur.fetchall()
+    errors = 0
+
+    def step(key: str, fn, *args) -> None:
+        """One collector or source per step. DECISION(2026-10-24, Anastasia/Claude Code): an exception inside one
+        collector is logged with its traceback, rolled back, counted and reported as {"error": <type>}; the pass goes
+        on with the next source. Why: without this boundary one bad item (a UNIQUE violation on 2026-10-24, a JSON
+        decode error, a bad URL) aborted the whole pass, the container restarted 37 times and every source after
+        the failing one was silently not collected; the freshness check could not see it."""
+        nonlocal errors
+        try:
+            report[key] = fn(*args)
+        except Exception as exc:  # noqa: BLE001 - the boundary exists to keep the pass alive
+            log.exception("%s failed: %s", key, type(exc).__name__)
+            try:
+                conn.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            report[key] = {"error": type(exc).__name__}
+            errors += 1
+
     for topic_id, spec in TOPICS.items():
         ensure_topic(conn, topic_id, spec["name"], spec["query_terms"])
         topic = {"id": topic_id, **spec}
         if only in (None, "rss"):
             for source in rss_sources:
-                report[f"rss/{source['id']}"] = rss.collect_source(conn, fetcher, source, topic)
+                step(f"rss/{source['id']}", rss.collect_source, conn, fetcher, source, topic)
             for source in official_feeds:
-                report[f"official/{source['id']}"] = rss.collect_official_feed(conn, fetcher, source, topic)
+                step(f"official/{source['id']}", rss.collect_official_feed, conn, fetcher, source, topic)
         if only in (None, "guardian"):
-            report["guardian"] = guardian.collect(conn, fetcher, topic)
+            step("guardian", guardian.collect, conn, fetcher, topic)
         if only in (None, "federal_register"):
-            report["federal_register"] = federal_register.collect(conn, fetcher, topic)
+            step("federal_register", federal_register.collect, conn, fetcher, topic)
         if only in (None, "congress"):
-            report["congress"] = congress.collect(conn, fetcher, topic)
+            step("congress", congress.collect, conn, fetcher, topic)
     conn.close()
+    report["_errors"] = errors
     return report
 
 
@@ -76,8 +97,9 @@ def main() -> int:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     while True:
         report = run_once(args.only)
+        errors = report.pop("_errors", 0)
         total = sum(r.get("inserted", 0) for r in report.values())
-        log.info("pass complete: %d new rows", total)
+        log.info("pass complete: %d new rows, %d collector errors", total, errors)
         if not args.loop:
             return 0
         time.sleep(args.loop)
