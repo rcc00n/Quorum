@@ -41,7 +41,7 @@ flowchart LR
 ```
 
 - Agents read only through Zetaris. One SQL query joins documents, the source registry with ratings and an official-document feed; this is the sponsor technology doing real work, not a wrapper.
-- Agents write to the `analysis` schema in the same Postgres directly (Zetaris is read-only for us), plus `quotes` and `coverage` rows in the collection schema, exactly as its README allows.
+- Agents write nothing into the collection schema: for the hackathon the snapshot is the sole cross-block contract (DECISIONS.md log 2026-10-24, agreed by all three owners); `quotes` and `coverage` rows and the `analysis` schema of section 4 are superseded by the file store (`reasoning/store.py`) until after the hackathon. Zetaris is read-only for us.
 - Article text is never stored. Reasoning calls the collection block's `collectors.common.fetch_text(url, title=, lead=)` at analysis time, which honours robots.txt and the source's access level, and stores only verbatim quotes with code-point offsets, the content hash of the text at fetch time and the achieved access level (section 8, evidence rows). Official documents are read in full from `official_docs`. The SQL also carries `canonical_url`, `content_hash` and `fetched_at` per document so a quote's hash can be compared with the collected one.
 - The portal never reads `analysis` tables directly. It pulls published snapshots (section 8). Nothing from reasoning runs on the portal VPS.
 
@@ -63,7 +63,7 @@ Schema `analysis` in the shared Postgres. All timestamps UTC. All ids stable acr
 | `roundups` | `topic_id`, `edition_date`, `body_json`, `empty_day` | One per topic and day. |
 | `snapshots` | `topic_id`, `edition_date`, `version`, `json`, `published_at` | What the portal pulls. Immutable per version. **Built 2026-10-24 as a file store** (`reasoning/store.py`: `snapshots/<topic>/<date>/v<N>.json`, `latest.json`, the run's private ledger beside it); the Postgres table and the rest of this schema stay DEFERRED for the hackathon (section 10). |
 
-`quotes` and `coverage` live in the collection schema; reasoning inserts rows and never alters their schema. A `quotes` insert is rejected by collection if the quote is not found verbatim at the URL; reasoning treats a rejection as "no evidence", never as an error to retry around.
+*Superseded 2026-10-24 (DECISIONS.md log): reasoning writes no `quotes` or `coverage` rows for the hackathon; the verbatim-quote rule lives on in the snapshot's evidence rows (offsets, `content_hash_at_quote`) and in `collectors.common.verify_quote`.* `quotes` and `coverage` live in the collection schema; reasoning inserts rows and never alters their schema. A `quotes` insert is rejected by collection if the quote is not found verbatim at the URL; reasoning treats a rejection as "no evidence", never as an error to retry around.
 
 ## 5. The graph
 
@@ -246,7 +246,7 @@ Fields the implementation adds on top of the shape above (all optional for the p
 
 Mapping to the portal's current `Event`: `established` ← `article` blocks of kind `fact` and `context`; `statements` ← the `statements` block; `disputed` ← claims with status disputed; `unknown` ← the `not_confirmed` block; `coverage` ← `spectrum.coverage` as lines; `importance.label` ← `rubric.total` with its rationale; `summary` ← `standfirst`; `digests[].summary` ← `roundup` rendered as text. New fields the portal does not render yet: `article` as prose, `photo`, `rubric`, `trace_ref`, `needs_review`, `status: empty` for quiet days. Ordering is upstream: `stories` are already ranked.
 
-Transport, to agree with Vadim: reasoning exposes `GET /snapshots/{topic_id}/{edition_date}` and `GET /snapshots/{topic_id}/latest` on the reasoning host, bearer-token protected, reachable from the VPS over an SSH tunnel bound to loopback. The adapter pulls on request and caches by `version`. No database port is exposed and nothing is pushed into the portal's auth database. Status vocabulary: `ok`, `partial` (a node failed and the trace says which), `empty` (no story above the bar; roundup carries the day). The adapter must not turn a failed pull into an empty edition.
+Transport (agreed with Vadim 2026-10-24, Issue #2 comment 6379883472): for the hackathon the hand-over is the immutable snapshot file, its full SHA-256 and the exact producer commit, transferred privately and verified byte for byte on the web side (`node web/tests/boundary.cjs --reasoning --reasoning-file <file>` with `QUORUM_REASONING_EXPECTED_SHA256`); a provisional run also gets a separate private sidecar file (dump SHA-256, `corpus_as_of`, window, `provisional`, row-manifest digests) that never goes inside the snapshot. DEFERRED: `GET /snapshots/{topic_id}/{edition_date}` and `/latest` on the reasoning host, bearer-token protected over an SSH tunnel bound to loopback, with the adapter caching by `version`. No database port is exposed and nothing is pushed into the portal's auth database. Status vocabulary: `ok`, `partial` (a node failed and the trace says which), `empty` (no story above the bar; roundup carries the day). The adapter must not turn a failed pull into an empty edition.
 
 ## 9. Code layout and tooling
 
