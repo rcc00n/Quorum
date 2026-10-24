@@ -3,6 +3,8 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 spec=importlib.util.spec_from_file_location('rehearse',Path(__file__).with_name('rehearse.py'))
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
@@ -22,3 +24,24 @@ class RehearsalTests(unittest.TestCase):
     def test_existing_destination_is_rejected_before_any_git_mutation(self):
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(ValueError):module.rehearse(d,d)
+
+
+    def test_web_owned_profile_excludes_pending_owner_code(self):
+        directory=Path(__file__).with_name('patches')
+        selected=module.selected_patches(directory,profile='web-owned')
+        self.assertEqual(len(selected),5)
+        for path in selected:
+            text=path.read_text()
+            self.assertNotIn('diff --git a/reasoning/',text)
+            self.assertNotIn('diff --git a/collectors/',text)
+        self.assertTrue(any('build_integrity.py' in p.read_text() for p in selected))
+        with self.assertRaises(ValueError):module.selected_patches(directory,True,'web-owned')
+        with self.assertRaises(ValueError):module.selected_patches(directory,profile='unknown')
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError):module.selected_patches(d,profile='web-owned')
+
+    def test_stale_remote_heads_stop_before_creating_a_candidate(self):
+        with tempfile.TemporaryDirectory() as d, patch.object(module,'git',return_value=SimpleNamespace(stdout='0'*40)) as git:
+            with self.assertRaises(ValueError):module.rehearse(d,Path(d)/'new',profile='web-owned',require_current=True)
+            self.assertFalse((Path(d)/'new').exists())
+            self.assertFalse(any('worktree' in call.args for call in git.call_args_list))

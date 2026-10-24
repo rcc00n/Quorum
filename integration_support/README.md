@@ -72,3 +72,15 @@ PR #6 had no submitted owner reviews or comments at audit time; existing request
 Patched reasoning: **246 PASS**, including **16 actual-reference TEST-state memory cases**. Unchanged reference conformance: **13/13 PASS**. Django: **70 PASS**, with the two unchanged-original cases enabled locally. Rehearsal safety: **3 PASS**. A fresh nine-patch reproduction has exactly the same Git tree as the audited/tested tree (`5be9c3db0edf711b40a54f064ff31a052c7119c3`); applied-tree whitespace and owner-history/schema/config statics pass. Next production build/typecheck, matching compiled receipt, ratings/editorial/trace and TypeScript contracts pass locally. All four authenticated Chromium suites pass on that reproduced tree: original store/auth/correction/rollback, canonical fictional, skipped-check/keyboard and unchanged genuine v3 (all 28 roundup entries, zero stories, source links, trace/provenance and three widths). Hosted final-head CI is recorded in PR #6 and Issue #2; external-reference/private-original tests remain explicitly skipped in CI, not counted as operational integration.
 
 Original snapshot and sidecar hashes were rechecked unchanged; their historical config mismatch was not reinvestigated. Full genuine acceptance, owner adoption, sponsor workflow, production bridge, live database, deployment/restore and final release remain BLOCKED or NOT TESTED as detailed in the proposed canonical checklist. No model/provider call, new collection, production credential access, service change, merge to integration/master or deployment occurred.
+
+
+## Release-candidate profiles
+
+2026-10-24 · rcc00n / Codex · `--patch-profile web-owned --require-current` applies only independent web/deployment/diagnostic patches and refuses stale fetched owner pins before worktree creation. Why: unapproved reasoning/privacy/memory proposals must remain distinguishable from the candidate used for the genuine demo. This is a module decision; owner merge approvals are still required.
+
+```bash
+python3 integration_support/rehearse.py --repo <checkout> \
+  --destination <NEW-external-RC-path> --patch-profile web-owned --require-current
+```
+
+Fetch first, then use this profile: it does not contact any service itself. Patches 0003/0006/0007/0008/0009 are applied; owner-dependent 0001/0002/0004/0005 remain provisional review artifacts. `--with-proposed-patches` retains the separately labelled all-provisional audit profile. Neither profile approves integration, production publishing, or sponsor completion.

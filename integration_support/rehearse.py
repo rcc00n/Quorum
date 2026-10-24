@@ -13,6 +13,16 @@ PINS = {
     'collection':'8f126c57a9ef9af798543bf23a0a60737b0ce5dc',
     'web':'f59e75840c9aee67ca35a8f44bf5dd42747af75f',
 }
+WEB_OWNED_PATCHES = (
+    '0003-offline-diagnostics.patch',
+    '0006-offline-diagnostics-audit-tests.patch',
+    '0007-compiled-build-integrity.patch',
+    '0008-keyboard-investigation-flow.patch',
+    '0009-final-readiness-checklist.patch',
+)
+REMOTE_BRANCHES = dict(integration='integration', reasoning='yelysei/agents',
+                       collection='data-collection', web='feature/web-genuine-integration')
+
 REHEARSAL_ROW = '| 2026-10-24 | rcc00n / Codex, explicit local rehearsal authorization | Local rehearsal retains all owner decision rows, additive environment/ignore entries and both development-contract and production-bridge gates; integration workflow approval is Issue #2 comment 6390138653. No product threshold, strict contract or publication authority changed. | Exercise reasoning → collection → web together without overwriting owner history or pushing rehearsal merges. |\n'
 
 
@@ -50,12 +60,35 @@ def assignments(text):
     return result
 
 
-def rehearse(repo,destination,with_patches=False):
+def selected_patches(directory, with_patches=False, profile=None):
+    # DECISION(2026-10-24, rcc00n/Codex): web-owned candidates exclude pending owner-dependent patches.
+    # Why: a passing provisional rehearsal must not imply approval of reasoning/privacy/memory changes.
+    if profile not in (None,'web-owned') or (with_patches and profile):
+        raise ValueError('Choose one explicit patch profile')
+    paths=sorted(Path(directory).glob('*.patch'))
+    if profile=='web-owned':
+        selected=[Path(directory)/name for name in WEB_OWNED_PATCHES]
+        if any(not p.is_file() for p in selected):raise ValueError('Required web-owned patch missing')
+        return selected
+    return paths if with_patches else []
+
+
+def require_current_pins(repo):
+    for owner, branch in REMOTE_BRANCHES.items():
+        if git(repo,'rev-parse','refs/remotes/origin/'+branch).stdout.strip()!=PINS[owner]:
+            raise ValueError('Fetched owner head differs from reviewed pin; review and repin before candidate creation')
+
+
+def rehearse(repo,destination,with_patches=False,profile=None,require_current=False):
     repo,destination=Path(repo).resolve(),Path(destination).resolve()
     if destination.exists() or destination.is_relative_to(repo):raise ValueError('Use a new external disposable worktree path')
+    patches=selected_patches(Path(__file__).parent/'patches',with_patches,profile)
+    if require_current:require_current_pins(repo)
     for sha in PINS.values():git(repo,'cat-file','-e',sha+'^{commit}')
     git(repo,'worktree','add','--detach',str(destination),PINS['integration'])
-    report=dict(inputs=PINS,merges=[],owner_approved=False,production_published=False)
+    report=dict(inputs=PINS,merges=[],owner_approved=False,production_published=False,
+                patch_profile=profile or ('all-provisional' if with_patches else 'none'),
+                release_approved=False)
     for owner in ('reasoning','collection','web'):
         result=git(destination,'merge','--no-ff','--no-edit',PINS[owner],check=False)
         conflicts=git(destination,'diff','--name-only','--diff-filter=U').stdout.splitlines()
@@ -79,9 +112,9 @@ def rehearse(repo,destination,with_patches=False):
             rows={line for line in git(repo,'show',PINS[ref]+':docs/DECISIONS.md').stdout.splitlines() if line.startswith('| 2026-')}
             if not rows<=merged:raise ValueError('Owner decision history lost')
         report['merges'].append(dict(owner=owner,commit=git(destination,'rev-parse','HEAD').stdout.strip(),resolved=conflicts))
-    if with_patches:
+    if patches:
         report['patches']=[]
-        for patch in sorted((Path(__file__).parent/'patches').glob('*.patch')):
+        for patch in patches:
             git(destination,'apply','--check',str(patch))
             git(destination,'apply','--index',str(patch))
             git(destination,'diff','--cached','--check')
@@ -97,6 +130,8 @@ if __name__=='__main__':
     parser.add_argument('--repo',required=True)
     parser.add_argument('--destination',required=True)
     parser.add_argument('--with-proposed-patches',action='store_true')
+    parser.add_argument('--patch-profile',choices=['web-owned'])
+    parser.add_argument('--require-current',action='store_true',help='Compare pins to already-fetched origin refs; performs no fetch')
     args=parser.parse_args()
-    try:print(json.dumps(rehearse(args.repo,args.destination,args.with_proposed_patches),indent=2))
+    try:print(json.dumps(rehearse(args.repo,args.destination,args.with_proposed_patches,args.patch_profile,args.require_current),indent=2))
     except (OSError,ValueError,subprocess.CalledProcessError):raise SystemExit('Rehearsal stopped; inspect the disposable worktree. No branch was pushed.') from None
