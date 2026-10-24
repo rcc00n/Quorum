@@ -312,9 +312,14 @@ review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-re
   Zetaris corpus SQL with the previous windows (`tools/corpus.py`), the live `fetch_text` path through the
   shared fetcher (`QUORUM_COLLECTORS_PATH`), request spacing (`min_interval_ms = 1600`, TESTED only once the
   first live run completes), Studio wiring. Dry-run tests do not establish live integration.
-- BLOCKED: a genuine-corpus run — the collection Postgres and datasource `QUORUM_COLLECT` run on Anastasia's
-  machine and no network path or dump reaches reasoning's machine yet (Issue #2, the first concrete integration
-  blocker); the Nightshift route — the Windows runtime binds Windows loopback only, so a run must start from a
+- INTEGRATED (direct NVIDIA route, provisional corpus, 2026-10-24 04:17–05:13Z): the first genuine run — Anastasia's
+  dump restored into a local Postgres, read through Zetaris as `QUORUM_COLLECT`, 1 249 model calls (Lightning 879,
+  Ultra 309, 0 reasoning tokens), 131 DocRefs, 28 events, 189 claims, 406 evidence rows all bound to offsets (12 of 12
+  re-fetched quotes verbatim), 4 confirmed claims across outlets, third reviewer on 34 disagreements; `status:
+  partial` (63 model errors, all HTTP 429 or no-JSON), 0 stories (highest rubric total 5). Two defects it exposed are
+  fixed after it (a 429 aborted an event's fact-check; shared pacing across lanes). The canonical run on the closed
+  edition follows; Issue #2 holds the hand-over (snapshot + sidecar SHA-256).
+- BLOCKED: the Nightshift route — the Windows runtime binds Windows loopback only, so a run must start from a
   Windows Python venv or after an approved WSL networking change; the Meterless Engine feature — proposal
   written, go/no-go and a checkout pending.
 - NOT_STARTED: a live eval run (`tests/eval.py --live`, opt-in); the sources-registry load for the coverage
