@@ -11,7 +11,7 @@
 .ssh/
 .codex/
 .agents/
-node_modules/
+node_modules
 .venv/
 venv/
 __pycache__/
@@ -42,3 +42,7 @@ Thumbs.db
 *.der
 *.class
 pgdata/
+
+# Portal build output (dependencies and runtime stay outside the repository)
+.next/
+*.tsbuildinfo

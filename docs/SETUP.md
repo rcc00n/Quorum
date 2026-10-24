@@ -40,6 +40,8 @@ Never use the bundle's destructive installation-test suite or `down -v` on this 
 
 ## Configuration and diagnostics
 
+The team uses Codex. Routine diagnostics do not check Cursor or require proprietary editor-model acceptance. Legacy Cursor checks are available only through `python3 scripts/checks.py cursor-history`; they do not affect routine readiness. See [rules evidence](RULES_CHECK.md) for the unverified organizer-update claim. No installed editor or unrelated software is changed.
+
 ```bash
 if [ ! -e .env ]; then (umask 077; cp .env.example .env); fi
 chmod 600 .env
