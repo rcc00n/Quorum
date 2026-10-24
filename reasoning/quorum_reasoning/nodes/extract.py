@@ -39,7 +39,8 @@ def run(state: RunState) -> dict:
                         "doc_type": d.get("doc_type"),
                     }
                 )
-            n = dropped = 0
+            n = 0
+            dropped: list[dict] = []
             try:
                 ans = llm.json_task("extract_claims", {"event_id": e["id"], "documents": payload_docs}, dry_run=state["dry_run"])
                 for c in ans.get("claims", [])[: untrusted.CLAIMS_PER_EVENT_MAX]:
@@ -50,7 +51,7 @@ def run(state: RunState) -> dict:
                     # model-returned ids and text are checked against the state: the origin must be a document
                     # of this event, and the claim's words must be found in it
                     if origin not in doc_texts or not untrusted.grounded_in(text_c, doc_texts[origin]):
-                        dropped += 1
+                        dropped.append({"text": text_c, "reason": "origin not a document of this event" if origin not in doc_texts else "text not found in its origin document"})
                         continue
                     cid = ids.claim_id(e["id"], text_c)
                     if cid in claims:
@@ -72,7 +73,9 @@ def run(state: RunState) -> dict:
                         adjudication="",
                     )
                     n += 1
-                s.decision = f"{n} claims extracted" + (f"; {dropped} dropped: origin or text not found in the document" if dropped else "")
+                s.decision = f"{n} claims extracted" + (f"; {len(dropped)} dropped: origin or text not found in the document" if dropped else "")
+                if dropped:
+                    s.detail = dropped  # kept for audit in the per-event trace (decided 2026-10-24)
                 s.reason = f"from {len(payload_docs)} documents; level-2 sources contribute leads only, level-3 nothing"
             except Exception as exc:  # noqa: BLE001 — one event's extraction must not kill the run; the trace shows it
                 errors.append(StepError(node="extract_claims", event_id=e["id"], message=str(exc)[:300]))

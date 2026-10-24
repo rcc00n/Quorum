@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 from .. import llm, untrusted
-from ..rules.confirmation import verdict
+from ..rules.confirmation import origin_group, verdict
 from ..state import RunState, StepError
 from ..text import best_passage
 from ..tools.fetch_text import fetch_text
@@ -24,7 +24,8 @@ from .research import already_seen, evidence_from
 
 def run(state: RunState) -> dict:
     claims = {cid: dict(c) for cid, c in state["claims"].items()}
-    docs = state["documents"]
+    docs = [d for d in state["documents"] if not d.get("superseded")]  # retracted text is not evidence
+    by_id = {d["id"]: d for d in state["documents"]}
     steps, errors = [], []
     for e in state["events"]:
         event_claims = [c for c in claims.values() if c["event_id"] == e["id"]]
@@ -62,7 +63,7 @@ def run(state: RunState) -> dict:
                         c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker")]
                         found += 1
                     own = [ev for ev in c["evidence"] if ev["found_by"] == "fact_checker"]
-                    status, reason = verdict(own)
+                    status, reason = verdict(own, origin_group(c, by_id))
                     c["fact_checker_status"] = status
                     c["fact_checker_reason"] = reason
                     counts[status] += 1

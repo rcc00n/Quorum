@@ -22,10 +22,11 @@ class Step:
         self.model = model
         self.decision = ""
         self.reason = ""
+        self.detail: list[dict] | None = None  # audit rows the decision summarises (e.g. extract's dropped claims)
         self._started = time.perf_counter()
 
     def record(self) -> StepRecord:
-        return StepRecord(
+        rec = StepRecord(
             node=self.node,
             iteration=0,  # set by `finish`
             event_id=self.event_id,
@@ -34,6 +35,9 @@ class Step:
             model=self.model,
             duration_ms=int((time.perf_counter() - self._started) * 1000),
         )
+        if self.detail:
+            rec["detail"] = self.detail
+        return rec
 
 
 def iteration_of(state: RunState, node: str, event_id: str | None = None) -> int:

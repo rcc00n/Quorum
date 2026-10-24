@@ -11,7 +11,7 @@ from collections import Counter
 from typing import Literal
 
 from .. import config
-from ..rules.confirmation import is_thin, verdict
+from ..rules.confirmation import is_thin, origin_group, verdict
 from ..state import Claim, RunState
 from ..trace import finish, iteration_of, step
 
@@ -24,12 +24,13 @@ def own_evidence(claim: Claim) -> list:
 def thin_events(state: RunState) -> list[str]:
     """Events with at least one thin claim and a research round left."""
     max_rounds = config.get("loops", "research_rounds_max", 2)
+    by_id = {d["id"]: d for d in state["documents"]}
     out = []
     for e in state["events"]:
         if state["research_rounds"].get(e["id"], 0) >= max_rounds:
             continue
         claims = [c for c in state["claims"].values() if c["event_id"] == e["id"]]
-        if any(is_thin(own_evidence(c)) for c in claims):
+        if any(is_thin(own_evidence(c), origin_group(c, by_id)) for c in claims):
             out.append(e["id"])
     return out
 
@@ -37,6 +38,7 @@ def thin_events(state: RunState) -> list[str]:
 def run(state: RunState) -> dict:
     max_rounds = config.get("loops", "research_rounds_max", 2)
     claims = {cid: dict(c) for cid, c in state["claims"].items()}
+    by_id = {d["id"]: d for d in state["documents"]}
     steps = []
     for e in state["events"]:
         event_claims = [c for c in claims.values() if c["event_id"] == e["id"]]
@@ -49,11 +51,12 @@ def run(state: RunState) -> dict:
             counts: Counter[str] = Counter()
             thin = 0
             for c in event_claims:
-                status, reason = verdict(own_evidence(c))
+                origin = origin_group(c, by_id)
+                status, reason = verdict(own_evidence(c), origin)
                 c["verifier_status"] = status
                 c["verifier_reason"] = reason
                 counts[status] += 1
-                thin += is_thin(own_evidence(c))
+                thin += is_thin(own_evidence(c), origin)
             s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified; {thin} thin"
             if thin and used < max_rounds:
                 s.reason = f"thin claims and {max_rounds - used} research round(s) left: back to research"

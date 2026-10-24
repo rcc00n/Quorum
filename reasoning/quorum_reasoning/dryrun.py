@@ -96,6 +96,8 @@ def rubric(p: dict[str, Any]) -> dict[str, Any]:
         legal, legal_why = 0, "no official document"
     if any(k in low for k in ("congress", "senate", "president", "federal", "nationwide", "law", "sanctions", "parliament")):
         reach, reach_why = 2, "national scope in the headlines"
+    elif any(k in low for k in ("dead", "killed", "casualt", "displaced", "evacuat")):
+        reach, reach_why = 2, "confirmed deaths or mass displacement reach the whole country (rubric rule, 2026-10-24)"
     elif any(k in low for k in ("region", "city", "county", "district")):
         reach, reach_why = 1, "regional scope"
     else:

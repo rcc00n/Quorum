@@ -28,6 +28,7 @@ class DocRef(TypedDict):
     official: NotRequired[bool]  # True for official_docs rows
     doc_type: NotRequired[str | None]  # law | order | vote | ruling | statement | release
     text: NotRequired[str | None]  # only for official_docs (public domain); never for outlets
+    superseded: NotRequired[bool]  # a correction replaced this row: spread and coverage only, never evidence
 
 
 class Evidence(TypedDict):
@@ -40,6 +41,7 @@ class Evidence(TypedDict):
     url: str
     title: str
     is_document: bool  # True when it comes from a signed/adopted official document
+    by_headline: NotRequired[bool]  # True when the source is level 2: the passage comes from headline and lead only
 
 
 class Claim(TypedDict):
@@ -100,6 +102,7 @@ class StepRecord(TypedDict):
     reason: str
     model: str | None
     duration_ms: int
+    detail: NotRequired[list[dict]]  # audit rows a decision summarises, e.g. extract's dropped claims (text, reason)
 
 
 class StepError(TypedDict):

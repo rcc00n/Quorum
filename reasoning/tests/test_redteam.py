@@ -225,13 +225,21 @@ def _rows_with_correction(sql: str, limit: int):
 
 
 def test_a8_superseded_document_is_not_part_of_the_corpus(monkeypatch):
-    """A8. collectors/schema.sql sets supersedes_id when a re-fetch found changed content: the new row
-    replaces the old one. Reasoning must read only the current version, or a claim keeps being
-    supported by text its own outlet has already corrected within the same day."""
+    """A8, amended 2026-10-24 (DECISIONS.md log): the superseded row stays in the corpus for spread and
+    coverage, marked `superseded`, and is excluded from evidence and extraction by the nodes. The original
+    A8 behaviour (dropping the row) lost the publication from spread."""
     monkeypatch.setattr(corpus, "_run_sql", _rows_with_correction)
     docs = corpus.load_documents(TOPIC, DAY, corpus="zetaris")
-    ids = [d["id"] for d in docs]
-    assert 22 in ids and 21 not in ids
+    by_id = {d["id"]: d for d in docs}
+    assert 21 in by_id and 22 in by_id, "both versions stay in the corpus: spread counts every publication"
+    assert by_id[21].get("superseded") is True
+    assert not by_id[22].get("superseded")
+    # the nodes exclude the marked row from evidence candidates
+    from quorum_reasoning.nodes.research import _candidates
+
+    st = state_with(docs, [], {})
+    assert 21 not in [d["id"] for d in _candidates(st, [21, 22], 1)]
+    assert 21 not in [d["id"] for d in _candidates(st, [], 2)]
 
 
 # --- A9: a stored quote must not be cut mid-sentence -----------------------------------------------------

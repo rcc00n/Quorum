@@ -12,15 +12,16 @@ from collections import Counter
 from typing import Literal
 
 from ..rules.confirmation import adjudicate as adjudicate_rule
-from ..rules.confirmation import has_document_support, independent_support
+from ..rules.confirmation import has_document_support, independent_support, origin_group
 from ..rules.impact_bar import build_rubric, confirmation_points, crosses_bar, rank_and_cap
 from ..state import Claim, Event, RunState
 from ..trace import finish, step
 
 
-def event_confirmation(claims: list[Claim]) -> tuple[int, int]:
-    """(confirmation points, number of confirmed claims) for one event."""
-    best_groups = max((len(independent_support(c["evidence"])) for c in claims), default=0)
+def event_confirmation(claims: list[Claim], documents_by_id: dict) -> tuple[int, int]:
+    """(confirmation points, number of confirmed claims) for one event. The origin outlet's group counts
+    next to at least one other, same as the claim rule (DECISIONS.md log, 2026-10-24)."""
+    best_groups = max((len(independent_support(c["evidence"], origin_group(c, documents_by_id))) for c in claims), default=0)
     any_document = any(has_document_support(c["evidence"]) for c in claims)
     confirmed = sum(1 for c in claims if c["final_status"] == "confirmed")
     return confirmation_points(best_groups, any_document), confirmed
@@ -29,6 +30,7 @@ def event_confirmation(claims: list[Claim]) -> tuple[int, int]:
 def run(state: RunState) -> dict:
     claims = {cid: dict(c) for cid, c in state["claims"].items()}
     events: list[Event] = [dict(e) for e in state["events"]]  # type: ignore[misc]
+    by_id = {d["id"]: d for d in state["documents"]}
     steps = []
     for e in events:
         event_claims = [c for c in claims.values() if c["event_id"] == e["id"]]
@@ -43,7 +45,7 @@ def run(state: RunState) -> dict:
                 c["adjudication"] = why
                 counts[final] += 1
                 disagreements += v != f
-            points, confirmed = event_confirmation(event_claims)
+            points, confirmed = event_confirmation(event_claims, by_id)
             r = e["rubric"] or build_rubric(0, 0, 0, 0, {})
             e["rubric"] = build_rubric(r["legal_force"], r["reach"], r["irreversibility"], points, r["rationale"])
             e["rubric"]["rationale"]["confirmation"] = {

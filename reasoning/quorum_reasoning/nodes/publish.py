@@ -78,6 +78,7 @@ def claim_view(c: Claim) -> dict:
                 "independence_group": ev["independence_group"],
                 "found_by": ev["found_by"],
                 "is_document": ev["is_document"],
+                "by_headline": bool(ev.get("by_headline")),
             }
             for ev in c["evidence"]
         ],

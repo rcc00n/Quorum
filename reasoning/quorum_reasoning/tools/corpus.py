@@ -99,13 +99,16 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
     """
     out: list[DocRef] = []
     rows = list(_run_sql(docs_sql, limit=500))
-    # A correction re-fetch (collectors/schema.sql: supersedes_id) replaces the row it supersedes: only
-    # the current version of a document takes part in the day, or retracted text keeps feeding evidence.
+    # A correction re-fetch (collectors/schema.sql: supersedes_id) replaces the row it supersedes. The
+    # superseded row stays in the corpus marked `superseded` — it counts for spread and coverage, never as
+    # evidence or an extraction origin (decided 2026-10-24, DECISIONS.md log; supersedes the 2026-10-23
+    # drop-the-row rule, see README.md › Decisions).
     superseded = {int(r["supersedes_id"]) for r in rows if r.get("supersedes_id")}
     for row in rows:
+        ref = _docref(row, official=False)
         if int(row["id"]) in superseded:
-            continue
-        out.append(_docref(row, official=False))
+            ref["superseded"] = True
+        out.append(ref)
     for row in _run_sql(official_sql, limit=200):
         out.append(_docref(row, official=True))
     doc_ids = [d["id"] for d in out]
@@ -155,4 +158,11 @@ def load_fixture(topic_id: str, edition_date: str) -> list[DocRef]:
         raise FileNotFoundError(f"no fixture {path.name} under {path.parent}; see fixtures/ and fixtures/usecases/")
     data = json.loads(path.read_text(encoding="utf-8"))
     docs = [d for d in data["documents"] if d.get("topic_id", topic_id) == topic_id]
-    return [DocRef(**{k: v for k, v in d.items() if k != "topic_id"}) for d in docs]
+    superseded_ids = {d["supersedes_id"] for d in docs if d.get("supersedes_id")}
+    out: list[DocRef] = []
+    for d in docs:
+        ref = DocRef(**{k: v for k, v in d.items() if k not in ("topic_id", "supersedes_id")})
+        if d["id"] in superseded_ids:
+            ref["superseded"] = True  # spread and coverage only, never evidence (same rule as load_documents)
+        out.append(ref)
+    return out

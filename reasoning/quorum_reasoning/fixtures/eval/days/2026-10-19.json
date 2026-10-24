@@ -1,44 +1,84 @@
 {
-  "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits.",
-  "topic_id": "russia-ukraine-war",
-  "edition_date": "2026-10-19",
-  "expected_above_bar": 0,
-  "expected_above_bar_reason": "St. Petersburg drone attack: legal_force 0, reach 1 (one region), irreversibility 2 (fires and a death), confirmation 2 (three independence groups) = 5, below the threshold. Trump's criticism of Zelensky: legal_force 0, reach 1, irreversibility 0, confirmation 2 = 3.",
-  "documents": [
-    {
-      "id": 91901, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
-      "flank": "left", "tier": "major", "url": "https://edition.cnn.com/2026/10/18/europe/ukraine-russia-drone-attack-trump-intl",
-      "title": "Ukraine defies Trump and launches one of its biggest drone attacks on Russia this year",
-      "lead": "Ukrainian drones set fire to the St. Petersburg Oil Terminal. The governor of St. Petersburg reported fires at the Ruchyi oil depot and several industrial warehouses.",
-      "published_at": "2026-10-18T12:00:00Z", "access_level": 1, "wire_origin": null
-    },
-    {
-      "id": 91902, "source_id": "breitbart", "source_name": "Breitbart", "independence_group": "breitbart", "kind": "outlet",
-      "flank": "right", "tier": "minor", "url": "https://www.breitbart.com/national-security/2026/10/18/st-petersburg-oil-terminal-set-ablaze-amid-massive-wave-of-ukraine-drone-strikes/",
-      "title": "St. Petersburg Oil Terminal Set Ablaze Amid Ukraine Drone Strikes",
-      "lead": "Fires broke out at the St. Petersburg Oil Terminal after a wave of Ukrainian drone strikes, the governor said.",
-      "published_at": "2026-10-18T14:00:00Z", "access_level": 1, "wire_origin": null
-    },
-    {
-      "id": 91903, "source_id": "daily-beast", "source_name": "The Daily Beast", "independence_group": "daily-beast", "kind": "outlet",
-      "flank": "left", "tier": "minor", "url": "https://www.thedailybeast.com/vladimir-putins-hometown-st-petersburg-goes-up-in-flames-in-defiant-overnight-ukraine-attack",
-      "title": "Vladimir Putin's Hometown St. Petersburg Goes Up in Flames in Defiant Overnight Ukraine Attack",
-      "lead": "One person was killed and 15 injured in the overnight Ukrainian drone attack on St. Petersburg, officials said. Fires broke out at the St. Petersburg Oil Terminal.",
-      "published_at": "2026-10-18T13:00:00Z", "access_level": 1, "wire_origin": null
-    },
-    {
-      "id": 91904, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
-      "flank": "left", "tier": "major", "url": "https://www.cnn.com/2026/10/18/europe/ukraine-russia-drone-attack-trump-intl",
-      "title": "Trump slams Zelensky after Ukraine defies US president with major attack on Russia",
-      "lead": "President Trump criticized President Zelensky after Ukraine launched one of its biggest drone attacks on Russia this year. Russia's Defense Ministry said it destroyed 1,015 Ukrainian drones over 15 regions.",
-      "published_at": "2026-10-18T20:00:00Z", "access_level": 1, "wire_origin": null
-    },
-    {
-      "id": 91905, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
-      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/19/nx-s1-6007371/ukraine-and-russia-exchange-strikes-as-relations-between-trump-and-zelenskyy-sour",
-      "title": "Ukraine and Russia exchange strikes, as relations between Trump and Zelenskyy sour",
-      "lead": "President Trump criticized Ukraine's leader after one of Ukraine's biggest drone attacks on Russia this year. Fires broke out at the St. Petersburg Oil Terminal.",
-      "published_at": "2026-10-19T09:00:00Z", "access_level": 1, "wire_origin": null
-    }
-  ]
+ "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits.",
+ "topic_id": "russia-ukraine-war",
+ "edition_date": "2026-10-19",
+ "expected_above_bar": 0,
+ "expected_above_bar_reason": "St. Petersburg drone attack, re-checked 2026-10-24: the death figure (one killed, 15 injured) is single-source, so the confirmed-deaths reach rule does not apply - legal_force 0, reach 1 (one region), irreversibility 2, confirmation 2 - total 5, below the bar. The dry-run actual of 1 is a stand-in artifact: keyword reach from the Trump-angle titles plus title-echo support.",
+ "documents": [
+  {
+   "id": 91901,
+   "source_id": "cnn",
+   "source_name": "CNN",
+   "independence_group": "cnn",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "url": "https://edition.cnn.com/2026/10/18/europe/ukraine-russia-drone-attack-trump-intl",
+   "title": "Ukraine defies Trump and launches one of its biggest drone attacks on Russia this year",
+   "lead": "Ukrainian drones set fire to the St. Petersburg Oil Terminal. The governor of St. Petersburg reported fires at the Ruchyi oil depot and several industrial warehouses.",
+   "published_at": "2026-10-18T12:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  },
+  {
+   "id": 91902,
+   "source_id": "breitbart",
+   "source_name": "Breitbart",
+   "independence_group": "breitbart",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "url": "https://www.breitbart.com/national-security/2026/10/18/st-petersburg-oil-terminal-set-ablaze-amid-massive-wave-of-ukraine-drone-strikes/",
+   "title": "St. Petersburg Oil Terminal Set Ablaze Amid Ukraine Drone Strikes",
+   "lead": "Fires broke out at the St. Petersburg Oil Terminal after a wave of Ukrainian drone strikes, the governor said.",
+   "published_at": "2026-10-18T14:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  },
+  {
+   "id": 91903,
+   "source_id": "daily-beast",
+   "source_name": "The Daily Beast",
+   "independence_group": "daily-beast",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "url": "https://www.thedailybeast.com/vladimir-putins-hometown-st-petersburg-goes-up-in-flames-in-defiant-overnight-ukraine-attack",
+   "title": "Vladimir Putin's Hometown St. Petersburg Goes Up in Flames in Defiant Overnight Ukraine Attack",
+   "lead": "One person was killed and 15 injured in the overnight Ukrainian drone attack on St. Petersburg, officials said. Fires broke out at the St. Petersburg Oil Terminal.",
+   "published_at": "2026-10-18T13:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  },
+  {
+   "id": 91904,
+   "source_id": "cnn",
+   "source_name": "CNN",
+   "independence_group": "cnn",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "url": "https://www.cnn.com/2026/10/18/europe/ukraine-russia-drone-attack-trump-intl",
+   "title": "Trump slams Zelensky after Ukraine defies US president with major attack on Russia",
+   "lead": "President Trump criticized President Zelensky after Ukraine launched one of its biggest drone attacks on Russia this year. Russia's Defense Ministry said it destroyed 1,015 Ukrainian drones over 15 regions.",
+   "published_at": "2026-10-18T20:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  },
+  {
+   "id": 91905,
+   "source_id": "npr",
+   "source_name": "NPR",
+   "independence_group": "npr",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "url": "https://www.npr.org/2026/10/19/nx-s1-6007371/ukraine-and-russia-exchange-strikes-as-relations-between-trump-and-zelenskyy-sour",
+   "title": "Ukraine and Russia exchange strikes, as relations between Trump and Zelenskyy sour",
+   "lead": "President Trump criticized Ukraine's leader after one of Ukraine's biggest drone attacks on Russia this year. Fires broke out at the St. Petersburg Oil Terminal.",
+   "published_at": "2026-10-19T09:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  }
+ ]
 }

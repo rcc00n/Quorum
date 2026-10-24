@@ -62,10 +62,15 @@ rubric's judgment against `expected_above_bar`.
 Baseline (dry run, 2026-10-23): false confirmed 0, missed confirmed 7, disputed rate 5%, 7 of 28 claims
 not extracted; above-bar matches expected on 4 of 7 days.
 
-After the event-key clustering redesign (dry run, 2026-10-24): false confirmed 0, missed confirmed 7,
-disputed rate 5%, above-bar matches 3 of 7 days. The fragmentation is gone — the Kramatorsk bus-strike
-outlets now form one event and its toll claim carries cross-outlet evidence (npr + cnn), which was
-structurally impossible before — so the remaining `missed confirmed` distance is the stance stand-in's
-word-overlap bound, measurable only live. 2026-10-19 differs on above-bar because the merged drone-strike
-event now confirms a claim; the hand-applied `expected_above_bar` values predate the 2026-10-24 rubric
-sentence on confirmed deaths and are re-applied with it (see the day files' reasons).
+After the event-key clustering redesign and the 2026-10-24 rule decisions (origin group counts next to one
+other; confirmed deaths reach the whole country), dry run: false confirmed 1, missed confirmed 4, disputed
+rate 0%, above-bar matches 3 of 7 days. The clustering fragmentation is gone — the Kramatorsk bus-strike
+outlets form one event whose toll claims are `disputed` in the state, and the day correctly escalates
+(points 6, zero confirmed claims) instead of publishing a story. Known artifacts of the harness, not the
+rules: the "false confirmed 1" is the matcher mapping e07's narrow date claim onto the run's broader
+Treasury-license claim, which is legitimately confirmed under the origin rule while e07's own claim stays
+single-source; the "disputed 0%" is the matcher picking an unmatched variant over the disputed toll claim;
+2026-10-19's above-bar difference is the rubric stand-in's keyword reach on the Trump-angle titles. The
+remaining `missed confirmed` distance is the stance stand-in's word-overlap bound, measurable only live.
+Hand-applied `expected_above_bar` values were re-checked against the 2026-10-24 rules (see the day files'
+reasons; none changed value).

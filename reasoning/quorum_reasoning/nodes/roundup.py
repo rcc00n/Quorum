@@ -47,6 +47,7 @@ def run(state: RunState) -> dict:
             docs = [by_id[i] for i in e["document_ids"] if i in by_id]
             lead = next((d["lead"] for d in docs if d["lead"]), "")
             label = status_label(e, claims, docs)
+            line_source = "model"  # a raw title is only the fallback, marked so the page can tell (B10, decided 2026-10-24)
             try:
                 ans = llm.json_task(
                     "roundup_line",
@@ -54,15 +55,18 @@ def run(state: RunState) -> dict:
                     dry_run=state["dry_run"],
                 )
                 line = untrusted.clip(ans.get("line", ""), untrusted.CAP_LINE)
-                if check_text("line", line):
+                if check_text("line", line) or not line.strip():
                     line = e["headline"].rstrip(".") + "."  # the headline is the safe fallback; the critic's rules apply here too
+                    line_source = "title"
             except Exception as exc:  # noqa: BLE001
                 errors.append(StepError(node="roundup", event_id=e["id"], message=str(exc)[:300]))
                 line = e["headline"].rstrip(".") + "."
+                line_source = "title"
             items.append(
                 {
                     "event_id": e["id"],
                     "line": line,
+                    "line_source": line_source,
                     "status": label.lower(),
                     "group": label,
                     "needs_review": e["needs_review"],

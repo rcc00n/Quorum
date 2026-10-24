@@ -44,7 +44,7 @@ label, a dropped document, a killed run or a cost amplification; low = bounded s
 | B7 | B | med | `llm.json_task` parsed the reply from the first `{` to the last `}`: a reply echoing attacker-shaped JSON before its answer broke the parse or returned the attacker's object. | `test_parse_json_object_takes_the_models_final_answer` | fixed in `6c50dad` (last balanced JSON object) |
 | B8 | B | low | Untrusted text reached payloads uncapped (a stance passage could be 20 000 characters). | end-to-end tests in `test_injection.py` | fixed in `6c50dad` (caps in `untrusted.py`) |
 | B9 | B | low | Payloads and prompts carried no statement that the text fields are quoted data. | `test_verdicts_unaffected_by_instructions_in_the_text` | fixed in `6c50dad` (`DATA_NOTE` + one paragraph per prompt) |
-| B10 | B | med | Event headlines, standfirsts and roundup fallback lines derive from untrusted titles verbatim; an instruction-shaped or misleading title surfaces in the system's voice. Code cannot decide that a sentence is an instruction. | by construction; see "What code cannot prevent" | question for Yelysei; note for Anastasia |
+| B10 | B | med | Event headlines, standfirsts and roundup fallback lines derive from untrusted titles verbatim; an instruction-shaped or misleading title surfaces in the system's voice. Code cannot decide that a sentence is an instruction. | by construction; see "What code cannot prevent" | decided 2026-10-24: roundup lines are always model-generated and critic-checked; the raw title is only the fallback, marked `line_source: "title"`. Event headlines remain titles (curation is the mitigation); note for Anastasia stands |
 | B11 | B | low | `fetch_text` is called once per (claim, document) pair with no cache: in live mode the same URL is fetched many times per run. | code-read finding | proposal |
 | C1 | C | med | Mass-casualty strikes score below the bar: Kramatorsk (30 dead, 3 independence groups) = 0+1+2+2 = 5 < 6. If intended, one sentence in DECISIONS.md closes it; if not, the rubric needs casualty guidance. | eval days 2026-10-10/-12 (`expected_above_bar` differs) | question for Yelysei |
 | C2 | C | med | Clustering on exact title tokens fragments real days (titles of one event share ~2 tokens), so cross-outlet confirmation is structurally unreachable; this dominates the eval's `missed confirmed` = 7. | `tests/eval.py` dry baseline | fixed by the event-key clustering redesign (2026-10-24): the fragmented eval days now cluster (Kramatorsk's three outlets are one event with cross-outlet evidence); the dry-run `missed confirmed` number stays at 7 because the remaining distance is the stance stand-in's word-overlap bound, which only a live run measures (fixtures/eval/README.md) |
@@ -53,7 +53,7 @@ label, a dropped document, a killed run or a cost amplification; low = bounded s
 | C5 | C | low | `tools/corpus.load_fixture` ignores `edition_date`: every dry-run date returns the same sample day. The eval sidesteps it by injecting documents. | code-read finding | proposal |
 | D1 | D | med | A single-outlet scoop was labelled `unverified` in the roundup; DECISIONS names `single source` and the reader loses the one-outlet warning. | `test_scoop_roundup_status_is_single_source` | fixed in `f1b39b8` |
 | D2 | D | med | A below-bar event with a disputed claim could never show `disputed`: no such label or group existed, though DECISIONS lists it. | `test_roundup_label_disputed_exists` | fixed in `f1b39b8` |
-| D3 | D | med | Retraction within the day: whether a superseded document still counts for spread, and how corrections arriving under new URLs are linked, is undefined in DECISIONS/ARCHITECTURE. The corpus now drops superseded rows (A8), so they count for nothing. | `test_retraction_superseded_document_is_not_evidence` (xfail) | question for Yelysei and Anastasia |
+| D3 | D | med | Retraction within the day: whether a superseded document still counts for spread, and how corrections arriving under new URLs are linked, is undefined in DECISIONS/ARCHITECTURE. The corpus now drops superseded rows (A8), so they count for nothing. | `test_retraction_superseded_document_is_not_evidence` (xfail flipped to pass, 2026-10-24) | decided 2026-10-24 (DECISIONS.md log): superseded rows stay for spread and coverage, excluded from evidence, confirmation and extraction; corrections under new URLs remain with Anastasia |
 
 ## Proposals (not applied; Yelysei decides)
 
@@ -109,6 +109,14 @@ DECISIONS.md › Principles for handling facts. A bounded third pass would work 
   code gate plus all three verdicts on the page.
 
 ## Open questions for Yelysei
+
+Decided 2026-10-24 (DECISIONS.md log and reasoning/README.md › Decisions carry the canonical entries):
+1 — the origin outlet or agency counts as one group next to at least one other (never for statement-kind
+claims); 2 — stays as recorded; 3 — model lines with a marked title fallback; 4 — engineering constants
+stay in code; 5 — dropped claims kept with text and reason in the per-event trace (`detail`); 6 — the
+confirmed-deaths reach sentence, threshold unchanged; 7 — superseded rows: spread yes, evidence no; 8 —
+`by_headline` on level-2 evidence; 9 — `unverified` kept and defined. The clustering proposals (A7, C2)
+became the event-key redesign. The original questions follow for the record.
 
 1. **Origin plus one other group.** A claim extracted from a Reuters story and supported only by AP stays
    `unverified`: the origin document is excluded from evidence, so Reuters' group never appears. If the

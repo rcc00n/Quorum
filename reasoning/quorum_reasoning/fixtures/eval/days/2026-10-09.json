@@ -1,30 +1,54 @@
 {
-  "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits. Titles and URLs are from search results; leads are reconstructed from search-result summaries and are not verbatim outlet text.",
-  "topic_id": "russia-ukraine-war",
-  "edition_date": "2026-10-09",
-  "expected_above_bar": 0,
-  "expected_above_bar_reason": "Bus strike in Kramatorsk: legal_force 0, reach 1 (one region), irreversibility 2 (people killed), confirmation 2 (three independence groups) = 5, below the threshold of 6.",
-  "documents": [
-    {
-      "id": 90901, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
-      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/08/g-s1-147106/russia-ukraine-war",
-      "title": "Russian strikes on Ukraine's public buses leave 30 dead as blackouts worsen in Kyiv",
-      "lead": "A Russian guided bomb exploded beside passenger buses in Kramatorsk, killing 30 people, authorities said. Officials suspended public transport in Kramatorsk and Sloviansk.",
-      "published_at": "2026-10-08T15:00:00Z", "access_level": 1, "wire_origin": null
-    },
-    {
-      "id": 90902, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
-      "flank": "left", "tier": "major", "url": "https://www.cnn.com/2026/10/08/europe/deadly-bus-strike-russia-ukraine-intl",
-      "title": "Russian strike kills at least 33 in eastern Ukraine in deadliest single attack this year",
-      "lead": "At least 33 people were killed when a Russian strike caused two public buses to catch fire in Kramatorsk, officials said. Police said Russian drones targeted officers who were helping victims of the strike.",
-      "published_at": "2026-10-08T14:00:00Z", "access_level": 1, "wire_origin": null
-    },
-    {
-      "id": 90903, "source_id": "breitbart", "source_name": "Breitbart", "independence_group": "breitbart", "kind": "outlet",
-      "flank": "right", "tier": "minor", "url": "https://www.breitbart.com/europe/2026/10/08/30-killed-in-russian-air-strike-on-civilian-bus-stop/",
-      "title": "30 Killed in Russian Air Strike on Civilian Bus Stop",
-      "lead": "A Russian air strike beside a bus stop in Kramatorsk killed 30 people, authorities said.",
-      "published_at": "2026-10-08T16:00:00Z", "access_level": 1, "wire_origin": null
-    }
-  ]
+ "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits. Titles and URLs are from search results; leads are reconstructed from search-result summaries and are not verbatim outlet text.",
+ "topic_id": "russia-ukraine-war",
+ "edition_date": "2026-10-09",
+ "expected_above_bar": 0,
+ "expected_above_bar_reason": "Bus strike in Kramatorsk, re-applied 2026-10-24 with the confirmed-deaths reach rule: legal_force 0, reach 2 (confirmed deaths), irreversibility 2, confirmation 2 - total 6 crosses on points, but the toll is disputed (30 vs at least 33) and no claim is confirmed, so the event escalates to the roundup as reported-not-confirmed: 0 stories (DECISIONS: confirmation is a gate).",
+ "documents": [
+  {
+   "id": 90901,
+   "source_id": "npr",
+   "source_name": "NPR",
+   "independence_group": "npr",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "url": "https://www.npr.org/2026/10/08/g-s1-147106/russia-ukraine-war",
+   "title": "Russian strikes on Ukraine's public buses leave 30 dead as blackouts worsen in Kyiv",
+   "lead": "A Russian guided bomb exploded beside passenger buses in Kramatorsk, killing 30 people, authorities said. Officials suspended public transport in Kramatorsk and Sloviansk.",
+   "published_at": "2026-10-08T15:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  },
+  {
+   "id": 90902,
+   "source_id": "cnn",
+   "source_name": "CNN",
+   "independence_group": "cnn",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "url": "https://www.cnn.com/2026/10/08/europe/deadly-bus-strike-russia-ukraine-intl",
+   "title": "Russian strike kills at least 33 in eastern Ukraine in deadliest single attack this year",
+   "lead": "At least 33 people were killed when a Russian strike caused two public buses to catch fire in Kramatorsk, officials said. Police said Russian drones targeted officers who were helping victims of the strike.",
+   "published_at": "2026-10-08T14:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  },
+  {
+   "id": 90903,
+   "source_id": "breitbart",
+   "source_name": "Breitbart",
+   "independence_group": "breitbart",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "url": "https://www.breitbart.com/europe/2026/10/08/30-killed-in-russian-air-strike-on-civilian-bus-stop/",
+   "title": "30 Killed in Russian Air Strike on Civilian Bus Stop",
+   "lead": "A Russian air strike beside a bus stop in Kramatorsk killed 30 people, authorities said.",
+   "published_at": "2026-10-08T16:00:00Z",
+   "access_level": 1,
+   "wire_origin": null
+  }
+ ]
 }

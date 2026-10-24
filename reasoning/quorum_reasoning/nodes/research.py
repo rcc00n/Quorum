@@ -9,7 +9,7 @@ only the four allowed stance words are accepted, anything else counts as neutral
 from __future__ import annotations
 
 from .. import config, llm, untrusted
-from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin
+from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin, origin_group
 from ..state import Claim, DocRef, Evidence, RunState, StepError
 from ..text import best_passage, clip_sentences
 from ..tools.corpus import OFFICIAL_ID_OFFSET
@@ -33,7 +33,7 @@ def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str) -> Evid
     # Official ids are namespaced above OFFICIAL_ID_OFFSET (tools/corpus.py); the evidence row keeps the
     # database id so analysis.evidence rows point at real official_docs rows.
     db_id = doc["id"] - OFFICIAL_ID_OFFSET if doc.get("official") and doc["id"] >= OFFICIAL_ID_OFFSET else doc["id"]
-    return Evidence(
+    ev = Evidence(
         quote=clip_sentences(passage, 300),
         document_id=None if doc.get("official") else doc["id"],
         official_doc_id=db_id if doc.get("official") else None,
@@ -44,10 +44,13 @@ def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str) -> Evid
         title=doc["source_name"],
         is_document=is_doc,
     )
+    if not doc.get("official") and doc["access_level"] == 2:
+        ev["by_headline"] = True  # DECISIONS.md › Sources: paywalled sources participate at level 2, marked "by headline"
+    return ev
 
 
 def _candidates(state: RunState, event_doc_ids: list[int], round_no: int) -> list[DocRef]:
-    docs = state["documents"]
+    docs = [d for d in state["documents"] if not d.get("superseded")]  # retracted text is not evidence; it still counts for spread
     if round_no <= 1:
         return [d for d in docs if d["id"] in event_doc_ids]
     return [d for d in docs if d["id"] not in event_doc_ids]  # round 2: the rest of the day, official documents included
@@ -65,10 +68,11 @@ def run(state: RunState) -> dict:
         event_claims = [c for c in claims.values() if c["event_id"] == e["id"]]
         if not event_claims:
             continue
-        if used >= 1 and not any(is_thin(c["evidence"]) for c in event_claims):
+        by_id = {d["id"]: d for d in state["documents"]}
+        if used >= 1 and not any(is_thin(c["evidence"], origin_group(c, by_id)) for c in event_claims):
             continue  # nothing thin: no second round for this event
         round_no = used + 1
-        targets = event_claims if round_no == 1 else [c for c in event_claims if is_thin(c["evidence"])]
+        targets = event_claims if round_no == 1 else [c for c in event_claims if is_thin(c["evidence"], origin_group(c, by_id))]
         with step(state, "research", event_id=e["id"], model=llm.model_name()) as s:
             found = 0
             try:

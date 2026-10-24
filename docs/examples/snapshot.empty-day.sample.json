@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-24T00:16:55Z",
+  "generated_at": "2026-10-24T00:30:03Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -34,12 +34,13 @@
     "count": 3,
     "groups": [
       {
-        "name": "Single source",
+        "name": "Confirmed",
         "items": [
           {
             "event_id": "b913ab53ff63",
             "line": "Grain corridor talks open in Vienna; delegations meet in Vienna for talks on the grain corridor.",
-            "status": "single source",
+            "line_source": "model",
+            "status": "confirmed",
             "needs_review": false,
             "sources": [
               {
@@ -51,10 +52,16 @@
                 "url": "https://www.reuters.com/fiction/grain-corridor-talks-open-2026-11-01/"
               }
             ]
-          },
+          }
+        ]
+      },
+      {
+        "name": "Single source",
+        "items": [
           {
             "event_id": "8ec9e4f49dc1",
             "line": "Museum reopens in Lviv after winter repairs.",
+            "line_source": "model",
             "status": "single source",
             "needs_review": false,
             "sources": [
@@ -67,6 +74,7 @@
           {
             "event_id": "c83a993b6c7f",
             "line": "Wheat futures eased in Tuesday trading.",
+            "line_source": "model",
             "status": "single source",
             "needs_review": false,
             "sources": [
@@ -185,8 +193,8 @@
       "node": "verify",
       "iteration": 1,
       "event_id": "b913ab53ff63",
-      "decision": "0 confirmed, 0 disputed, 2 unverified; 2 thin",
-      "reason": "thin claims and 1 research round(s) left: back to research",
+      "decision": "2 confirmed, 0 disputed, 0 unverified; 0 thin",
+      "reason": "every claim has a document or two independent groups: on to the fact-checker",
       "model": null,
       "duration_ms": 0
     },
@@ -211,15 +219,6 @@
     {
       "node": "research",
       "iteration": 2,
-      "event_id": "b913ab53ff63",
-      "decision": "round 2: 0 passages with a stance for 2 claims",
-      "reason": "widened to the rest of the day and official documents for thin claims",
-      "model": "meterless/auto",
-      "duration_ms": 0
-    },
-    {
-      "node": "research",
-      "iteration": 2,
       "event_id": "8ec9e4f49dc1",
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
@@ -233,15 +232,6 @@
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
       "model": "meterless/auto",
-      "duration_ms": 0
-    },
-    {
-      "node": "verify",
-      "iteration": 2,
-      "event_id": "b913ab53ff63",
-      "decision": "0 confirmed, 0 disputed, 2 unverified; 2 thin",
-      "reason": "thin claims but the research budget is spent: on to the fact-checker",
-      "model": null,
       "duration_ms": 0
     },
     {
@@ -266,7 +256,7 @@
       "node": "fact_check",
       "iteration": 1,
       "event_id": "b913ab53ff63",
-      "decision": "0 confirmed, 0 disputed, 2 unverified from 2 own passages",
+      "decision": "2 confirmed, 0 disputed, 0 unverified from 2 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "meterless/auto",
       "duration_ms": 0
@@ -293,7 +283,7 @@
       "node": "adjudicate",
       "iteration": 1,
       "event_id": "b913ab53ff63",
-      "decision": "0 confirmed, 0 disputed, 2 unverified; 0 disagreement(s); rubric total 2 (confirmation 1)",
+      "decision": "2 confirmed, 0 disputed, 0 unverified; 0 disagreement(s); rubric total 3 (confirmation 2)",
       "reason": "below the bar",
       "model": null,
       "duration_ms": 0
@@ -329,10 +319,10 @@
       "node": "roundup",
       "iteration": 1,
       "event_id": null,
-      "decision": "3 events in 1 group(s); empty day: True",
+      "decision": "3 events in 2 group(s); empty day: True",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
       "model": "meterless/auto",
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "publish",

@@ -22,9 +22,10 @@ USECASES = Path(__file__).resolve().parent.parent / "quorum_reasoning" / "fixtur
 
 
 def run_day(monkeypatch, name: str):
+    """Runs the graph over one use-case day through the real fixture loader (QUORUM_FIXTURE), so loader
+    behaviour such as the superseded marking is part of what these tests cover."""
     data = json.loads((USECASES / f"{name}.json").read_text(encoding="utf-8"))
-    docs = [DocRef(**{k: v for k, v in d.items() if k != "topic_id"}) for d in data["documents"]]
-    monkeypatch.setattr(plan_node, "load_documents", lambda topic, day, **kw: list(docs))
+    monkeypatch.setenv("QUORUM_FIXTURE", f"usecases/{name}")
     os.environ["QUORUM_DRY_RUN"] = "1"
     return graph.run_local(data["topic_id"], data["edition_date"], dry_run=True)
 
@@ -116,21 +117,31 @@ def test_retraction_correction_at_least_blocks_confirmation(monkeypatch):
     assert any(ev["stance"] == "contradicts" for ev in wrong["evidence"])
 
 
-@pytest.mark.xfail(reason="supersedes_id handling is undefined in DECISIONS.md/ARCHITECTURE.md and unimplemented; question for Yelysei (review report, D5)")
 def test_retraction_superseded_document_is_not_evidence(monkeypatch):
+    """D3, decided 2026-10-24 (DECISIONS.md log): a superseded document stays in spread but is excluded
+    from evidence, confirmation and extraction."""
     state = run_day(monkeypatch, "retraction")
     for c in state["claims"].values():
+        assert c["origin_document_id"] != 9501, "a claim must not originate from retracted text"
         for ev in c["evidence"]:
             assert ev["document_id"] != 9501, "a document superseded within the day should not support a claim"
+    assert any(9501 in e["document_ids"] for e in state["events"]), "the superseded publication still counts for spread"
 
 
-def test_roundup_label_disputed_exists(monkeypatch):
-    """Fails on HEAD: DECISIONS.md › Selecting major news lists the roundup status "disputed", but
-    roundup.status_label can never return it. Finding D9; proposed fix in ws_d/changes.diff."""
-    state = run_day(monkeypatch, "retraction")
-    items = roundup_items(state)
-    assert len(items) == 1
-    assert items[0]["status"] == "disputed"
+def test_roundup_label_disputed_exists():
+    """D2: DECISIONS.md › Selecting major news lists the roundup status "disputed"; status_label must be
+    able to return it. Unit-level since 2026-10-24: under the origin-group rule the retraction fixture's
+    event escalates ("Reported, not confirmed" outranks "Disputed"), which is its own test above."""
+    from quorum_reasoning.nodes.roundup import GROUP_ORDER, status_label
+
+    assert "Disputed" in GROUP_ORDER
+    e = {"needs_review": False}
+    claim = {"final_status": "disputed", "kind": "fact", "evidence": []}
+    docs = [
+        {"independence_group": "cnn", "wire_origin": None},
+        {"independence_group": "npr", "wire_origin": None},
+    ]
+    assert status_label(e, [claim], docs) == "Disputed"
 
 
 # 6. Official release with no independent coverage — DECISIONS.md › Principles for handling facts:
