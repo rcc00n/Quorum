@@ -28,6 +28,6 @@ CREATE LIGHTNING REST TABLE fedreg_documents
 -- SELECT f.document_number, f.title AS official_title, d.source_id, d.title AS outlet_title
 -- FROM fedreg.fedreg_documents f
 -- JOIN QUORUM_COLLECT.documents d
---   ON d.topic_id = 'ukraine-aid'
+--   ON d.topic_id = 'russia-ukraine-war'
 --  AND d.published_at BETWEEN CAST(f.publication_date AS TIMESTAMP) AND CAST(f.publication_date AS TIMESTAMP) + INTERVAL 2 DAYS
 -- ORDER BY f.publication_date DESC;

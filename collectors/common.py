@@ -170,13 +170,17 @@ def content_hash(title: str, lead: str | None, text: str | None) -> str:
 #   - an "AP/Reuters/AFP contributed to this report" or "Reporting by ... Editing by ..." trailer
 # It does NOT fire on a mere mention inside the lead ("..., Reuters reported Tuesday") — that is citation,
 # not reprint. Reprints with the wire credit only deep in the body (level 2 documents: no body) are missed.
+# DECISION(2026-10-24, Anastasia/Claude Code): the dateline place may carry commas and slashes ("KYIV, Ukraine (AP) —",
+# "WASHINGTON/KYIV, Oct 22 (Reuters) -"); the rule label stays wire-v2 (no live row was marked under the narrower
+# class: 0 wire marks on 2026-10-24). Why: AP's city-country form is the standard dateline on this topic; without
+# the comma every such reprint was counted as an independent outlet.
 _WIRE_NAMES = {
     "AP": r"(?:the\s+)?associated\s+press|\bAP\b",
     "Reuters": r"\breuters\b",
     "AFP": r"\bAFP\b|agence\s+france[- ]presse",
 }
 _WIRE_BYLINE = {k: re.compile(rf"^\s*(?:by\s+)?(?:{v})(?:\s+staff|\s+news)?\s*$", re.I) for k, v in _WIRE_NAMES.items()}
-_WIRE_DATELINE = {k: re.compile(rf"^\s*(?:[A-Z][A-Za-z.' -]{{1,40}},?\s*(?:[A-Z][a-z]{{2,8}}\.?\s+\d{{1,2}}\s*)?)?\(\s*(?:{v})\s*\)\s*[-\u2013\u2014:]", re.I) for k, v in _WIRE_NAMES.items()}
+_WIRE_DATELINE = {k: re.compile(rf"^\s*(?:[A-Z][A-Za-z.,'/ -]{{1,60}},?\s*(?:[A-Z][a-z]{{2,8}}\.?\s+\d{{1,2}}\s*)?)?\(\s*(?:{v})\s*\)\s*[-\u2013\u2014:]", re.I) for k, v in _WIRE_NAMES.items()}
 _WIRE_TRAILER = {k: re.compile(rf"(?:{v})\s+contributed\s+to\s+this\s+report", re.I) for k, v in _WIRE_NAMES.items()}
 # "Reporting by ...; Editing by ..." is Reuters' house sign-off and appears on no other agency's copy.
 _REUTERS_SIGNOFF = re.compile(r"\breporting\s+by\b.*\bediting\s+by\b", re.I | re.S)
@@ -340,12 +344,20 @@ def upsert_official_doc(conn: psycopg.Connection, *, source_id: str, topic_id: s
                         published_at: datetime | None, lang: str = "en") -> bool:
     title, full_text = clean_field(title, TITLE_MAX) or "", clean_text(full_text) or ""
     with conn.cursor() as cur:
+        # DECISION(2026-10-24, Anastasia/Claude Code): a re-collected official document refreshes doc_type, doc_number and
+        # its dates, not only its text; a date the API omits this pass never replaces a stored one (COALESCE). Why:
+        # congress.py derives doc_type from the bill's latest action, which changes between passes (introduced ->
+        # passed -> enacted); frozen at first sight, an enacted bill would have stayed 'release' and never confirmed.
+        # official_docs has no version chain (unlike documents): a row is the latest known state of its URL.
         cur.execute(
             """
             INSERT INTO official_docs (source_id, topic_id, url, doc_type, doc_number, title, full_text,
                                        signed_at, published_at, lang)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (url) DO UPDATE SET full_text = EXCLUDED.full_text, title = EXCLUDED.title,
+                                            doc_type = EXCLUDED.doc_type, doc_number = EXCLUDED.doc_number,
+                                            signed_at = COALESCE(EXCLUDED.signed_at, official_docs.signed_at),
+                                            published_at = COALESCE(EXCLUDED.published_at, official_docs.published_at),
                                             fetched_at = now()
             RETURNING (xmax = 0) AS inserted
             """,

@@ -14,9 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import feedparser  # noqa: E402
-
 from collectors.common import HERE, Fetcher  # noqa: E402
+from collectors.rss import _entries  # noqa: E402  # same parser as the collector: RSS/Atom and the news-sitemap XML
 
 
 def main() -> int:
@@ -34,7 +33,7 @@ def main() -> int:
                     print(f"FAIL  {row['id']:<16} unreachable  {url}")
                     bad += 1
                     continue
-                n = len(feedparser.parse(resp.content).entries)
+                n = len(_entries(resp.content))
                 status = "OK  " if n else "WARN"
                 bad += int(n == 0)
                 print(f"{status}  {row['id']:<16} {resp.status_code} items={n:<3} robots={'allow' if robots else 'DENY '}  {url}")

@@ -73,9 +73,17 @@ def collect_official_feed(conn, fetcher: Fetcher, source: dict, topic: dict | No
                 continue
             stats["matched"] += 1
             page = fetcher.get(link)
-            text = extract_text(page.text) if page is not None else (lead or title)
+            text = extract_text(page.text) if page is not None else ""
+            if not text:
+                # DECISION(2026-10-24, Anastasia/Claude Code): a release whose page cannot be fetched this pass (robots.txt,
+                # timeout, 5xx) or yields no paragraph text is skipped, not stored with the feed summary as its text.
+                # Why: ON CONFLICT (url) replaces full_text, so the fallback overwrote a stored page text with a short
+                # summary on the next transient failure; the same skip rule as collect_source. A body whose robots.txt
+                # denies the bot therefore produces no official_docs rows (whitehouse.gov and defense.gov allow it).
+                stats["skipped"] = stats.get("skipped", 0) + 1
+                continue
             if upsert_official_doc(conn, source_id=source["id"], topic_id=topic["id"] if topic else None, url=link,
-                                   doc_type="release", doc_number=None, title=title, full_text=text or title,
+                                   doc_type="release", doc_number=None, title=title, full_text=text,
                                    signed_at=None, published_at=parse_dt(entry.get("published") or entry.get("updated"))):
                 stats["inserted"] += 1
     log.info("%s (official): %s", source["id"], stats)
