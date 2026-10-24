@@ -241,12 +241,19 @@ def upsert_document(conn: psycopg.Connection, d: Doc) -> int | None:
     h = content_hash(d.title, d.lead, d.body_for_hash)
     wire = detect_wire_origin(d.byline, d.lead)
     with conn.cursor() as cur:
-        cur.execute("SELECT id, content_hash FROM documents WHERE canonical_url = %s ORDER BY id DESC LIMIT 1", (canon,))
-        prev = cur.fetchone()
-        if prev and prev["content_hash"] == h:
-            cur.execute("UPDATE documents SET fetched_at = now() WHERE id = %s", (prev["id"],))
+        # DECISION(2026-10-24, Anastasia/Claude Code): a (canonical_url, content_hash) pair that already exists anywhere
+        # in the chain is a known version: refresh its fetched_at and insert nothing, even if it is not the newest row.
+        # Why: the previous code compared only against the newest row, so an article whose hash reverted (A -> B -> A)
+        # hit the UNIQUE constraint and crashed the whole pass; the live collector restarted 37 times on one Fox News
+        # URL between 00:23Z and 01:03Z on 2026-10-24 and no source after it was collected.
+        cur.execute("SELECT id FROM documents WHERE canonical_url = %s AND content_hash = %s", (canon, h))
+        known = cur.fetchone()
+        if known:
+            cur.execute("UPDATE documents SET fetched_at = now() WHERE id = %s", (known["id"],))
             conn.commit()
             return None
+        cur.execute("SELECT id FROM documents WHERE canonical_url = %s ORDER BY id DESC LIMIT 1", (canon,))
+        prev = cur.fetchone()
         cur.execute(
             """
             INSERT INTO documents (source_id, topic_id, url, canonical_url, title, lead, byline, published_at,

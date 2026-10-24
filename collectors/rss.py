@@ -74,11 +74,19 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> 
             body = None
             link = fetcher.resolve(link)  # Google News wrapper -> publisher URL, so documents.url is the real one
             if level == 1:
-                page = fetcher.get(link)
-                if page is None:
-                    level = 2
+                if not fetcher.allowed(link):
+                    level = 2  # robots.txt disallows the page: title + lead only, by the access-level rule
                     stats["level2"] += 1
                 else:
+                    page = fetcher.get(link)
+                    if page is None:
+                        # DECISION(2026-10-24, Anastasia/Claude Code): a transient fetch failure (timeout, 5xx) on a
+                        # level-1 source skips the item for this pass instead of downgrading it to level 2. Why: the
+                        # hash at level 2 omits the body, so a downgrade produced a new row with supersedes_id and the
+                        # next successful fetch collided with the original hash (the 2026-10-24 crash loop). The item
+                        # is in the feed again next pass; only robots.txt decides level 2.
+                        stats["skipped"] = stats.get("skipped", 0) + 1
+                        continue
                     body = _body_text(page.text)
             doc = Doc(
                 source_id=source["id"], topic_id=topic["id"] if topic else None, url=link, title=title, lead=lead,
