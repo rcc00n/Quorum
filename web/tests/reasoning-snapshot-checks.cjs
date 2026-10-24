@@ -83,8 +83,8 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
   assert.equal(await page.locator(".r-roundup-row").count(), roundup.length);
   for (const [i, item] of roundup.entries()) {
     const row = page.locator(".r-roundup-row").nth(i);
-    assert.equal(await row.locator(":scope > a").textContent(), item.line);
-    assert.equal(new URL(await row.locator(":scope > a").getAttribute("href"), root).searchParams.get("event"), item.event_id);
+    assert.equal(await row.getByRole("link", {name:item.line, exact:true}).textContent(), item.line);
+    assert.equal(new URL(await row.getByRole("link", {name:item.line, exact:true}).getAttribute("href"), root).searchParams.get("event"), item.event_id);
     assert.equal((await row.locator(".help").first().textContent()).trim(), "Producer status: " + item.status + (item.needs_review ? " · needs review" : ""));
     assert.deepEqual(await row.locator(".r-sources a").evaluateAll((links) => links.map((a) => a.href)), [...new Set(item.sources.map((s) => new URL(s.url).href))]);
   }

@@ -73,3 +73,13 @@ Snapshot implementation and unapproved transport: [portal-owned proposal](../doc
 Read-only **internal portal proposal** compatibility: `portal_snapshot validate --file /path/to/candidate.json`. The [canonical handoff](../docs/PORTAL_INTEGRATION.md#read-only-compatibility-command) specifies the JSON report, exit codes and limits. It checks the same production validator/projection without creating a snapshot store or touching auth records.
 
 Canonical reasoning 1.0 **FICTIONAL local preview** and exact sample pin: [integration handoff](../docs/PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Start with `node web/tests/boundary.cjs --reasoning --serve` after the external Next build; this isolates local test auth and keeps the production publisher unused. `--reasoning` without `--serve` runs the real HTTP/browser acceptance suite. Neither command accesses production credentials.
+
+Read-only genuine-file acceptance (no catalog, auth writes, inference or publication):
+
+```bash
+python backend/manage.py reasoning_snapshot --file <private-original.json> --sha256 <owner-full-sha256> \
+  --sidecar <private-original.sidecar.json> --sidecar-sha256 <owner-full-sidecar-sha256> \
+  --producer-commit <full-producer-commit>
+```
+
+The JSON report separates `compatible` from `metadata_valid`. A config discrepancy exits nonzero; even matching metadata keeps `execution_verified`, `source_text_verified` and `published` false. It never rewrites inputs. Optional local tests take `QUORUM_TEST_GENUINE_SNAPSHOT`; CI skips those two private-original tests and uses synthetic negative cases instead.

@@ -2840,3 +2840,7 @@ details[open] > summary > .r-disclosure-icon {
 }
 .source-row > span:last-of-type { white-space: nowrap; }
 .source-row .rating-provenance { grid-column: 1 / -1; }
+
+/* DECISION(2026-10-24, rcc00n/Codex): give recorded-check links their own 24px target.
+   Why: mobile source links must not run into the investigation action. */
+.r-check-link { display: block; width: fit-content; min-height: 24px; margin-block: .5rem; font-size: .875rem; }
