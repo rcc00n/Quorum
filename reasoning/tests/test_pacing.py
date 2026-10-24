@@ -1,6 +1,7 @@
-"""Adaptive pacing of live model calls (2026-10-24, from the journals of two live runs): the default lane's base
-interval, the per-route interval that doubles on HTTP 429 and steps back down after clean calls, the 150 s pause
-after two 429s in a row with its one extra attempt, and the rate-limit headers kept in the ledger row.
+"""Pacing of live model calls (2026-10-24, from three live runs' journals): the lanes' base intervals, the one retry
+on HTTP 429, the route interval that doubles once and steps back after clean calls, the stop on the second refused
+call within 10 minutes (RateLimitAbort, exit 3), the rate-limit headers kept in the ledger row, the journal repair and
+the replay of journalled answers on --resume.
 
 No credits, no network and no real waiting: the client is a fake that raises the SDK's own exception types, and
 `time.sleep` / `time.monotonic` are replaced by a fake clock that only records and advances.
@@ -101,16 +102,17 @@ def live(clock, fake_route_env, monkeypatch):
 def test_base_intervals_from_config(monkeypatch):
     monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS", raising=False)
     monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER", raising=False)
-    assert llm.min_interval_ms() == 2400
-    assert llm.min_interval_ms("fact_checker") == 4000
+    monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS_REVIEWER", raising=False)
+    assert llm.min_interval_ms() == 6000
+    assert llm.min_interval_ms("fact_checker") == 10000 and llm.min_interval_ms("reviewer") == 10000
 
 
-def test_one_429_then_success_retries_after_15_s_and_doubles_the_lane(live, clock):
+def test_one_429_then_success_retries_after_15_s_and_doubles_the_lane_once(live, clock):
     client = live([_rate_limited({"x-ratelimit-remaining": "0", "Authorization": "Bearer secret", "x-other": "1"}), _completion()])
     assert llm.json_task("stance", {}, dry_run=False) == {"ok": True}
     assert client.attempts == 2
-    assert clock.sleeps == [llm.RETRY_RATE_LIMIT_WAIT_S]  # the retry is 15 s after the first attempt: no extra throttle wait
-    assert llm._effective_interval_ms("default", MODEL) == 4800
+    assert clock.sleeps == [llm.RETRY_RATE_LIMIT_WAIT_S]  # 15 s already exceed the raised 12 s interval: no throttle wait
+    assert llm._effective_interval_ms("default", MODEL) == 12000
     row = llm.calls[-1]
     assert row["attempts"] == 2 and row["served"] == MODEL and "waited 15 s" in row["retried_after"]
     assert row["rate_headers"] == [{"x-ratelimit-remaining": "0"}], "only rate-limit headers, never Authorization"
@@ -122,75 +124,74 @@ def test_no_429_means_no_rate_headers_key(live, clock):
     assert "rate_headers" not in llm.calls[-1]
 
 
-def test_two_429s_pause_150_s_then_third_attempt_is_served(live, clock):
+def test_two_429s_fail_the_call_on_two_attempts(live, clock):
     client = live([_rate_limited(), _rate_limited(), _completion()])
-    assert llm.json_task("stance", {}, dry_run=False) == {"ok": True}
-    assert client.attempts == 3
-    assert clock.sleeps == [15.0, 150.0]
-    row = llm.calls[-1]
-    assert row["attempts"] == 3 and row["served"] == MODEL and row["http_status"] == 200
-    assert row["rate_headers"] == [{}, {}], "one entry per 429 attempt"
-    assert not llm._pause_next_by_route.get(MODEL) and not llm._failed_429_calls_by_route.get(MODEL)
-
-
-def test_three_429s_fail_after_the_pause(live, clock):
-    client = live([_rate_limited(), _rate_limited(), _rate_limited(), _completion()])
     with pytest.raises(RateLimitError):
         llm.json_task("stance", {}, dry_run=False)
-    assert client.attempts == 3 and clock.sleeps == [15.0, 150.0]
+    assert client.attempts == 2 and clock.sleeps == [15.0]
     row = llm.calls[-1]
-    assert row["served"] == "error" and row["attempts"] == 3 and row["http_status"] == 429 and len(row["rate_headers"]) == 3
+    assert row["served"] == "error" and row["attempts"] == 2 and row["http_status"] == 429
+    assert row["rate_headers"] == [{}, {}], "one entry per 429 attempt"
     assert llm.error_count() == 1
-    assert llm._effective_interval_ms("default", MODEL) == llm.LANE_INTERVAL_CAP_MS  # 2400 → 4800 → 9600 → cap
 
 
-def test_retry_after_wins_for_the_first_wait_and_the_long_pause_still_holds(live, clock):
-    live([_rate_limited({"retry-after": "7"}), _rate_limited({"retry-after": "7"}), _completion()])
+def test_interval_doubles_only_once(live, clock):
+    for _ in range(3):
+        llm._note_rate_limited("default", MODEL)
+    assert llm._effective_interval_ms("default", MODEL) == 2 * llm.min_interval_ms() == 12000
+
+
+def test_retry_after_decides_the_retry_wait_capped_at_60_s(live, clock):
+    live([_rate_limited({"retry-after": "7"}), _completion()])
     llm.json_task("stance", {}, dry_run=False)
-    assert clock.sleeps == [7.0, 150.0], "the wait before attempt 3 is max(Retry-After, 150 s)"
-    assert llm.calls[-1]["rate_headers"] == [{"retry-after": "7"}, {"retry-after": "7"}]
+    assert clock.sleeps[0] == 7.0
+    clock.sleeps.clear()
+    clock.now += 100.0
+    live([_rate_limited({"retry-after": "300"}), _completion()])
+    llm.json_task("stance", {}, dry_run=False)
+    assert clock.sleeps == [llm.RETRY_MAX_WAIT_S]
 
 
-def test_timeout_then_429_gets_no_third_attempt(live, clock):
+def test_timeout_then_429_fails_on_two_attempts(live, clock):
     client = live([APITimeoutError(httpx.Request("POST", "http://127.0.0.1:9/v1/chat/completions")), _rate_limited(), _completion()])
     with pytest.raises(RateLimitError):
         llm.json_task("stance", {}, dry_run=False)
-    assert client.attempts == 2 and clock.sleeps == [llm.RETRY_DEFAULT_WAIT_S]
+    assert client.attempts == 2 and clock.sleeps[0] == llm.RETRY_DEFAULT_WAIT_S
     assert llm.calls[-1]["attempts"] == 2
 
 
-def test_call_after_a_failed_call_pauses_once_then_fails_on_two_attempts(live, clock):
-    live([_rate_limited(), _rate_limited(), _rate_limited()])
+def test_second_failed_call_within_10_min_aborts_the_run(live, clock):
+    live([_rate_limited()] * 4)
     with pytest.raises(RateLimitError):
         llm.json_task("stance", {}, dry_run=False)
-    clock.sleeps.clear()
-    client = live([_rate_limited(), _rate_limited(), _completion()])
-    with pytest.raises(RateLimitError):
-        llm.json_task("stance", {}, dry_run=False)
-    assert client.attempts == 2
-    assert clock.sleeps[:2] == [150.0, 15.0] and len(clock.sleeps) == 2, clock.sleeps  # not [10, 150, 150]
-    assert llm.calls[-1]["attempts"] == 2 and llm.calls[-1]["served"] == "error"
-
-
-def test_breaker_stops_the_run_on_the_third_consecutive_failed_call(live, clock):
-    live([_rate_limited()] * 7)
-    for _ in range(2):
-        with pytest.raises(RateLimitError):
-            llm.json_task("stance", {}, dry_run=False)
     with pytest.raises(llm.RateLimitAbort) as info:
         llm.json_task("stance", {}, dry_run=False)
     assert not isinstance(info.value, Exception), "the nodes' `except Exception` must not swallow it"
-    assert info.value.route == MODEL and info.value.count == 3
-    assert len(llm.calls) == 3 and all(c["served"] == "error" for c in llm.calls), "the aborting call still has its ledger row"
+    assert info.value.route == MODEL and info.value.count == 2
+    assert str(info.value) == (
+        f"route {MODEL} is drained (2 refused calls in 10 min); the bucket refills at ~2-4 requests/min: "
+        "wait at least 5 hours, then re-run with --resume"
+    )
+    assert len(llm.calls) == 2 and all(c["served"] == "error" for c in llm.calls), "the aborting call still has its ledger row"
+    assert 150.0 not in clock.sleeps, "no long pause any more"
 
 
-def test_a_success_resets_the_breaker(live, clock):
-    live([_rate_limited()] * 5 + [_completion()] + [_rate_limited()] * 3)
-    for _ in range(2):
-        with pytest.raises(RateLimitError):
-            llm.json_task("stance", {}, dry_run=False)
-    llm.json_task("stance", {}, dry_run=False)  # 150 s pause, then served
-    with pytest.raises(RateLimitError):  # not RateLimitAbort: the streak was broken
+def test_failed_calls_more_than_10_min_apart_do_not_abort(live, clock):
+    live([_rate_limited()] * 2 + [_completion()] + [_rate_limited()] * 2)
+    with pytest.raises(RateLimitError):
+        llm.json_task("stance", {}, dry_run=False)
+    clock.now += 11 * 60
+    llm.json_task("stance", {}, dry_run=False)
+    with pytest.raises(RateLimitError):  # a refusal, not RateLimitAbort: the previous one is 11 min old
+        llm.json_task("stance", {}, dry_run=False)
+
+
+def test_a_success_between_failures_does_not_reset_the_window(live, clock):
+    live([_rate_limited()] * 2 + [_completion()] + [_rate_limited()] * 2)
+    with pytest.raises(RateLimitError):
+        llm.json_task("stance", {}, dry_run=False)
+    llm.json_task("stance", {}, dry_run=False)
+    with pytest.raises(llm.RateLimitAbort):
         llm.json_task("stance", {}, dry_run=False)
 
 
@@ -198,83 +199,63 @@ def test_run_maps_rate_limit_abort_to_exit_3(fake_route_env, monkeypatch, tmp_pa
     from quorum_reasoning import graph, run as run_cli
 
     def refuse(*a, **k):
-        raise llm.RateLimitAbort(MODEL, 3)
+        raise llm.RateLimitAbort(MODEL, 2)
 
     monkeypatch.setattr(graph, "run_local", refuse)
     assert run_cli.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 3
     err = capsys.readouterr().err
-    assert f"refusing to continue: route {MODEL} refused 3 consecutive calls; wait a few minutes, then re-run with --resume" in err
+    assert f"refusing to continue: route {MODEL} is drained (2 refused calls in 10 min)" in err
+    assert "wait at least 5 hours, then re-run with --resume" in err
 
 
-def test_unpaced_lane_keeps_the_plain_single_retry(live, clock, monkeypatch):
+def test_unpaced_lane_keeps_the_plain_single_retry_and_never_aborts(live, clock, monkeypatch):
     monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS", "0")
-    client = live([_rate_limited(), _rate_limited(), _completion()] + [_rate_limited()] * 6)
-    with pytest.raises(RateLimitError):
-        llm.json_task("stance", {}, dry_run=False)
-    assert client.attempts == 2 and clock.sleeps == [15.0]
-    assert llm.json_task("stance", {}, dry_run=False) == {"ok": True}
-    assert clock.sleeps == [15.0], "no pause before the next call, no adaptive wait"
+    client = live([_rate_limited()] * 6)
     for _ in range(3):
         with pytest.raises(RateLimitError):  # never RateLimitAbort on an unpaced lane
             llm.json_task("stance", {}, dry_run=False)
-    assert 150.0 not in clock.sleeps
+    assert client.attempts == 6 and clock.sleeps == [15.0, 15.0, 15.0]
+    assert not llm._lane_interval_by_route and not llm._last_failed_429_at_by_route
 
 
-def test_pause_counter_is_per_route(live, clock, monkeypatch):
-    live([_rate_limited()] * 3)
+def test_failure_window_is_per_route(live, clock, monkeypatch):
+    live([_rate_limited()] * 2)
     with pytest.raises(RateLimitError):
         llm.json_task("stance", {}, dry_run=False)
-    assert llm._pause_next_by_route.get(MODEL)
     monkeypatch.setattr(llm, "_route", lambda which="default": ("http://127.0.0.1:9/v1", "test-token-not-real", "nvidia/other-model"))
-    clock.sleeps.clear()
-    clock.now += 100.0
-    client = live([_rate_limited(), _completion()])
-    assert llm.json_task("stance", {}, dry_run=False) == {"ok": True}
-    assert client.attempts == 2 and clock.sleeps == [15.0], "a 429 history on another route causes no pause"
+    live([_rate_limited()] * 2)
+    with pytest.raises(RateLimitError):  # the first failure on this route: no abort
+        llm.json_task("stance", {}, dry_run=False)
 
 
 @pytest.mark.parametrize("first", ["timeout", "503"])
-def test_server_errors_keep_one_retry_and_leave_the_429_counters_alone(live, clock, first):
+def test_server_errors_keep_one_retry_and_leave_the_429_state_alone(live, clock, first):
     err = APITimeoutError(httpx.Request("POST", "http://127.0.0.1:9/v1/chat/completions")) if first == "timeout" else _status_error(503)
-    client = live([err, err, _completion()])
-    with pytest.raises(Exception):
-        llm.json_task("stance", {}, dry_run=False)
-    assert client.attempts == 2 and clock.sleeps == [llm.RETRY_DEFAULT_WAIT_S]
-    assert not llm._pause_next_by_route and not llm._failed_429_calls_by_route and not llm._lane_interval_by_route
+    client = live([err, err, err, err])
+    for _ in range(2):
+        with pytest.raises(Exception) as info:
+            llm.json_task("stance", {}, dry_run=False)
+        assert not isinstance(info.value, llm.RateLimitAbort)
+    assert client.attempts == 4
+    assert not llm._last_failed_429_at_by_route and not llm._lane_interval_by_route
     assert "rate_headers" not in llm.calls[-1]
 
 
-def test_clean_calls_step_the_interval_down_never_below_base(live, clock):
+def test_clean_calls_step_the_interval_back_to_base(live, clock):
     live([_rate_limited(), _completion()])
     llm.json_task("stance", {}, dry_run=False)
-    assert llm._effective_interval_ms("default", MODEL) == 4800
+    assert llm._effective_interval_ms("default", MODEL) == 12000
     # the retried call that was finally served counts as the first successful call of the streak
     live([_completion() for _ in range(llm.LANE_STEP_DOWN_AFTER - 2)])
     for _ in range(llm.LANE_STEP_DOWN_AFTER - 2):
         llm.json_task("stance", {}, dry_run=False)
-    assert llm._effective_interval_ms("default", MODEL) == 4800, "14 successful calls: not yet"
-    live([_completion() for _ in range(3 * llm.LANE_STEP_DOWN_AFTER)])
+    assert llm._effective_interval_ms("default", MODEL) == 12000, "14 successful calls: not yet"
+    live([_completion() for _ in range(20)])
     llm.json_task("stance", {}, dry_run=False)
-    assert llm._effective_interval_ms("default", MODEL) == 2400
-    for _ in range(3 * llm.LANE_STEP_DOWN_AFTER - 1):
+    assert llm._effective_interval_ms("default", MODEL) == 6000
+    for _ in range(19):
         llm.json_task("stance", {}, dry_run=False)
-    assert llm._effective_interval_ms("default", MODEL) == 2400, "never below the configured base"
-
-
-def test_step_down_halves_once_per_15_calls(clock, monkeypatch):
-    monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS", raising=False)
-    for _ in range(3):
-        llm._note_rate_limited("default", MODEL)
-    assert llm._effective_interval_ms("default", MODEL) == 10_000
-    for _ in range(llm.LANE_STEP_DOWN_AFTER):
-        llm._note_success("default", MODEL)
-    assert llm._effective_interval_ms("default", MODEL) == 5000
-    for _ in range(llm.LANE_STEP_DOWN_AFTER):
-        llm._note_success("default", MODEL)
-    assert llm._effective_interval_ms("default", MODEL) == 2500
-    for _ in range(llm.LANE_STEP_DOWN_AFTER):
-        llm._note_success("default", MODEL)
-    assert llm._effective_interval_ms("default", MODEL) == 2400
+    assert llm._effective_interval_ms("default", MODEL) == 6000, "never below the configured base"
 
 
 def test_zero_interval_lane_is_not_adapted(clock, monkeypatch):
@@ -292,25 +273,23 @@ def test_dry_run_never_sleeps(clock, monkeypatch):
 def test_throttle_honours_the_raised_interval_on_its_route_only(clock, monkeypatch):
     monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS", raising=False)
     llm._throttle("default", "lightning")
-    llm._throttle("default", "other")  # shared pause only (2.4 s since the last call anywhere)
-    assert clock.sleeps == [2.4]
+    llm._throttle("default", "other")  # shared pause only (6 s since the last call anywhere)
+    assert clock.sleeps == [6.0]
     llm._note_rate_limited("default", "lightning")
     clock.sleeps.clear()
-    llm._throttle("default", "lightning")  # 2.4 s have passed; the raised 4.8 s interval needs 2.4 s more
-    assert clock.sleeps == [2.4]
+    llm._throttle("default", "lightning")  # 6 s have passed; the raised 12 s interval needs 6 s more
+    assert clock.sleeps == [6.0]
     clock.sleeps.clear()
-    clock.now += 3.0
-    llm._throttle("default", "other")  # untouched route: its 2.4 s base has passed, no wait
+    clock.now += 7.0
+    llm._throttle("default", "other")  # untouched route: its 6 s base has passed, no wait
     assert clock.sleeps == []
 
 
 def test_verbose_line_names_the_wait_and_the_new_interval(live, clock, monkeypatch, capsys):
     monkeypatch.setattr(llm, "_verbose", lambda: True)
-    live([_rate_limited(), _rate_limited(), _completion()])
+    live([_rate_limited(), _completion()])
     llm.json_task("stance", {}, dry_run=False)
-    err = capsys.readouterr().err
-    assert "429; retry in 15 s; lane interval now 4800 ms" in err
-    assert "429 again; lane paused 150 s; lane interval now 9600 ms" in err
+    assert "429; retry in 15 s; lane interval now 12000 ms" in capsys.readouterr().err
 
 
 # --- replay from the journal on --resume (Vadim, CANONICAL-DURABLE-01) -------------------------------------
@@ -396,30 +375,18 @@ def test_append_after_a_truncated_tail_keeps_every_good_row(live, clock, monkeyp
     assert llm.calls[-1].get("request_key") and len(llm.replay) == 1
 
 
-def test_long_retry_after_sets_the_long_pause(live, clock):
-    live([_rate_limited({"retry-after": "300"}), _rate_limited({"retry-after": "300"}), _completion()])
-    llm.json_task("stance", {}, dry_run=False)
-    assert clock.sleeps == [llm.RETRY_MAX_WAIT_S, 300.0], "first wait capped at 60 s; the long pause is max(Retry-After, 150 s)"
-
-
-def test_long_pause_is_capped(live, clock):
-    live([_rate_limited({"retry-after": "5000"}), _rate_limited({"retry-after": "5000"}), _completion()])
-    llm.json_task("stance", {}, dry_run=False)
-    assert clock.sleeps == [llm.RETRY_MAX_WAIT_S, llm.RATE_LIMIT_PAUSE_MAX_S]
-
-
 def test_shared_zero_turns_the_fact_checker_lane_off_too(live, clock, monkeypatch):
     monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS", "0")
     monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER", raising=False)
     assert llm.min_interval_ms("fact_checker") == 0
-    monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER", "4000")
-    assert llm.min_interval_ms("fact_checker") == 4000, "the lane's own env still wins"
+    monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER", "7000")
+    assert llm.min_interval_ms("fact_checker") == 7000, "the lane's own env still wins"
     monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER")
     client = live([_rate_limited(), _rate_limited(), _completion()])
     with pytest.raises(RateLimitError):
         llm.json_task("verify", {}, dry_run=False, which="fact_checker")
-    assert client.attempts == 2 and clock.sleeps == [15.0], "Nightshift: the plain single retry, no pause"
-    assert not llm._pause_next_by_route and not llm._failed_429_calls_by_route
+    assert client.attempts == 2 and clock.sleeps == [15.0], "Nightshift: the plain single retry"
+    assert not llm._last_failed_429_at_by_route and not llm._lane_interval_by_route
 
 
 _MESSAGES = [{"role": "system", "content": "prompt"}, {"role": "user", "content": "data"}]
@@ -477,11 +444,10 @@ def test_load_journal_never_queues_an_error_row(tmp_path):
 
 @pytest.mark.parametrize("value", ["nan", "inf", "-inf", "NaN"])
 def test_non_finite_retry_after_counts_as_absent(live, clock, value):
-    assert llm._retry_after_seconds(_rate_limited({"retry-after": value})) is None
     assert llm._retry_wait(_rate_limited({"retry-after": value})) == llm.RETRY_RATE_LIMIT_WAIT_S
-    client = live([_rate_limited({"retry-after": value}), _rate_limited({"retry-after": value}), _completion()])
+    client = live([_rate_limited({"retry-after": value}), _completion()])
     assert llm.json_task("stance", {}, dry_run=False) == {"ok": True}
-    assert client.attempts == 3 and clock.sleeps == [15.0, 150.0]
+    assert client.attempts == 2 and clock.sleeps == [15.0]
 
 
 @pytest.mark.parametrize("value", ["0", "-5"])

@@ -310,7 +310,7 @@ review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-re
   read yet.
 - IMPLEMENTED, not yet exercised live from this branch: the model route as changed on 2026-10-24 (`llm.py`), the
   Zetaris corpus SQL with the previous windows (`tools/corpus.py`), the live `fetch_text` path through the
-  shared fetcher (`QUORUM_COLLECTORS_PATH`), request spacing (`min_interval_ms = 1600`, TESTED only once the
+  shared fetcher (`QUORUM_COLLECTORS_PATH`), request spacing (`min_interval_ms = 6000` fast lane / 10000 Ultra, stop-instead-of-crawl on a drained model; TESTED only once the
   first live run completes), Studio wiring. Dry-run tests do not establish live integration.
 - INTEGRATED (direct NVIDIA route, provisional corpus, 2026-10-24 04:17–05:13Z): the first genuine run — Anastasia's
   dump restored into a local Postgres, read through Zetaris as `QUORUM_COLLECT`, 1 249 model calls (Lightning 879,

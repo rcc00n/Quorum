@@ -79,10 +79,16 @@ max_tokens = 1500                 # ceiling per reply; every task answers in far
 # there). Why: the journals of two live runs showed a 429 whenever a 60 s window held 31 or more requests (about
 # one per 33 calls at 1600 ms) and none below that; the 429 carries no Retry-After, and staying at the limit for
 # ~30-35 min pushed the provider into a stricter state that refused even ~8 requests/min for minutes.
-min_interval_ms = 2400            # base pause between live calls; env QUORUM_MIN_INTERVAL_MS overrides
-# Per-lane pause, measured per model route (llm.min_interval_ms; decision there): the Ultra-550B lane answered 429 to a
-# 1600 ms cadence most often on the first genuine run. Env QUORUM_MIN_INTERVAL_MS_FACT_CHECKER /
+# (superseded 2026-10-24, next entry)
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): base pace 6000 ms on the default (Lightning) lane (~10
+# requests/min) and 10000 ms on the fact-checker and reviewer (Ultra) lanes (~6 requests/min); llm.py backs a refused
+# route off to twice its base and stops the run on the second refused call within 10 min (decisions there). Why:
+# three runs' journals and NVIDIA user reports show a per-model bucket (Lightning ~700-900 requests, Ultra ~250) with
+# a slow refill (~2-4 requests/min, 3.5-7 h to full), no rate headers and no Retry-After; a slower base spends the
+# bucket more evenly over a run, and a drained bucket is refused at any pace above the refill.
+min_interval_ms = 6000            # base pause between live calls; env QUORUM_MIN_INTERVAL_MS overrides
+# Per-lane pause, measured per model route (llm.min_interval_ms; decision there; values: decision above). Env QUORUM_MIN_INTERVAL_MS_FACT_CHECKER /
 # QUORUM_MIN_INTERVAL_MS_REVIEWER override. Through Nightshift QUORUM_MIN_INTERVAL_MS=0 alone turns these lanes off
 # too (an explicit shared 0 wins over the values below unless a lane's own env is set; decision in llm.min_interval_ms).
-min_interval_ms_fact_checker = 4000
-min_interval_ms_reviewer = 4000
+min_interval_ms_fact_checker = 10000
+min_interval_ms_reviewer = 10000

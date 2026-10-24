@@ -370,23 +370,28 @@ _last_call_by_route: dict[str, float] = {}
 # the old handling (one retry, then straight back to the fixed cadence) kept the key pressed against the limit, and
 # after ~30-35 min the provider switched to a stricter state that refused even ~8 requests/min for minutes. 15 clean
 # calls per step down, so a raised lane recovers within minutes once the provider accepts calls again.
-LANE_INTERVAL_CAP_MS = 10_000
+# (superseded 2026-10-24, next entry: the 10 s cap and repeated doubling are gone)
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a 429 on a paced route sets its interval to twice the lane's
+# base (once: LANE_INTERVAL_FACTOR, no further doubling), and LANE_STEP_DOWN_AFTER consecutive served calls bring it
+# back to the base. Lanes paced at 0 (Nightshift) and dry runs are not adapted. Why: three runs' journals show a
+# per-model bucket with a slow refill (~2-4 requests/min), not a per-minute cap; slowing down further does not
+# refill a drained bucket, so the interval only backs off a little and the abort rule (RATE_LIMIT_ABORT_WINDOW_S)
+# stops the run instead of crawling.
+LANE_INTERVAL_FACTOR = 2
 LANE_STEP_DOWN_AFTER = 15
 _lane_interval_by_route: dict[str, int] = {}  # raised interval (ms) per route; absent = the lane's base
-_clean_streak_by_route: dict[str, int] = {}  # consecutive successful calls since the last 429 or step-down
-_pause_next_by_route: dict[str, bool] = {}  # the last call on this route failed on 429: pause before the next one
-_failed_429_calls_by_route: dict[str, int] = {}  # consecutive calls on this route that failed on a 429 (the breaker)
+_clean_streak_by_route: dict[str, int] = {}  # consecutive successful calls since the last 429
+_last_failed_429_at_by_route: dict[str, float] = {}  # monotonic time of the route's last call that failed on 429
 
 
 def reset_pacing() -> None:
-    """Forgets every route's adapted interval, streaks and last-call times (tests; a fresh process starts clean)."""
+    """Forgets every route's adapted interval, streaks, failures and last-call times (tests; a fresh process starts clean)."""
     global _last_call_at
     _last_call_at = 0.0
     _last_call_by_route.clear()
     _lane_interval_by_route.clear()
     _clean_streak_by_route.clear()
-    _pause_next_by_route.clear()
-    _failed_429_calls_by_route.clear()
+    _last_failed_429_at_by_route.clear()
 
 
 def _effective_interval_ms(which: str = "default", route: str = "") -> int:
@@ -401,30 +406,22 @@ def _note_rate_limited(which: str, route: str) -> tuple[int, int]:
     """Records one 429 on `route`; returns (interval before, interval after) in ms."""
     _clean_streak_by_route[route] = 0
     before = _effective_interval_ms(which, route)
-    if before <= 0:
+    base = min_interval_ms(which)
+    if base <= 0:
         return before, before
-    after = min(before * 2, max(LANE_INTERVAL_CAP_MS, min_interval_ms(which)))
+    after = base * LANE_INTERVAL_FACTOR
     _lane_interval_by_route[route] = after
     return before, after
 
 
 def _note_success(which: str, route: str) -> None:
-    """Records one served call on `route`; every LANE_STEP_DOWN_AFTER in a row halve a raised interval once."""
-    _pause_next_by_route.pop(route, None)
-    _failed_429_calls_by_route.pop(route, None)
-    base = min_interval_ms(which)
-    current = _lane_interval_by_route.get(route)
-    if base <= 0 or current is None or current <= base:
-        _lane_interval_by_route.pop(route, None)
+    """Records one served call on `route`; LANE_STEP_DOWN_AFTER in a row bring a raised interval back to the base."""
+    if route not in _lane_interval_by_route:
         _clean_streak_by_route[route] = 0
         return
     streak = _clean_streak_by_route.get(route, 0) + 1
-    if streak >= LANE_STEP_DOWN_AFTER:
-        lowered = max(base, current // 2)
-        if lowered <= base:
-            _lane_interval_by_route.pop(route, None)
-        else:
-            _lane_interval_by_route[route] = lowered
+    if streak >= LANE_STEP_DOWN_AFTER or min_interval_ms(which) <= 0:
+        _lane_interval_by_route.pop(route, None)
         streak = 0
     _clean_streak_by_route[route] = streak
 
@@ -453,23 +450,35 @@ RETRY_MAX_WAIT_S = 60.0
 # call gets the usual two attempts only (no second long pause). Paced lanes only: a lane at 0 ms (Nightshift) keeps
 # the plain single retry. Why: on the NVIDIA direct route (the only route this evidence is from) the stricter state
 # reached after ~30-35 min at the limit refused calls for 2.5-10+ min and the single 15 s retry rescued only ~55%;
-# a third attempt is allowed only behind the long pause.
-RATE_LIMIT_PAUSE_S = 150.0
-RATE_LIMIT_PAUSE_MAX_S = 600.0  # cap on a Retry-After that asks for a longer long pause
+# a third attempt is allowed only behind the long pause. (superseded 2026-10-24: the 150 s pause and the third attempt
+# are removed; see the abort rule at RATE_LIMIT_ABORT_WINDOW_S)
 # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): three consecutive calls on one route that failed on 429, each
 # already behind its long pause, stop the run with RateLimitAbort; run.py turns it into exit code 3 and the run is
 # continued later with --resume. RateLimitAbort derives from BaseException. Why: the nodes catch `Exception` per
 # passage so one failed call skips one passage; a provider that keeps refusing would otherwise turn every remaining
 # passage into a silent skip and publish an edition of failures. Three, because one or two failed calls in a row
-# can still be a recoverable episode, while three in a row already sit behind ~8 min of refusals.
-RATE_LIMIT_ABORT_AFTER = 3
+# can still be a recoverable episode, while three in a row already sit behind ~8 min of refusals. (superseded
+# 2026-10-24 for the count and the window, next entry; RateLimitAbort stays a BaseException for the same reason)
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): stop instead of crawl. A 429 gets one retry (15 s, or
+# Retry-After capped at 60 s); a call refused on both attempts fails, and the second such failed call on one route
+# within RATE_LIMIT_ABORT_WINDOW_S (monotonic clock) raises RateLimitAbort, which run.py turns into exit code 3:
+# wait at least 5 hours, then --resume (the journal replays the finished calls). RateLimitAbort derives from
+# BaseException so the nodes' per-passage `except Exception` cannot swallow it. Paced lanes only; a lane at 0 ms
+# (Nightshift) keeps the plain single retry and never aborts. Why: three runs' journals and NVIDIA user reports show
+# a per-model bucket (Lightning ~700-900 requests, Ultra ~250) refilling at ~2-4 requests/min (full refill 3.5-7 h),
+# with no rate headers and no Retry-After; once drained, any faster pace is refused, the old 150 s pauses and third
+# attempts kept it drained (60 successes in 30 min), and 429 streaks are reported to bring hour-long lockouts.
+RATE_LIMIT_ABORT_WINDOW_S = 600.0
 
 
 class RateLimitAbort(BaseException):
-    """A route refused RATE_LIMIT_ABORT_AFTER consecutive calls with HTTP 429: stop the run (run.py: exit 3)."""
+    """A route refused two calls within RATE_LIMIT_ABORT_WINDOW_S: its bucket is drained; stop the run (run.py: exit 3)."""
 
-    def __init__(self, route: str, count: int):
-        super().__init__(f"route {route} refused {count} consecutive calls")
+    def __init__(self, route: str, count: int = 2):
+        super().__init__(
+            f"route {route} is drained ({count} refused calls in {RATE_LIMIT_ABORT_WINDOW_S / 60:.0f} min); "
+            "the bucket refills at ~2-4 requests/min: wait at least 5 hours, then re-run with --resume"
+        )
         self.route = route
         self.count = count
 
@@ -490,18 +499,6 @@ def _rate_headers(exc: Exception) -> dict[str, str] | None:
         if low == "retry-after" or low.startswith(RATE_HEADER_PREFIXES):
             kept[low] = str(value)
     return kept
-
-
-def _retry_after_seconds(exc: Exception) -> float | None:
-    """The raw Retry-After header in seconds, uncapped; None when absent or in HTTP-date form."""
-    response = getattr(exc, "response", None)
-    headers = getattr(response, "headers", None) if response is not None else None
-    header = headers.get("retry-after") if headers is not None else None
-    try:
-        value = float(header) if header else None
-        return value if value is not None and math.isfinite(value) else None  # "nan"/"inf" count as absent
-    except ValueError:
-        return None
 
 
 def _retry_wait(exc: Exception) -> float | None:
@@ -535,24 +532,18 @@ def _retry_wait(exc: Exception) -> float | None:
 
 
 def _create(model: str, messages: list[dict[str, str]], temperature: float, entry: dict[str, Any]) -> tuple[Any, int]:
-    """One chat completion with explicit, recorded retries. Returns (completion, HTTP status).
+    """One chat completion with at most one explicit retry. Returns (completion, HTTP status).
 
-    A retry fires only on 429 / 5xx / timeouts / dropped connections, after Retry-After when the server
+    The retry fires only on 429 / 5xx / timeouts / dropped connections, after Retry-After when the server
     sends it (floored at 1 s, capped at 60 s), and is recorded in the ledger row (`attempts`, `retried_after`;
-    every 429 attempt also appends the response's rate-limit headers to `rate_headers`). Two attempts in total
-    (the external-operation rule of AGENTS.md § 3), except on a paced lane whose call was refused 429 on both
-    attempts: a third and last attempt after RATE_LIMIT_PAUSE_S (decision there). Every 429 on a paced lane also
-    raises the route's interval for later calls (decision at LANE_INTERVAL_CAP_MS).
+    every 429 attempt also appends the response's rate-limit headers to `rate_headers`). Two attempts in total:
+    the external-operation rule of AGENTS.md § 3. On a paced lane a 429 also raises the route's interval
+    (decision at LANE_INTERVAL_FACTOR), and a call that ends on a 429 is timed for the abort rule
+    (decision at RATE_LIMIT_ABORT_WINDOW_S; raised by json_task once the failed call's row is written).
     """
     lane = entry.get("lane", "default")
     paced = min_interval_ms(lane) > 0
-    started_paused = paced and _pause_next_by_route.pop(model, False)
-    if started_paused:
-        if _verbose():
-            print(f"  · {entry['task']:<15} {lane:<13} {model:<42} last call refused; lane paused {RATE_LIMIT_PAUSE_S:.0f} s", file=sys.stderr, flush=True)
-        time.sleep(RATE_LIMIT_PAUSE_S)
     attempt = 0
-    refusals = 0  # 429 answers to this call
     while True:
         attempt += 1
         entry["attempts"] = attempt
@@ -565,22 +556,21 @@ def _create(model: str, messages: list[dict[str, str]], temperature: float, entr
             wait = _retry_wait(exc) if attempt == 1 else None
             note = f"one retry in {wait:.0f} s" if wait is not None else ""
             if status == 429:
-                refusals += 1
                 headers = _rate_headers(exc)
                 if headers is not None:
                     entry.setdefault("rate_headers", []).append(headers)
                 if paced:
                     before, after = _note_rate_limited(lane, model)
-                    if attempt == 2 and refusals == 2 and not started_paused:
-                        wait = min(max(_retry_after_seconds(exc) or 0.0, RATE_LIMIT_PAUSE_S), RATE_LIMIT_PAUSE_MAX_S)
-                        note = f"429 again; lane paused {wait:.0f} s"
-                    elif wait is not None:
+                    if wait is not None:
                         note = f"429; retry in {wait:.0f} s"
-                    if wait is not None and after != before:
-                        note += f"; lane interval now {after} ms"
-                    if wait is None:
-                        _pause_next_by_route[model] = True
-                        _failed_429_calls_by_route[model] = _failed_429_calls_by_route.get(model, 0) + 1
+                        if after != before:
+                            note += f"; lane interval now {after} ms"
+                    else:
+                        now = time.monotonic()
+                        previous = _last_failed_429_at_by_route.get(model)
+                        _last_failed_429_at_by_route[model] = now
+                        if previous is not None and now - previous <= RATE_LIMIT_ABORT_WINDOW_S:
+                            entry["_abort"] = True  # json_task raises RateLimitAbort after writing the row
             if wait is None:
                 raise
             step = f"{type(exc).__name__}: HTTP {status if status is not None else '-'}, waited {wait:.0f} s"
@@ -643,6 +633,7 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
     try:
         completion, status = _create(model, messages, temperature, entry)
     except Exception as exc:
+        abort = bool(entry.pop("_abort", False))
         entry["ms"] = int((time.perf_counter() - started) * 1000)
         entry["http_status"] = getattr(exc, "status_code", None)
         entry["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
@@ -650,10 +641,8 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         _journal(entry, payload)
         if _verbose():
             print(f"  · {task:<15} {which:<13} {model:<42} FAILED {entry['ms']:>6} ms  {type(exc).__name__}", file=sys.stderr, flush=True)
-        failed = _failed_429_calls_by_route.get(model, 0)
-        if failed >= RATE_LIMIT_ABORT_AFTER:  # decision at RATE_LIMIT_ABORT_AFTER
-            _failed_429_calls_by_route.pop(model, None)
-            raise RateLimitAbort(model, failed) from exc
+        if abort:  # decision at RATE_LIMIT_ABORT_WINDOW_S
+            raise RateLimitAbort(model, 2) from exc
         raise
     entry["ms"] = int((time.perf_counter() - started) * 1000)
     served, receipt_id = _served_and_receipt(completion, model)

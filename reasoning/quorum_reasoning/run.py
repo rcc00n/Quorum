@@ -170,8 +170,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"resuming {rid}: {loaded} journalled calls restored into the ledger", file=sys.stderr)
     try:
         state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, attempt=args.attempt, on_step=on_step, checkpoint_path=checkpoint, resume=args.resume)
-    except llm.RateLimitAbort as exc:  # decision at llm.RATE_LIMIT_ABORT_AFTER
-        print(f"refusing to continue: route {exc.route} refused {exc.count} consecutive calls; wait a few minutes, then re-run with --resume", file=sys.stderr)
+    except llm.RateLimitAbort as exc:  # decision at llm.RATE_LIMIT_ABORT_WINDOW_S
+        print(f"refusing to continue: {exc}", file=sys.stderr)
         return 3
     except ValueError as exc:
         if "resume" in str(exc) or "already has a checkpoint" in str(exc):
