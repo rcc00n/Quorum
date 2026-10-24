@@ -10,6 +10,8 @@ Apply to a clean disposable combined tree with `git apply --check <patch>` follo
 
 2. `0002-source-memory-hooks.patch` — Yelysei reviews graph/selection behavior; Anastasia reviews exact DocRef namespace/hash/access handling. Default off, zero requested/forced-dry writes, reference persistence/recall and existing-cap fresh re-verification. Nine TEST-state hook cases pass; patched reasoning suite 234/234; unchanged reference conformance 13/13 at engine `1742dec56a66e58eef9dda2d2b865823758ca8cd`. No genuine graph or sponsor completion claim. The patch includes its module README and proposed canonical decision entry; it does not overwrite the owner's go/no-go.
 
+3. `0003-offline-diagnostics.patch` — Vadim reviews. Adds `--offline` to existing doctor/verify wrappers without reading private config or contacting service clients. Six tooling tests pass; each offline command returns five local PASS and one deliberately BLOCKED live-evidence item. `--offline --inference` is rejected before config access.
+
 ## Rehearsal pins
 
 - integration: `c3cc5ac4a65855769ab48e36a1d59d5cc1ae261d`
