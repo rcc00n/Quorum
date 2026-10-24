@@ -7,6 +7,7 @@ first demo recording use this mode. Nothing here is a routine check; the graph r
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -41,9 +42,42 @@ TIMEOUT_S = 180  # a model load on the hotspot can take minutes (Setup Guide ›
 # evidence, not the route in .env. Reset by `plan`, summarised into the snapshot's provenance by `publish`.
 calls: list[dict[str, Any]] = []
 
+# When set (run.py, live runs), every ledger row is also appended at once to this JSON-lines file together with the
+# full request payload the model saw (task, lane, payload), so a run that dies mid-way leaves a complete, private
+# request/receipt journal; `load_journal` restores the ledger of a resumed run from it.
+journal_path: Path | None = None
+current_run_id: str | None = None  # set by run.py; stamped on every ledger row and journal line
+
 
 def reset_calls() -> None:
     calls.clear()
+
+
+def _journal(entry: dict[str, Any], payload: dict[str, Any]) -> None:
+    if journal_path is None:
+        return
+    try:
+        journal_path.parent.mkdir(parents=True, exist_ok=True)
+        with journal_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({**entry, "payload": payload}, ensure_ascii=False) + "\n")
+    except OSError as exc:  # the journal must never break a run
+        print(f"journal write failed: {exc}", file=sys.stderr)
+
+
+def load_journal(path: Path) -> int:
+    """Restores the ledger from a journal (payloads dropped). Returns the number of rows loaded. Used on --resume
+    so the snapshot's provenance counts cover the whole run, not only the resumed part."""
+    if not path.is_file():
+        return 0
+    n = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        row.pop("payload", None)
+        calls.append(row)
+        n += 1
+    return n
 
 
 def served_counts() -> dict[str, int]:
@@ -353,7 +387,7 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         {"role": "system", "content": _prompt(task)},
         {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
     ]
-    entry: dict[str, Any] = {"task": task, "lane": which, "route": model, "served": "error", "ms": 0, "attempts": 0}
+    entry: dict[str, Any] = {"task": task, "lane": which, "route": model, "served": "error", "ms": 0, "attempts": 0, "run_id": current_run_id}
     started = time.perf_counter()
     try:
         completion, status = _create(model, messages, temperature, entry)
@@ -362,6 +396,7 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         entry["http_status"] = getattr(exc, "status_code", None)
         entry["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
         calls.append(entry)
+        _journal(entry, payload)
         if _verbose():
             print(f"  · {task:<15} {which:<13} {model:<42} FAILED {entry['ms']:>6} ms  {type(exc).__name__}", file=sys.stderr, flush=True)
         raise
@@ -387,7 +422,10 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
     if obj is None:
         why = f" (finish_reason {entry['finish_reason']})" if entry.get("finish_reason") not in (None, "stop") else ""
         entry["error"] = "reply carried no JSON object" + why
+    if obj is not None:
+        entry["reply_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()  # the reply's fingerprint; the text itself stays private
     calls.append(entry)
+    _journal(entry, payload)
     if _verbose():
         flag = "" if served == model or model.startswith("meterless/") else "  (substituted)"
         if entry.get("error"):

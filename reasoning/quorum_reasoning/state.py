@@ -30,6 +30,7 @@ class DocRef(TypedDict):
     text: NotRequired[str | None]  # only for official_docs (public domain); never for outlets
     superseded: NotRequired[bool]  # a correction replaced this row: spread and coverage only, never evidence
     from_previous_day: NotRequired[bool]  # loaded from an earlier edition window for research round 2: evidence only, never an event, spread or coverage
+    topic_match: NotRequired[str | None]  # title | lead | body — where collection's topic terms matched (documents.topic_match); counted in the trace, never used to filter
     canonical_url: NotRequired[str | None]  # documents.canonical_url (tracking parameters stripped by collection)
     content_hash: NotRequired[str | None]  # documents.content_hash at collection: sha256(title + "\n" + lead + "\n" + body[:2000])
     fetched_at: NotRequired[str | None]  # when collection fetched the row (ISO 8601 UTC); official_docs.fetched_at for official rows

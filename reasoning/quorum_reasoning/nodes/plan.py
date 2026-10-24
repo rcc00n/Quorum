@@ -23,7 +23,8 @@ def run(state: RunState) -> dict:
     if corpus not in ("fixture", "zetaris"):
         raise ValueError(f"corpus must be fixture or zetaris, got {corpus!r}")
     clear_cache()  # article texts live for one run only
-    llm.reset_calls()  # the ledger of live model calls is per run
+    if not llm.calls or not all(c.get("run_id") == state.get("run_id") for c in llm.calls):
+        llm.reset_calls()  # the ledger of live model calls is per run (a resumed run reloads its own journal first)
     with step(state, "plan") as s:
         docs = state.get("documents") or load_documents(topic_id, edition_date, corpus=corpus)
         today_all = [d for d in docs if not d.get("from_previous_day")]
@@ -34,10 +35,16 @@ def run(state: RunState) -> dict:
         sources = sorted({d["source_id"] for d in today})
         rounds = config.get("loops", "research_rounds_max", 2)
         model_mode = "stand-ins (dry run)" if llm.is_dry_run(dry_run) else f"live, {llm.model_name()}"
+        # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): documents.topic_match (title | lead | body) is counted here
+        # and carried on DocRef, never used to drop a document. Why: DECISIONS.md › Selecting major news says candidates
+        # are all events in the corpus and no decision allows a relevance filter; the first real day measures the
+        # noise (events whose terms matched only the lead or body) before anyone decides on one. Anastasia's ask 3.
+        matched = {k: sum(1 for d in today if d.get("topic_match") == k) for k in ("title", "lead", "body")}
         s.decision = (
             f"{len(today)} documents from {len(sources)} sources, {official} official"
             + (f"; {folded} superseded versions folded into their chains (counted once)" if folded else "")
             + (f"; {earlier} earlier-day documents for evidence only" if earlier else "")
+            + (f"; topic terms matched in title {matched['title']} / lead only {matched['lead']} / body only {matched['body']}" if any(matched.values()) else "")
             + f"; research budget {rounds} rounds per event"
         )
         s.reason = f"corpus: {corpus}, edition window ending 05:30 America/New_York; model: {model_mode}; every event gets the same budget"

@@ -86,7 +86,7 @@ def sql_pair(topic_id: str, start: str, end: str, db: str | None = None) -> tupl
     docs_sql = f"""
         SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
                d.url, d.canonical_url, d.title, d.lead, d.published_at, d.fetched_at, d.access_level, d.wire_origin,
-               d.supersedes_id, d.content_hash
+               d.supersedes_id, d.content_hash, d.topic_match
         FROM {db}.documents d
         JOIN {db}.sources s ON s.id = d.source_id
         WHERE d.topic_id = '{topic_id}'
@@ -232,6 +232,8 @@ def _docref(row: dict, *, official: bool) -> DocRef:
         access_level=int(row.get("access_level") or (1 if official else 3)),
         wire_origin=_text_or_none(row.get("wire_origin")),
     )
+    if row.get("topic_match") not in (None, "", "None"):
+        ref["topic_match"] = str(row["topic_match"])  # title | lead | body: where the topic's query terms matched (collection, 2026-10-24)
     if row.get("canonical_url") not in (None, "", "None"):
         ref["canonical_url"] = str(row["canonical_url"])
     if row.get("content_hash") not in (None, "", "None"):

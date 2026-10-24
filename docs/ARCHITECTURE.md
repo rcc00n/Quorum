@@ -141,7 +141,7 @@ class RunState(TypedDict):                      # reasoning/quorum_reasoning/sta
 - `adjudicate → escalate` (also `review_disputed → escalate`): an event that crosses the bar on points with zero confirmed claims after all rounds is removed from the stories and put into the roundup as "reported, not confirmed", with a `needs_review` flag and a `review_reason` for the portal.
 - Source failure (403, timeout, robots.txt denial): recorded in `errors` and in the trace; the node continues with what it has. The topic summary says which sources were missing.
 - `recursion_limit` is set per run to 60 node executions; hitting it is a failed run, not an infinite loop.
-- Checkpointer: in-memory for development and the demo recording, Postgres (`langgraph-checkpoint-postgres`) when the daily schedule runs unattended, so a crashed run resumes at the failed node.
+- Checkpointer: in-memory for dry runs, tests and Studio; a SQLite file under the output directory for every live run (`graph._checkpointer`, 2026-10-24), so a run that dies mid-way resumes at its last completed node with `run.py --resume`, with the ledger restored from the private request journal (`<out>/_journal/<run_id>.jsonl`: every call's payload, status, tokens, receipt id, reply hash). Postgres (`langgraph-checkpoint-postgres`) stays the option for an unattended daily schedule.
 - Idempotency: a node that is retried runs again from its start, so every write inside a node is an upsert keyed by the stable ids of section 4. Nothing is appended twice.
 
 ## 6. Rules the code enforces

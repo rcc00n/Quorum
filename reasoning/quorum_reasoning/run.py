@@ -25,7 +25,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import graph, llm, store
+from . import graph, ids, llm, store
 
 
 def format_step(s: dict) -> str:
@@ -91,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--list", action="store_true", help="list every stored snapshot version under --out and exit")
     ap.add_argument("--show", action="store_true", help="print one stored snapshot (--topic, --date, optional --version) and exit")
     ap.add_argument("--version", type=int, default=None, help="with --show: the version to print (default: newest)")
+    ap.add_argument("--checkpoint", action="store_true", help="checkpoint every node into <out>/_checkpoints/<run_id>.sqlite (always on with --model live)")
+    ap.add_argument("--resume", action="store_true", help="continue the run <date>-<topic>-<attempt> from its last completed node (needs the checkpoint file)")
+    ap.add_argument("--attempt", type=int, default=1, help="attempt number in the run id (default 1); a fresh live run of the same day after a finished one needs 2, 3, …")
     ap.add_argument("--mermaid", action="store_true", help="print the graph as Mermaid and exit")
     ap.add_argument("--models", action="store_true", help="list the routes the configured hotspot offers (GET /v1/models) and exit")
     ap.add_argument("--test-connection", action="store_true", help="one small completion per lane (default, fact_checker) and exit")
@@ -150,7 +153,24 @@ def main(argv: list[str] | None = None) -> int:
     if not args.quiet:
         print_header()
         on_step = lambda rec: print(format_step(rec), flush=True)  # noqa: E731 — progress as each node finishes
-    state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, on_step=on_step)
+    rid = ids.run_id(args.topic, args.date, args.attempt)
+    llm.current_run_id = rid
+    checkpoint = None
+    if args.checkpoint or args.resume or not model_dry:
+        checkpoint = str(Path(args.out) / "_checkpoints" / f"{rid}.sqlite")
+    if not model_dry:
+        llm.journal_path = Path(args.out) / "_journal" / f"{rid}.jsonl"  # private: full request payloads and receipts
+        if args.resume:
+            llm.reset_calls()
+            loaded = llm.load_journal(llm.journal_path)
+            print(f"resuming {rid}: {loaded} journalled calls restored into the ledger", file=sys.stderr)
+    try:
+        state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, attempt=args.attempt, on_step=on_step, checkpoint_path=checkpoint, resume=args.resume)
+    except ValueError as exc:
+        if "resume" in str(exc):
+            print(f"refusing to run: {exc}", file=sys.stderr)
+            return 2
+        raise
     snapshot = state["snapshot"]
     out, version = store.publish(snapshot, Path(args.out), ledger=llm.calls)
     ledger = ledger_path(Path(args.out), args.topic, args.date, version)
@@ -166,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"snapshot: {out} (version {version}, published_at {snapshot['published_at']}, sha256 {store.sha256_of(out)})")
         if ledger:
             print(f"ledger (private, not part of the snapshot): {ledger}")
+        if checkpoint:
+            print(f"checkpoint (private): {checkpoint}; journal: {llm.journal_path or '-'}")
     return 0 if snapshot["status"] != "partial" else 2
 
 

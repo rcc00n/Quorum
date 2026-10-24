@@ -27,8 +27,9 @@ TOPIC = "russia-ukraine-war"
 
 def write(name: str, snapshot: dict) -> None:
     path = EXAMPLES / name
-    path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    content = json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n"
+    path.write_text(content, encoding="utf-8", newline="\n")
+    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()  # the git blob's hash (LF), not the CRLF working copy's
     print(f"{name}: status {snapshot['status']}, {len(snapshot['stories'])} stories, roundup {snapshot['roundup']['count']}, sha256 {digest}")
 
 
