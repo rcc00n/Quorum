@@ -1,0 +1,107 @@
+diff --git a/web/components/reasoning-preview.tsx b/web/components/reasoning-preview.tsx
+index a262ef2..ecbbe80 100644
+--- a/web/components/reasoning-preview.tsx
++++ b/web/components/reasoning-preview.tsx
+@@ -15,6 +15,13 @@ import { Spectrum } from "./spectrum";
+ import { ReasoningSpectrum } from "./reasoning-spectrum";
+ import { ReasoningTimeline, previewHref } from "./reasoning-timeline";
+ import { roundupCheckNotice } from "@/lib/reasoning-trace";
++function focusReadingTarget(target: HTMLElement) {
++  // DECISION(2026-10-24, rcc00n/Codex): section navigation transfers keyboard focus after async loading.
++  // Why: scrolling alone leaves keyboard and screen-reader users at the previous link.
++  target.tabIndex = -1;
++  target.focus({ preventScroll: true });
++}
++
+ function ReadingNavigation({
+   run,
+   story,
+@@ -53,7 +60,10 @@ function ReadingNavigation({
+     targets.forEach((e) => observer.observe(e));
+     // A date/event navigation may render its anchor after the recorded edition loads.
+     const target = document.getElementById(location.hash.slice(1));
+-    if (target) target.scrollIntoView({ behavior: "instant" });
++    if (target && targets.includes(target)) {
++      focusReadingTarget(target);
++      target.scrollIntoView({ behavior: "instant" });
++    }
+     return () => observer.disconnect();
+   }, [ids, eventId]);
+   return (
+@@ -63,7 +73,11 @@ function ReadingNavigation({
+           key={id}
+           href={"#" + id}
+           aria-current={active === id ? "location" : undefined}
+-          onClick={() => setActive(id)}
++          onClick={() => {
++            setActive(id);
++            const target = document.getElementById(id);
++            if (target) focusReadingTarget(target);
++          }}
+         >
+           {title}
+         </a>
+@@ -262,7 +276,7 @@ export function ReasoningPreviewPage({
+           <ReadingNavigation run={run} story={!!story} eventId={eventId} />
+         )}
+       </div>
+-      <main id="main" className="r-main">
++      <main id="main" tabIndex={-1} className="r-main">
+         {loading ? (
+           <section className="r-preview-loading" role="status" aria-busy="true">
+             <p>Loading the recorded reasoning sample…</p>
+diff --git a/web/components/reasoning-timeline.tsx b/web/components/reasoning-timeline.tsx
+index 4e9fd24..21442e4 100644
+--- a/web/components/reasoning-timeline.tsx
++++ b/web/components/reasoning-timeline.tsx
+@@ -66,9 +66,9 @@ export function ReasoningTimeline({
+     setEvent(id);
+   }
+   return (
+-    <section id="reasoning-timeline" className="r-section">
++    <section id="reasoning-timeline" tabIndex={-1} aria-labelledby="reasoning-timeline-title" className="r-section">
+       <p className="eyebrow">RECORDED EXECUTION · NOT LIVE INFERENCE</p>
+-      <h2>Investigation Timeline</h2>
++      <h2 id="reasoning-timeline-title">Investigation Timeline</h2>
+       <p>
+         Research can return for more evidence. A rejected draft can return for
+         revision. Explore what this recorded run actually did.
+diff --git a/web/tests/roundup-checks.cjs b/web/tests/roundup-checks.cjs
+index f2b96ae..d96cd4f 100644
+--- a/web/tests/roundup-checks.cjs
++++ b/web/tests/roundup-checks.cjs
+@@ -15,6 +15,16 @@ module.exports = async ({browser, root, env, password}) => {
+     const row = page.locator('.r-roundup-row').filter({hasText:item.line});
+     await row.getByText('Producer status: confirmed', {exact:true}).waitFor();
+     await row.getByText('Independent check skipped; not double-checked.', {exact:true}).waitFor();
++    for (const width of [1440,390]) {
++      await page.setViewportSize({width,height:900});
++      await page.getByRole('link',{name:'Skip to content',exact:true}).focus();
++      await page.keyboard.press('Enter');
++      assert.equal(await page.locator('#main').evaluate(el=>el===document.activeElement),true);
++      const roundupLink=page.getByRole('navigation',{name:'Read and investigate'}).getByRole('link',{name:'Also today',exact:true});
++      await roundupLink.focus();await page.keyboard.press('Enter');
++      assert.equal(await page.locator('#reasoning-roundup').evaluate(el=>el===document.activeElement),true);
++      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
++    }
+     const inspect = row.getByRole('link',{name:'Inspect recorded checks →',exact:true});
+     const href=new URL(await inspect.getAttribute('href'),root);
+     assert.equal(href.searchParams.get('date'),sample.edition_date);
+@@ -22,6 +32,9 @@ module.exports = async ({browser, root, env, password}) => {
+     assert.equal(href.hash,'#reasoning-timeline');
+     await inspect.focus(); await page.keyboard.press('Enter');
+     await page.getByText('Independent check skipped; not double-checked.', {exact:true}).waitFor();
++    await page.waitForFunction(() => document.activeElement?.id === 'reasoning-timeline', null, {timeout:5000});
++    await page.keyboard.press('Tab');
++    assert.equal(await page.getByLabel('Trace event filter',{exact:true}).evaluate(el=>el===document.activeElement),true);
+     assert.equal(await page.getByLabel('Trace event filter',{exact:true}).inputValue(),item.event_id);
+     await page.getByLabel('Trace node filter',{exact:true}).selectOption('research');
+     await page.getByText('Independent check skipped; not double-checked.',{exact:true}).waitFor();
+@@ -32,6 +45,6 @@ module.exports = async ({browser, root, env, password}) => {
+     await page.reload();
+     await page.getByText(/Independent verification is not established by this roundup entry/).waitFor();
+     assert.equal(await page.getByText('Independent check skipped; not double-checked.',{exact:true}).count(),0);
+-    console.log('PASS: TEST confirmed roundup with skipped check stays producer-attributed on list/detail; absent check never implies verification');
++    console.log('PASS: TEST confirmed roundup with skipped check stays producer-attributed on list/detail; absent check never implies verification; keyboard focus and no overflow at 1440/390px');
+   } finally {fs.writeFileSync(file, original); await context.close();}
+ };
