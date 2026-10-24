@@ -21,11 +21,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter
 from pathlib import Path
 
-from quorum_reasoning import graph
+from quorum_reasoning import graph, llm
 from quorum_reasoning.nodes import plan
 from quorum_reasoning.state import DocRef
 from quorum_reasoning.text import containment
@@ -175,6 +176,12 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.live:
+        if os.getenv("QUORUM_DRY_RUN") == "1":
+            print("refusing to run: --live together with QUORUM_DRY_RUN=1; unset the variable or drop --live", file=sys.stderr)
+            return 2
+        if not llm.route_configured():
+            print("refusing to run: --live but no model route is configured (MODEL_BASE_URL and MODEL_API_KEY in .env)", file=sys.stderr)
+            return 2
         estimate = estimate_model_calls(load_days())
         print(f"A live run makes up to about {estimate} model calls over {len(load_days())} days.")
         if not args.confirm_credits:

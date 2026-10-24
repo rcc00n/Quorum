@@ -121,7 +121,7 @@ def test_snapshot_matches_the_contract(state):
 def test_run_is_deterministic():
     again = graph.run_local(TOPIC, DAY, dry_run=True, attempt=2)
     first = graph.run_local(TOPIC, DAY, dry_run=True, attempt=3)
-    strip = lambda snap: {k: v for k, v in snap.items() if k not in ("run_id", "trace")}  # noqa: E731
+    strip = lambda snap: {k: v for k, v in snap.items() if k not in ("run_id", "trace", "generated_at")}  # noqa: E731 — generated_at is wall-clock
     a, b = strip(again["snapshot"]), strip(first["snapshot"])
     a["stories"] = [{k: v for k, v in s.items() if k != "trace_ref"} for s in a["stories"]]
     b["stories"] = [{k: v for k, v in s.items() if k != "trace_ref"} for s in b["stories"]]

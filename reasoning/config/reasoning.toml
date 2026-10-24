@@ -43,4 +43,11 @@ temperature = 0.1
 reasoning = "off"                 # off | on
 reasoning_budget = 0              # when reasoning = "on": cap on thinking tokens, NVIDIA's `reasoning_budget` (0 = provider default)
 max_tokens = 1500                 # ceiling per reply; every task answers in far fewer
-min_interval_ms = 0               # pause between live calls; 1600 stays under the direct route's 40-requests/min trial cap
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): 1600 ms between live calls by default (37 requests/min,
+# under the direct NVIDIA route's documented 40-requests/min trial cap), overridable per run with
+# QUORUM_MIN_INTERVAL_MS (0 through Nightshift, where the hotspot paces upstream; 3500 if the direct route
+# still answers 429). Why: with no spacing the first live fixture run hit HTTP 429 after 61 calls and finished
+# only at 3500 ms (Vadim, NVIDIA-FIRST-01); the one explicit retry in llm.py honours Retry-After, so the
+# documented cap is the starting point and the observed 3500 ms the fallback. Verified only by the first live
+# run on this branch: until then this value is IMPLEMENTED, not TESTED.
+min_interval_ms = 1600            # pause between live calls; env QUORUM_MIN_INTERVAL_MS overrides

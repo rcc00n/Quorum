@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-24T00:30:03Z",
+  "generated_at": "2026-10-24T01:56:43Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -27,6 +27,7 @@
     "confirmation_min": 1
   },
   "summary": "No story crossed the bar today out of 3 events. The roundup carries all of them.",
+  "summary_source": "model",
   "sources_missing": [],
   "stories": [],
   "roundup": {
@@ -105,8 +106,8 @@
       "event_id": null,
       "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
-      "model": "meterless/auto",
-      "duration_ms": 0
+      "model": "stand-ins",
+      "duration_ms": 1
     },
     {
       "node": "score_importance",
@@ -114,7 +115,7 @@
       "event_id": "b913ab53ff63",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
       "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -123,7 +124,7 @@
       "event_id": "8ec9e4f49dc1",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
       "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -132,7 +133,7 @@
       "event_id": "c83a993b6c7f",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
       "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -141,7 +142,7 @@
       "event_id": "b913ab53ff63",
       "decision": "2 claims extracted",
       "reason": "from 2 documents; level-2 sources contribute leads only, level-3 nothing",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -150,7 +151,7 @@
       "event_id": "8ec9e4f49dc1",
       "decision": "1 claims extracted",
       "reason": "from 1 documents; level-2 sources contribute leads only, level-3 nothing",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -159,7 +160,7 @@
       "event_id": "c83a993b6c7f",
       "decision": "1 claims extracted",
       "reason": "from 1 documents; level-2 sources contribute leads only, level-3 nothing",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -168,7 +169,7 @@
       "event_id": "b913ab53ff63",
       "decision": "round 1: 2 passages with a stance for 2 claims",
       "reason": "event documents only",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -177,7 +178,7 @@
       "event_id": "8ec9e4f49dc1",
       "decision": "round 1: 0 passages with a stance for 1 claims",
       "reason": "event documents only",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -186,7 +187,7 @@
       "event_id": "c83a993b6c7f",
       "decision": "round 1: 0 passages with a stance for 1 claims",
       "reason": "event documents only",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -222,7 +223,7 @@
       "event_id": "8ec9e4f49dc1",
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -231,7 +232,7 @@
       "event_id": "c83a993b6c7f",
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -258,7 +259,7 @@
       "event_id": "b913ab53ff63",
       "decision": "2 confirmed, 0 disputed, 0 unverified from 2 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -267,7 +268,7 @@
       "event_id": "8ec9e4f49dc1",
       "decision": "0 confirmed, 0 disputed, 1 unverified from 0 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -276,7 +277,7 @@
       "event_id": "c83a993b6c7f",
       "decision": "0 confirmed, 0 disputed, 1 unverified from 0 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "meterless/auto",
+      "model": "stand-ins",
       "duration_ms": 0
     },
     {
@@ -321,8 +322,8 @@
       "event_id": null,
       "decision": "3 events in 2 group(s); empty day: True",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
-      "model": "meterless/auto",
-      "duration_ms": 1
+      "model": "stand-ins",
+      "duration_ms": 0
     },
     {
       "node": "publish",
@@ -330,8 +331,8 @@
       "event_id": null,
       "decision": "snapshot empty: 0 stories, roundup of 3",
       "reason": "built from state; the store versions it",
-      "model": "meterless/auto",
-      "duration_ms": 1
+      "model": "stand-ins",
+      "duration_ms": 0
     }
   ]
 }

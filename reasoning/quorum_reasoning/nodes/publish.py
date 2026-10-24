@@ -8,11 +8,12 @@ crossed the bar, "ok" otherwise. The adapter must not turn a failed pull into an
 from __future__ import annotations
 
 import math
+import re
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .. import config, llm, untrusted
-from ..state import Claim, Event, RunState
+from ..state import Claim, Event, RunState, StepError
 from ..tools.corpus import _edition_window, fixture_name
 from ..trace import finish, step
 
@@ -44,12 +45,12 @@ def envelope(state: RunState) -> dict:
         "provenance": {
             "corpus": state["corpus"] + (f":{fixture_name()}" if fictional else ""),
             "model": "stand-ins" if llm.is_dry_run(state["dry_run"]) else llm.model_name(),
-            "fact_checker_model": "stand-ins" if llm.is_dry_run(state["dry_run"]) else llm.model_name("fact_checker"),
+            "fact_checker_model": "stand-ins" if llm.is_dry_run(state["dry_run"]) else llm.model_name("fact_checker"),  # model_name itself says stand-ins when QUORUM_DRY_RUN is set
             "fictional": fictional,
             # what actually answered, counted from the responses — the evidence that Nemotron powered the run
             "model_calls": len(llm.calls),
             "answered_by": llm.served_counts(),
-            "model_errors": sum(1 for c in llm.calls if c["served"] == "error"),
+            "model_errors": llm.error_count(),  # transport failures and replies without JSON alike
         },
     }
 
@@ -108,24 +109,75 @@ def story_view(state: RunState, e: Event) -> dict:
     }
 
 
+_NO_STORY = re.compile(r"\bno (?:story|stories|event|events)\b.{0,40}?\b(?:crossed|cleared|passed|made|met)\b", re.IGNORECASE)
+_NUMBER_WORDS = {"zero": 0, "no": 0, "none": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+_COUNT_CROSSED = re.compile(r"\b(\d+|zero|none|one|two|three|four|five|six|seven|eight|nine|ten)\b(?: of \d+)?(?: \w+){0,3}? (?:crossed|cleared|passed|made it over|met) the bar", re.IGNORECASE)
+_STORY_WORDS = {"story", "stories", "event", "events"}
+
+
+def summary_contradiction(summary: str, above_bar: int) -> str | None:
+    """Why a summary contradicts the run's own count of stories above the bar, or None when it agrees.
+
+    Checked in code because the model's text is the one line a reader sees first: the first live fixture run
+    produced "one story crossed the bar" and "no story crossed the bar" in one summary (Vadim's finding,
+    NVIDIA-FIRST-01, snapshot 8f86e67c…9017). Two checks: the "no story crossed the bar" phrase may appear only
+    on a zero day, and every "<N> ... crossed the bar" count must equal the real count. Anything else in the
+    text is the model's to say.
+    """
+    text = summary or ""
+    if _NO_STORY.search(text) and above_bar > 0:
+        return f"says no story crossed the bar, but {above_bar} did"
+    for m in _COUNT_CROSSED.finditer(text):
+        raw = m.group(1).lower()
+        n = _NUMBER_WORDS.get(raw)
+        if n is None:
+            n = int(raw)
+        if n != above_bar:
+            return f"says {raw} crossed the bar, but {above_bar} did"
+    return None
+
+
+def fallback_summary(events: int, above_bar: int, needs_review: int) -> str:
+    """Code-built summary used when the model's is missing or contradicts the counts; marked `summary_source: fallback`."""
+    if above_bar == 0:
+        text = f"No story crossed the bar today out of {events} events. The roundup carries the day."
+    elif above_bar == 1:
+        text = f"One story crossed the bar today out of {events} events."
+    else:
+        text = f"{above_bar} stories crossed the bar today out of {events} events."
+    if needs_review:
+        text += f" {needs_review} event(s) flagged for review."
+    return text
+
+
 def run(state: RunState) -> dict:
     stories = sorted((e for e in state["events"] if e["above_bar"]), key=lambda e: e["rank"] or 0)
     with step(state, "publish", model=llm.model_name()) as s:
+        n_review = sum(1 for e in state["events"] if e["needs_review"])
         payload = {
             "topic_id": state["topic_id"],
             "edition_date": state["edition_date"],
             "events": len(state["events"]),
             "above_bar": len(stories),
-            "needs_review": sum(1 for e in state["events"] if e["needs_review"]),
+            "above_bar_case": "zero" if not stories else ("one" if len(stories) == 1 else "several"),
+            "needs_review": n_review,
             "headlines": [untrusted.clip(e["headline"], untrusted.CAP_HEADLINE) for e in stories],
             "sources_missing": [],
         }
+        summary_source = "model"
+        summary_errors: list[StepError] = []
         try:
             summary = untrusted.clip(llm.json_task("summary", payload, dry_run=state["dry_run"]).get("summary", ""), untrusted.CAP_SUMMARY)
+            problem = summary_contradiction(summary, len(stories)) or (None if summary.strip() else "empty summary")
+            if problem:
+                summary_errors.append(StepError(node="publish", event_id=None, message=f"summary rejected: {problem}; fallback text used"))
+                s.reason = f"model summary rejected: {problem}; fallback text"
+                summary, summary_source = fallback_summary(len(state["events"]), len(stories), n_review), "fallback"
         except Exception as exc:  # noqa: BLE001
-            summary = f"{len(stories)} of {len(state['events'])} events crossed the bar today."
+            summary_errors.append(StepError(node="publish", event_id=None, message=f"summary model call failed: {str(exc)[:200]}; fallback text used"))
             s.reason = f"summary model call failed: {str(exc)[:120]}; fallback text"
-        errors = state.get("errors", [])
+            summary, summary_source = fallback_summary(len(state["events"]), len(stories), n_review), "fallback"
+        errors = list(state.get("errors", [])) + summary_errors
         status = "partial" if errors else ("empty" if not stories else "ok")
         snapshot = {
             "schema_version": SCHEMA_VERSION,
@@ -137,6 +189,7 @@ def run(state: RunState) -> dict:
             **envelope(state),
             "bar": {"threshold": config.get("impact_bar", "threshold", 6), "confirmation_min": config.get("impact_bar", "confirmation_min", 1)},
             "summary": summary,
+            "summary_source": summary_source,  # "model", or "fallback" when the model's text failed or contradicted the counts (then `errors` says so)
             "sources_missing": [],  # filled once plan can compare the sources table with the day's corpus
             "stories": [story_view(state, e) for e in stories],
             "roundup": state["roundup"] or {"empty_day": not stories, "count": 0, "groups": []},
@@ -147,4 +200,4 @@ def run(state: RunState) -> dict:
         s.reason = s.reason or "built from state; the store versions it"
     rec = finish(state, s)
     snapshot["trace"].append(rec)
-    return {"snapshot": snapshot, "summary": summary, "steps": [rec]}
+    return {"snapshot": snapshot, "summary": summary, "steps": [rec], "errors": summary_errors}

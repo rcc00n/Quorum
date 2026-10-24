@@ -47,6 +47,9 @@ def reset_calls() -> None:
 
 
 def served_counts() -> dict[str, int]:
+    """Answering model -> calls. Every ledger row has exactly one `served` value ("error" for a call that got no
+    reply), so the counts sum to `len(calls)`; a reply that answered but carried no JSON stays under its model
+    and is counted separately by `error_count`."""
     out: dict[str, int] = {}
     for c in calls:
         out[c["served"]] = out.get(c["served"], 0) + 1
@@ -80,11 +83,15 @@ def _client():
     base, key, _ = _route()
     # meterless-app and meterless-scope are the Runtime contract's required headers (Setup Guide § 4.5);
     # NVIDIA's own endpoint ignores them, so the same client works on a direct route.
+    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): the SDK retries nothing (max_retries=0); the one
+    # retry this module allows is explicit, in `_create`, on 429/5xx/timeouts only, honouring Retry-After.
+    # Why: max_retries=2 let the SDK make three HTTP attempts per call behind the ledger's back, which broke
+    # the two-attempt rule (AGENTS.md § 3) and hid the 429s of the first live fixture run (Vadim, NVIDIA-FIRST-01).
     return OpenAI(
         base_url=base,
         api_key=key,
         timeout=TIMEOUT_S,
-        max_retries=2,
+        max_retries=0,
         default_headers={"meterless-app": APP_NAME, "meterless-scope": "user"},
     )
 
@@ -156,14 +163,31 @@ def test_connection(which: str = "default") -> dict[str, str]:
     return {"lane": which, "route": model, "answered_by": getattr(completion, "model", "") or "", "reply": (completion.choices[0].message.content or "").strip()[:40]}
 
 
+def route_configured() -> bool:
+    """True when MODEL_BASE_URL and MODEL_API_KEY (or the METERLESS_* names) are both set."""
+    base, key, _ = _route()
+    return bool(base and key)
+
+
 def is_dry_run(state_flag: bool) -> bool:
     if state_flag or os.getenv("QUORUM_DRY_RUN") == "1":
         return True
-    base, key, _ = _route()
-    return not (base and key)
+    return not route_configured()
+
+
+def error_count() -> int:
+    """Ledger rows that did not end in a parsed answer: transport failures and replies without JSON alike."""
+    return sum(1 for c in calls if c.get("error"))
 
 
 def model_name(which: str = "default") -> str:
+    """The route a lane would use, or "stand-ins" when the run is dry (QUORUM_DRY_RUN=1 or no route).
+
+    Trace rows and the envelope carry this: a dry run must never show a real model name as if it had answered
+    (the committed samples did, from the local .env, until 2026-10-24).
+    """
+    if is_dry_run(False):
+        return "stand-ins"
     return _route(which)[2]
 
 
@@ -225,15 +249,83 @@ def _request_extras() -> dict[str, Any]:
     return extras
 
 
+def min_interval_ms() -> int:
+    """Pause between two live calls: QUORUM_MIN_INTERVAL_MS when set (Nightshift runs set it to 0), else
+    config/reasoning.toml › models.min_interval_ms (the direct route's trial cap; see the decision there)."""
+    raw = os.getenv("QUORUM_MIN_INTERVAL_MS", "").strip()
+    if raw:
+        return max(0, int(raw))
+    return int(config.get("models", "min_interval_ms", 0) or 0)
+
+
 def _throttle() -> None:
-    """Keeps at least models.min_interval_ms between two live calls (the provider's per-minute cap)."""
+    """Keeps at least min_interval_ms() between two live calls (the provider's per-minute cap)."""
     global _last_call_at
-    gap = int(config.get("models", "min_interval_ms", 0) or 0) / 1000.0
+    gap = min_interval_ms() / 1000.0
     if gap > 0:
         wait = _last_call_at + gap - time.monotonic()
         if wait > 0:
             time.sleep(wait)
     _last_call_at = time.monotonic()
+
+
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+RETRY_DEFAULT_WAIT_S = 5.0
+RETRY_MAX_WAIT_S = 60.0
+
+
+def _retry_wait(exc: Exception) -> float | None:
+    """Seconds to wait before the single retry, or None when the failure is not retryable (4xx other than 429,
+    malformed replies, anything that is not a transport or server-side failure)."""
+    from openai import APIConnectionError, APIStatusError, APITimeoutError  # imported lazily: not needed in dry run
+
+    if isinstance(exc, APITimeoutError):
+        return RETRY_DEFAULT_WAIT_S
+    if isinstance(exc, APIStatusError):
+        if exc.status_code not in RETRY_STATUSES:
+            return None
+        wait = RETRY_DEFAULT_WAIT_S
+        header = exc.response.headers.get("retry-after") if getattr(exc, "response", None) is not None else None
+        if header:
+            try:
+                wait = float(header)
+            except ValueError:
+                from datetime import datetime, timezone
+                from email.utils import parsedate_to_datetime
+
+                try:
+                    wait = (parsedate_to_datetime(header) - datetime.now(timezone.utc)).total_seconds()
+                except (TypeError, ValueError):
+                    wait = RETRY_DEFAULT_WAIT_S
+        return min(max(wait, 1.0), RETRY_MAX_WAIT_S)
+    if isinstance(exc, APIConnectionError):
+        return RETRY_DEFAULT_WAIT_S  # a dropped socket counts like a timeout
+    return None
+
+
+def _create(model: str, messages: list[dict[str, str]], temperature: float, entry: dict[str, Any]) -> tuple[Any, int]:
+    """One chat completion with at most one explicit retry. Returns (completion, HTTP status).
+
+    The retry fires only on 429 / 5xx / timeouts / dropped connections, after Retry-After when the server
+    sends it (floored at 1 s, capped at 60 s), and is recorded in the ledger row (`attempts`, `retried_after`).
+    Two attempts in total: the external-operation rule of AGENTS.md § 3.
+    """
+    attempt = 0
+    while True:
+        attempt += 1
+        entry["attempts"] = attempt
+        _throttle()
+        try:
+            raw = _client().chat.completions.with_raw_response.create(model=model, temperature=temperature, messages=messages, **_request_extras())
+            return raw.parse(), int(raw.status_code)
+        except Exception as exc:  # noqa: BLE001 — classified by _retry_wait
+            wait = _retry_wait(exc) if attempt == 1 else None
+            if wait is None:
+                raise
+            entry["retried_after"] = f"{type(exc).__name__}: HTTP {getattr(exc, 'status_code', '-')}, waited {wait:.0f} s"
+            if _verbose():
+                print(f"  · {entry['task']:<15} {entry['lane']:<13} {model:<42} {type(exc).__name__}; one retry in {wait:.0f} s", file=sys.stderr, flush=True)
+            time.sleep(wait)
 
 
 def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str = "default") -> dict[str, Any]:
@@ -243,44 +335,60 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
     fields are quoted outside material: the user message labels them as data (untrusted.DATA_NOTE) and the
     prompts repeat the rule. The reply is parsed as the last balanced JSON object, so hostile text that
     baits the model into echoing JSON-shaped material before its answer does not break or hijack the parse.
+
+    Every live call leaves exactly one ledger row (`calls`), written after parsing so a reply without JSON
+    is counted as an error (`error`), with the HTTP status, `finish_reason` and token counts of the reply.
+    The ledger is private (run.py writes it next to the snapshot in the output directory, never into it).
     """
     if is_dry_run(dry_run):
         return getattr(dryrun, task)(payload)
 
     _, _, model = _route(which)
     temperature = float(config.get("models", "temperature", 0.1))
-    _throttle()
+    messages = [
+        {"role": "system", "content": _prompt(task)},
+        {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
+    ]
+    entry: dict[str, Any] = {"task": task, "lane": which, "route": model, "served": "error", "ms": 0, "attempts": 0}
     started = time.perf_counter()
     try:
-        completion = _client().chat.completions.create(
-            model=model,
-            temperature=temperature,
-            messages=[
-                {"role": "system", "content": _prompt(task)},
-                {"role": "user", "content": DATA_NOTE + "\n" + json.dumps(payload, ensure_ascii=False)},
-            ],
-            **_request_extras(),
-        )
+        completion, status = _create(model, messages, temperature, entry)
     except Exception as exc:
-        ms = int((time.perf_counter() - started) * 1000)
-        calls.append({"task": task, "lane": which, "route": model, "served": "error", "ms": ms, "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+        entry["ms"] = int((time.perf_counter() - started) * 1000)
+        entry["http_status"] = getattr(exc, "status_code", None)
+        entry["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        calls.append(entry)
         if _verbose():
-            print(f"  · {task:<15} {which:<13} {model:<42} FAILED {ms:>6} ms  {type(exc).__name__}", file=sys.stderr, flush=True)
+            print(f"  · {task:<15} {which:<13} {model:<42} FAILED {entry['ms']:>6} ms  {type(exc).__name__}", file=sys.stderr, flush=True)
         raise
-    ms = int((time.perf_counter() - started) * 1000)
+    entry["ms"] = int((time.perf_counter() - started) * 1000)
     served, receipt_id = _served_and_receipt(completion, model)
     usage = getattr(completion, "usage", None)
-    tokens_in = int(getattr(usage, "prompt_tokens", 0) or 0)
-    tokens_out = int(getattr(usage, "completion_tokens", 0) or 0)
-    entry = {"task": task, "lane": which, "route": model, "served": served, "ms": ms, "tokens_in": tokens_in, "tokens_out": tokens_out}
+    choice = completion.choices[0] if getattr(completion, "choices", None) else None
+    entry.update(
+        served=served,
+        http_status=status,
+        finish_reason=getattr(choice, "finish_reason", None),
+        tokens_in=int(getattr(usage, "prompt_tokens", 0) or 0),
+        tokens_out=int(getattr(usage, "completion_tokens", 0) or 0),
+    )
+    details = getattr(usage, "completion_tokens_details", None)
+    reasoning_tokens = getattr(details, "reasoning_tokens", None) if details is not None else None
+    if reasoning_tokens is not None:
+        entry["reasoning_tokens"] = int(reasoning_tokens or 0)
     if receipt_id:
         entry["receipt_id"] = receipt_id
+    text = (choice.message.content if choice is not None and choice.message else None) or ""
+    obj = parse_json_object(text)
+    if obj is None:
+        why = f" (finish_reason {entry['finish_reason']})" if entry.get("finish_reason") not in (None, "stop") else ""
+        entry["error"] = "reply carried no JSON object" + why
     calls.append(entry)
     if _verbose():
         flag = "" if served == model or model.startswith("meterless/") else "  (substituted)"
-        print(f"  · {task:<15} {which:<13} {served:<42} {ms:>6} ms  {tokens_in:>5}>{tokens_out:<5}{flag}", file=sys.stderr, flush=True)
-    text = completion.choices[0].message.content or "{}"
-    obj = parse_json_object(text)
+        if entry.get("error"):
+            flag += "  NO JSON"
+        print(f"  · {task:<15} {which:<13} {served:<42} {entry['ms']:>6} ms  {entry['tokens_in']:>5}>{entry['tokens_out']:<5}{flag}", file=sys.stderr, flush=True)
     if obj is None:
-        raise ValueError(f"{task}: model did not return JSON")
+        raise ValueError(f"{task}: model did not return JSON ({entry['error']})")
     return obj

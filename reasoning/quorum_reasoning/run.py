@@ -42,6 +42,33 @@ def print_trace(steps: list[dict], file=sys.stdout) -> None:
         print(format_step(s), file=file)
 
 
+def live_mode_problem() -> str | None:
+    """Why `--model live` cannot run, or None. Live mode fails closed: it never falls back to stand-ins.
+
+    DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a live run with no route configured, or with
+    QUORUM_DRY_RUN=1 set, exits 2 before the graph starts instead of warning and running dry. Why: a dry run
+    labelled live is the one outcome that can be mistaken for integration evidence (Vadim's finding in
+    NVIDIA-FIRST-01); the explicit dry switch and the explicit live flag contradicting each other is an
+    error to fix, not a preference to resolve silently.
+    """
+    if os.getenv("QUORUM_DRY_RUN") == "1":
+        return "--model live together with QUORUM_DRY_RUN=1; unset the variable or drop --model live"
+    if not llm.route_configured():
+        return "--model live but no model route is configured (MODEL_BASE_URL and MODEL_API_KEY, or METERLESS_BASE_URL and METERLESS_RUNTIME_TOKEN, in .env)"
+    return None
+
+
+def write_ledger(out_dir: Path, topic: str, date: str) -> Path | None:
+    """The per-run call ledger, next to the snapshot and never inside it: task, lane, route, answering model,
+    HTTP status, finish_reason, tokens, attempts, receipt id, error. Private evidence for the output directory."""
+    if not llm.calls:
+        return None
+    path = out_dir / topic / f"{date}.ledger.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"topic_id": topic, "edition_date": date, "calls": llm.calls}, ensure_ascii=False, indent=1), encoding="utf-8")
+    return path
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run the Quorum reasoning graph for one topic and day.")
     ap.add_argument("--topic", default="russia-ukraine-war")
@@ -85,9 +112,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.fixture:
         os.environ["QUORUM_FIXTURE"] = args.fixture
     model_dry = args.dry_run if args.model is None else args.model == "dry"
+    if model_dry:
+        os.environ["QUORUM_DRY_RUN"] = "1"  # the explicit dry switch, so every module (trace model names included) agrees
     corpus = args.corpus or ("fixture" if (args.dry_run or model_dry) else "zetaris")
-    if args.model == "live" and llm.is_dry_run(False):
-        print("no model route configured (MODEL_BASE_URL / MODEL_API_KEY in .env, or QUORUM_DRY_RUN=1 is set): running dry", file=sys.stderr)
+    if args.model == "live":
+        problem = live_mode_problem()
+        if problem:
+            print(f"refusing to run: {problem}", file=sys.stderr)
+            return 2
     if args.verbose:
         os.environ["QUORUM_VERBOSE"] = "1"
     on_step = None
@@ -99,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(args.out) / args.topic / f"{args.date}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    ledger = write_ledger(Path(args.out), args.topic, args.date)
     if not args.quiet:
         print()
         prov = snapshot["provenance"]
@@ -107,8 +140,10 @@ def main(argv: list[str] | None = None) -> int:
             answered = ", ".join(f"{m} ×{n}" for m, n in prov["answered_by"].items())
             print(f"model calls: {prov['model_calls']} ({prov['model_errors']} failed); answered by: {answered}")
         print(f"status: {snapshot['status']}; stories: {len(snapshot['stories'])}; roundup: {snapshot['roundup']['count']}; errors: {len(snapshot['errors'])}")
-        print(f"summary: {snapshot['summary']}")
+        print(f"summary ({snapshot['summary_source']}): {snapshot['summary']}")
         print(f"snapshot: {out}")
+        if ledger:
+            print(f"ledger (private, not part of the snapshot): {ledger}")
     return 0 if snapshot["status"] != "partial" else 2
 
 

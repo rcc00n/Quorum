@@ -238,6 +238,8 @@ def summary(p: dict[str, Any]) -> dict[str, Any]:
     n_above, n_total = p.get("above_bar", 0), p.get("events", 0)
     if n_above == 0:
         s = f"No story crossed the bar today out of {n_total} events. The roundup carries all of them."
+    elif n_above == 1:
+        s = f"One of {n_total} events crossed the bar today: {(p.get('headlines') or ['(untitled)'])[0]}."
     else:
         s = f"{n_above} of {n_total} events crossed the bar today."
     review = p.get("needs_review", 0)

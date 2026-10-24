@@ -2,6 +2,8 @@
 
 Reasoning snapshots (ARCHITECTURE.md § 8) produced by the dry run on fictional fixture corpora. Shape is real, content is not news; every file carries `provenance.fictional: true`, and the portal labels such data as demo. The canonical contract stays § 8; these files follow it, never the other way round.
 
+All three are rebuilt by `python scripts/regenerate_samples.py` (from `reasoning/`, venv active); the per-file commands below are what it runs.
+
 | File | What it is | Regenerate (from `reasoning/`, venv active) |
 | --- | --- | --- |
 | `snapshot.sample.json` | A normal day: two stories above the bar, two events in the roundup, one disputed claim, the critic's rejection and rewrite in `trace`. | `python -m quorum_reasoning.run --dry-run --out /tmp/out`, copy `/tmp/out/russia-ukraine-war/2026-10-22.json` |
