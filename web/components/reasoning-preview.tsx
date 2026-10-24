@@ -309,6 +309,11 @@ export function ReasoningPreviewPage({
               These declarations do not establish a genuine sponsor run or
               publication.
             </p>
+            {data.preview.provisional && !data.preview.corpus_binding && (
+              <p className="r-preview-limits r-corpus-binding">
+                PROVISIONAL CORPUS · Capture metadata unavailable; no sidecar is bound to this preview.
+              </p>
+            )}
             {data.preview.corpus_binding && (
               <p className="r-preview-limits r-corpus-binding">
                 {data.preview.corpus_binding.provisional ? "PROVISIONAL CORPUS" : "Producer corpus capture"}

@@ -19,6 +19,7 @@ from .snapshot_validation import (
 from .snapshot_store import read_bounded
 
 SAMPLE = Path(__file__).parent / "fixtures/reasoning-demo/snapshot.sample.json"
+HISTORICAL_V3_SHA256 = "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
 SAMPLE_REVISION = "6ea82434d0f06cefb51f5536732ceac68e9780ef"
 MISSING = [
     "original document/source IDs",
@@ -170,7 +171,7 @@ def envelope(p, *, raw_sha256=None):
         if "model_errors" in provenance:
             fail(
                 answered.get("error", 0) == provenance["model_errors"]
-                or (raw_sha256 == "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
+                or (raw_sha256 == HISTORICAL_V3_SHA256
                     and answered.get("error") == 61 and provenance["model_errors"] == 63),
                 "inconsistent_model_error_count",
             )
@@ -664,6 +665,9 @@ def present_reasoning(raw, *, now=None, catalog=None):
                 "expired" if now >= timestamp(p["expires_at"]) else "within_hint"
             ),
             sha256=hashlib.sha256(raw).hexdigest(),
+            # DECISION(2026-10-24, rcc00n/Codex): the pinned provisional artifact stays labelled without a sidecar.
+            # Why: missing metadata must not erase a known corpus limitation.
+            provisional=True if hashlib.sha256(raw).hexdigest() == HISTORICAL_V3_SHA256 else None,
             missing_provenance=missing_provenance,
             warnings=[
                 (
@@ -705,6 +709,7 @@ def load_preview(path=None):
             if "bytes" in binding:
                 fail(type(binding["bytes"]) is int and binding["bytes"] == len(snapshot_raw), "sidecar_size_mismatch")
             fail(type(sidecar["provisional"]) is bool, "invalid_sidecar")
+            fail(result["preview"]["provisional"] is not True or sidecar["provisional"], "sidecar_provisional_mismatch")
             capture = sidecar["corpus_as_of_utc"]
             fail(isinstance(capture, str) and bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z", capture)), "invalid_sidecar")
             captured_at = datetime.fromisoformat(capture.replace("Z", "+00:00"))
@@ -716,5 +721,6 @@ def load_preview(path=None):
         except (ValueError, TypeError, KeyError):
             raise SnapshotError("invalid_sidecar") from None
         # Expose only bounded display metadata; private paths, logs and producer prose stay private.
+        result["preview"]["provisional"] = sidecar["provisional"]
         result["preview"]["corpus_binding"] = dict(provisional=sidecar["provisional"], corpus_as_of_utc=capture, sidecar_sha256=hashlib.sha256(raw).hexdigest())
     return result
