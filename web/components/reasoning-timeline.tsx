@@ -20,7 +20,9 @@ export function ReasoningTimeline({
   run: ReasoningRun;
   currentEvent?: string;
 }) {
-  const [event, setEvent] = useState(""),
+  // DECISION(2026-10-24, rcc00n/Codex): an event deep-link starts with that event's trace.
+  // Why: the roundup investigation link must not initially mix other events' checks.
+  const [event, setEvent] = useState(currentEvent),
     [node, setNode] = useState(""),
     [loop, setLoop] = useState("");
   const steps = run.trace || [],
@@ -96,7 +98,7 @@ export function ReasoningTimeline({
               setLoop("");
             }}
           >
-            This story’s steps
+            {run.stories.some((story) => story.event_id === currentEvent) ? "This story’s steps" : "This event’s steps"}
           </button>
         )}
       </div>

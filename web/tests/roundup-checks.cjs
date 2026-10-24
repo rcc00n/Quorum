@@ -5,7 +5,7 @@ module.exports = async ({browser, root, env, password}) => {
   const sample = JSON.parse(original), item = sample.roundup.groups[0].items[0];
   item.status = 'confirmed';
   sample.trace.push({node:'fact_check', iteration:1, event_id:item.event_id,
-    decision:'skipped: event cannot reach the impact bar; claims not double-checked', reason:'TEST bar gate', model:null, duration_ms:0});
+    decision:'  SKIPPED : event cannot reach the impact bar; claims not double-checked', reason:'TEST bar gate', model:null, duration_ms:0});
   const context = await browser.newContext(), page = await context.newPage();
   try {
     fs.writeFileSync(file, JSON.stringify(sample));
@@ -15,8 +15,17 @@ module.exports = async ({browser, root, env, password}) => {
     const row = page.locator('.r-roundup-row').filter({hasText:item.line});
     await row.getByText('Producer status: confirmed', {exact:true}).waitFor();
     await row.getByText('Independent check skipped; not double-checked.', {exact:true}).waitFor();
-    await row.locator(':scope > a').click();
+    const inspect = row.getByRole('link',{name:'Inspect recorded checks →',exact:true});
+    const href=new URL(await inspect.getAttribute('href'),root);
+    assert.equal(href.searchParams.get('date'),sample.edition_date);
+    assert.equal(href.searchParams.get('version'),String(sample.version));
+    assert.equal(href.hash,'#reasoning-timeline');
+    await inspect.focus(); await page.keyboard.press('Enter');
     await page.getByText('Independent check skipped; not double-checked.', {exact:true}).waitFor();
+    assert.equal(await page.getByLabel('Trace event filter',{exact:true}).inputValue(),item.event_id);
+    await page.getByLabel('Trace node filter',{exact:true}).selectOption('research');
+    await page.getByText('Independent check skipped; not double-checked.',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'This event’s steps',exact:true}).waitFor();
     // An event with no recorded skip must not inherit another event's warning.
     sample.trace = sample.trace.filter(s => !(s.node === 'fact_check' && s.event_id === item.event_id));
     fs.writeFileSync(file, JSON.stringify(sample));

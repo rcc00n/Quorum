@@ -186,6 +186,9 @@ function Roundup({ run }: { run: ReasoningRun }) {
                 {item.needs_review ? " · needs review" : ""}
               </p>
               <p className="r-check-notice help">{roundupCheckNotice(run.trace, item.event_id)}</p>
+              <Link className="r-check-link" href={previewHref(run, item.event_id) + "#reasoning-timeline"}>
+                Inspect recorded checks →
+              </Link>
               <Sources sources={item.sources} />
             </article>
           ))}

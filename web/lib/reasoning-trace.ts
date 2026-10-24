@@ -19,7 +19,7 @@ export const stageName = (node: string) =>
 // DECISION(2026-10-24, rcc00n/Codex): scope skipped checks to the recorded event.
 // Why: a producer roundup verdict must not imply independent verification.
 export function roundupCheckNotice(steps: ReasoningStep[] | undefined, eventId: string) {
-  return steps?.some((s) => s.event_id === eventId && s.node === "fact_check" && /^skipped:/i.test(s.decision))
+  return steps?.some((s) => s.event_id === eventId && s.node === "fact_check" && /^skipped\s*:/i.test(s.decision.trim()))
     ? "Independent check skipped; not double-checked."
     : "Independent verification is not established by this roundup entry; claim evidence is not supplied.";
 }

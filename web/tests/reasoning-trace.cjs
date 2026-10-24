@@ -82,3 +82,8 @@ assert.match(roundupCheckNotice([skipped], 'TEST-event'), /Independent check ski
 for (const trace of [undefined, [], [{...skipped, event_id: 'TEST-other'}], [{...skipped, node: 'verify'}], [step('fact_check', 1)]])
   assert.match(roundupCheckNotice(trace, 'TEST-event'), /not established/);
 console.log('PASS: skipped independent-check notice; unknown, completed, cross-event and wrong-stage traces never imply verification');
+
+for (const decision of ['  skipped: TEST gate', '\tSKIPPED : TEST gate'])
+  assert.match(roundupCheckNotice([{...skipped,decision}], 'TEST-event'), /Independent check skipped/);
+for (const decision of ['not skipped: TEST', 'completed: TEST'])
+  assert.match(roundupCheckNotice([{...skipped,decision}], 'TEST-event'), /not established/);
