@@ -306,6 +306,24 @@ export function ReasoningPreviewPage({
               These declarations do not establish a genuine sponsor run or
               publication.
             </p>
+            {(run.provenance.fact_checker_model !== undefined ||
+              run.provenance.model_calls !== undefined ||
+              run.provenance.answered_by !== undefined ||
+              run.provenance.model_errors !== undefined) && (
+              <p className="r-preview-limits r-model-provenance">
+                Reported model provenance: {run.provenance.fact_checker_model !== undefined &&
+                  `fact-checker ${run.provenance.fact_checker_model}. `}
+                {run.provenance.model_calls !== undefined &&
+                  `${run.provenance.model_calls} model calls. `}
+                {run.provenance.model_errors !== undefined &&
+                  `${run.provenance.model_errors} model errors. `}
+                {run.provenance.answered_by !== undefined &&
+                  `Answered by: ${Object.entries(run.provenance.answered_by)
+                    .map(([model, count]) => `${model} ×${count}`)
+                    .join(", ")}. `}
+                Snapshot declarations; not independent provider verification.
+              </p>
+            )}
             {(run.status === "partial" ||
               run.errors?.length ||
               run.sources_missing.length > 0) && (

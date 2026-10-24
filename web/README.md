@@ -27,6 +27,7 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-23 | rcc00n / Codex | Preserve and display reported responding-model/count provenance and upstream context claim kinds; external snapshot acceptance copies original bytes into disposable preview data and compares them through authenticated HTTP, TypeScript and DOM | Verify the real-model FICTIONAL artifact without changing its prose, replacing old fixtures or enabling publication; validation bounds remain canonical in backend/README.md |
 | 2026-10-22 | rcc00n / Codex | Derive feedback-loop illustrations only from consecutive same-event trace records with an increased iteration; retain all detailed steps, persistent fictional label and reading navigation | Make recorded re-checks/revisions understandable without claiming causal graph edges or live execution; compact source drilldowns preserve exact cohort counts |
 | 2026-10-22 | rcc00n / Codex | Typed reasoning 1.0 reading page with paired evidence, cohort grid and recorded feedback loops; neutral identity retained | Make the canonical fictional sample inspectable without inventing scores, times or production results |
 | 2026-10-22 | rcc00n / Codex | Optional reading-first article and edition/roundup presentation; explicit completed quiet-day guard; cap ten per topic, not a target | Adopt approved product flow while preserving legacy snapshots and all evidence appendices; production schema/mapping still awaits reasoning agreement |

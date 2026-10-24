@@ -72,6 +72,10 @@ Optional extensions: Source kind/tier/independence_group, rating_provenance, aud
 
 ### Reasoning 1.0 fictional development preview
 
+The development consumer also accepts the runtime's optional `provenance.fact_checker_model`, `model_calls`, `answered_by` and `model_errors`, and claim `kind: context`. It preserves model IDs, counts and context statuses verbatim. The backend module decision owns validation bounds; supplied totals must agree, unknown fields and invalid references still fail. The preview shows these as **reported** provenance, never independent provider verification. A contradictory producer summary remains unchanged and visible.
+
+The first real NVIDIA model execution used a FICTIONAL fixture corpus, not real collected news: [run evidence and original hash](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6376895532). [Nightshift routing evidence](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6376996285) separately proves tiny Runtime requests, including explicit Ultra selection; it does not prove Verify duty or a Meterless Engine feature. Neither result closes the real-corpus/provenance/transport gates below. Use the [external snapshot acceptance command](PORTAL_VERIFICATION.md#external-real-model-fixture-acceptance) to test the saved original locally without replacing canonical fixtures.
+
 The current envelope requires schema_version/topic_id/edition_date/run_id/version/status/summary/sources_missing/stories/roundup plus **generated_at, published_at (nullable), expires_at, edition_timezone, window.start/end, provenance.corpus/model/fictional**. `bar`, `errors`, `trace` remain optional. Unknown fields are rejected explicitly; notify before adding fields. No competing upstream JSON schema is introduced.
 
 | Upstream | Portal presentation / transformation | Status / owner action |

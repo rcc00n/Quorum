@@ -53,6 +53,7 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-23 | rcc00n / Codex | Development reasoning consumer preserves optional fact-checker/model-call provenance and upstream `context` claims; counts are integers 0–100000, answered-by maps have at most 100 nonempty model keys with positive counts, and supplied totals/error counts must agree | Accept the original NVIDIA fixture result without weakening unknown-field/reference checks or treating declarations as publication authority; bounds limit untrusted ledgers, and old canonical fixtures remain supported |
 | 2026-10-23 | rcc00n / Codex, explicit compatibility authorization | Require the current canonical 1.0 envelope in the development consumer, validate UTC/calendar-window semantics, retain declarations without publication authority, and redact arbitrary partial-error messages | Support all three upstream fixtures without exporting private logs or weakening the strict production schema |
 | 2026-10-22 | rcc00n / Codex | Reasoning-owned canonical 1.0 consumer in a separate gated localhost preview; production validator/store/adapter unchanged | Support the actual fictional sample without fabricating collector provenance or enabling publication |
 | 2026-10-22 | rcc00n / Codex | Unfold 0.81 with branded pages; superuser-only account management; read-only preferences/source views | Reuse Django security while preventing staff self-escalation and cross-workstream writes |

@@ -18,6 +18,62 @@ def sample():
 
 
 class ReasoningMappingTests(SimpleTestCase):
+    def test_model_ledger_context_and_original_summary_are_preserved(self):
+        p = sample()
+        p["provenance"].update(
+            fact_checker_model="TEST/ultra",
+            model_calls=3,
+            answered_by={"TEST/lightning": 2, "TEST/ultra": 1},
+            model_errors=0,
+        )
+        p["stories"][0]["claims"][0]["kind"] = "context"
+        # Explicit TEST inconsistency; the consumer must not repair producer prose.
+        p["summary"] = "One story crossed the bar. No story crossed the bar today."
+        result = present_reasoning(
+            json.dumps(p).encode(), now=datetime(2026, 10, 23, 13, tzinfo=timezone.utc)
+        )
+        self.assertEqual(result["reasoning"], p)
+        self.assertEqual(result["digests"][0]["summary"], p["summary"])
+        self.assertEqual(result["events"][0]["reasoning"]["claims"][0]["kind"], "context")
+        self.assertEqual(result["status"], "demo")
+        self.assertFalse(result["preview"]["published"])
+        self.assertEqual(result["preview"]["expiry_hint"], "expired")
+
+    def test_invalid_model_ledger_rejected_without_weakening_old_envelope(self):
+        mutations = [
+            {"model_calls": True},
+            {"model_calls": -1},
+            {"model_calls": 100001},
+            {"model_errors": 1.5},
+            {"model_errors": 4},
+            {"answered_by": []},
+            {"answered_by": {"": 3}},
+            {"answered_by": {"TEST/lightning": True}},
+            {"answered_by": {"TEST/lightning": 0}},
+            {"answered_by": {"TEST/lightning": 2}},
+            {"answered_by": {"TEST/lightning": 2, "error": 1}},
+            {"fact_checker_model": ""},
+            {"fact_checker_model": None},
+            {"unknown_model_field": "TEST"},
+        ]
+        for mutation in mutations:
+            p = sample()
+            p["provenance"].update(
+                fact_checker_model="TEST/ultra",
+                model_calls=3,
+                answered_by={"TEST/lightning": 3},
+                model_errors=0,
+            )
+            p["provenance"].update(mutation)
+            with self.subTest(mutation=mutation), self.assertRaises(SnapshotError):
+                parse_reasoning(json.dumps(p).encode())
+        p = sample()
+        p["provenance"].update(
+            model_calls=3, model_errors=1,
+            answered_by={"TEST/lightning": 2, "error": 1},
+        )
+        self.assertEqual(parse_reasoning(json.dumps(p).encode()), p)
+
     def test_exact_sample_and_no_forged_provenance(self):
         raw = SAMPLE.read_bytes()
         self.assertEqual(

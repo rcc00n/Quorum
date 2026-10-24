@@ -107,11 +107,49 @@ def envelope(p):
     fail(start == expected_start and end == expected_end, "inconsistent_edition_window")
     fail(expires > end, "expiry_before_edition_end")
     # Historical reruns may be generated after expiry. Never manufacture freshness.
-    obj(p["provenance"], ["corpus", "model", "fictional"])
+    obj(
+        p["provenance"],
+        ["corpus", "model", "fictional"],
+        ["fact_checker_model", "model_calls", "answered_by", "model_errors"],
+    )
     for key in ("corpus", "model"):
         text(p["provenance"][key])
         fail(bool(p["provenance"][key]), "missing_reasoning_provenance")
     fail(type(p["provenance"]["fictional"]) is bool)
+    provenance = p["provenance"]
+    if "fact_checker_model" in provenance:
+        text(provenance["fact_checker_model"])
+        fail(bool(provenance["fact_checker_model"]), "missing_reasoning_provenance")
+    for key in ("model_calls", "model_errors"):
+        if key in provenance:
+            fail(
+                type(provenance[key]) is int and 0 <= provenance[key] <= 100000,
+                "invalid_model_call_count",
+            )
+    if "answered_by" in provenance:
+        answered = provenance["answered_by"]
+        fail(isinstance(answered, dict) and len(answered) <= 100, "invalid_answered_by")
+        for model, count in answered.items():
+            text(model)
+            fail(
+                bool(model) and type(count) is int and 0 < count <= 100000,
+                "invalid_answered_by",
+            )
+        if "model_calls" in provenance:
+            fail(
+                sum(answered.values()) == provenance["model_calls"],
+                "inconsistent_model_call_count",
+            )
+        if "model_errors" in provenance:
+            fail(
+                answered.get("error", 0) == provenance["model_errors"],
+                "inconsistent_model_error_count",
+            )
+    if "model_calls" in provenance and "model_errors" in provenance:
+        fail(
+            provenance["model_errors"] <= provenance["model_calls"],
+            "inconsistent_model_error_count",
+        )
 
 
 def public_error(error):
@@ -290,7 +328,7 @@ def parse_reasoning(raw):
             for key in ("status", "verifier", "fact_checker"):
                 fail(c[key] in ("confirmed", "disputed", "unverified"))
             if "kind" in c:
-                fail(c["kind"] in ("fact", "statement", "number"))
+                fail(c["kind"] in ("fact", "statement", "number", "context"))
             if "speaker" in c:
                 text(c["speaker"], True)
             for e in rows(c["evidence"]):

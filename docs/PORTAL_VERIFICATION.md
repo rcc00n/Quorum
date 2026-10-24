@@ -41,6 +41,32 @@ Relevant environment names: Django `DJANGO_DEBUG`, `DJANGO_SECRET_KEY`, `DJANGO_
 
 Hosted CI: `.github/workflows/portal.yml`, push to `feature/web-portals` for backend/web/deploy/workflow changes or manual `workflow_dispatch`; job also refuses other branches. Python3.10 regression/check/migration/upgrade/security/validator + Node22 build/typecheck/static fixtures; no browser download, sponsor service or paid model required. Reproduce browser tests locally as above. Inspect `gh run list --workflow portal.yml --branch feature/web-portals` / `gh run view <id>` for actual hosted results, never assume a green local run is hosted CI.
 
+## External real-model fixture acceptance
+
+The original direct-NVIDIA result remains private and unchanged outside Git. This is real model output over **FICTIONAL source data**, not verified news or a Zetaris/Meterless Engine run. The consumer accepts its optional model ledger and `context` claim kind, retains exact source JSON in the authenticated API and displays the reported model provenance. The known summary contradiction remains visible verbatim; parser acceptance does not certify editorial consistency.
+
+After the normal build, test that exact file through disposable authenticated Django → Next.js → Chromium, including TypeScript validation of the actual API response:
+
+```bash
+export QUORUM_NVIDIA_SNAPSHOT="$HOME/.local/share/quorum/experiments/nvidia-first-20261023/live-graph-resumed/snapshots/russia-ukraine-war/2026-10-22.json"
+QUORUM_REASONING_EXPECTED_SHA256=8f86e67c5a7a011465e72fa16123d1b904df5a1f4e586a3ad92ceedc9ea75017 \
+  node web/tests/boundary.cjs --reasoning --reasoning-file "$QUORUM_NVIDIA_SNAPSHOT"
+```
+
+Use the browser environment variables from the current reproducible checks above. `--reasoning-file` requires `--reasoning`, copies source bytes only into its owned temporary runtime, keeps publisher/store disabled, and never replaces canonical fixtures. It verifies the source/copy hashes before and after, exact upstream API equality, unchanged summary, all article blocks/claim links/source URLs, every supplied paired verdict and evidence quote/stance/group, all trace decisions/reasons/models/durations, roundup links/statuses and responsive layouts. Screenshots stay outside Git. The source snapshot contains **1 article, 12 published story claims, 77 published evidence rows, 39 trace records and 3 roundup entries**; the graph's full private state contains 20 claims/117 evidence rows, so the UI must not invent omitted roundup claim details.
+
+Run the ordinary `boundary.cjs` and `boundary.cjs --reasoning` suites too; the external-file check supplements all original auth/analysis/demo and main/empty/partial fixture regressions. No model request is made by these checks. Local acceptance does not activate publication, change production configuration/accounts or authorize transport.
+
+### Local acceptance evidence — 2026-10-23
+
+WEB-NVIDIA-ACCEPT is **TESTED locally**, not deployed or verified real-news processing. The original SHA-256 above is unchanged. Authenticated API `reasoning` equals the entire original JSON; actual returned API JSON satisfies the TypeScript model. Chromium compares the one article/headline/standfirst/five blocks, all 12 published claims and both review verdicts/reasons, all 77 published evidence quotes/stances/groups/source URLs, 39 ordered trace decisions/reasons/model identities/durations, three roundup statuses/links and absent roundup claim details. Desktop/tablet/mobile widths 1440/768/390 have no horizontal overflow; the retained FICTIONAL label, unpublished/expired hints and model declarations are visible. Desktop topic and mobile article screenshots were inspected outside Git.
+
+The original summary still says both “1 story crossed the bar” and “No story crossed the bar today”; it is displayed verbatim, not repaired by this consumer. The upstream snapshot reports `ok`; this is retained as a producer status, not an editorial correctness claim. The article's paired reviewers agree on its supplied verdicts; the four reviewer disagreements on the escalated roundup event are exported in its trace, not as invented claim detail.
+
+Relevant local checks: 50 Django tests (including ledger/context preservation and malformed-count/unknown-field rejection), two focused fixed-clock tests, system check and no migration drift; six deployment safety tests; four tooling tests; Next production build/typecheck; rating/editorial/recorded-loop/TypeScript contract checks; original isolated auth/analysis/demo browser boundary and the external snapshot boundary. The main/empty/partial canonical browser suite also passes: 2/0/2 stories and 45/29/45 trace records, plus context/XSS/partial/error/retry, keyboard, reduced motion and three widths. No model calls, hosted CI, push, merge or production check/deployment is claimed by these local checks. Private logs/screenshots: `~/.local/share/quorum/experiments/web-nvidia-accept-20261023/`.
+
+Routine doctor:15 PASS/0 FAIL/1 BLOCKED/1 NOT_TESTED; verify without inference:19 PASS/0 FAIL/14 BLOCKED/1 NOT_TESTED. Model credentials are not loaded into routine diagnostics; the separately recorded real NVIDIA/Meterless experiments remain the inference evidence. Local Zetaris resource/auth/runtime/SQL gates remain unresolved. Production publisher/store, account/configuration data and deployment code were not changed.
+
 ## Previous proposal milestone — 2026-10-22 local / 2026-10-23 UTC
 
 Backend foundation: `6d70d1a`; shared master coordination: `d5fe6bf`. UI/tests and documentation are reviewed together in PR #1.

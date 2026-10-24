@@ -16,6 +16,10 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), "quorum-boundary-")),
   children = [];
 let proxy, browser;
 const reasoningMode = process.argv.includes("--reasoning");
+const sourceIndex = process.argv.indexOf("--reasoning-file");
+const reasoningFile = sourceIndex < 0 ? null : process.argv[sourceIndex + 1];
+if (sourceIndex >= 0 && (!reasoningMode || !reasoningFile || reasoningFile.startsWith("--")))
+  throw Error("--reasoning-file requires --reasoning and a source file path");
 const serveMode = reasoningMode && process.argv.includes("--serve");
 fs.chmodSync(temp, 0o700);
 const freePort = () =>
@@ -73,7 +77,7 @@ const run = (args, env) =>
   };
   if (reasoningMode)
     fs.copyFileSync(
-      path.join(
+      reasoningFile || path.join(
         repo,
         "backend/portal/fixtures/reasoning-demo/snapshot.sample.json",
       ),
@@ -157,12 +161,13 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     args: ["--no-sandbox"],
   });
   if (reasoningMode) {
-    await require("./reasoning-checks.cjs")({
+    await require(reasoningFile ? "./reasoning-snapshot-checks.cjs" : "./reasoning-checks.cjs")({
       browser,
       root,
       env,
       password,
       temp,
+      sourceFile: reasoningFile,
     });
     return;
   }

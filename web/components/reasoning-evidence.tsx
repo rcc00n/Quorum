@@ -144,6 +144,7 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
         <span>
           <small className="r-claim-status">
             {c.kind === "statement" ? "Attributed statement · " : ""}
+            {c.kind === "context" ? "Source-attributed context · " : ""}
             {c.status}
           </small>
           <strong>{c.text}</strong>

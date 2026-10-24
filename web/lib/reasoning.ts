@@ -15,7 +15,7 @@ export type ReasoningEvidence = ReasoningSource & {
 export type ReasoningClaim = {
   id: string;
   text: string;
-  kind?: "fact" | "statement" | "number";
+  kind?: "fact" | "statement" | "number" | "context";
   speaker?: string | null;
   status: "confirmed" | "disputed" | "unverified";
   verifier: "confirmed" | "disputed" | "unverified";
@@ -132,7 +132,15 @@ export type ReasoningRun = {
   expires_at: string;
   edition_timezone: string;
   window: { start: string; end: string };
-  provenance: { corpus: string; model: string; fictional: boolean };
+  provenance: {
+    corpus: string;
+    model: string;
+    fictional: boolean;
+    fact_checker_model?: string;
+    model_calls?: number;
+    answered_by?: Record<string, number>;
+    model_errors?: number;
+  };
   bar?: { threshold: number; confirmation_min: number };
   summary: string;
   sources_missing: string[];

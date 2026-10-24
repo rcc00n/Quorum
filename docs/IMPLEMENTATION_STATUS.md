@@ -6,6 +6,7 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 | Feature ID | Feature / implementation | Status | Test evidence / deployment | Dependencies |
 | --- | --- | --- | --- | --- |
+| WEB-NVIDIA-ACCEPT | Optional model-ledger/context compatibility and original real-model FICTIONAL snapshot through local Django/Next preview | TESTED locally; not DEPLOYED or real-news integration | 50 Django tests; build/typecheck; unchanged snapshot/API/TypeScript/DOM equality, 12 published claims/77 evidence rows/39 steps/3 roundup items, three widths; see PORTAL_VERIFICATION.md | Upstream summary inconsistency, genuine Zetaris provenance/topic/date and approved production bridge/transport remain open |
 | WEB-LANDING | `/`, editorial landing; `web/app/page.tsx` | DEPLOYED | Prior desktop/mobile browser checks; HTTPS smoke | None |
 | WEB-REGISTER | `/register`, Django UserCreationForm | DEPLOYED | Auth tests; prior live registration | Email flows deferred pending delivery |
 | WEB-LOGIN | Login/logout/session expiry | DEPLOYED | Auth tests; production account flow evidence | None |
