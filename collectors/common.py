@@ -136,23 +136,42 @@ def content_hash(title: str, lead: str | None, text: str | None) -> str:
 
 # ---------------------------------------------------- wire detection ----
 
-_WIRE_PATTERNS = {
-    "AP": re.compile(r"\b(associated press|\(ap\)|by ap\b|ap news)\b", re.I),
-    "Reuters": re.compile(r"\breuters\b", re.I),
-    "AFP": re.compile(r"\b(afp|agence france-presse)\b", re.I),
+# Wire detection — what it catches and what it does not (wire-v2, 2026-10-23).
+# Reasoning counts a reprint in the WIRE's independence group (lowercased value must equal the agency row's
+# independence_group: AP->ap, Reuters->reuters, AFP->afp), so a MISSED mark double-counts a reprint as an
+# independent outlet and can falsely confirm a claim, while a FALSE mark folds an outlet's own reporting into the
+# agency and can hide a real confirmation. The rule therefore fires only on authorship signals:
+#   - byline names the agency ("By The Associated Press", "AP", "Reuters", "AFP", "Reuters Staff")
+#   - lead OPENS with a wire dateline credit: "WASHINGTON (AP) —", "(Reuters) -", "KYIV, Oct 22 (Reuters)"
+#   - an "AP/Reuters/AFP contributed to this report" or "Reporting by ... Editing by ..." trailer
+# It does NOT fire on a mere mention inside the lead ("..., Reuters reported Tuesday") — that is citation,
+# not reprint. Reprints with the wire credit only deep in the body (level 2 documents: no body) are missed.
+_WIRE_NAMES = {
+    "AP": r"(?:the\s+)?associated\s+press|\bAP\b",
+    "Reuters": r"\breuters\b",
+    "AFP": r"\bAFP\b|agence\s+france[- ]presse",
 }
+_WIRE_BYLINE = {k: re.compile(rf"^\s*(?:by\s+)?(?:{v})(?:\s+staff|\s+news)?\s*$", re.I) for k, v in _WIRE_NAMES.items()}
+_WIRE_DATELINE = {k: re.compile(rf"^\s*(?:[A-Z][A-Za-z.' -]{{1,40}},?\s*(?:[A-Z][a-z]{{2,8}}\.?\s+\d{{1,2}}\s*)?)?\(\s*(?:{v})\s*\)\s*[-\u2013\u2014:]", re.I) for k, v in _WIRE_NAMES.items()}
+_WIRE_TRAILER = {k: re.compile(rf"(?:{v})\s+contributed\s+to\s+this\s+report", re.I) for k, v in _WIRE_NAMES.items()}
+# "Reporting by ...; Editing by ..." is Reuters' house sign-off and appears on no other agency's copy.
+_REUTERS_SIGNOFF = re.compile(r"\breporting\s+by\b.*\bediting\s+by\b", re.I | re.S)
 
 
 def detect_wire_origin(byline: str | None, lead: str | None) -> str | None:
-    """Rule v1: byline or lead names a wire service. Title matching against agency rows is done in SQL later."""
-    blob = f"{byline or ''} {lead or ''}"
-    for name, pattern in _WIRE_PATTERNS.items():
-        if pattern.search(blob):
+    """Return 'AP' | 'Reuters' | 'AFP' when the document is a wire reprint by authorship signals, else None."""
+    b, l = (byline or "").strip(), (lead or "").strip()
+    for name in ("AP", "Reuters", "AFP"):
+        if b and _WIRE_BYLINE[name].search(b):
             return name
+        if l and (_WIRE_DATELINE[name].search(l) or _WIRE_TRAILER[name].search(l)):
+            return name
+    if l and _REUTERS_SIGNOFF.search(l):
+        return "Reuters"
     return None
 
 
-WIRE_RULE_VERSION = "byline-v1"
+WIRE_RULE_VERSION = "wire-v2"
 
 # --------------------------------------------------------- polite HTTP ----
 
@@ -237,7 +256,7 @@ class Doc:
 def upsert_document(conn: psycopg.Connection, d: Doc) -> int | None:
     """Insert a document row; returns its id, or None if this exact (url, hash) already exists."""
     canon = canonicalize(d.url)
-    d.title, d.lead, d.byline = clean_text(d.title) or "", clean_text(d.lead), clean_text(d.byline)
+    d.title, d.lead, d.byline = clean_field(d.title, TITLE_MAX) or "", clean_field(d.lead, LEAD_MAX), clean_field(d.byline, 200)
     h = content_hash(d.title, d.lead, d.body_for_hash)
     wire = detect_wire_origin(d.byline, d.lead)
     with conn.cursor() as cur:
@@ -269,15 +288,30 @@ def upsert_document(conn: psycopg.Connection, d: Doc) -> int | None:
     return new_id
 
 
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_TAGS_INLINE = re.compile(r"<[^>]+>")
+TITLE_MAX, LEAD_MAX = 300, 600
+
+
 def clean_text(value: str | None) -> str | None:
-    """Postgres TEXT rejects NUL bytes; some Federal Register raw texts contain them."""
-    return value.replace("\x00", "") if value else value
+    """Postgres TEXT rejects NUL bytes; some Federal Register raw texts contain them. Also drops other C0 controls."""
+    return _CONTROL.sub("", value) if value else value
+
+
+def clean_field(value: str | None, max_len: int) -> str | None:
+    """Title/lead hygiene at collection time (injection audit, 2026-10-23): strip tags and control characters,
+    collapse whitespace, cap length. Reasoning caps again on its side; two layers."""
+    if not value:
+        return value
+    from html import unescape
+    text = " ".join(unescape(_TAGS_INLINE.sub(" ", _CONTROL.sub("", value))).split())
+    return text[:max_len] or None
 
 
 def upsert_official_doc(conn: psycopg.Connection, *, source_id: str, topic_id: str | None, url: str, doc_type: str,
                         doc_number: str | None, title: str, full_text: str, signed_at: datetime | None,
                         published_at: datetime | None, lang: str = "en") -> bool:
-    title, full_text = clean_text(title) or "", clean_text(full_text) or ""
+    title, full_text = clean_field(title, TITLE_MAX) or "", clean_text(full_text) or ""
     with conn.cursor() as cur:
         cur.execute(
             """
