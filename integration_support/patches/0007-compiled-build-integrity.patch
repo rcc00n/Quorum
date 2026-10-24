@@ -1,0 +1,130 @@
+diff --git a/deploy/README.md b/deploy/README.md
+index 65e784a..6a9016c 100644
+--- a/deploy/README.md
++++ b/deploy/README.md
+@@ -80,3 +80,5 @@ python3 /opt/quorum/releases/<label>/deploy/upgrade-release.py /opt/quorum/relea
+ Plan mode is read-only. Apply requires the recognized current release, active Quorum services/loopback ports, private production environment, disabled snapshot root/publication, disk/RAM headroom and unchanged old dependency pins. It creates private integrity-checked SQLite backups before any installation, adds only missing pinned distributions without replacing old ones, runs production checks and rejects any pending migration. It then stops only Quorum, takes a final consistent auth backup/fingerprint, backs up static files, collects static, atomically switches the release and starts only those two services. HTTPS and unchanged auth/preferences/container start identities are verified. A bounded health failure switches back and restores static assets. No DB is automatically restored because migrations are forbidden and concurrent user writes must survive. Additive packages may remain installed; the old release's pins remain intact. No Nginx/SSH/firewall/Docker configuration changes occur. Real authenticated post-release browser checks remain a separate release gate.
+ 
+ For an operator rollback, read the private `rollback.json`, verify the old release exists, stop only `quorum-api` and `quorum-web`, atomically select that previous release and start those two units. Restore the saved static tree if assets changed. Keep the current auth database; restore a backup only after explicit diagnosis/authorization of a data issue. Recheck HTTPS and authenticated routes. The upgrade path refuses migrations rather than guessing a reverse migration.
++
++Build receipt version 2 binds both reviewed web source and compiled standalone/static bytes. Rebuild older receipts before packaging. Linked artifacts are rejected: use an external build directory with locally installed dependencies rather than a `node_modules` symlink. A matching receipt is a local integrity check, not owner review or deployment authorization.
+diff --git a/deploy/build_integrity.py b/deploy/build_integrity.py
+index 5b3e54c..52c0954 100644
+--- a/deploy/build_integrity.py
++++ b/deploy/build_integrity.py
+@@ -1,6 +1,7 @@
+ """Local build receipts bind standalone assets to the web source that produced them."""
+ import hashlib
+ import json
++import re
+ from pathlib import Path
+ import subprocess
+ import sys
+@@ -22,10 +23,31 @@ def web_digest(repo):
+     return digest.hexdigest()
+ 
+ 
++def artifact_digest(build):
++    # DECISION(2026-10-24, rcc00n/Codex): bind receipts to compiled output and reject linked artifacts.
++    # Why: a matching source hash alone cannot detect modified server code or linked private files.
++    root=Path(build)/'.next'
++    if not (root/'standalone/server.js').is_file():
++        raise ValueError('Standalone server missing')
++    digest=hashlib.sha256()
++    for name in ('standalone','static'):
++        tree=root/name
++        if not tree.is_dir() or tree.is_symlink() or root.is_symlink():
++            raise ValueError('Artifact directory missing or linked')
++        for path in sorted(tree.rglob('*')):
++            if path.is_symlink():
++                raise ValueError('Linked build artifact rejected; build with local dependencies')
++            if path.is_file():
++                digest.update(path.relative_to(root).as_posix().encode()+b'\0'+hashlib.sha256(path.read_bytes()).digest())
++            elif not path.is_dir():
++                raise ValueError('Special build artifact rejected')
++    return digest.hexdigest()
++
++
+ def write_receipt(repo, build, expected_digest):
+     if web_digest(repo) != expected_digest:
+         raise RuntimeError('Web source changed during the build; rebuild before packaging')
+-    receipt = dict(version=1, web_source_sha256=web_digest(repo),
++    receipt = dict(version=2, web_source_sha256=web_digest(repo), artifact_sha256=artifact_digest(build),
+                    build_revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip())
+     (Path(build) / RECEIPT).write_text(json.dumps(receipt, sort_keys=True)+'\n')
+ 
+@@ -33,9 +55,13 @@ def write_receipt(repo, build, expected_digest):
+ def validate_build(repo, build):
+     try:
+         receipt=json.loads((Path(build)/RECEIPT).read_text())
+-        if receipt['version'] != 1 or receipt['web_source_sha256'] != web_digest(repo):
++        if not isinstance(receipt,dict) or set(receipt)!={'version','web_source_sha256','artifact_sha256','build_revision'}:
++            raise ValueError()
++        if type(receipt['version']) is not int or receipt['version']!=2:
++            raise ValueError()
++        if not isinstance(receipt['build_revision'],str) or not re.fullmatch('[0-9a-f]{40}',receipt['build_revision']):
+             raise ValueError()
+-        if not all((Path(build)/'.next'/name).is_dir() for name in ('standalone','static')):
++        if receipt['web_source_sha256'] != web_digest(repo) or receipt['artifact_sha256']!=artifact_digest(build):
+             raise ValueError()
+     except (OSError,ValueError,KeyError,TypeError):
+         raise RuntimeError('Build receipt missing, stale or incomplete; rebuild the reviewed web source') from None
+diff --git a/deploy/test_build_integrity.py b/deploy/test_build_integrity.py
+index ca3368b..2248e5c 100644
+--- a/deploy/test_build_integrity.py
++++ b/deploy/test_build_integrity.py
+@@ -7,7 +7,7 @@ import sys
+ import tempfile
+ import unittest
+ sys.path.insert(0,str(Path(__file__).resolve().parent))
+-from build_integrity import web_digest, validate_build, write_receipt
++from build_integrity import web_digest, artifact_digest, validate_build, write_receipt
+ spec=importlib.util.spec_from_file_location('package_release',Path(__file__).with_name('package-release.py'))
+ package=importlib.util.module_from_spec(spec);spec.loader.exec_module(package)
+ 
+@@ -17,10 +17,13 @@ class BuildIntegrityTests(unittest.TestCase):
+             root=Path(d);(root/'web').mkdir();(root/'web/page.tsx').write_text('TEST source')
+             build=root/'build';build.mkdir()
+             with self.assertRaises(RuntimeError):validate_build(root,build)
+-            receipt=dict(version=1,web_source_sha256=web_digest(root),build_revision='a'*40)
++            receipt=dict(version=2,web_source_sha256=web_digest(root),artifact_sha256='0'*64,build_revision='a'*40)
+             (build/'.quorum-build.json').write_text(json.dumps(receipt))
+             with self.assertRaises(RuntimeError):validate_build(root,build)
+             for name in ('standalone','static'):(build/'.next'/name).mkdir(parents=True)
++            (build/'.next/standalone/server.js').write_text('TEST server')
++            receipt['artifact_sha256']=artifact_digest(build)
++            (build/'.quorum-build.json').write_text(json.dumps(receipt))
+             self.assertEqual(validate_build(root,build),receipt)
+             (root/'web/page.tsx').write_text('TEST changed source')
+             with self.assertRaises(RuntimeError):write_receipt(root,build,receipt['web_source_sha256'])
+@@ -46,3 +49,30 @@ class BuildIntegrityTests(unittest.TestCase):
+             root=Path(d);(root/'web').mkdir();(root/'outside').write_text('TEST private')
+             (root/'web/link').symlink_to(root/'outside')
+             with self.assertRaises(RuntimeError):web_digest(root)
++
++
++    def test_output_tampering_and_linked_artifacts_are_rejected(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d);(root/'web').mkdir();(root/'web/page.tsx').write_text('TEST source')
++            build=root/'build';server=build/'.next/standalone/server.js'
++            server.parent.mkdir(parents=True);server.write_text('TEST server')
++            assets=build/'.next/static';assets.mkdir();(assets/'chunk.js').write_text('TEST chunk')
++            receipt=dict(version=2,web_source_sha256=web_digest(root),artifact_sha256=artifact_digest(build),build_revision='a'*40)
++            marker=build/'.quorum-build.json';marker.write_text(json.dumps(receipt))
++            self.assertEqual(validate_build(root,build),receipt)
++            server.write_text('TEST changed server')
++            with self.assertRaises(RuntimeError):validate_build(root,build)
++            server.write_text('TEST server');(assets/'chunk.js').unlink()
++            with self.assertRaises(RuntimeError):validate_build(root,build)
++            (assets/'chunk.js').write_text('TEST chunk');(assets/'extra.js').write_text('TEST extra')
++            with self.assertRaises(RuntimeError):validate_build(root,build)
++            (assets/'extra.js').unlink();server.unlink();(root/'outside.js').write_text('TEST server')
++            server.symlink_to(root/'outside.js')
++            with self.assertRaises(RuntimeError):validate_build(root,build)
++
++    def test_legacy_coercive_and_unknown_receipts_require_rebuild(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d);(root/'web').mkdir();build=root/'build';build.mkdir()
++            for receipt in (dict(version=True),dict(version=1),dict(version=2,extra='TEST'),[]):
++                (build/'.quorum-build.json').write_text(json.dumps(receipt))
++                with self.assertRaises(RuntimeError):validate_build(root,build)
