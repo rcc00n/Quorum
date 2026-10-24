@@ -41,17 +41,29 @@ def edition_window(edition_date: str) -> tuple[str, str]:
     return start.strftime(fmt), end.strftime(fmt)
 
 
+def previous_window(edition_date: str) -> tuple[str, str]:
+    """The two edition windows before `edition_date`, as one span (reasoning's research round 2 corpus,
+    yelysei/agents@0224ca6; those rows are evidence only, never events, spread or coverage)."""
+    d = date.fromisoformat(edition_date)
+    start, _ = edition_window((d - timedelta(days=2)).isoformat())
+    _, end = edition_window((d - timedelta(days=1)).isoformat())
+    return start, end
+
+
 def sql_pair(topic: str, start: str, end: str) -> tuple[str, str]:
-    """The two statements reasoning runs, verbatim except that official_docs omits full_text here (sanitized)."""
+    """The two statements reasoning runs (yelysei/agents@0224ca6, tools/corpus.py), verbatim except that official_docs
+    omits full_text here (sanitized) and d.lead is not selected. Reasoning runs the same pair a second time over the
+    previous two edition windows (research round 2); evidence.py reports that window too, see previous_window()."""
     docs = f"""SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
-       d.url, d.title, d.published_at, d.access_level, d.wire_origin, d.supersedes_id, d.content_hash
+       d.url, d.canonical_url, d.title, d.published_at, d.fetched_at, d.access_level, d.wire_origin,
+       d.supersedes_id, d.content_hash
 FROM {DB}.documents d
 JOIN {DB}.sources s ON s.id = d.source_id
 WHERE d.topic_id = '{topic}'
   AND d.published_at >= TIMESTAMP '{start}' AND d.published_at < TIMESTAMP '{end}'
 ORDER BY d.published_at DESC"""
-    official = f"""SELECT o.id, o.source_id, s.name AS source_name, s.independence_group, s.kind,
-       o.url, o.title, o.doc_type, o.doc_number, COALESCE(o.signed_at, o.published_at) AS published_at,
+    official = f"""SELECT o.id, o.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
+       o.url, o.title, o.doc_type, o.doc_number, COALESCE(o.signed_at, o.published_at) AS published_at, o.fetched_at,
        length(o.full_text) AS full_text_chars
 FROM {DB}.official_docs o
 JOIN {DB}.sources s ON s.id = o.source_id
@@ -105,6 +117,10 @@ def main() -> int:
     run_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     docs = run_sql(docs_sql, limit=args.limit)
     official = run_sql(official_sql, limit=args.limit)
+    p_start, p_end = previous_window(args.date)
+    prev_docs_sql, prev_official_sql = sql_pair(args.topic, p_start, p_end)
+    prev_docs = run_sql(prev_docs_sql, limit=args.limit)
+    prev_official = run_sql(prev_official_sql, limit=args.limit)
 
     schema_hash = hashlib.sha256((ROOT / "collectors" / "schema.sql").read_bytes()).hexdigest()[:16]
     out = {
@@ -124,12 +140,17 @@ def main() -> int:
             "count": len(official), "by_source": breakdown(official, "source_id"), "by_doc_type": breakdown(official, "doc_type"),
             "sample": [sanitize_official(r) for r in official[: args.sample]],
         },
+        "previous_windows": {
+            "window_utc": [p_start, p_end], "purpose": "reasoning research round 2 only (never events, spread or coverage)",
+            "documents": len(prev_docs), "documents_by_source": breakdown(prev_docs, "source_id"), "official_docs": len(prev_official),
+        },
         "sanitization": "no lead, no article/official text, no credentials; titles truncated to 80 chars",
     }
     dest = ROOT / "collectors" / "zetaris" / "evidence" / f"{args.topic}_{args.date}.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(out, indent=2, default=str) + "\n")
     print(f"documents={len(docs)} official_docs={len(official)} window={start}..{end}")
+    print(f"previous windows: documents={len(prev_docs)} official_docs={len(prev_official)} window={p_start}..{p_end}")
     print(f"written {dest.relative_to(ROOT)}")
     return 0 if docs or official else 1
 
