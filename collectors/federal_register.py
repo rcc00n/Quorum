@@ -12,8 +12,10 @@ from collectors.common import Fetcher, parse_dt, upsert_official_doc
 log = logging.getLogger("collectors.federal_register")
 API = "https://www.federalregister.gov/api/v1/documents.json"
 
-# DECISION(2026-10-22, Anastasia/Claude): presidential documents map to 'order', rules to 'law', notices to 'release'.
-# Why: DECISIONS.md treats an adopted document as fact and an agency statement as a statement; notices are the latter.
+# DECISION(2026-10-22, Anastasia/Claude; confirmed 2026-10-23 against reasoning rules/confirmation.py): Federal
+# Register types map PRESDOCU (executive orders, proclamations, memoranda) -> 'order', RULE (final rules) -> 'law',
+# PRORULE (proposed rules) and NOTICE -> 'release'. Why: only adopted instruments establish facts; a proposed rule or
+# a notice is the agency's statement. Values are exactly the schema's enum, which reasoning reads verbatim.
 _TYPE_MAP = {"PRESDOCU": "order", "RULE": "law", "PRORULE": "release", "NOTICE": "release"}
 
 

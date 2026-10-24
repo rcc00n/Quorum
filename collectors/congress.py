@@ -21,6 +21,14 @@ _TYPES = {"house-bill": "hr", "senate-bill": "s", "house-resolution": "hres", "s
 
 
 def _doc_type(latest_action: str) -> str:
+    """Map a bill's latest action to the schema's doc_type.
+
+    DECISION(2026-10-23, Anastasia/Claude Code): 'law' only when enacted ("Became Public Law" / "Signed by
+    President"); 'vote' when a chamber passed or agreed to it — the fact established is that the vote happened
+    with that outcome, not that the bill is law; everything else (introduced, referred, reported) is 'release',
+    i.e. a statement of intent. Why: reasoning's confirmation rule treats law|order|vote|ruling as establishing
+    documents and statement|release as words (DECISIONS.md › Principles); an unpassed bill must not confirm.
+    """
     text = (latest_action or "").lower()
     if "became public law" in text or "signed by president" in text:
         return "law"

@@ -45,12 +45,16 @@ def run_once(only: str | None = None) -> dict:
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM sources WHERE kind IN ('outlet', 'agency', 'military') AND cardinality(rss_urls) > 0")
         rss_sources = cur.fetchall()
+        cur.execute("SELECT * FROM sources WHERE kind = 'official' AND cardinality(rss_urls) > 0")
+        official_feeds = cur.fetchall()
     for topic_id, spec in TOPICS.items():
         ensure_topic(conn, topic_id, spec["name"], spec["query_terms"])
         topic = {"id": topic_id, **spec}
         if only in (None, "rss"):
             for source in rss_sources:
                 report[f"rss/{source['id']}"] = rss.collect_source(conn, fetcher, source, topic)
+            for source in official_feeds:
+                report[f"official/{source['id']}"] = rss.collect_official_feed(conn, fetcher, source, topic)
         if only in (None, "guardian"):
             report["guardian"] = guardian.collect(conn, fetcher, topic)
         if only in (None, "federal_register"):

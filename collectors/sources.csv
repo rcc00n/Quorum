@@ -26,3 +26,5 @@ isw,Institute for the Study of War,understandingwar.org,military,,,isw,,,,,,,3,U
 federal-register,Federal Register,federalregister.gov,official,,,us-gov,,,,,,,1,US,en
 congress-gov,Congress.gov,congress.gov,official,,,us-gov,,,,,,,1,US,en
 whitehouse,The White House,whitehouse.gov,official,,,us-gov,,,,,,https://www.whitehouse.gov/news/feed/,1,US,en
+defense-gov,U.S. Department of Defense,defense.gov,official,,,us-gov,,,,,,https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=50|https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=9&Site=945&max=50,1,US,en
+state-gov,U.S. Department of State,state.gov,official,,,us-gov,,,,,,,1,US,en
