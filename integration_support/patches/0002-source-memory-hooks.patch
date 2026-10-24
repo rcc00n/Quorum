@@ -1,0 +1,393 @@
+diff --git a/docs/DECISIONS.md b/docs/DECISIONS.md
+index c331806..a9a47f4 100644
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -192,6 +192,8 @@ Four things are deferred. For the first of them, data accumulates from day one.
+ 
+ ## Still to clarify
+ 
++**Owner-review support proposal (2026-10-24, rcc00n / Codex):** an optional reference H-MEM sidecar can persist source-attributed framing and confirmed-evidence candidates from internal `frame` state, and prioritize exact authorized DocRefs in research round 2. Default off; forced/requested dry mode performs no memory I/O; fresh fetch/stance/quote/independence checks and the existing candidate cap remain mandatory. No snapshot fields or confirmation rules change. Offline TEST-state hook tests and unchanged-reference conformance establish preparation only; Yelysei must approve/adopt and provide genuine feature evidence before claiming sponsor completion. Anastasia reviews namespace/hash/access provenance. This is a proposed patch, not a change to the owner's go/no-go decision.
++
+ Seven questions the team has not closed yet.
+ 
+ - [ ] Whether the model's own rating is needed as a fifth mode already in the MVP. Default: no.
+@@ -234,6 +236,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in
+ 
+ | Date | Who (human / tool) | What was decided | Why |
+ | --- | --- | --- | --- |
++| 2026-10-24 | rcc00n / Codex, explicit cross-team support authorization | Prepare owner-review-only H-MEM frame/research hooks, default off with zero dry writes, exact DocRef identity and fresh verification; no production/sponsor completion claim. | Make the existing owner proposal executable and testable offline without changing unreviewed owner branches or the strict snapshot contract. |
+ | 2026-10-24 | rcc00n / Codex, explicit local rehearsal authorization | Local rehearsal retains all owner decision rows, additive environment/ignore entries and both development-contract and production-bridge gates; integration workflow approval is Issue #2 comment 6390138653. No product threshold, strict contract or publication authority changed. | Exercise reasoning → collection → web together without overwriting owner history or pushing rehearsal merges. |
+ | 2026-10-24 | Yelysei / Claude Code (Yelysei's choice between keeping the full chain, this, and skipping research round 2 as well) | The impact bar gates the expensive checks: events that cannot reach the threshold even with full confirmation keep both research rounds on the fast lane but skip the blind fact-checker and the reviewer; their claims export `fact_checker: unverified` (reason "skipped…"), status = verifier's verdict, no `resolved_by`, adjudication "not double-checked" (Selecting major news). | 77% of the first genuine runs' calls, all of the large-model calls, went to events that could not become stories; roundup labels are not published facts. Alternative rejected: skipping research round 2 too would have left roundup labels on the event's own documents only. |
+ | 2026-10-24 | Anastasia / Claude Code (proposal, Issue #2 6385696755); agreed by Yelysei / Claude Code; Vadim pending | `integration` branch cut from master; blocks merge there first through owner PRs in the order yelysei/agents → data-collection → feature/web-portals (merge commits); small compatibility fixes allowed there with a DECISION record; CI and the release checklist run against it; master stays the demo fallback until it is green (see Shared development coordination). | Compatibility problems are found and fixed in one place while master remains the last state that demonstrably worked. |
+diff --git a/reasoning/config/reasoning.toml b/reasoning/config/reasoning.toml
+index 78b1b11..b996886 100644
+--- a/reasoning/config/reasoning.toml
++++ b/reasoning/config/reasoning.toml
+@@ -92,3 +92,8 @@ min_interval_ms = 6000            # base pause between live calls; env QUORUM_MI
+ # too (an explicit shared 0 wins over the values below unless a lane's own env is set; decision in llm.min_interval_ms).
+ min_interval_ms_fact_checker = 10000
+ min_interval_ms_reviewer = 10000
++
++# DECISION(2026-10-24, rcc00n/Codex): proposed source memory is opt-in; dry mode never touches it.
++# Why: owner review and genuine feature evidence are required before enabling the sidecar.
++[engines]
++hmem = "off"
+diff --git a/reasoning/memory/README.md b/reasoning/memory/README.md
+new file mode 100644
+index 0000000..bbdd37c
+--- /dev/null
++++ b/reasoning/memory/README.md
+@@ -0,0 +1,17 @@
++# Proposed H-MEM source-memory hooks
++
++Owner review required: Yelysei (graph/selection policy) and Anastasia (DocRef namespace/provenance). Default `[engines] hmem = "off"`; forced or requested dry mode returns before any subprocess or store access. This patch does not enable memory for an existing run.
++
++Opt-in prerequisites: existing official reference checkout in `METERLESS_HOME`, its installed TSX (or `QUORUM_HMEM_TSX`), and a new dedicated absolute `QUORUM_HMEM_DIR` outside the repository. No downloads, service, credentials, corpus transfer or inference are needed for offline validation.
++
++`frame` writes actually present attributed framing and supporting evidence of confirmed fact/number claims from internal state. Exact original article/official IDs, source URL/group, publication/hash/access metadata and quote bindings are retained. No synthetic story is needed; zero eligible records truthfully records zero writes. The unchanged reference HMEM class persists records and ledger. Duplicate imports are idempotent. A pending write or occupied lock fails closed; partial stores need owner inspection, not automatic replay.
++
++Research round 2 can prioritize only recalled records that exactly match an authorized current DocRef in the ordinary ranked pool, within the existing edition/history window. Superseded, wrong-namespace, unknown-source, changed-metadata and mismatched fictional records cannot be injected. Memory changes candidate order only when opted in; the existing candidate cap remains unchanged. Selected documents continue through existing fetch, stance, quote/hash/access and independence logic. No remembered verdict or quote is copied into evidence.
++
++Audit rows use the existing `memory` trace node shape with counts and reference-ledger action counts; no snapshot/API fields are added. Failure retains ordinary ranking, emits an honest partial error and withholds private exception contents. The reference implementation is a deterministic reference component, not production storage.
++
++Run `METERLESS_HOME=<existing-checkout> <reasoning-python> -m pytest reasoning/tests/test_source_memory.py -q`. Run the installed TSX with `HMEM_IMPL=<this-directory>/sidecar.mjs` against the official conformance runner. Tests use explicit TEST records and stub model/fetch responses; reference persistence/recall is real. Genuine graph adoption and sponsor compliance remain unverified until the owner approves, executes an authorized genuine workflow and records its evidence. Original v3/config attestation remains separate and blocked.
++
++## Decisions
++
++2026-10-24 · rcc00n / Codex · Propose local subprocess reference-memory hooks at frame/write and research-round2 retrieval; never import recalled evidence or change confirmation rules. Why: exercise the existing owner proposal with exact source provenance and bounded re-verification while preserving default-off/dry behavior and strict snapshot fields.
+diff --git a/reasoning/memory/sidecar.mjs b/reasoning/memory/sidecar.mjs
+new file mode 100644
+index 0000000..9478a3e
+--- /dev/null
++++ b/reasoning/memory/sidecar.mjs
+@@ -0,0 +1,45 @@
++// Unmodified official reference engine; no HTTP service, provider or vendor copy.
++import fs from 'node:fs';
++import path from 'node:path';
++import crypto from 'node:crypto';
++import {pathToFileURL,fileURLToPath} from 'node:url';
++const home=process.env.METERLESS_HOME;
++if(!home)throw Error('Reference engine checkout required');
++export const {HMEM}=await import(pathToFileURL(path.join(home,'engines/hmem/reference/src/index.ts')).href);
++if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
++  process.umask(0o077);
++  try {
++    const raw=fs.readFileSync(0,'utf8');if(Buffer.byteLength(raw)>2*1024*1024)throw Error('Request too large');
++    const request=JSON.parse(raw);
++    if(request.dry_run!==false||process.env.QUORUM_DRY_RUN==='1'){console.log(JSON.stringify({rows:[],count:0,ledger_entries:0,disabled:true}));process.exit(0);}
++    const dir=process.env.QUORUM_HMEM_DIR;
++    if(!dir||!path.isAbsolute(dir))throw Error('Private external directory required');
++    if(request.action==='recall'&&!fs.existsSync(dir)){console.log(JSON.stringify({rows:[],count:0,ledger_entries:0}));process.exit(0);}
++    const marker=path.join(dir,'quorum-source-memory-v1');
++    if(fs.existsSync(dir)&&(!fs.existsSync(marker)&&fs.readdirSync(dir).length))throw Error('Existing unrelated directory rejected');
++    fs.mkdirSync(dir,{recursive:true,mode:0o700});
++    if(!fs.existsSync(marker))fs.writeFileSync(marker,'quorum-source-memory-v1',{flag:'wx',mode:0o600});
++    const lock=path.join(dir,'quorum.lock'),pending=path.join(dir,'quorum.pending');
++    const fd=fs.openSync(lock,'wx',0o600);
++    try {
++      if(fs.existsSync(pending))throw Error('Incomplete write needs owner inspection');
++      const engine=new HMEM({persistDir:dir,actor:'quorum-source-memory'}),before=engine.ledger.all().length;
++      let result;
++      if(request.action==='store') {
++        fs.writeFileSync(pending,'pending',{flag:'wx',mode:0o600});
++        const seen=new Set(engine.store.all().map(m=>m.source));let count=0;
++        for(const row of request.rows) {
++          const content=JSON.stringify(row),key=crypto.createHash('sha256').update(content).digest('hex');
++          if(seen.has(key))continue;
++          engine.add({content,source:key,type:'general',layer:'working',confidence:0.7,tags:['candidate-only',row.topic_id,row.docref.source_id],
++            provenance:{origin:'model_response',learnedAt:Date.now(),label:'Attributed source memory; fresh verification required',refs:[row.run_id,row.docref.url]}});
++          seen.add(key);count++;
++        }
++        fs.unlinkSync(pending);result={count,rows:[]};
++      } else if(request.action==='recall') {
++        result={rows:engine.query(request.query,{threshold:0,topN:engine.store.all().length}).memories.map(({memory,relevance})=>({record:JSON.parse(memory.content),memory_id:memory.id,relevance})),count:0};
++      } else throw Error('Unsupported action');
++      console.log(JSON.stringify({...result,ledger_entries:engine.ledger.all().length-before}));
++    } finally {fs.closeSync(fd);fs.unlinkSync(lock);}
++  } catch {console.error('H-MEM operation unavailable; private details withheld');process.exitCode=1;}
++}
+diff --git a/reasoning/quorum_reasoning/nodes/frame.py b/reasoning/quorum_reasoning/nodes/frame.py
+index be488f2..6f8b584 100644
+--- a/reasoning/quorum_reasoning/nodes/frame.py
++++ b/reasoning/quorum_reasoning/nodes/frame.py
+@@ -15,6 +15,7 @@ from collections import Counter, defaultdict
+ from .. import llm, untrusted
+ from ..state import DocRef, RunState, StepError
+ from ..trace import finish, step
++from ..tools import memory
+ 
+ COHORTS = ("major_left", "minor_left", "major_right", "minor_right", "center")
+ 
+@@ -119,4 +120,5 @@ def run(state: RunState) -> dict:
+                 s.decision = "failed; coverage counts only"
+                 s.reason = untrusted.PUBLIC_FAILURE
+         steps.append(finish(state, s))
+-    return {"events": events, "steps": steps, "errors": errors}
++    memory_steps, memory_errors = memory.remember(state | {"steps": state.get("steps", []) + steps}, events)
++    return {"events": events, "steps": steps + memory_steps, "errors": errors + memory_errors}
+diff --git a/reasoning/quorum_reasoning/nodes/research.py b/reasoning/quorum_reasoning/nodes/research.py
+index 6d62699..5aa6020 100644
+--- a/reasoning/quorum_reasoning/nodes/research.py
++++ b/reasoning/quorum_reasoning/nodes/research.py
+@@ -12,6 +12,7 @@ from .. import config, llm, untrusted
+ from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin, origin_group
+ from ..state import Claim, DocRef, Evidence, RunState, StepError
+ from ..text import best_passage, clip_sentences, tokens
++from ..tools import memory
+ from ..tools.corpus import OFFICIAL_ID_OFFSET
+ from ..tools.fetch_text import FetchResult, fetch_result, find_quote
+ from ..trace import finish, step
+@@ -149,7 +150,12 @@ def run(state: RunState) -> dict:
+             for c in targets:
+                 pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
+                 # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
+-                candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"])
++                candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"], cap=0 if memory.enabled(state) else None)
++                if round_no > 1 and memory.enabled(state):
++                    candidates, memory_steps, memory_errors = memory.prioritize(state | {"steps": state.get("steps", []) + steps}, e["id"], c["text"], candidates)
++                    steps.extend(memory_steps); errors.extend(memory_errors)
++                    cap = int(config.get("research", "candidates_per_claim", 0) or 0)
++                    if cap > 0: candidates = candidates[:cap]
+                 for d in candidates:
+                     fetched = fetch_result(d, dry_run=state["dry_run"])
+                     passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
+diff --git a/reasoning/quorum_reasoning/tools/memory.py b/reasoning/quorum_reasoning/tools/memory.py
+new file mode 100644
+index 0000000..7246960
+--- /dev/null
++++ b/reasoning/quorum_reasoning/tools/memory.py
+@@ -0,0 +1,92 @@
++"""Opt-in source-memory candidates. Memory never supplies evidence or a verdict."""
++from __future__ import annotations
++import json
++import os
++import re
++import subprocess
++from datetime import datetime
++from pathlib import Path
++from .. import config, llm
++from ..trace import step, finish
++from .corpus import OFFICIAL_ID_OFFSET, _edition_window, _previous_window, previous_days
++
++
++def enabled(state):
++    return config.get('engines','hmem','off') == 'on' and not llm.is_dry_run(state.get('dry_run',True))
++
++
++def identity(doc):
++    official=bool(doc.get('official'))
++    return dict(namespace='official' if official else 'article',
++                id=doc['id']-OFFICIAL_ID_OFFSET if official and doc['id']>=OFFICIAL_ID_OFFSET else doc['id'],
++                **{k:doc.get(k) for k in ('source_id','url','published_at','content_hash','fetched_at','access_level','independence_group','wire_origin','kind','doc_type')})
++
++
++def _call(state, action, **payload):
++    repo=Path(__file__).resolve().parents[3]
++    directory=Path(os.environ['QUORUM_HMEM_DIR']).expanduser()
++    if not directory.is_absolute() or directory.resolve().is_relative_to(repo) or any((parent/'.git').exists() for parent in (directory.resolve(),*directory.resolve().parents)):
++        raise ValueError('Private memory must stay outside the repository')
++    home=Path(os.environ['METERLESS_HOME'])
++    tsx=os.getenv('QUORUM_HMEM_TSX',str(home/'engines/hmem/reference/node_modules/.bin/tsx'))
++    data=json.dumps(dict(action=action,dry_run=state.get('dry_run',True),**payload))
++    if len(data.encode())>2*1024*1024:raise ValueError('Memory request too large')
++    result=subprocess.run([tsx,str(repo/'reasoning/memory/sidecar.mjs')],input=data,text=True,capture_output=True,timeout=20,check=True)
++    if len(result.stdout.encode())>2*1024*1024:raise ValueError('Memory response too large')
++    return json.loads(result.stdout)
++
++
++def _trace(state,event_id,decision,reason):
++    with step(state,'memory',event_id=event_id) as s:
++        s.decision=decision;s.reason=reason
++    return finish(state,s)
++
++
++def remember(state,events):
++    if not enabled(state):return [],[]
++    try:
++        docs={(identity(d)['namespace'],identity(d)['id']):d for d in state['documents'] if not d.get('superseded')}
++        base=dict(topic_id=state['topic_id'],edition_date=state['edition_date'],run_id=state['run_id'],fictional=state.get('corpus')=='fixture')
++        rows=[]
++        for claim in state['claims'].values():
++            if claim.get('final_status')!='confirmed' or claim.get('kind') not in ('fact','number'):continue
++            for ev in claim['evidence']:
++                ns='official' if ev.get('official_doc_id') is not None else 'article'
++                doc=docs.get((ns,ev.get('official_doc_id') if ns=='official' else ev.get('document_id')))
++                if not doc or ev['stance']!='supports' or ev.get('source_id')!=doc['source_id'] or ev['url']!=doc['url']:continue
++                if not isinstance(ev.get('char_start'),int) or not isinstance(ev.get('char_end'),int) or ev['char_start']<0 or ev['char_end']-ev['char_start']!=len(ev['quote']):continue
++                if not re.fullmatch('[0-9a-f]{64}',ev.get('content_hash_at_quote') or '') or ev.get('access_achieved') not in (1,2):continue
++                rows.append(dict(base,kind='evidence-candidate',event_id=claim['event_id'],docref=identity(doc),
++                                 claim_id=claim['id'],claim_text=claim['text'],quote=ev['quote'],
++                                 **{k:ev.get(k) for k in ('char_start','char_end','content_hash_at_quote','access_achieved','fetched_at')}))
++        for event in events:
++            for row in event.get('framing',{}).get('outlets',[]):
++                matches=[d for d in docs.values() if d['url']==row['url']]
++                if len(matches)==1 and row.get('interpretation_label'):
++                    rows.append(dict(base,kind='framing',event_id=event['id'],docref=identity(matches[0]),interpretation_label=row['interpretation_label']))
++        result=_call(state,'store',rows=rows) if rows else dict(count=0,ledger_entries=0)
++        return [_trace(state,None,f"stored {result['count']} source memories",f"Reference H-MEM; candidate-only records; {result['ledger_entries']} ledger actions")],[]
++    except Exception:
++        return [_trace(state,None,'memory write unavailable','No memory success claimed; private details withheld')],[dict(node='memory',event_id=None,message='Source memory write unavailable')]
++
++
++def prioritize(state,event_id,query,ordered):
++    if not enabled(state):return ordered,[],[]
++    # DECISION(2026-10-24, rcc00n/Codex): recall can only prioritize exact current authorized DocRefs.
++    # Why: neither stale memory nor a recalled quote may bypass fresh fetch/stance/quote/independence checks.
++    try:
++        result=_call(state,'recall',query=query)
++        start,_=_previous_window(state['edition_date'],previous_days());_,end=_edition_window(state['edition_date'])
++        as_time=lambda x:datetime.fromisoformat(x.replace('Z','+00:00'))
++        candidates=[]
++        for row in result['rows']:
++            r=row['record']
++            if r['topic_id']!=state['topic_id'] or r['fictional']!=(state.get('corpus')=='fixture') or r['kind']!='evidence-candidate':continue
++            if not as_time(start)<=as_time(r['docref']['published_at'])<as_time(end):continue
++            for doc in ordered:
++                if not doc.get('superseded') and identity(doc)==r['docref'] and doc not in candidates:candidates.append(doc)
++        rest=[doc for doc in ordered if doc not in candidates]
++        trace=_trace(state,event_id,f'recalled {len(candidates)} authorized source candidates',f"Reference H-MEM; fresh verification required; {result['ledger_entries']} ledger actions")
++        return candidates+rest,[trace],[]
++    except Exception:
++        return ordered,[_trace(state,event_id,'memory recall unavailable','Ordinary research ranking retained; private details withheld')],[dict(node='memory',event_id=event_id,message='Source memory recall unavailable')]
+diff --git a/reasoning/tests/test_source_memory.py b/reasoning/tests/test_source_memory.py
+new file mode 100644
+index 0000000..c995bf6
+--- /dev/null
++++ b/reasoning/tests/test_source_memory.py
+@@ -0,0 +1,136 @@
++"""Real reference persistence with explicit TEST records; no provider or live corpus."""
++import copy
++import json
++from pathlib import Path
++from unittest.mock import patch
++import pytest
++from quorum_reasoning.tools import memory
++from quorum_reasoning.nodes import research, frame
++from quorum_reasoning.state import initial_state
++from quorum_reasoning.tools.fetch_text import fetch_result, FetchResult, content_hash
++
++TEXT='The Senate passed the aid bill.'
++
++
++def state():
++    s=initial_state('TEST-memory-run','russia-ukraine-war','2026-10-22',dry_run=False)
++    s['corpus']='fixture'
++    s['documents']=[dict(id=i,source_id=f'TEST-{i}',source_name=f'TEST-{i}',independence_group=f'TEST-{i}',
++        kind='outlet',flank='left',tier='minor',url=f'https://example.org/TEST/{i}',title='TEST bill',lead=TEXT,
++        published_at='2026-10-21T12:00:00Z',access_level=1,wire_origin=None,text=TEXT) for i in (1,2)]
++    s['events']=[dict(id='TEST-event',document_ids=[1],headline='TEST bill',above_bar=False,framing={})]
++    d=s['documents'][1]
++    ev=research.evidence_from(d,TEXT,'supports','researcher',fetch_result(d,dry_run=True))
++    s['claims']={'TEST-claim':dict(id='TEST-claim',event_id='TEST-event',text=TEXT,kind='fact',origin_document_id=1,
++        final_status='confirmed',evidence=[ev])}
++    s['research_rounds']={'TEST-event':1}
++    return s
++
++
++@pytest.fixture
++def live_memory(monkeypatch,tmp_path):
++    import os
++    home=Path(os.getenv('METERLESS_HOME','/nonexistent'))
++    if not (home/'engines/hmem/reference/node_modules/.bin/tsx').is_file():pytest.skip('installed reference/TSX not supplied')
++    monkeypatch.delenv('QUORUM_DRY_RUN',raising=False)
++    directory=tmp_path/'private-memory'
++    monkeypatch.setenv('QUORUM_HMEM_DIR',str(directory))
++    # Simulated live nodes only; json_task/fetch are stubbed, while the reference engine is real.
++    monkeypatch.setattr(memory,'enabled',lambda s:not s['dry_run'])
++    return directory
++
++
++def test_default_off_and_forced_dry_do_not_touch_store(monkeypatch,tmp_path):
++    s=state();directory=tmp_path/'never-created';monkeypatch.setenv('QUORUM_HMEM_DIR',str(directory))
++    assert not memory.enabled(s)
++    monkeypatch.setattr(memory.config,'get',lambda section,key,default=None:'on' if (section,key)==('engines','hmem') else default)
++    s['dry_run']=True
++    with patch.object(memory,'_call',side_effect=AssertionError('dry mode touched memory')):
++        assert memory.remember(s,[])==([],[])
++        assert memory.prioritize(s,'TEST-event','TEST',[])==([],[],[])
++    assert not directory.exists()
++
++
++def test_reference_persists_and_recalls_exact_docref_across_processes(live_memory):
++    s=state();steps,errors=memory.remember(s,[])
++    assert not errors and 'stored 1' in steps[0]['decision']
++    rows,steps,errors=memory.prioritize(s,'TEST-event',TEXT,list(reversed(s['documents'])))
++    assert not errors and rows[0]['id']==2 and 'recalled 1' in steps[0]['decision']
++    assert (live_memory/'state.json').exists() and (live_memory/'ledger.jsonl').exists()
++    raw=memory._call(s,'recall',query=TEXT)['rows'][0]['record']
++    assert raw['docref']==memory.identity(s['documents'][1])
++    assert raw['quote']==TEXT and raw['kind']=='evidence-candidate'
++    assert 'stored 0' in memory.remember(s,[])[0][0]['decision']
++
++
++def test_recalled_quote_is_not_evidence_without_fresh_fetch_and_stance(live_memory):
++    s=state();memory.remember(s,[]);s['claims']['TEST-claim']['evidence']=[]
++    fresh='The Senate did not pass the aid bill.'
++    fetched=FetchResult(fresh,fresh,content_hash('TEST bill',TEXT,fresh),1,'2026-10-22T10:00:00Z','TEST shared fetcher')
++    with patch.object(research,'fetch_result',return_value=fetched) as fetch, patch.object(research.llm,'json_task',return_value={'stance':'contradicts'}) as model:
++        result=research.run(s)
++    ev=result['claims']['TEST-claim']['evidence']
++    assert fetch.called and model.called
++    assert len(ev)==1 and ev[0]['stance']=='contradicts' and ev[0]['quote']==fresh
++    assert ev[0]['content_hash_at_quote']==fetched.content_hash
++    assert any(x['node']=='memory' and 'recalled 1' in x['decision'] for x in result['steps'])
++
++
++def test_stale_unknown_wrong_namespace_or_fictional_identity_never_injected(live_memory):
++    s=state();memory.remember(s,[])
++    for field,value in (('source_id','OTHER'),('content_hash','a'*64),('official',True),('superseded',True)):
++        candidate=copy.deepcopy(s['documents'][1]);candidate[field]=value
++        ordered,steps,errors=memory.prioritize(s,'TEST-event',TEXT,[candidate])
++        assert not errors and ordered==[candidate] and 'recalled 0' in steps[0]['decision']
++    s['corpus']='zetaris'
++    assert 'recalled 0' in memory.prioritize(s,'TEST-event',TEXT,s['documents'])[1][0]['decision']
++
++
++def test_pending_write_fails_closed_and_frame_hook_reports_zero_truthfully(live_memory):
++    s=state();s['claims']={}
++    assert 'stored 0' in frame.run(s)['steps'][-1]['decision']
++    assert not live_memory.exists()
++    memory.remember(state(),[])
++    (live_memory/'quorum.pending').write_text('TEST incomplete write')
++    ordered,steps,errors=memory.prioritize(s,'TEST-event',TEXT,s['documents'])
++    assert ordered==s['documents'] and errors and steps[0]['decision']=='memory recall unavailable'
++
++
++def test_frame_hook_persists_attributed_framing_with_exact_docref(live_memory):
++    s=state();s['events'][0]['above_bar']=True
++    with patch.object(frame.llm,'json_task',return_value={'interpretation_label':'TEST source framing'}):
++        result=frame.run(s)
++    assert 'stored 2' in result['steps'][-1]['decision']
++    rows=memory._call(s,'recall',query=TEXT)['rows']
++    framing=next(x['record'] for x in rows if x['record']['kind']=='framing')
++    assert framing['docref']==memory.identity(s['documents'][0])
++    assert framing['interpretation_label']=='TEST source framing'
++
++
++def test_memory_does_not_increase_existing_candidate_cap(live_memory,monkeypatch):
++    s=state();memory.remember(s,[]);s['claims']['TEST-claim']['evidence']=[]
++    for i in range(3,14):
++        d=copy.deepcopy(s['documents'][1]);d.update(id=i,source_id=f'TEST-{i}',url=f'https://example.org/TEST/{i}');s['documents'].append(d)
++    original=memory.config.get
++    monkeypatch.setattr(memory.config,'get',lambda section,key,default=None:1 if (section,key)==('research','candidates_per_claim') else original(section,key,default))
++    with patch.object(research.llm,'json_task',return_value={'stance':'contradicts'}) as model:
++        result=research.run(s)
++    assert model.call_count==1 and len(result['claims']['TEST-claim']['evidence'])==1
++
++
++def test_missing_fresh_source_never_reuses_remembered_quote(live_memory):
++    s=state();memory.remember(s,[]);s['claims']['TEST-claim']['evidence']=[]
++    with patch.object(research,'fetch_result',return_value=None), patch.object(research.llm,'json_task') as model:
++        result=research.run(s)
++    model.assert_not_called()
++    assert result['claims']['TEST-claim']['evidence']==[]
++
++
++
++def test_raw_sidecar_dry_request_and_unrelated_directory_do_not_write(live_memory):
++    s=state();s['dry_run']=True
++    report=memory._call(s,'store',rows=[])
++    assert report['disabled'] and not live_memory.exists()
++    s['dry_run']=False;live_memory.mkdir();(live_memory/'TEST-unrelated').write_text('TEST protected data')
++    with pytest.raises(Exception):memory._call(s,'store',rows=[])
++    assert list(live_memory.iterdir())==[live_memory/'TEST-unrelated']
