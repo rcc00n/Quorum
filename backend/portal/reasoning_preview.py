@@ -1,4 +1,4 @@
-"""Reasoning 1.0 presentation adapter. DEV/fictional only; never calls the publisher."""
+"""Reasoning 1.0 presentation adapter. Unpublished development only; never calls the publisher."""
 
 import hashlib
 import json
@@ -47,6 +47,33 @@ def obj(value, required, optional=()):
     fail(isinstance(value, dict))
     fail(set(required) <= value.keys(), "missing_reasoning_field")
     fail(value.keys() <= set(required) | set(optional), "unsupported_reasoning_field")
+
+
+def quote_binding(e):
+    # DECISION(2026-10-23, rcc00n/Codex): validate optional owner 0224ca6 quote bindings
+    # as declarations only. Why: source text is absent, so offsets cannot be independently verified here.
+    if "source_id" in e and e["source_id"] is not None:
+        identifier(e["source_id"])
+    if "document_id" in e or "official_doc_id" in e:
+        fail("document_id" in e and "official_doc_id" in e)
+        ids = [e["document_id"], e["official_doc_id"]]
+        fail(sum(v is not None for v in ids) == 1)
+        fail(all(v is None or type(v) is int and v > 0 for v in ids))
+    if "char_start" in e or "char_end" in e:
+        fail("char_start" in e and "char_end" in e)
+        a, b = e["char_start"], e["char_end"]
+        fail(a is None and b is None or type(a) is int and type(b) is int and 0 <= a < b and b - a == len(e["quote"]))
+    if "content_hash_at_quote" in e:
+        value = e["content_hash_at_quote"]
+        fail(value is None or isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None)
+    if "access_achieved" in e:
+        value = e["access_achieved"]
+        fail(value is None or type(value) is int and value in (1, 2))
+    if e.get("fetched_at") is not None:
+        timestamp(e["fetched_at"])
+    for key in ("hash_mismatch", "from_previous_day"):
+        if key in e:
+            fail(type(e[key]) is bool or key == "hash_mismatch" and e[key] is None)
 
 
 def identifier(value):
@@ -207,7 +234,7 @@ def parse_reasoning(raw):
             "window",
             "provenance",
         ],
-        ["bar", "errors", "trace"],
+        ["bar", "errors", "trace", "summary_source"],
     )
     fail(p["schema_version"] == "1.0", "unsupported_reasoning_version")
     identifier(p["topic_id"])
@@ -217,6 +244,10 @@ def parse_reasoning(raw):
     fail(type(p["version"]) is int and p["version"] > 0)
     fail(p["status"] in ("ok", "partial", "empty"))
     text(p["summary"])
+    if "summary_source" in p:
+        fail(p["summary_source"] in ("model", "fallback"))
+        if p["summary_source"] == "fallback":
+            fail(p["status"] == "partial" and bool(p.get("errors")))
     for missing in rows(p["sources_missing"]):
         text(missing)
     if "bar" in p:
@@ -318,7 +349,7 @@ def parse_reasoning(raw):
                     "reason",
                     "evidence",
                 ],
-                ["kind", "speaker"],
+                ["kind", "speaker", "reviewer_status", "reviewer_reason", "reviewer_quote", "resolved_by"],
             )
             identifier(c["id"])
             fail(c["id"] not in claims, "duplicate_reasoning_claim")
@@ -327,6 +358,15 @@ def parse_reasoning(raw):
                 text(c[key])
             for key in ("status", "verifier", "fact_checker"):
                 fail(c[key] in ("confirmed", "disputed", "unverified"))
+            if "reviewer_status" in c:
+                fail(c["reviewer_status"] is None or c["reviewer_status"] in ("confirmed", "disputed", "unverified"))
+            for key in ("reviewer_reason", "reviewer_quote"):
+                if key in c:
+                    text(c[key])
+            if "resolved_by" in c:
+                fail(c["resolved_by"] in ("agreement", "reviewer", "dispute"))
+                if c["resolved_by"] == "reviewer":
+                    fail(c.get("reviewer_status") == c["status"])
             if "kind" in c:
                 fail(c["kind"] in ("fact", "statement", "number", "context"))
             if "speaker" in c:
@@ -335,7 +375,9 @@ def parse_reasoning(raw):
                 obj(
                     e,
                     ["stance", "quote", "title", "url", "independence_group"],
-                    ["found_by", "is_document", "quote_id"],
+                    ["found_by", "is_document", "quote_id", "by_headline",
+                     "source_id", "document_id", "official_doc_id", "char_start", "char_end",
+                     "content_hash_at_quote", "access_achieved", "fetched_at", "hash_mismatch", "from_previous_day"],
                 )
                 fail(e["stance"] in ("supports", "contradicts", "neutral", "statement"))
                 for key in ("quote", "title", "independence_group"):
@@ -345,6 +387,9 @@ def parse_reasoning(raw):
                     fail(e["found_by"] in ("researcher", "verifier", "fact_checker"))
                 if "is_document" in e:
                     fail(type(e["is_document"]) is bool)
+                if "by_headline" in e:
+                    fail(type(e["by_headline"]) is bool)
+                quote_binding(e)
                 if "quote_id" in e:
                     fail(type(e["quote_id"]) in (str, int) or e["quote_id"] is None)
         for block in rows(s["article"]):
@@ -448,13 +493,15 @@ def parse_reasoning(raw):
         obj(group, ["name", "items"])
         text(group["name"])
         for item in rows(group["items"]):
-            obj(item, ["event_id", "line", "status", "sources"], ["needs_review"])
+            obj(item, ["event_id", "line", "status", "sources"], ["needs_review", "line_source"])
             identifier(item["event_id"])
             fail(item["event_id"] not in event_ids, "duplicate_reasoning_event")
             event_ids.add(item["event_id"])
             item_count += 1
             text(item["line"])
             text(item["status"])
+            if "line_source" in item:
+                fail(item["line_source"] in ("model", "title"))
             if "needs_review" in item:
                 fail(type(item["needs_review"]) is bool)
             for value in rows(item["sources"]):
@@ -474,6 +521,7 @@ def parse_reasoning(raw):
                 "model",
                 "duration_ms",
             ],
+            ["detail"],
         )
         text(step["node"])
         fail(type(step["iteration"]) is int and step["iteration"] >= 1)
@@ -485,6 +533,11 @@ def parse_reasoning(raw):
         )
         for key in ("decision", "reason"):
             text(step[key])
+        if "detail" in step:
+            for detail in rows(step["detail"], 12):
+                obj(detail, ["text", "reason"])
+                text(detail["text"])
+                text(detail["reason"])
         text(step["model"], True)
         fail(type(step["duration_ms"]) in (int, float) and step["duration_ms"] >= 0)
     for error in rows(p.get("errors", [])):
@@ -513,6 +566,12 @@ def present_reasoning(raw, *, now=None):
         if p["status"] == "partial" or p.get("errors") or p["sources_missing"]
         else "available"
     )
+    missing_provenance = list(MISSING)
+    evidence = [e for story in p["stories"] for claim in story["claims"] for e in claim["evidence"]]
+    if evidence and all(e.get("source_id") and (e.get("document_id") is not None or e.get("official_doc_id") is not None) for e in evidence):
+        missing_provenance.remove("original document/source IDs")
+    if evidence and all(e.get("access_achieved") is not None and e.get("fetched_at") is not None for e in evidence):
+        missing_provenance.remove("achieved access levels and retrieval timestamps")
     events = []
     source_rows = {}
     for s in sorted(p["stories"], key=lambda s: s["rank"]):
@@ -588,9 +647,18 @@ def present_reasoning(raw, *, now=None):
                 "expired" if now >= timestamp(p["expires_at"]) else "within_hint"
             ),
             sha256=hashlib.sha256(raw).hexdigest(),
-            missing_provenance=MISSING,
+            missing_provenance=missing_provenance,
             warnings=[
-                "FICTIONAL data; links and quotations are illustrative, not verified news.",
+                (
+                    "FICTIONAL data; links and quotations are illustrative, not verified news."
+                    if p["provenance"]["fictional"]
+                    else "Producer-declared collected corpus; this preview does not independently verify source provenance. "
+                    + (
+                        "Deterministic stand-ins; no AI verification."
+                        if p["provenance"]["model"] == "stand-ins"
+                        else "Recorded model output; not publication-approved."
+                    )
+                ),
                 "Unpublished preview. Reported timestamps and provenance do not prove publication or a genuine sponsor run.",
                 "Trace order is array order, not a fabricated timestamp sequence.",
             ],

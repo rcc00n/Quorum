@@ -248,10 +248,10 @@ def zetaris():
         emit('PASS' if isinstance(config, dict) else 'NOT_TESTED', 'Zetaris GUI /api/config', 'Actual UI config response; not SQL verification')
     except Exception as exc:
         failure('Zetaris GUI /api/config', exc)
-    # The bundle's API healthcheck uses HTTP /, while REST routes live under /api/v1.0.
+    # The bundle probes HTTP / without curl --fail; SQL is verified separately below.
     try:
-        probe_api_http(api+'/')
-        emit('PASS', 'Zetaris REST API process', 'HTTP health response at the bundled API healthcheck URL; SQL tested separately')
+        status = probe_api_http(api+'/')
+        emit('PASS', 'Zetaris REST API process', f'HTTP {status} at the bundled root probe; SQL tested separately')
     except Exception as exc:
         failure('Zetaris REST API process', exc)
     try:
@@ -286,9 +286,17 @@ def zetaris():
 
 
 def probe_api_http(url):
-    with urllib.request.build_opener(NoRedirect).open(url, timeout=15) as response:
-        if response.status != 200:
-            raise ValueError('API healthcheck did not return HTTP 200')
+    # DECISION(2026-10-23, rcc00n/Codex): accept the bundled API's unrouted root (404) as
+    # process reachability. Why: authenticated SQL works there; root 200 is not its contract.
+    try:
+        with urllib.request.build_opener(NoRedirect).open(url, timeout=15) as response:
+            if response.status != 200:
+                raise ValueError('Unexpected API root response')
+            return response.status
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return exc.code
+        raise
 
 
 def nemotron(allow_inference=False):

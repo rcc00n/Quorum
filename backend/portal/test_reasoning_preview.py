@@ -161,6 +161,61 @@ class ReasoningMappingTests(SimpleTestCase):
         self.assertFalse(result["preview"]["published"])
         self.assertEqual(result["status"], "demo")
         self.assertFalse(result["reasoning"]["provenance"]["fictional"])
+        self.assertIn("Producer-declared collected corpus", result["preview"]["warnings"][0])
+        self.assertIn("not publication-approved", result["preview"]["warnings"][0])
+        p["provenance"]["model"] = "stand-ins"
+        result = present_reasoning(json.dumps(p).encode())
+        self.assertIn("no AI verification", result["preview"]["warnings"][0])
+        self.assertFalse(result["preview"]["published"])
+
+    def test_current_optional_access_and_roundup_audit_contract(self):
+        p = sample()
+        evidence = p["stories"][0]["claims"][0]["evidence"][0]
+        evidence["by_headline"] = True
+        item = p["roundup"]["groups"][0]["items"][0]
+        item["line_source"] = "title"
+        p["trace"][0]["detail"] = [{"text": "TEST dropped claim", "reason": "TEST origin mismatch"}]
+        self.assertEqual(parse_reasoning(json.dumps(p).encode()), p)
+        for value in ("full-text", 1, None):
+            evidence["by_headline"] = value
+            with self.assertRaises(SnapshotError):
+                parse_reasoning(json.dumps(p).encode())
+        evidence["by_headline"] = True
+        item["line_source"] = "invented"
+        with self.assertRaises(SnapshotError):
+            parse_reasoning(json.dumps(p).encode())
+        item["line_source"] = "model"
+        p["trace"][0]["detail"][0]["private_prompt"] = "TEST rejected"
+        with self.assertRaises(SnapshotError):
+            parse_reasoning(json.dumps(p).encode())
+
+    def test_latest_quote_binding_and_third_review_declarations(self):
+        p = sample()
+        c = p["stories"][0]["claims"][0]
+        c.update(reviewer_status=c["status"], reviewer_reason="TEST review", reviewer_quote="TEST decisive words", resolved_by="reviewer")
+        e = c["evidence"][0]
+        e.update(source_id="TEST-source", document_id=None, official_doc_id=42,
+                 char_start=4, char_end=4 + len(e["quote"]), content_hash_at_quote="a" * 64,
+                 access_achieved=1, fetched_at="2026-10-23T04:00:00Z", hash_mismatch=False,
+                 from_previous_day=True)
+        self.assertEqual(parse_reasoning(json.dumps(p).encode()), p)
+        for change in ({"document_id": 42}, {"official_doc_id": True}, {"official_doc_id": None},
+                       {"char_start": -1}, {"char_end": 4}, {"char_start": None},
+                       {"content_hash_at_quote": "not-a-hash"}, {"access_achieved": True},
+                       {"access_achieved": 3}, {"fetched_at": "2026-10-23"},
+                       {"hash_mismatch": "false"}, {"from_previous_day": None}):
+            q = copy.deepcopy(p)
+            q["stories"][0]["claims"][0]["evidence"][0].update(change)
+            with self.subTest(change=change), self.assertRaises(SnapshotError):
+                parse_reasoning(json.dumps(q).encode())
+        e.update(char_start=None, char_end=None, content_hash_at_quote=None,
+                 access_achieved=None, fetched_at=None, hash_mismatch=None)
+        self.assertEqual(parse_reasoning(json.dumps(p).encode()), p)
+        p.update(summary_source="fallback", status="partial", errors=[dict(node="publish", event_id=None, message="TEST summary rejected")])
+        self.assertEqual(present_reasoning(json.dumps(p).encode())["preview"]["status"], "partial")
+        p["summary_source"] = "invented"
+        with self.assertRaises(SnapshotError):
+            parse_reasoning(json.dumps(p).encode())
 
     def test_dst_calendar_windows(self):
         for day, start, end, expires in [

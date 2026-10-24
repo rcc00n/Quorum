@@ -113,6 +113,15 @@ function Chain({
             </p>
             <blockquote>{e.quote}</blockquote>
             <Sources sources={[e]} />
+            {e.by_headline !== undefined && (
+              <p className="help">{e.by_headline ? "Headline and lead only (producer flag)." : "Producer did not mark headline-only access; body access is not independently verified."}</p>
+            )}
+            {e.source_id && <details><summary>Reported quote provenance</summary>
+              <p>Source: {e.source_id} · {e.official_doc_id != null ? `Official document: ${e.official_doc_id}` : `Article document: ${e.document_id ?? "unavailable"}`}</p>
+              <p>Access: {e.access_achieved ?? "unavailable"} · Fetched: {e.fetched_at ?? "unavailable"}{e.from_previous_day ? " · Earlier edition context" : ""}</p>
+              <p>Unicode quote range: {e.char_start ?? "unavailable"}–{e.char_end ?? "unavailable"} (end exclusive). Content hash: {e.content_hash_at_quote ?? "unavailable"}</p>
+              <p>{e.hash_mismatch === true ? "Reported content version mismatch; requires review." : "Producer declarations; source text and quote binding are not independently verified by this preview."}</p>
+            </details>}
             <small>
               Source independence group:{" "}
               {e.independence_group || "Not supplied"} ·{" "}
@@ -170,6 +179,13 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
             <p>{c.reason || "No final rationale supplied."}</p>
           </div>
         </div>
+        {c.resolved_by && <aside className="r-disagreement">
+          <strong>Resolution: {c.resolved_by}</strong>
+          <p>Third reviewer: {c.reviewer_status ?? "No accepted verdict supplied"}</p>
+          {c.reviewer_reason && <p>{c.reviewer_reason}</p>}
+          {c.reviewer_quote && <blockquote>{c.reviewer_quote}</blockquote>}
+          <p>Recorded producer decision; not an independent portal review.</p>
+        </aside>}
         {c.speaker && (
           <p>
             Speaker: {c.speaker}. Attribution does not establish the statement’s
@@ -201,6 +217,9 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
                   {e.stance}: {e.quote}
                 </p>
                 <Sources sources={[e]} />
+            {e.by_headline !== undefined && (
+              <p className="help">{e.by_headline ? "Headline and lead only (producer flag)." : "Producer did not mark headline-only access; body access is not independently verified."}</p>
+            )}
               </div>
             ))}
           </section>
@@ -218,14 +237,14 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
     </details>
   );
 }
-export function ReasoningEvidence({ story }: { story: ReasoningStory }) {
+export function ReasoningEvidence({ story, fictional = true }: { story: ReasoningStory; fictional?: boolean }) {
   return (
     <section id="reasoning-evidence" className="r-section">
       <p className="eyebrow">FOLLOW THE EVIDENCE</p>
       <h2>Evidence Explorer</h2>
       <p>
         Compare the recorded primary and blind fact-checking paths. These
-        fictional findings are not independently verified.
+        {fictional ? "fictional" : "recorded"} findings are not independently verified.
       </p>
       <div className="r-evidence-guide">
         <span>

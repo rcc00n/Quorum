@@ -143,11 +143,11 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     const accountFile = path.join(temp, "LOCAL-DEMO-accounts.txt");
     fs.writeFileSync(
       accountFile,
-      `LOCAL FICTIONAL PREVIEW ONLY\nUsername: DEMO-boundary-reader\nPassword: ${password}\nUsername: DEMO-boundary-admin (local staff)\nPassword: ${password}\n`,
+      `LOCAL UNPUBLISHED PREVIEW ONLY\nUsername: DEMO-boundary-reader\nPassword: ${password}\nUsername: DEMO-boundary-admin (local staff)\nPassword: ${password}\n`,
       { mode: 0o600 },
     );
     console.log(
-      `FICTIONAL local preview: ${root}/preview/reasoning\nPrivate LOCAL test credentials: ${accountFile}\nSign in using that file; Ctrl+C removes all temporary runtime data. No production account or publisher is used.`,
+      `Unpublished local preview: ${root}/preview/reasoning\nPrivate LOCAL test credentials: ${accountFile}\nSign in using that file; Ctrl+C removes all temporary runtime data. No production account or publisher is used.`,
     );
     await new Promise((resolve) => {
       process.once("SIGINT", resolve);

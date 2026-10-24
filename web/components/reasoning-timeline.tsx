@@ -298,6 +298,7 @@ export function ReasoningTimeline({
                 <div className="r-trace-body">
                   <p className="eyebrow">Recorded reason</p>
                   <p>{s.reason || "No reason supplied."}</p>
+                  {s.detail?.map((d, i) => <div key={i}><p>{d.text}</p><small>{d.reason}</small></div>)}
                   <small>
                     Node: {s.node} · {s.duration_ms} ms · Model:{" "}
                     {s.model || "Not supplied"}

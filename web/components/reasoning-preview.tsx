@@ -95,7 +95,7 @@ function Impact({ story: s }: { story: ReasoningStory }) {
     </details>
   );
 }
-function Article({ story: s }: { story: ReasoningStory }) {
+function Article({ story: s, fictional }: { story: ReasoningStory; fictional: boolean }) {
   return (
     <article
       id="reasoning-article"
@@ -109,7 +109,7 @@ function Article({ story: s }: { story: ReasoningStory }) {
       <p className="r-standfirst">{s.standfirst}</p>
       <p className="help">
         Sources follow each passage. Statements remain attributed; uncertainty
-        is explicit. This is fictional recorded output.
+        is explicit. {fictional ? "This is fictional recorded output." : "This recorded output requires editorial review."}
       </p>
       {(s.needs_review || s.critic_notes || s.review_reason) && (
         <aside className="r-disagreement">
@@ -249,8 +249,8 @@ export function ReasoningPreviewPage({
       </header>
       <div className="r-preview-chrome">
         <div className="r-demo" role="note">
-          <strong>DEMO / FICTIONAL DATA</strong>
-          <span>Recorded snapshot · not real news or live inference.</span>
+          <strong>{!run ? "UNPUBLISHED PREVIEW" : run.provenance.fictional ? "DEMO / FICTIONAL DATA" : "UNPUBLISHED / CORPUS EXPERIMENT"}</strong>
+          <span>{!run ? "Recorded snapshot · awaiting provenance." : run.provenance.fictional ? "Recorded snapshot · not real news or live inference." : run.provenance.model === "stand-ins" ? "Producer-declared collected corpus · deterministic stand-ins · no AI verification." : "Producer-declared collected corpus · recorded model output · requires editorial review."}</span>
         </div>
         {run && !loading && !error && (
           <ReadingNavigation run={run} story={!!story} eventId={eventId} />
@@ -345,8 +345,8 @@ export function ReasoningPreviewPage({
             {eventId ? (
               story ? (
                 <>
-                  <Article story={story} />
-                  <ReasoningEvidence story={story} />
+                  <Article story={story} fictional={run.provenance.fictional} />
+                  <ReasoningEvidence story={story} fictional={run.provenance.fictional} />
                   <ReasoningTimeline
                     key={eventId}
                     run={run}
@@ -373,6 +373,7 @@ export function ReasoningPreviewPage({
                     {roundup.status}
                     {roundup.needs_review ? " · needs review" : ""}
                   </p>
+                  {roundup.line_source === "title" && <p className="help">Source headline fallback; no generated roundup line was supplied.</p>}
                   <Sources sources={roundup.sources} />
                   <p className="r-unavailable">
                     Only a roundup entry was supplied. No full article or claim
@@ -394,6 +395,7 @@ export function ReasoningPreviewPage({
                   <p className="eyebrow">TOPIC EDITION / {run.topic_id}</p>
                   <h1>The daily perspective</h1>
                   <p className="r-topic-summary">{run.summary}</p>
+                  {run.summary_source === "fallback" && <p className="r-unavailable">Producer supplied a fallback summary; inspect the partial-run errors.</p>}
                   <p className="help">
                     {run.bar
                       ? `Impact bar ${run.bar.threshold} / 9; confirmation minimum ${run.bar.confirmation_min}. `
@@ -406,7 +408,7 @@ export function ReasoningPreviewPage({
                       <aside className="r-quiet" role="status">
                         <h2>No featured stories crossed the bar</h2>
                         <p>
-                          This fictional completed run supplied an empty
+                          This {run.provenance.fictional ? "fictional " : ""}completed run supplied an empty
                           selection, not a missing snapshot.
                         </p>
                       </aside>
@@ -455,7 +457,7 @@ export function ReasoningPreviewPage({
               ))}
               <p className="help">
                 Run {run.run_id} · file SHA-256 {data.preview.sha256}. This
-                identifies the fixture file, not collected source content.
+                identifies the snapshot file, not collected source content.
               </p>
             </section>
           </>

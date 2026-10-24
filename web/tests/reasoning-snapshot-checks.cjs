@@ -1,4 +1,4 @@
-// Unchanged external FICTIONAL snapshot through authenticated Django/Next; no interception.
+// Unchanged external unpublished snapshot through authenticated Django/Next; no interception.
 const fs = require("node:fs"),
   path = require("node:path"),
   os = require("node:os"),
@@ -12,7 +12,9 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
   const sha256 = digest(original);
   if (process.env.QUORUM_REASONING_EXPECTED_SHA256)
     assert.equal(sha256, process.env.QUORUM_REASONING_EXPECTED_SHA256);
-  assert.equal(sample.provenance.fictional, true);
+  assert.equal(typeof sample.provenance.fictional, "boolean");
+  const banner = sample.provenance.fictional ? "DEMO / FICTIONAL DATA" : "UNPUBLISHED / CORPUS EXPERIMENT";
+  const expired = Date.now() >= Date.parse(sample.expires_at);
   assert.equal(digest(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_FILE)), sha256);
   const context = await browser.newContext();
   assert.equal((await context.request.get(root + "/api/preview/reasoning/")).status(), 401);
@@ -28,7 +30,7 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
   assert.equal(result.preview.sha256, sha256);
   assert.equal(result.preview.published, false);
   assert.equal(result.status, "demo");
-  assert.equal(result.preview.expiry_hint, "expired");
+  assert.equal(result.preview.expiry_hint, expired ? "expired" : "within_hint");
   assert.equal((await (await context.request.get(root + "/api/feed/")).json()).status, "pending");
   const apiFile = path.join(temp, "external-reasoning-api.json");
   fs.writeFileSync(apiFile, JSON.stringify(result), { mode: 0o600 });
@@ -43,10 +45,10 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
   fs.mkdirSync(output, { recursive: true });
   await page.goto(root + "/preview/reasoning");
   await page.getByRole("heading", { name: "The daily perspective", exact: true }).waitFor();
-  await page.getByText("DEMO / FICTIONAL DATA", { exact: true }).waitFor();
+  await page.getByText(banner, { exact: true }).waitFor();
   assert.equal(await page.locator(".r-topic-summary").textContent(), sample.summary);
   assert.ok((await page.locator(".r-preview-limits").first().textContent()).includes("Not published"));
-  assert.ok((await page.locator(".r-preview-limits").first().textContent()).includes("Expired hint"));
+  assert.ok((await page.locator(".r-preview-limits").first().textContent()).includes(expired ? "Expired hint" : "Expiry hint"));
   if (sample.provenance.model_calls !== undefined) {
     const provenance = await page.locator(".r-model-provenance").textContent();
     assert.ok(provenance.includes(`${sample.provenance.model_calls} model calls`));
@@ -54,6 +56,16 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
     for (const [model, count] of Object.entries(sample.provenance.answered_by || {}))
       assert.ok(provenance.includes(`${model} ×${count}`));
   }
+  if (!sample.provenance.fictional && sample.provenance.model === "stand-ins")
+    assert.ok((await page.locator(".r-demo").textContent()).includes("no AI verification"));
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+    assert.equal(await page.locator("body").evaluate((el) => el.scrollWidth > innerWidth), false);
+    assert.ok(await page.getByText(banner, { exact: true }).isVisible());
+    await page.screenshot({ path: path.join(output, `snapshot-topic-${width}.png`), animations: "disabled" });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   assert.equal(await page.locator(".r-story-row").count(), sample.stories.length);
   const roundup = sample.roundup.groups.flatMap((g) => g.items);
   assert.equal(await page.locator(".r-roundup-row").count(), roundup.length);
@@ -127,7 +139,7 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
       assert.equal(await page.locator("body").evaluate((el) => el.scrollWidth > innerWidth), false);
       await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
       await page.screenshot({ path: path.join(output, `snapshot-article-${width}.png`), animations: "disabled" });
-      const label = page.getByText("DEMO / FICTIONAL DATA", { exact: true });
+      const label = page.getByText(banner, { exact: true });
       assert.ok(await label.isVisible());
     }
   }
@@ -147,5 +159,5 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
   assert.equal(digest(fs.readFileSync(sourceFile)), sha256);
   assert.equal(digest(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_FILE)), sha256);
   await context.close();
-  console.log(`PASS: unchanged external FICTIONAL snapshot ${sha256}; authenticated Django/Next/TypeScript, exact prose/reviews/evidence/trace/roundup and three widths; no publication`);
+  console.log(`PASS: unchanged external unpublished snapshot ${sha256}; authenticated Django/Next/TypeScript, exact prose/reviews/evidence/trace/roundup and three widths; no publication`);
 };

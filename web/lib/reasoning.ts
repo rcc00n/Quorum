@@ -11,6 +11,17 @@ export type ReasoningEvidence = ReasoningSource & {
   independence_group: string;
   found_by?: "researcher" | "verifier" | "fact_checker";
   is_document?: boolean;
+  by_headline?: boolean;
+  source_id?: string | null;
+  document_id?: number | null;
+  official_doc_id?: number | null;
+  char_start?: number | null;
+  char_end?: number | null;
+  content_hash_at_quote?: string | null;
+  access_achieved?: 1 | 2 | null;
+  fetched_at?: string | null;
+  hash_mismatch?: boolean | null;
+  from_previous_day?: boolean;
 };
 export type ReasoningClaim = {
   id: string;
@@ -21,6 +32,10 @@ export type ReasoningClaim = {
   verifier: "confirmed" | "disputed" | "unverified";
   fact_checker: "confirmed" | "disputed" | "unverified";
   reason: string;
+  reviewer_status?: "confirmed" | "disputed" | "unverified" | null;
+  reviewer_reason?: string;
+  reviewer_quote?: string;
+  resolved_by?: "agreement" | "reviewer" | "dispute";
   evidence: ReasoningEvidence[];
 };
 export type ReasoningStep = {
@@ -31,6 +46,7 @@ export type ReasoningStep = {
   reason: string;
   model: string | null;
   duration_ms: number;
+  detail?: { text: string; reason: string }[];
 };
 export type ReasoningStory = {
   event_id: string;
@@ -116,6 +132,7 @@ export type ReasoningRoundup = {
       line: string;
       status: string;
       needs_review?: boolean;
+      line_source?: "model" | "title";
       sources: ReasoningSource[];
     }[];
   }[];
@@ -143,6 +160,7 @@ export type ReasoningRun = {
   };
   bar?: { threshold: number; confirmation_min: number };
   summary: string;
+  summary_source?: "model" | "fallback";
   sources_missing: string[];
   stories: ReasoningStory[];
   roundup: ReasoningRoundup;

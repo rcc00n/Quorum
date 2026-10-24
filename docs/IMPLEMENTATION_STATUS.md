@@ -124,3 +124,18 @@ Owner Vadim; branch `feature/web-portals`; implementation **`67b4cf7f8a1c41b2ebc
 All previous auth/admin/session/CSRF/store/rollback/UI guarantees remain covered. 48 Django + six upgrade + four tooling tests, Next build/typecheck, static contract/ratings/editorial/trace checks and both real HTTP/browser suites pass. Current commands and audit evidence: [verification](PORTAL_VERIFICATION.md#current-reproducible-checks). The short [Start Here](TEAM_HANDOFF.md) links canonical specs rather than asking teammates to implement UI types as reasoning API. No real integration or new deployment checkbox is closed.
 
 Hosted [CI39903475716](https://github.com/rcc00n/Quorum/actions/runs/39903475716) **succeeded** on `1d27894026616f7d5f4d8d7f7c092dd0258278e2` (adapter implementation `67b4cf7`). Final follow-up changes documentation/evidence only. [Team notification](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6357796090) posted; @Sor1na and @AnastasiaShkirpan have not explicitly acknowledged at this check. PR remains draft, production untouched.
+
+## FULL-REAL-01 local experiment and current consumer
+
+Owner Vadim / Codex; `feature/web-portals`, local changes only; PR #1 remains draft and production untouched. These observations supersede the earlier local registry/startup blockers, not release/publication gates. Private evidence remains outside Git under `~/.local/share/quorum/experiments/full-real-integration-20261023/`.
+
+| Feature ID | Status | Actual evidence / remaining dependency |
+| --- | --- | --- |
+| REAL-ZETARIS-01 | TESTED | Official default stack/verify, authenticated SQL and canonical loader; unique isolated datasource exposes the preserved 43 articles/50 officials/14 collected sources. Original metadata identical; no recollection or teammate datasource overwrite |
+| REAL-EDITION-01 | TESTED | `ukraine-aid/2026-10-23`: 11 articles/6 sources/0 same-edition officials. Latest 0224ca6 loader adds 14 explicitly historical rows (including 1 official), which do not count as same-edition corroboration |
+| REAL-GRAPH-DRY-01 | TESTED | Original graph at 58c9078 with actual Zetaris corpus and deterministic stand-ins: no inference/errors, 10 roundup entries; original non-fixture artifact accepted through authenticated Django/Next and three widths |
+| REAL-GRAPH-LIVE-01 | BLOCKED | One execution: 172 confirmed genuine Lightning completions, 136401 known tokens; attempt 173 failed Windows interop with unknown outcome. No final live snapshot or full graph/Ultra-review claim. Reconcile unresolved receipt before replay; no whole rerun performed |
+| WEB-R1-CURRENT | TESTED | 0224ca6 additive quote/identity/access/third-review/summary-source contract; old fixture compatibility and non-fixture stand-in labels retain unpublished/auth gates. Three latest original fixtures parse; actual main-file bytes accepted by Django/TypeScript/browser |
+| WEB-INTEGRATION | BLOCKED | Complete original real-live snapshot still absent. New upstream provenance/reviewer/summary fixes need genuine acceptance; missing same-edition official corroboration and production bridge decisions remain explicit |
+
+Validation: 52 Django tests, 4 tooling tests, Next production build/typecheck, static contract/ratings/editorial/trace tests, original portal HTTP/auth/store/rollback browser regression, prior reasoning fixture suite, current upstream main fixture and genuine stand-in corpus browser acceptance. Current main fixture SHA-256 is `68ed0b449bdaedee01435ee702b8d454496b6d9e286543ecbc7b9976695c642b` from git show 0224ca6, differing from the owner's notice hash; unchanged original bytes are the acceptance basis. No new hosted CI or deployment is claimed.
