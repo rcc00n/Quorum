@@ -40,8 +40,10 @@ def run(state: RunState) -> dict:
             # one StepError carry the failure count. Why: on the first genuine run one HTTP 429 aborted the whole
             # event's fact-check, 155 of 189 claims were marked "fact-checker failed; treated as unverified", and
             # every disagreement that produced was an artifact of the error path, not of the evidence.
+            judged_calls = 0
             for c in event_claims:
                 failed_before = len(failed)
+                judged_before = judged_calls
                 pool = [d for d in docs if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "fact_checker")]
                 # the fact-checker has the researcher's access to the whole corpus; the same code ranking bounds its calls
                 for d in rank_candidates(c["text"], pool, dry_run=state["dry_run"]):
@@ -66,16 +68,19 @@ def run(state: RunState) -> dict:
                     except Exception as exc:  # noqa: BLE001 — one passage lost, the claim and the event go on
                         failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
                         continue
-                    stance = untrusted.valid_stance(ans.get("stance"))
+                    judged_calls += 1
+                    stance = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
                     if stance == "neutral":
                         continue
                     c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker", fetched)]
                     found += 1
                 own = [ev for ev in c["evidence"] if ev["found_by"] == "fact_checker"]
                 status, reason = verdict(own, origin_group(c, by_id))
-                c["fact_checker_status"] = status
                 lost = len(failed) - failed_before
+                judged = judged_calls - judged_before
+                c["fact_checker_status"] = status
                 c["fact_checker_reason"] = reason + (f" ({lost} stance call(s) failed for this claim)" if lost else "")
+                c["fact_checker_judged"] = judged  # 0 with failures = unavailable, not a verdict (adjudicate reads it)
                 counts[status] += 1
             s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "")
             s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + (f"; failures: {failed[0]}" if failed else "")

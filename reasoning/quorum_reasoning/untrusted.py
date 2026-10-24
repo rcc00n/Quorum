@@ -14,9 +14,10 @@ model output, nothing a judge would ask "why this number?" about at product leve
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
-from .text import containment
+from .text import containment, sentences, tokens
 
 # Prefixed to every live model payload (llm.json_task). The prompts carry the same rule.
 DATA_NOTE = (
@@ -59,21 +60,42 @@ def clip(text: Any, limit: int) -> str:
 
 def valid_stance(value: Any) -> str:
     """The stance if it is one of the four allowed words, else `neutral` (fail-safe: neutral is discarded)."""
-    return value if value in STANCES else "neutral"
+    return value if isinstance(value, str) and value in STANCES else "neutral"
+
+
+_NUMBER = re.compile(r"\d[\d.,]*")
+_NEGATION = re.compile(r"\b(?:not|no|never|none|neither|nor|without)\b|n't\b", re.IGNORECASE)
 
 
 def grounded_in(claim_text: str, document_text: str) -> bool:
     """True when the claim's words are found in the document it is attributed to.
 
-    Verbatim containment counts immediately; otherwise the token-containment share must reach
-    GROUNDING_MIN. A claim the model invented, or copied from an instruction rather than the document,
-    fails both.
+    Verbatim containment counts immediately. Otherwise three checks, all on the best-matching window of the
+    document (the sentence sharing the most words with the claim and its two neighbours), not on the whole text:
+    every number in the claim appears in the window; the window and the claim agree on negation; and the share of
+    the claim's tokens found in the window reaches GROUNDING_MIN. A claim the model invented, copied from an
+    instruction, re-numbered ("killed 31" for "killed 5 … wounded 31") or negation-flipped fails.
+
+    DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): bag-of-words containment over the whole document let a
+    claim with a wrong figure or a flipped negation pass as grounded, and the origin outlet counts as a confirming
+    group (review finding). Why the window: a document of 20 000 characters contains most words of most claims.
     """
     if not claim_text or not document_text:
         return False
     if claim_text.strip().lower() in document_text.lower():
         return True
-    return containment(claim_text, document_text) >= GROUNDING_MIN
+    sents = sentences(document_text)
+    if not sents:
+        return False
+    cw = tokens(claim_text)
+    best = max(range(len(sents)), key=lambda i: len(cw & tokens(sents[i])))
+    window = " ".join(sents[max(0, best - 1) : best + 2])
+    numbers = {n.strip(".,") for n in _NUMBER.findall(claim_text)}
+    if numbers and not all(n and n in window for n in numbers):
+        return False
+    if bool(_NEGATION.search(claim_text)) != bool(_NEGATION.search(window)):
+        return False
+    return containment(claim_text, window) >= GROUNDING_MIN
 
 
 def known_urls(documents: list[dict], claims: dict[str, dict] | None = None) -> set[str]:
@@ -97,7 +119,12 @@ def filter_sources(sources: Any, known: set[str]) -> list[dict]:
     out = []
     for s in sources if isinstance(sources, list) else []:
         if isinstance(s, dict) and s.get("url") in known:
-            out.append({**s, "title": clip(s.get("title", ""), CAP_TITLE)})
+            row = {"title": clip(s.get("title", ""), CAP_TITLE), "url": s["url"]}  # only the contract's keys reach the snapshot
+            if isinstance(s.get("quote"), str):
+                row["quote"] = clip(s["quote"], CAP_PASSAGE)
+            if isinstance(s.get("quote_id"), (str, int)):
+                row["quote_id"] = s["quote_id"]
+            out.append(row)
     return out
 
 

@@ -7,7 +7,11 @@ import re
 _WORD = re.compile(r"[a-z0-9]+")
 # A sentence ends at . ! or ? followed by whitespace and a capital letter or quote, unless the period closes a
 # one-letter abbreviation (H.R. 4521, U.S. Senate) or a common title (Mr. Smith, No. 5).
-_SENT = re.compile(r"(?<![A-Z]\.)(?<!\bMr\.)(?<!\bMs\.)(?<!\bDr\.)(?<!\bNo\.)(?<!\bSt\.)(?<=[.!?])\s+(?=[A-Z\"'“‘(])")
+_SENT = re.compile(
+    r"(?<![A-Z]\.)(?<!\bMr\.)(?<!\bMs\.)(?<!\bDr\.)(?<!\bNo\.)(?<!\bSt\.)(?<!\bLt\.)(?<!\bJr\.)(?<!\bSr\.)"
+    r"(?<!\bGen\.)(?<!\bSen\.)(?<!\bRep\.)(?<!\bGov\.)(?<!\bCol\.)(?<!\bMaj\.)(?<!\bAdm\.)(?<!\bProf\.)(?<!\bMrs\.)"
+    r"(?<=[.!?])\s+(?=[A-Z\"'“‘(])"
+)
 
 
 def sentences(text: str) -> list[str]:

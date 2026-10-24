@@ -6,6 +6,7 @@ import re
 
 from .. import config
 from ..state import ArticleBlock, Claim
+from ..text import sentences as _sentences  # abbreviation-aware: "U.S.", "Lt. Gen." do not end a sentence
 
 ORDER = ["fact", "context", "statements", "not_confirmed"]
 
@@ -42,19 +43,25 @@ def check_article(blocks: list[ArticleBlock], claims: dict[str, Claim]) -> list[
         for w in forbidden:
             if re.search(r"\b" + re.escape(w) + r"\b", low):
                 violations.append(f"block {i} ({b['kind']}): forbidden wording '{w}'")
+        # every block's ids must name claims the critic was given (the event's own; critique passes only those)
+        for cid in b["claim_ids"]:
+            if cid not in claims:
+                violations.append(f"block {i} ({b['kind']}): unknown claim {cid}")
         if b["kind"] in ("fact", "context"):
             if not b["claim_ids"]:
                 violations.append(f"block {i} ({b['kind']}): no claim behind the sentence")
             for cid in b["claim_ids"]:
                 c = claims.get(cid)
                 if c is None:
-                    violations.append(f"block {i} ({b['kind']}): unknown claim {cid}")
-                elif c["final_status"] != "confirmed":
+                    continue  # already reported
+                if c["final_status"] != "confirmed":
                     violations.append(f"block {i} ({b['kind']}): claim {cid} is {c['final_status']}, not confirmed")
+                elif c.get("kind") == "statement":
+                    violations.append(f"block {i} ({b['kind']}): claim {cid} is a statement (that the words were said), not a fact")
             if not b["sources"]:
                 violations.append(f"block {i} ({b['kind']}): no source after the sentence")
         if b["kind"] == "statements":
-            sentences = [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+            sentences = _sentences(text)
             for s in sentences:
                 sl = s.lower()
                 if sl.startswith("what follows"):

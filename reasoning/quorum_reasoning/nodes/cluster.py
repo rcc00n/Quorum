@@ -168,10 +168,19 @@ def run(state: RunState) -> dict:
     splits = 0
     unsure = 0
 
+    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): pair questions run in descending key-overlap order and may
+    # spend at most the budget minus a reserve for the singleton and chain passes; a question not asked because the
+    # budget is spent is counted as such in the trace, not as "unsure". Why: on the first real day the pair loop in
+    # document-index order spent every question on the first ten documents, the singleton and chain passes got none,
+    # and a 15-document event was "kept together unconfirmed" without a single check (review finding).
+    reserve = max(8, budget // 4)
+    spent_out = {"pair": 0, "singleton": 0, "chain": 0}
+
     def ask(mode: str, a: dict[str, Any], b: dict[str, Any]) -> Any:
         """One merge question. Returns True, False or None (unsure / failed / budget spent)."""
         nonlocal budget
-        if budget <= 0:
+        if budget <= 0 or (mode == "pair" and budget <= reserve):
+            spent_out[mode] += 1
             return None
         budget -= 1
         asked[mode] += 1
@@ -195,21 +204,26 @@ def run(state: RunState) -> dict:
         full = {d["id"]: sig[d["id"]] | stems(keys[d["id"]]["canonical"]) | stems(d["title"]) | stems(d["lead"]) for d in docs}
 
         uf = _UF(len(docs))
+        pending_pairs: list[tuple[float, int, int]] = []
         for i in range(len(docs)):
             for j in range(i + 1, len(docs)):
                 a, b = docs[i]["id"], docs[j]["id"]
                 if not (sig[a] & sig[b]):
                     continue  # no shared significant entity or action: apart, no model call
-                if overlap_coefficient(full[a], full[b]) >= merge_hi:
+                coeff = overlap_coefficient(full[a], full[b])
+                if coeff >= merge_hi:
                     if uf.find(i) != uf.find(j):
                         merged["auto"] += 1
                         uf.union(i, j)
                     continue
-                if uf.find(i) == uf.find(j):
-                    continue
-                if ask("pair", _side(docs[i], keys[a]), _side(docs[j], keys[b])) is True:
-                    merged["pair"] += 1
-                    uf.union(i, j)
+                pending_pairs.append((coeff, i, j))
+        pending_pairs.sort(key=lambda t: (-t[0], t[1], t[2]))  # the likeliest merges first, so a spent budget costs the least
+        for _, i, j in pending_pairs:
+            if uf.find(i) == uf.find(j):
+                continue
+            if ask("pair", _side(docs[i], keys[docs[i]["id"]]), _side(docs[j], keys[docs[j]["id"]])) is True:
+                merged["pair"] += 1
+                uf.union(i, j)
 
         groups: dict[int, list[int]] = {}
         for idx in range(len(docs)):
@@ -252,7 +266,7 @@ def run(state: RunState) -> dict:
                 worklist.extend([h for h in (half_a, half_b) if len(h) >= 3])
             elif verdict is None:
                 unsure += 1
-                chain_notes.append(f"kept together unconfirmed: {sorted(docs[i]['id'] for i in cl)}")
+                chain_notes.append(("not checked, budget spent: " if budget <= 0 else "kept together unconfirmed: ") + f"{sorted(docs[i]['id'] for i in cl)}")
 
         events: list[Event] = []
         for cl in clusters:
@@ -285,6 +299,7 @@ def run(state: RunState) -> dict:
             + f"; {merged['auto']} key merges in code, "
             f"model: {asked['pair']} pair / {asked['singleton']} singleton / {asked['chain']} chain questions, "
             f"{merged['pair'] + merged['singleton']} merged, {splits} split, {unsure} kept unconfirmed"
+            + (f"; budget spent before {sum(spent_out.values())} question(s) (pair {spent_out['pair']} / singleton {spent_out['singleton']} / chain {spent_out['chain']})" if any(spent_out.values()) else "")
         )
         s.reason = "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between" + (
             "; " + "; ".join(chain_notes) if chain_notes else ""

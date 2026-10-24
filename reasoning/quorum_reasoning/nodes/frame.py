@@ -52,21 +52,29 @@ def run(state: RunState) -> dict:
             continue
         with step(state, "frame", event_id=e["id"], model=llm.model_name()) as s:
             outlets = []
+            failed: list[str] = []
             try:
                 for did in e["document_ids"]:
                     d = by_id[did]
                     if cohort_of(d) is None:
                         continue
-                    ans = llm.json_task(
-                        "frame",
-                        {
-                            "documents": [{"title": untrusted.clip(d["title"], untrusted.CAP_TITLE), "lead": untrusted.clip(d["lead"], untrusted.CAP_LEAD)}],
-                            "source": d["source_name"],
-                            "flank": d.get("flank"),
-                            "tier": d.get("tier"),
-                        },
-                        dry_run=state["dry_run"],
-                    )
+                    try:
+                        ans = llm.json_task(
+                            "frame",
+                            {
+                                "documents": [{"title": untrusted.clip(d["title"], untrusted.CAP_TITLE), "lead": untrusted.clip(d["lead"], untrusted.CAP_LEAD)}],
+                                "source": d["source_name"],
+                                "flank": d.get("flank"),
+                                "tier": d.get("tier"),
+                            },
+                            dry_run=state["dry_run"],
+                        )
+                    except Exception as exc:  # noqa: BLE001 — one outlet unlabelled, the others keep their labels
+                        failed.append(f"{d['source_name']}: {type(exc).__name__}")
+                        continue
+                    if not isinstance(ans, dict):
+                        failed.append(f"{d['source_name']}: no object")
+                        continue
                     outlets.append(
                         {
                             "source": d["source_name"],
@@ -83,7 +91,9 @@ def run(state: RunState) -> dict:
                 by_label_flank: dict[str, Counter[str]] = defaultdict(Counter)
                 for o in outlets:
                     by_label_flank[o["interpretation_label"]][o["flank"]] += 1
-                sides = {}
+                # both sides are always present (ARCHITECTURE § 8; the portal parser requires them on a completed frame):
+                # a flank no outlet covered is empty strings, which is itself the finding
+                sides = {flank: {"highlights": "", "omits": "", "wording": "", "example_url": ""} for flank in ("left", "right")}
                 for flank in ("left", "right"):
                     side = [o for o in outlets if o["flank"] == flank]
                     side.sort(key=lambda o: 0 if o["cohort"].startswith("major") else 1)
@@ -99,8 +109,10 @@ def run(state: RunState) -> dict:
                     ],
                     "outlets": outlets,
                 }
-                s.decision = f"{len(outlets)} outlets labelled; {len(labels)} interpretation(s)"
-                s.reason = "labels per outlet from the model; cohort shares counted in code"
+                s.decision = f"{len(outlets)} outlets labelled; {len(labels)} interpretation(s)" + (f"; {len(failed)} outlet call(s) failed" if failed else "")
+                s.reason = "labels per outlet from the model; cohort shares counted in code" + (f"; failures: {failed[0]}" if failed else "")
+                if failed:
+                    errors.append(StepError(node="frame", event_id=e["id"], message=f"{len(failed)} outlet framing call(s) failed: {failed[0]}"))
             except Exception as exc:  # noqa: BLE001
                 errors.append(StepError(node="frame", event_id=e["id"], message=str(exc)[:300]))
                 e["framing"] = {"rating_mode": "average", "coverage": coverage(state["documents"], e["document_ids"]), "interpretations": [], "outlets": outlets}

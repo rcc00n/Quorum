@@ -268,6 +268,6 @@ def summary(p: dict[str, Any]) -> dict[str, Any]:
     if review:
         s += f" {review} flagged for review."
     missing = p.get("sources_missing") or []
-    if missing:
+    if isinstance(missing, list) and missing:
         s += f" Sources missing today: {', '.join(missing)}."
     return {"summary": s}

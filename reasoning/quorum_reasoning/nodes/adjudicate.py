@@ -71,12 +71,22 @@ def run(state: RunState) -> dict:
             for c in event_claims:
                 v = c["verifier_status"] or "unverified"
                 f = c["fact_checker_status"] or "unverified"
-                final, why = adjudicate_rule(v, f)
+                unavailable = c.get("fact_checker_judged") == 0 and "failed" in c.get("fact_checker_reason", "")
+                if unavailable:
+                    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): when the fact-checker judged no passage at all
+                    # (every call failed), the claim is "not double-checked": final status `unverified`, not `disputed`,
+                    # and it is not sent to the reviewer. Why: a failure is not a verdict; `disputed` would read as a
+                    # contradiction and cost a reviewer call on the same failing route; `confirmed` without the blind
+                    # check would break the independent-fact-checker principle. Fails toward unverified.
+                    final, why = "unverified", f"not double-checked: the fact-checker judged no passage ({c['fact_checker_reason'][:80]}); the verifier said {v}"
+                    c["resolved_by"] = "dispute"
+                else:
+                    final, why = adjudicate_rule(v, f)
+                    c["resolved_by"] = "agreement" if v == f else "dispute"  # the third pass may change this to "reviewer"
                 c["final_status"] = final
                 c["adjudication"] = why
-                c["resolved_by"] = "agreement" if v == f else "dispute"  # the third pass may change this to "reviewer"
                 counts[final] += 1
-                disagreements += v != f
+                disagreements += (v != f) and not unavailable
             points, _ = score_event(e, event_claims, by_id)
             s.decision = (
                 f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified; "

@@ -6,7 +6,7 @@ The counts are data computed by code; repeat them exactly, never recount or rein
 - `above_bar_case` is "one": say that one story out of `events` events crossed the bar and name it by its headline. Do not say that no story crossed the bar.
 - `above_bar_case` is "several": say that `above_bar` of `events` events crossed the bar and name the stories by their headlines. Do not say that no story crossed the bar.
 
-Mention missing sources by name if any, and the number flagged for review if it is not zero. No evaluation, no adjectives, no prediction. Three sentences at most.
+Mention missing sources by name only when `sources_missing` is a non-empty list; when it is null, say nothing about missing sources at all. Mention the number flagged for review if it is not zero. No evaluation, no adjectives, no prediction. Three sentences at most.
 
 Answer with JSON only: {"summary": "..."}
 

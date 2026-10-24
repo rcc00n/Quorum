@@ -67,6 +67,8 @@ def verdict(evidence: list[Evidence], origin: str | None = None) -> tuple[ClaimS
         return "disputed", "one source supports it and another contradicts it"
     if len(groups) == 1:
         return "unverified", f"one independent group only ({next(iter(groups))}); needs a second or a document"
+    if contradicted:
+        return "unverified", "no source supports it and at least one contradicts it"
     return "unverified", "no supporting evidence beyond statements"
 
 

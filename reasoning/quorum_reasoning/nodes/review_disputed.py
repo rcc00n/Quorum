@@ -97,6 +97,8 @@ def validate(claim: Claim, ans: dict[str, Any], origin: str | None) -> tuple[str
     rule_status, _ = verdict(rows, origin)
     if reviewer_verdict == "confirmed" and rule_status != "confirmed":
         return None, reason, quote, f"sided with the {chain} chain for confirmed, but that chain is {rule_status} under the confirmation rule"
+    if reviewer_verdict == "confirmed" and any(ev["stance"] == "contradicts" for ev in claim["evidence"]):
+        return None, reason, quote, "cannot confirm: the other chain holds a contradicting passage (supporting and contradicting evidence both exist → disputed)"
     if reviewer_verdict != claim[f"{chain}_status"]:  # type: ignore[literal-required]
         return None, reason, quote, f"verdict {reviewer_verdict} does not match the cited {chain} chain's verdict"
     return reviewer_verdict, reason, quote, ""

@@ -73,7 +73,11 @@ def load_journal(path: Path) -> int:
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
-        row = json.loads(line)
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            print("journal: one truncated line skipped (the process died while writing it)", file=sys.stderr)
+            continue
         row.pop("payload", None)
         calls.append(row)
         n += 1
@@ -82,8 +86,8 @@ def load_journal(path: Path) -> int:
 
 def served_counts() -> dict[str, int]:
     """Answering model -> calls. Every ledger row has exactly one `served` value ("error" for a call that got no
-    reply), so the counts sum to `len(calls)`; a reply that answered but carried no JSON stays under its model
-    and is counted separately by `error_count`."""
+    usable reply: transport failure or a reply without JSON), so the counts sum to `len(calls)` and the "error"
+    count equals `error_count()`; `answered_model` on a no-JSON row keeps the model that did answer."""
     out: dict[str, int] = {}
     for c in calls:
         out[c["served"]] = out.get(c["served"], 0) + 1
@@ -444,6 +448,12 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
     if obj is None:
         why = f" (finish_reason {entry['finish_reason']})" if entry.get("finish_reason") not in (None, "stop") else ""
         entry["error"] = "reply carried no JSON object" + why
+        # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a reply without a usable answer is filed under "error" in
+        # `served` (the model that answered is kept in `answered_model`), so `answered_by["error"]` equals
+        # `model_errors`, the equality the portal's parser checks. Why: the first genuine run had 2 such replies and
+        # the snapshot failed Vadim's consistency rule (63 ≠ 61).
+        entry["answered_model"] = served
+        served = entry["served"] = "error"
     if obj is not None:
         entry["reply_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()  # the reply's fingerprint; the text itself stays private
     calls.append(entry)

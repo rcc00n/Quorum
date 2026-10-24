@@ -19,7 +19,8 @@ from ..trace import finish, step
 
 def already_seen(claim: Claim, doc: DocRef, found_by: str) -> bool:
     key = "official_doc_id" if doc.get("official") else "document_id"
-    return any(ev[key] == doc["id"] and ev["found_by"] == found_by for ev in claim["evidence"])
+    db_id = doc["id"] - OFFICIAL_ID_OFFSET if doc.get("official") and doc["id"] >= OFFICIAL_ID_OFFSET else doc["id"]  # evidence rows keep the database id
+    return any(ev[key] == db_id and ev["found_by"] == found_by for ev in claim["evidence"])
 
 
 def bind_quote(ev: Evidence, doc: DocRef, fetched: FetchResult | None) -> Evidence:
@@ -34,14 +35,20 @@ def bind_quote(ev: Evidence, doc: DocRef, fetched: FetchResult | None) -> Eviden
     ev["access_achieved"] = fetched.access_achieved
     ev["fetched_at"] = fetched.fetched_at
     stored = doc.get("content_hash")
-    ev["hash_mismatch"] = (stored != fetched.content_hash) if (stored and fetched.content_hash) else None
+    comparable = bool(stored and fetched.content_hash) and not (doc["access_level"] == 1 and fetched.access_achieved == 2)  # a lead-only fallback hashes no body
+    ev["hash_mismatch"] = (stored != fetched.content_hash) if comparable else None
     return ev
 
 
 def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str, fetched: FetchResult | None = None) -> Evidence:
     is_doc = bool(doc.get("official")) and doc.get("doc_type") in DOCUMENT_TYPES_THAT_ESTABLISH
-    if doc.get("official") and not is_doc and stance == "supports":
-        stance = "statement"  # an official release is the party's words, not evidence for them
+    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): an official release/statement and an attributed-only
+    # military source (DECISIONS › Sources: ISW, DeepState, Oryx "presented as statements with the author named")
+    # are the party's words in both directions: `supports` and `contradicts` become `statement`. Why: a ministry's
+    # denial turned two independent confirmations into `disputed` (review finding, 2026-10-24); DECISIONS ›
+    # Principles says a party's words are a statement, never evidence for or against their own content.
+    if ((doc.get("official") and not is_doc) or doc["kind"] == "military") and stance in ("supports", "contradicts"):
+        stance = "statement"
     # A reprint carries the wire's independence group: ten reprints of one wire story are one piece of
     # evidence (DECISIONS.md › Principles for handling facts). wire_origin is 'AP'/'Reuters'/'AFP' in
     # collectors/schema.sql; independence groups are lower-case slugs.
@@ -140,7 +147,7 @@ def run(state: RunState) -> dict:
                     except Exception as exc:  # noqa: BLE001
                         failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
                         continue
-                    stance = untrusted.valid_stance(ans.get("stance"))
+                    stance = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
                     if stance == "neutral":
                         continue
                     c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]

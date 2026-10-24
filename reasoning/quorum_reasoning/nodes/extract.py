@@ -26,14 +26,17 @@ def run(state: RunState) -> dict:
             doc_texts: dict[int, str] = {}
             for did in e["document_ids"]:
                 d = by_id[did]
+                if d["access_level"] >= 3 and not d.get("official"):
+                    continue  # level 3 is the fact of coverage only: no text, no lead, no claims from it
                 text = fetch_text(d, dry_run=state["dry_run"])
-                doc_texts[did] = " ".join(p for p in (d["title"], d["lead"], text or "") if p)
+                clipped = untrusted.clip(text or "", untrusted.CAP_TEXT)
+                doc_texts[did] = " ".join(p for p in (d["title"], d["lead"], clipped) if p)  # ground against what the model saw
                 payload_docs.append(
                     {
                         "id": d["id"],
                         "title": untrusted.clip(d["title"], untrusted.CAP_TITLE),
                         "lead": untrusted.clip(d["lead"], untrusted.CAP_LEAD),
-                        "text": untrusted.clip(text or "", untrusted.CAP_TEXT),
+                        "text": clipped,
                         "source": d["source_name"],
                         "official": bool(d.get("official")),
                         "doc_type": d.get("doc_type"),

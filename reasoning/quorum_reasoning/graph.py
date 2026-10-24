@@ -111,6 +111,8 @@ def run_local(
             return snapshot.values  # type: ignore[return-value]  # the thread already finished
         inp = None  # continue from the last checkpoint
     else:
+        if checkpoint_path and app.get_state(cfg).values:
+            raise ValueError(f"run {rid} already has a checkpoint in {checkpoint_path}: pass --resume to continue it, or --attempt N+1 for a fresh run")
         inp = run_input(topic_id, edition_date, dry_run=dry_run, corpus=corpus, run_id=rid)
     if on_step is None:
         return app.invoke(inp, cfg)  # type: ignore[return-value]

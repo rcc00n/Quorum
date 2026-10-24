@@ -221,9 +221,10 @@ def test_reply_without_json_is_a_counted_error_with_its_finish_reason(live_calls
     with pytest.raises(ValueError, match="no JSON"):
         llm.json_task("stance", {}, dry_run=False)
     row = llm.calls[-1]
-    assert row["served"] == "nvidia/test-model" and row["finish_reason"] == "length" and "no JSON" in row["error"]
+    assert row["served"] == "error" and row["answered_model"] == "nvidia/test-model" and row["finish_reason"] == "length" and "no JSON" in row["error"]
     assert llm.error_count() == 1
-    assert sum(llm.served_counts().values()) == len(llm.calls) == 1  # provenance stays consistent for the portal's parser
+    counts = llm.served_counts()
+    assert sum(counts.values()) == len(llm.calls) == 1 and counts["error"] == llm.error_count()  # both equalities the portal's parser checks
 
 
 def test_ledger_is_written_next_to_the_snapshot_never_inside_it(fake_route, monkeypatch, tmp_path):

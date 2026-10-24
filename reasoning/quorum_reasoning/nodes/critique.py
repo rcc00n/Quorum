@@ -15,6 +15,30 @@ from ..state import Event, RunState
 from ..trace import finish, step
 
 
+def sanitise_article(blocks: list, claims: dict) -> list:
+    """The article as it may be published when the writer's last draft is still rejected (flagged `needs_review`).
+
+    DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a story published with the critic's notes attached keeps its
+    text, but no sentence is presented as a fact without a confirmed claim behind it: unknown or foreign claim ids are
+    dropped everywhere; a `fact`/`context` block whose ids are not all confirmed non-statement claims becomes a
+    `not_confirmed` block (its sources dropped); blocks of unknown kind are dropped; the fixed order is restored.
+    Why: ARCHITECTURE § 5 says such a story is published flagged, not dropped; § 6 says a fact block contains only
+    confirmed claims, and the portal's parser rejects the whole edition otherwise (review finding, 2026-10-24).
+    """
+    order = ["fact", "context", "statements", "not_confirmed"]
+    out = []
+    for b in blocks:
+        if b.get("kind") not in order:
+            continue
+        ids = [cid for cid in b.get("claim_ids", []) if cid in claims]
+        kind = b["kind"]
+        sources = b.get("sources", [])
+        if kind in ("fact", "context") and (not ids or any(claims[cid]["final_status"] != "confirmed" or claims[cid].get("kind") == "statement" for cid in ids)):
+            kind, sources = "not_confirmed", []
+        out.append({**b, "kind": kind, "claim_ids": ids, "sources": sources})
+    return sorted(out, key=lambda b: order.index(b["kind"]))
+
+
 def pending(e: Event) -> bool:
     return e["above_bar"] and e["drafts"] > 0 and e["critic_status"] is None
 
@@ -27,7 +51,8 @@ def run(state: RunState) -> dict:
         if not pending(e):
             continue
         with step(state, "critique", event_id=e["id"]) as s:
-            violations = check_text("headline", e["headline"]) + check_text("standfirst", e["standfirst"]) + check_article(e["article"], state["claims"])
+            own = {cid: c for cid, c in state["claims"].items() if c["event_id"] == e["id"]}  # a block may cite this event's claims only
+            violations = check_text("headline", e["headline"]) + check_text("standfirst", e["standfirst"]) + check_article(e["article"], own)
             if not e["article"]:
                 violations.append("article: no blocks")
             e["critic_status"] = "approved" if not violations else "rejected"
@@ -37,6 +62,7 @@ def run(state: RunState) -> dict:
             if violations and e["drafts"] >= drafts_max:
                 e["needs_review"] = True
                 e["review_reason"] = f"draft {e['drafts']} still rejected: {e['critic_notes'][:200]}"
+                e["article"] = sanitise_article(e["article"], own)
             s.decision = f"draft {e['drafts']} {e['critic_status']}" + (f": {len(violations)} violation(s)" if violations else "")
             if not violations:
                 s.reason = "order, attribution, sourcing and wording rules all hold"

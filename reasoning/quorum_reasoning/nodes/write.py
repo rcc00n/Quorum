@@ -73,7 +73,7 @@ def _blocks(ans: dict[str, Any], known_urls: set[str]) -> list[dict]:
             {
                 "kind": b.get("kind", ""),
                 "text": untrusted.clip(b.get("text", ""), untrusted.CAP_BLOCK_TEXT),
-                "claim_ids": [str(c) for c in b.get("claim_ids", []) if isinstance(c, (str, int))],
+                "claim_ids": [str(c) for c in (b.get("claim_ids") if isinstance(b.get("claim_ids"), list) else []) if isinstance(c, (str, int))],
                 "sources": untrusted.filter_sources(b.get("sources", []), known_urls),
             }
         )

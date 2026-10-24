@@ -128,7 +128,7 @@ def story_view(state: RunState, e: Event) -> dict:
 
 _NO_STORY = re.compile(r"\bno (?:story|stories|event|events)\b.{0,40}?\b(?:crossed|cleared|passed|made|met)\b", re.IGNORECASE)
 _NUMBER_WORDS = {"zero": 0, "no": 0, "none": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
-_COUNT_CROSSED = re.compile(r"\b(\d+|zero|none|one|two|three|four|five|six|seven|eight|nine|ten)\b(?: of \d+)?(?: \w+){0,3}? (?:crossed|cleared|passed|made it over|met) the bar", re.IGNORECASE)
+_COUNT_CROSSED = re.compile(r"\b(\d+|zero|none|one|two|three|four|five|six|seven|eight|nine|ten)\b(?: (?:stories|story|events|event))?(?: out)?(?: of (?:the )?\d+(?: \w+)?)?(?: \w+){0,3}? (?:crossed|cleared|passed|made it over|met) the bar", re.IGNORECASE)
 _STORY_WORDS = {"story", "stories", "event", "events"}
 
 
@@ -179,7 +179,7 @@ def run(state: RunState) -> dict:
             "above_bar_case": "zero" if not stories else ("one" if len(stories) == 1 else "several"),
             "needs_review": n_review,
             "headlines": [untrusted.clip(e["headline"], untrusted.CAP_HEADLINE) for e in stories],
-            "sources_missing": [],
+            "sources_missing": None,  # not computed yet (the registry is not loaded, work item E3): the summary must not claim "no sources missing"
         }
         summary_source = "model"
         summary_errors: list[StepError] = []

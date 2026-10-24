@@ -24,12 +24,12 @@ def status_label(e: Event, claims: list[Claim], docs: list[DocRef]) -> str:
     reprint counts in the wire's group here too (same rule as research.evidence_from)."""
     if e["needs_review"]:
         return "Reported, not confirmed"
-    if any(c["final_status"] == "confirmed" for c in claims):
+    if claims and all(c["kind"] == "statement" for c in claims):
+        return "Statements only"  # confirmed that the words were said is still only statements (review finding, 2026-10-24)
+    if any(c["final_status"] == "confirmed" and c["kind"] != "statement" for c in claims):
         return "Confirmed"
     if any(c["final_status"] == "disputed" for c in claims):
         return "Disputed"
-    if claims and all(c["kind"] == "statement" for c in claims):
-        return "Statements only"
     groups = {(d.get("wire_origin") or "").strip().lower() or d["independence_group"] for d in docs}
     if len(groups) == 1 or any(len(independent_support(c["evidence"])) == 1 for c in claims):
         return "Single source"

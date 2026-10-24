@@ -55,8 +55,9 @@ def live_mode_problem() -> str | None:
     NVIDIA-FIRST-01); the explicit dry switch and the explicit live flag contradicting each other is an
     error to fix, not a preference to resolve silently.
     """
+    llm._env()  # .env may set QUORUM_DRY_RUN; read it before judging (review finding, 2026-10-24)
     if os.getenv("QUORUM_DRY_RUN") == "1":
-        return "--model live together with QUORUM_DRY_RUN=1; unset the variable or drop --model live"
+        return "--model live together with QUORUM_DRY_RUN=1 (shell or .env); unset the variable or drop --model live"
     if not llm.route_configured():
         return "--model live but no model route is configured (MODEL_BASE_URL and MODEL_API_KEY, or METERLESS_BASE_URL and METERLESS_RUNTIME_TOKEN, in .env)"
     return None
@@ -158,6 +159,9 @@ def main(argv: list[str] | None = None) -> int:
     checkpoint = None
     if args.checkpoint or args.resume or not model_dry:
         checkpoint = str(Path(args.out) / "_checkpoints" / f"{rid}.sqlite")
+    if args.resume and model_dry:
+        print("refusing to run: --resume with a dry model would finish a live run on stand-ins; drop --dry-run / --model dry", file=sys.stderr)
+        return 2
     if not model_dry:
         llm.journal_path = Path(args.out) / "_journal" / f"{rid}.jsonl"  # private: full request payloads and receipts
         if args.resume:
@@ -167,10 +171,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, attempt=args.attempt, on_step=on_step, checkpoint_path=checkpoint, resume=args.resume)
     except ValueError as exc:
-        if "resume" in str(exc):
+        if "resume" in str(exc) or "already has a checkpoint" in str(exc):
             print(f"refusing to run: {exc}", file=sys.stderr)
             return 2
         raise
+    if args.resume and store.versions(Path(args.out), args.topic, args.date) and state.get("snapshot") and any(
+        store.load(Path(args.out), args.topic, args.date, v).get("run_id") == rid for v in store.versions(Path(args.out), args.topic, args.date)
+    ):
+        print(f"run {rid} had already finished and published; nothing to do (its version is in the store)", file=sys.stderr)
+        return 0
     snapshot = state["snapshot"]
     out, version = store.publish(snapshot, Path(args.out), ledger=llm.calls)
     ledger = ledger_path(Path(args.out), args.topic, args.date, version)
