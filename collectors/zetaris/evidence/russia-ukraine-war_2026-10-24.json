@@ -1,0 +1,141 @@
+{
+  "evidence_for": "Issue #2 \u2014 authorized Zetaris query over the collected corpus (data-collection block)",
+  "run_at_utc": "2026-10-24T01:22:29Z",
+  "branch": "data-collection",
+  "commit": "e3acb58",
+  "schema_sha256_16": "107ee0700b3dcfec",
+  "datasource": "QUORUM_COLLECT",
+  "route": "Zetaris REST /sql-editor/sqls/run via agent/tools_zetaris.py",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-24",
+  "window_utc": [
+    "2026-10-23T09:30:00Z",
+    "2026-10-24T09:30:00Z"
+  ],
+  "sql": {
+    "documents": "SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,\n       d.url, d.title, d.published_at, d.access_level, d.wire_origin, d.supersedes_id, d.content_hash\nFROM QUORUM_COLLECT.documents d\nJOIN QUORUM_COLLECT.sources s ON s.id = d.source_id\nWHERE d.topic_id = 'russia-ukraine-war'\n  AND d.published_at >= TIMESTAMP '2026-10-23T09:30:00Z' AND d.published_at < TIMESTAMP '2026-10-24T09:30:00Z'\nORDER BY d.published_at DESC",
+    "official_docs": "SELECT o.id, o.source_id, s.name AS source_name, s.independence_group, s.kind,\n       o.url, o.title, o.doc_type, o.doc_number, COALESCE(o.signed_at, o.published_at) AS published_at,\n       length(o.full_text) AS full_text_chars\nFROM QUORUM_COLLECT.official_docs o\nJOIN QUORUM_COLLECT.sources s ON s.id = o.source_id\nWHERE o.topic_id = 'russia-ukraine-war'\n  AND COALESCE(o.signed_at, o.published_at) >= TIMESTAMP '2026-10-23T09:30:00Z'\n  AND COALESCE(o.signed_at, o.published_at) < TIMESTAMP '2026-10-24T09:30:00Z'\nORDER BY published_at DESC"
+  },
+  "documents": {
+    "count": 53,
+    "by_source": {
+      "afp": 2,
+      "atlantic": 1,
+      "breitbart": 1,
+      "daily-beast": 7,
+      "daily-wire": 3,
+      "guardian": 14,
+      "nation": 1,
+      "new-republic": 4,
+      "ny-post": 5,
+      "nyt": 5,
+      "reuters": 10
+    },
+    "by_access_level": {
+      "1": 35,
+      "2": 18
+    },
+    "by_wire_origin": {
+      "None": 53
+    },
+    "by_flank": {
+      "None": 12,
+      "left": 32,
+      "right": 9
+    },
+    "sample": [
+      {
+        "id": "217",
+        "source_id": "guardian",
+        "independence_group": "guardian",
+        "flank": "left",
+        "tier": "major",
+        "published_at": "2026-10-24 01:09:20.0",
+        "access_level": "1",
+        "wire_origin": null,
+        "supersedes_id": "154",
+        "content_hash": "92682389321ad3e442eb975662f0f428e653f2c7a22d3c0773e40a07a34d565b",
+        "url": "https://www.theguardian.com/us-news/live/2026/oct/23/trump-florida-midterms-ramaswamy-latest-updates",
+        "title_80": "Ramaswamy accuses Acton of \u2018lying\u2019 about attack ad, but court records contradict"
+      },
+      {
+        "id": "180",
+        "source_id": "reuters",
+        "independence_group": "reuters",
+        "flank": null,
+        "tier": null,
+        "published_at": "2026-10-24 00:43:54.633",
+        "access_level": "2",
+        "wire_origin": null,
+        "supersedes_id": null,
+        "content_hash": "efff94d168724f84ba6517814a708217ae469a7b026a48a711a29629485a91b0",
+        "url": "https://www.reuters.com/business/autos-transportation/us-has-years-asked-musk-alter-starlink-service-ukraine-middle-east-sources-say-2026-10-24/",
+        "title_80": "US has for years asked Musk to alter Starlink service in Ukraine, Middle East, s"
+      },
+      {
+        "id": "154",
+        "source_id": "guardian",
+        "independence_group": "guardian",
+        "flank": "left",
+        "tier": "major",
+        "published_at": "2026-10-24 00:04:43.0",
+        "access_level": "1",
+        "wire_origin": null,
+        "supersedes_id": "136",
+        "content_hash": "3fe83aa45b85895f624d60a641fddc6c29607739543afa29cb3e949c23e9f2a4",
+        "url": "https://www.theguardian.com/us-news/live/2026/oct/23/trump-florida-midterms-ramaswamy-latest-updates",
+        "title_80": "Ramaswamy accuses Acton of \u2018lying\u2019 about attack ad, but court records contradict"
+      },
+      {
+        "id": "157",
+        "source_id": "nyt",
+        "independence_group": "nyt",
+        "flank": "left",
+        "tier": "major",
+        "published_at": "2026-10-23 23:59:31.0",
+        "access_level": "2",
+        "wire_origin": null,
+        "supersedes_id": null,
+        "content_hash": "a58a4d1b682e537c99489e309fa3c5c157a912207f1e22c63bb335274214b1b5",
+        "url": "https://www.nytimes.com/2026/10/23/us/politics/in-us-gas-talks-with-kremlin-hidden-financing-for-alaska-project-emerges.html",
+        "title_80": "In U.S. Gas Talks With Kremlin, Hidden Financing for Alaska Project Emerges"
+      },
+      {
+        "id": "140",
+        "source_id": "daily-beast",
+        "independence_group": "daily-beast",
+        "flank": "left",
+        "tier": "minor",
+        "published_at": "2026-10-23 22:21:18.0",
+        "access_level": "1",
+        "wire_origin": null,
+        "supersedes_id": null,
+        "content_hash": "841cae30a31a74a7efcdd98a579aab7827eea29412d7b49cfd073ae2cc95ec3e",
+        "url": "https://www.thedailybeast.com/melania-accused-of-stealing-credit-from-cancer-stricken-pope",
+        "title_80": "Melania Accused of Stealing Credit From Cancer-Stricken Pope"
+      }
+    ]
+  },
+  "official_docs": {
+    "count": 1,
+    "by_source": {
+      "whitehouse": 1
+    },
+    "by_doc_type": {
+      "release": 1
+    },
+    "sample": [
+      {
+        "id": "1990",
+        "source_id": "whitehouse",
+        "doc_type": "release",
+        "doc_number": null,
+        "published_at": "2026-10-23 13:16:54.0",
+        "full_text_chars": "3192",
+        "url": "https://www.whitehouse.gov/briefings-statements/2026/10/first-lady-melania-trump-secures-ceasefire-between-russia-and-ukraine-localized-to-oleshky/",
+        "title_80": "First Lady Melania Trump Secures Ceasefire Between Russia and Ukraine, Localized"
+      }
+    ]
+  },
+  "sanitization": "no lead, no article/official text, no credentials; titles truncated to 80 chars"
+}

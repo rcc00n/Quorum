@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 HERE = Path(__file__).resolve().parent
 
 REQUIRED_TABLES = ("sources", "topics", "documents", "official_docs", "quotes", "coverage")
@@ -20,6 +22,14 @@ REQUIRED_TABLES = ("sources", "topics", "documents", "official_docs", "quotes", 
 # so a single working feed cannot make the block look operational. Why: AGENTS.md forbids mocks as integrations.
 MIN_SOURCES_RECENT = 3
 RECENT_MINUTES = 30
+
+# Contract invariants with reasoning (yelysei/agents, rules/confirmation.py, nodes/research.py, state.py, tools/corpus.py).
+# DECISION(2026-10-24, Anastasia/Claude Code): these are checked here, in the collectors' own verifier, and FAIL the
+# block when broken. Why: reasoning uses lower(wire_origin) *as* the independence group, reads doc_type verbatim
+# against its enum, and queries one topic id; a rename on either side would silently break confirmation.
+WIRE_VALUES = ("AP", "Reuters", "AFP")                     # documents.wire_origin CHECK in schema.sql
+DOC_TYPES = {"law", "order", "vote", "ruling", "statement", "release"}  # official_docs.doc_type CHECK; reasoning state.py
+OUTLET_REQUIRED = ("flank", "tier", "independence_group")  # corpus.py reads s.flank, s.tier, s.kind, s.independence_group
 
 seen: set[str] = set()
 
@@ -62,6 +72,22 @@ def check_csv() -> None:
         return
     unrated = sum(1 for r in rows if r["kind"] == "outlet" and not any((r["allsides"], r["mbfc"], r["adfontes"])))
     emit("PASS", "sources.csv", f"{len(rows)} sources; {unrated} outlets still without ratings (source-audit task)")
+    # Invariant 1 (registry side): every wire value, lowercased, is exactly one agency row's independence_group.
+    agency_groups = {r["independence_group"] for r in rows if r["kind"] == "agency"}
+    expected = {w.lower() for w in WIRE_VALUES}
+    if agency_groups != expected:
+        emit("FAIL", "wire_origin invariant", f"agency independence_group {sorted(agency_groups)} != lower(wire_origin) {sorted(expected)}")
+    else:
+        emit("PASS", "wire_origin invariant", f"agency rows {sorted(agency_groups)} equal lower({'|'.join(WIRE_VALUES)})")
+    # corpus.py needs flank, tier and independence_group for every outlet row it joins. A center outlet may have no
+    # tier: docs/DECISIONS.md › Sources places WSJ "center, outside cohorts", so an empty tier there is the decision,
+    # not a gap.
+    incomplete = [r["id"] for r in rows if r["kind"] == "outlet"
+                  and not all(r[k] for k in OUTLET_REQUIRED if not (k == "tier" and r["flank"] == "center"))]
+    if incomplete:
+        emit("FAIL", "outlet registry", f"flank/tier/independence_group missing for {', '.join(incomplete)}")
+    else:
+        emit("PASS", "outlet registry", f"{sum(1 for r in rows if r['kind'] == 'outlet')} outlets have flank, tier and independence_group")
 
 
 def check_database() -> None:
@@ -90,6 +116,7 @@ def check_database() -> None:
             n_sources = cur.fetchone()[0]
             cur.execute("SELECT count(*) FROM official_docs")
             n_official = cur.fetchone()[0]
+            check_invariants(cur)
     except Exception as exc:  # connection or query failure; body withheld
         emit("BLOCKED", "collectors database", f"{type(exc).__name__}; details withheld")
         return
@@ -97,6 +124,41 @@ def check_database() -> None:
         emit("PASS", "collectors freshness", f"{n_sources} sources in the last {RECENT_MINUTES} min; {n_official} official docs")
     else:
         emit("FAIL", "collectors freshness", f"{n_sources} sources in the last {RECENT_MINUTES} min (need {MIN_SOURCES_RECENT}); {n_official} official docs (need 1)")
+
+
+def check_invariants(cur) -> None:
+    """Live-corpus side of the reasoning contract (collectors/HANDOFF.md § 4). Runs inside check_database's cursor."""
+    # Invariant 1 (data side): lower(wire_origin) of every marked row is an agency row's independence_group.
+    cur.execute(
+        "SELECT DISTINCT d.wire_origin FROM documents d WHERE d.wire_origin IS NOT NULL "
+        "AND lower(d.wire_origin) NOT IN (SELECT independence_group FROM sources WHERE kind = 'agency')"
+    )
+    orphans = [row[0] for row in cur.fetchall()]
+    cur.execute("SELECT count(*) FROM documents WHERE wire_origin IS NOT NULL")
+    n_wire = cur.fetchone()[0]
+    if orphans:
+        emit("FAIL", "wire_origin rows", f"values with no agency row: {orphans}")
+    else:
+        emit("PASS", "wire_origin rows", f"{n_wire} marked rows, every lower(wire_origin) is an agency independence_group")
+    # Invariant 2: doc_type values are a subset of the enum reasoning reads (state.py).
+    cur.execute("SELECT DISTINCT doc_type FROM official_docs")
+    found = {row[0] for row in cur.fetchall()}
+    if found - DOC_TYPES:
+        emit("FAIL", "doc_type enum", f"unknown values {sorted(found - DOC_TYPES)}")
+    else:
+        emit("PASS", "doc_type enum", f"values in use {sorted(found)} ⊆ {sorted(DOC_TYPES)}")
+    # Invariant 3: exactly one topic id across documents and official_docs, and it is the one run.py collects.
+    cur.execute("SELECT DISTINCT topic_id FROM documents UNION SELECT DISTINCT topic_id FROM official_docs")
+    topics = {row[0] for row in cur.fetchall()}
+    try:
+        from collectors.run import TOPICS  # type: ignore
+        expected = set(TOPICS)
+    except Exception:
+        expected = None
+    if len(topics) != 1 or (expected is not None and topics != expected):
+        emit("FAIL", "topic id", f"topic ids in data {sorted(map(str, topics))}; run.py collects {sorted(expected) if expected else '?'}")
+    else:
+        emit("PASS", "topic id", f"single topic id {next(iter(topics))} in documents and official_docs")
 
 
 def main() -> int:
