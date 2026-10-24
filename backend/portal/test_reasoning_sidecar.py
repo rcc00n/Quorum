@@ -45,3 +45,22 @@ class SidecarTests(SimpleTestCase):
         self.assertNotIn('TEST-unused',json.dumps(result))
         self.assertFalse(result['preview']['published'])
         self.assertEqual(result['reasoning'],json.loads(SAMPLE.read_bytes()))
+
+    def test_identity_types_size_and_chronology_fail_closed(self):
+        mutations = [
+            lambda x:x['snapshot'].update(version=float(x['snapshot']['version'])),
+            lambda x:x['snapshot'].update(bytes=True),
+            lambda x:x['snapshot'].update(bytes=x['snapshot']['bytes']+1),
+            lambda x:x.update(corpus_as_of_utc='2026-10-23T03:53Z'),
+            lambda x:x.update(corpus_as_of_utc='2026-10-20T03:53Z'),
+            lambda x:x.update(corpus_as_of_utc='2026-02-30T03:53Z'),
+            lambda x:x.update(corpus_as_of_utc='2026-10-22T03:53-06:00'),
+            lambda x:x.update(snapshot=[]),
+            lambda x:x.update(edition_window_utc=list(reversed(x['edition_window_utc']))),
+        ]
+        for index, mutate in enumerate(mutations):
+            bad=copy.deepcopy(self.sidecar);mutate(bad)
+            with self.subTest(index=index), self.assertRaises(SnapshotError):self.load(bad)
+        for bad in ([],None,True):
+            with self.subTest(root=bad), self.assertRaises(SnapshotError):self.load(bad)
+        self.assertTrue(self.load(self.sidecar)['preview']['corpus_binding']['provisional'])
