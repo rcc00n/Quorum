@@ -13,6 +13,7 @@ marker=dest/'.quorum-web-build'
 if any(dest.iterdir()) and not marker.exists():
     raise SystemExit('Refusing an existing directory without the Quorum build marker')
 marker.touch()
+(dest/'.quorum-build.json').unlink(missing_ok=True)
 for p in source.iterdir():
     if p.name in ('node_modules','.next'): continue
     if p.is_dir():
@@ -20,6 +21,7 @@ for p in source.iterdir():
         shutil.copytree(p,dest/p.name)
     else: shutil.copy2(p,dest/p.name)
 PY
+quorum_web_source_sha=$(python3 "$repo/deploy/build_integrity.py" --digest "$repo")
 cd "$build_root"
 if [[ ! -d node_modules ]] || ! cmp -s package-lock.json .quorum-installed-lock; then
   npm ci --no-audit --no-fund
@@ -27,3 +29,6 @@ if [[ ! -d node_modules ]] || ! cmp -s package-lock.json .quorum-installed-lock;
 fi
 NEXT_TELEMETRY_DISABLED=1 npm run build
 npm run typecheck
+# DECISION(2026-10-24, rcc00n/Codex): record source identity only after build and typecheck pass.
+# Why: packaging must reject stale standalone assets rather than stamping them with a newer Git revision.
+python3 "$repo/deploy/build_integrity.py" "$repo" "$build_root" "$quorum_web_source_sha"

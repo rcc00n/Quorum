@@ -46,6 +46,8 @@ The first-install commands are captured in `install-release.sh`. It refuses occu
 
 ## Decisions
 
+2026-10-24 · rcc00n / Codex · Package only a clean commit and a successful source-bound external build receipt; export tracked portal/deploy files and reject private runtime paths. Why: stale builds must not inherit a newer revision label, and untracked local data must never enter a release archive. `QUORUM_WEB_BUILD` selects the reviewed build; older builds without `.quorum-build.json` require rebuilding. This adds no deployment authority.
+
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
 | 2026-10-22 | rcc00n / Codex | Standalone local Next build, isolated Node 22 binary and Python venv, dedicated system user and loopback-only systemd services | VPS already hosts projects; avoid changing shared runtimes or building under limited memory |
