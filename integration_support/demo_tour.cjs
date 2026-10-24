@@ -115,7 +115,8 @@ async function main(args) {
     }
     await page.locator('.r-corpus-binding').scrollIntoViewIfNeeded();await hold(185);
     await page.locator('.r-upstream-errors > summary').click();await hold(195);
-    await page.goto(require('node:url').pathToFileURL(path.join(output,'release-matrix.html')).href);await hold(230);
+    await page.goto(require('node:url').pathToFileURL(path.join(output,'release-matrix.html')).href);await hold(212);
+    await page.evaluate(()=>scrollTo({top:document.body.scrollHeight,behavior:'smooth'}));await hold(230);
     assert.deepEqual(errors,[]);
     assert.equal(sha(fs.readFileSync(snapshot)),PINS.snapshot);assert.equal(sha(fs.readFileSync(sidecar)),PINS.sidecar);
     await context.close();context=null;
@@ -129,4 +130,4 @@ async function main(args) {
   }
 }
 module.exports={verifyEvidence,externalNewOutput,captions};
-if(require.main===module)main(process.argv.slice(2)).catch(()=>{console.error('FAIL: private demo rehearsal; inputs and local credentials withheld');process.exitCode=1;});
+if(require.main===module)main(process.argv.slice(2)).catch(error=>{const location=String(error.stack||'').match(/integration_support\/demo_tour\.cjs:\d+:\d+/);if(location)console.error('Check location: '+location[0]);console.error('FAIL: private demo rehearsal; inputs and local credentials withheld');process.exitCode=1;});

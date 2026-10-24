@@ -25,6 +25,8 @@ Local merge sequence retained all owner decision-log rows verbatim and unioned a
 
 ## Decisions
 
+2026-10-24 · rcc00n / Codex · `--patch-profile web-owned --require-current` applies only independent web/deployment/diagnostic patches and refuses stale fetched owner pins before worktree creation. Why: unapproved reasoning/privacy/memory proposals must remain distinguishable from the candidate used for the genuine demo. This is a module decision; owner merge approvals are still required.
+
 2026-10-24 · rcc00n / Codex · Publish review patches and offline tooling on a branch based on integration, keeping rehearsal merges local. Why: owners can review/apply minimal changes without pushing their unmerged histories or the disposable merges through another PR.
 
 ## Reproduce safely
@@ -76,7 +78,7 @@ Original snapshot and sidecar hashes were rechecked unchanged; their historical 
 
 ## Release-candidate profiles
 
-2026-10-24 · rcc00n / Codex · `--patch-profile web-owned --require-current` applies only independent web/deployment/diagnostic patches and refuses stale fetched owner pins before worktree creation. Why: unapproved reasoning/privacy/memory proposals must remain distinguishable from the candidate used for the genuine demo. This is a module decision; owner merge approvals are still required.
+See Decisions above for candidate profile policy.
 
 ```bash
 python3 integration_support/rehearse.py --repo <checkout> \
@@ -84,3 +86,6 @@ python3 integration_support/rehearse.py --repo <checkout> \
 ```
 
 Fetch first, then use this profile: it does not contact any service itself. Patches 0003/0006/0007/0008/0009 are applied; owner-dependent 0001/0002/0004/0005 remain provisional review artifacts. `--with-proposed-patches` retains the separately labelled all-provisional audit profile. Neither profile approves integration, production publishing, or sponsor completion.
+
+
+Release-candidate evidence and the timed private recording procedure are in [RELEASE_MATRIX.md](RELEASE_MATRIX.md) and [DEMO.md](DEMO.md). These supplement the canonical tracker/release checklist. The candidate applies five web-owned patches; full owner-patch tests and sponsor proposals remain separately labelled. Demo recordings, originals, captions, receipts and packaged releases remain outside Git.
