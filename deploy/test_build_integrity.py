@@ -31,7 +31,8 @@ class BuildIntegrityTests(unittest.TestCase):
             root=Path(d);repo=root/'repo';repo.mkdir();(repo/'backend').mkdir()
             subprocess.run(['git','init','-q',str(repo)],check=True)
             (repo/'backend/manage.py').write_text('# TEST source')
-            subprocess.run(['git','add','backend/manage.py'],cwd=repo,check=True)
+            (repo/'backend/.env.example').write_text('TEST placeholder only')
+            subprocess.run(['git','add','backend/manage.py','backend/.env.example'],cwd=repo,check=True)
             (repo/'backend/private.sqlite').write_text('TEST private data')
             (repo/'backend/.env').write_text('TEST private config')
             release=root/'release'

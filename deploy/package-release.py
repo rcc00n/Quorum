@@ -10,17 +10,27 @@ import tarfile
 from build_integrity import validate_build
 
 
-def copy_portal_sources(repo, release):
+def portal_source_paths(repo):
     # DECISION(2026-10-24, rcc00n/Codex): export tracked portal/deploy files only.
     # Why: local databases, logs, credentials and private experiment files must not enter release archives.
     paths=subprocess.check_output(['git','ls-files','-z','--','backend','deploy'],cwd=repo).decode().split('\0')
+    safe=[]
     for name in filter(None,paths):
         source=repo/name
+        # The tracked placeholder template is not a credential file and is excluded from releases.
+        if source.name == '.env.example':
+            continue
         if source.is_symlink() or source.name.startswith('.env') or source.suffix in ('.sqlite','.sqlite3','.dump','.log'):
             raise RuntimeError('Unsafe tracked release path; inspect source before packaging')
+        safe.append(name)
+    return safe
+
+
+def copy_portal_sources(repo, release, paths=None):
+    for name in portal_source_paths(repo) if paths is None else paths:
         target=release/name
         target.parent.mkdir(parents=True,exist_ok=True)
-        shutil.copy2(source,target)
+        shutil.copy2(repo/name,target)
 
 
 def main():
@@ -38,10 +48,11 @@ def main():
     archive=root/(label+'.tar.gz')
     if release.exists() or archive.exists():
         raise RuntimeError('Release or archive exists; choose a new label')
+    paths=portal_source_paths(repo)
     release.mkdir(parents=True)
     shutil.copytree(build/'.next/standalone',release/'web')
     shutil.copytree(build/'.next/static',release/'web/.next/static')
-    copy_portal_sources(repo,release)
+    copy_portal_sources(repo,release,paths)
     shutil.copy2(build/'.quorum-build.json',release/'WEB_BUILD.json')
     (release/'REVISION').write_text(revision+'\n')
     with tarfile.open(archive,'w:gz') as tar:
