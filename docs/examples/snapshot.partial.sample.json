@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "partial",
-  "generated_at": "2026-10-24T02:17:28Z",
+  "generated_at": "2026-10-24T02:24:42Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -281,7 +281,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -300,7 +301,8 @@
               "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
               "access_achieved": 2,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "statement",
@@ -319,7 +321,8 @@
               "content_hash_at_quote": "b72f03cf4e437d626b6489dcc59609a89fb851868b6858dbb577f752dfae68bb",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -338,7 +341,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -373,7 +377,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -392,7 +397,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -427,7 +433,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -446,7 +453,8 @@
               "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
               "access_achieved": 2,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -465,7 +473,8 @@
               "content_hash_at_quote": "3717217ce7d33036898b94414e80f487e534734a55d6a921aca46c6ce4a3d145",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -484,7 +493,8 @@
               "content_hash_at_quote": "31ba24cfca8bc5485899a048d787e072e57cd21f20f59e87c7b81be2b8b787d1",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -503,7 +513,8 @@
               "content_hash_at_quote": "a40866e9d11d0009a8b0b56bc7497a9856483d07e0f2a8033bbea9746ff99f52",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -522,7 +533,8 @@
               "content_hash_at_quote": "fa7f5954e6540321a68e179860b972596cd6f1f9a51678afbe3031c7c8f1ba4c",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -541,7 +553,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -560,7 +573,8 @@
               "content_hash_at_quote": "3717217ce7d33036898b94414e80f487e534734a55d6a921aca46c6ce4a3d145",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -579,7 +593,8 @@
               "content_hash_at_quote": "31ba24cfca8bc5485899a048d787e072e57cd21f20f59e87c7b81be2b8b787d1",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -598,7 +613,8 @@
               "content_hash_at_quote": "fa7f5954e6540321a68e179860b972596cd6f1f9a51678afbe3031c7c8f1ba4c",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -633,7 +649,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "statement",
@@ -652,7 +669,8 @@
               "content_hash_at_quote": "b72f03cf4e437d626b6489dcc59609a89fb851868b6858dbb577f752dfae68bb",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -671,7 +689,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "statement",
@@ -690,7 +709,8 @@
               "content_hash_at_quote": "b72f03cf4e437d626b6489dcc59609a89fb851868b6858dbb577f752dfae68bb",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -725,7 +745,8 @@
               "content_hash_at_quote": "b72f03cf4e437d626b6489dcc59609a89fb851868b6858dbb577f752dfae68bb",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "statement",
@@ -744,7 +765,8 @@
               "content_hash_at_quote": "b72f03cf4e437d626b6489dcc59609a89fb851868b6858dbb577f752dfae68bb",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -779,7 +801,8 @@
               "content_hash_at_quote": "b72f03cf4e437d626b6489dcc59609a89fb851868b6858dbb577f752dfae68bb",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "statement",
@@ -798,7 +821,8 @@
               "content_hash_at_quote": "b72f03cf4e437d626b6489dcc59609a89fb851868b6858dbb577f752dfae68bb",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -833,7 +857,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -852,7 +877,8 @@
               "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
               "access_achieved": 2,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -871,7 +897,8 @@
               "content_hash_at_quote": "3717217ce7d33036898b94414e80f487e534734a55d6a921aca46c6ce4a3d145",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -890,7 +917,8 @@
               "content_hash_at_quote": "31ba24cfca8bc5485899a048d787e072e57cd21f20f59e87c7b81be2b8b787d1",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -909,7 +937,8 @@
               "content_hash_at_quote": "a40866e9d11d0009a8b0b56bc7497a9856483d07e0f2a8033bbea9746ff99f52",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -928,7 +957,8 @@
               "content_hash_at_quote": "fa7f5954e6540321a68e179860b972596cd6f1f9a51678afbe3031c7c8f1ba4c",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -947,7 +977,8 @@
               "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
               "access_achieved": 2,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -966,7 +997,8 @@
               "content_hash_at_quote": "3717217ce7d33036898b94414e80f487e534734a55d6a921aca46c6ce4a3d145",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -985,7 +1017,8 @@
               "content_hash_at_quote": "31ba24cfca8bc5485899a048d787e072e57cd21f20f59e87c7b81be2b8b787d1",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1004,7 +1037,8 @@
               "content_hash_at_quote": "a40866e9d11d0009a8b0b56bc7497a9856483d07e0f2a8033bbea9746ff99f52",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1023,7 +1057,8 @@
               "content_hash_at_quote": "fa7f5954e6540321a68e179860b972596cd6f1f9a51678afbe3031c7c8f1ba4c",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -1058,7 +1093,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1077,7 +1113,8 @@
               "content_hash_at_quote": "3717217ce7d33036898b94414e80f487e534734a55d6a921aca46c6ce4a3d145",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1096,7 +1133,8 @@
               "content_hash_at_quote": "31ba24cfca8bc5485899a048d787e072e57cd21f20f59e87c7b81be2b8b787d1",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1115,7 +1153,8 @@
               "content_hash_at_quote": "a40866e9d11d0009a8b0b56bc7497a9856483d07e0f2a8033bbea9746ff99f52",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1134,7 +1173,8 @@
               "content_hash_at_quote": "fa7f5954e6540321a68e179860b972596cd6f1f9a51678afbe3031c7c8f1ba4c",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1153,7 +1193,8 @@
               "content_hash_at_quote": "e876e13ae53f8269a6e2e7721d1894738229e5e049444bcfe0c6d2e59c58912f",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1172,7 +1213,8 @@
               "content_hash_at_quote": "31ba24cfca8bc5485899a048d787e072e57cd21f20f59e87c7b81be2b8b787d1",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1191,7 +1233,8 @@
               "content_hash_at_quote": "a40866e9d11d0009a8b0b56bc7497a9856483d07e0f2a8033bbea9746ff99f52",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1210,7 +1253,8 @@
               "content_hash_at_quote": "fa7f5954e6540321a68e179860b972596cd6f1f9a51678afbe3031c7c8f1ba4c",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -1245,7 +1289,8 @@
               "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
               "access_achieved": 2,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "contradicts",
@@ -1264,7 +1309,8 @@
               "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
               "access_achieved": 2,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -1299,7 +1345,8 @@
               "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
               "access_achieved": 2,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1318,7 +1365,8 @@
               "content_hash_at_quote": "a40866e9d11d0009a8b0b56bc7497a9856483d07e0f2a8033bbea9746ff99f52",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1337,7 +1385,8 @@
               "content_hash_at_quote": "fa7f5954e6540321a68e179860b972596cd6f1f9a51678afbe3031c7c8f1ba4c",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         }
@@ -1525,7 +1574,8 @@
               "content_hash_at_quote": "804a4717e5a65653389cf17680ef6159f273da1a43236b9dc18a913ed9d1af46",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1544,7 +1594,8 @@
               "content_hash_at_quote": "caf537f6782804990b17dea9d3b3644f40985d28d01ad2abc67a6b2488f932f6",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1563,7 +1614,8 @@
               "content_hash_at_quote": "804a4717e5a65653389cf17680ef6159f273da1a43236b9dc18a913ed9d1af46",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -1598,7 +1650,8 @@
               "content_hash_at_quote": "804a4717e5a65653389cf17680ef6159f273da1a43236b9dc18a913ed9d1af46",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1617,7 +1670,8 @@
               "content_hash_at_quote": "caf537f6782804990b17dea9d3b3644f40985d28d01ad2abc67a6b2488f932f6",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1636,7 +1690,8 @@
               "content_hash_at_quote": "239ad4b510cd51a5e8763a52c6910f5263a9734a4e929c5a82b97ad18d31079e",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1655,7 +1710,8 @@
               "content_hash_at_quote": "804a4717e5a65653389cf17680ef6159f273da1a43236b9dc18a913ed9d1af46",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1674,7 +1730,8 @@
               "content_hash_at_quote": "caf537f6782804990b17dea9d3b3644f40985d28d01ad2abc67a6b2488f932f6",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1693,7 +1750,8 @@
               "content_hash_at_quote": "239ad4b510cd51a5e8763a52c6910f5263a9734a4e929c5a82b97ad18d31079e",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         },
@@ -1728,7 +1786,8 @@
               "content_hash_at_quote": "804a4717e5a65653389cf17680ef6159f273da1a43236b9dc18a913ed9d1af46",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1747,7 +1806,8 @@
               "content_hash_at_quote": "239ad4b510cd51a5e8763a52c6910f5263a9734a4e929c5a82b97ad18d31079e",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             },
             {
               "stance": "supports",
@@ -1766,7 +1826,8 @@
               "content_hash_at_quote": "239ad4b510cd51a5e8763a52c6910f5263a9734a4e929c5a82b97ad18d31079e",
               "access_achieved": 1,
               "fetched_at": null,
-              "hash_mismatch": null
+              "hash_mismatch": null,
+              "from_previous_day": false
             }
           ]
         }
@@ -1894,7 +1955,7 @@
       "decision": "4 events from 14 documents; 2 key merges in code, model: 11 pair / 1 singleton / 2 chain questions, 8 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 7
     },
     {
       "node": "score_importance",
@@ -1975,7 +2036,7 @@
       "decision": "round 1: 29 passages with a stance for 10 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 7
+      "duration_ms": 8
     },
     {
       "node": "research",
@@ -1984,7 +2045,7 @@
       "decision": "round 1: 7 passages with a stance for 3 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "research",
@@ -2045,27 +2106,27 @@
       "iteration": 2,
       "event_id": "84b6dd5f95fe",
       "decision": "round 2: 0 passages with a stance for 3 claims",
-      "reason": "widened to the rest of the day and official documents for thin claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "research",
       "iteration": 2,
       "event_id": "43c374b38b98",
       "decision": "round 2: 0 passages with a stance for 3 claims",
-      "reason": "widened to the rest of the day and official documents for thin claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 2
     },
     {
       "node": "research",
       "iteration": 2,
       "event_id": "150fcfcd869a",
       "decision": "round 2: 0 passages with a stance for 2 claims",
-      "reason": "widened to the rest of the day and official documents for thin claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 3
+      "duration_ms": 1
     },
     {
       "node": "verify",
@@ -2101,7 +2162,7 @@
       "decision": "6 confirmed, 0 disputed, 4 unverified from 20 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 14
+      "duration_ms": 10
     },
     {
       "node": "fact_check",
@@ -2110,7 +2171,7 @@
       "decision": "3 confirmed, 0 disputed, 0 unverified from 5 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 3
     },
     {
       "node": "fact_check",
@@ -2119,7 +2180,7 @@
       "decision": "1 confirmed, 0 disputed, 3 unverified from 2 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 3
+      "duration_ms": 2
     },
     {
       "node": "fact_check",
@@ -2272,7 +2333,7 @@
       "decision": "draft 2 approved",
       "reason": "order, attribution, sourcing and wording rules all hold",
       "model": null,
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "critique",

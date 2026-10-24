@@ -19,6 +19,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .. import config
 from ..state import DocRef
 
 _FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -67,17 +68,21 @@ def _edition_window(edition_date: str) -> tuple[str, str]:
 _TOPIC_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
-def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture") -> list[DocRef]:
-    """`corpus` is "fixture" (the bundled sample day, no network) or "zetaris" (the day's documents through Lightning SQL)."""
-    if not _TOPIC_ID.match(topic_id):
-        raise ValueError(f"topic_id must be a slug like russia-ukraine-war, got {topic_id!r}")
-    date.fromisoformat(edition_date)  # raises on a malformed date before anything reaches SQL
-    if corpus == "fixture":
-        return load_fixture(topic_id, edition_date)
-    if corpus != "zetaris":
-        raise ValueError(f"unknown corpus {corpus!r}")
-    db = _zetaris_db()
-    start, end = _edition_window(edition_date)
+def previous_days() -> int:
+    return max(0, int(config.get("research", "previous_days", 0) or 0))
+
+
+def _previous_window(edition_date: str, days: int) -> tuple[str, str]:
+    """The `days` edition windows before this edition's window, as one UTC interval [start, end)."""
+    start, _ = _edition_window(edition_date)
+    earlier, _ = _edition_window((date.fromisoformat(edition_date) - timedelta(days=days)).isoformat())
+    return earlier, start
+
+
+def sql_pair(topic_id: str, start: str, end: str, db: str | None = None) -> tuple[str, str]:
+    """The two statements the corpus runs for one UTC window: documents joined with sources, official documents
+    joined with sources. collectors/zetaris/evidence.py keeps a copy of these; change both together."""
+    db = db or _zetaris_db()
     docs_sql = f"""
         SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
                d.url, d.canonical_url, d.title, d.lead, d.published_at, d.fetched_at, d.access_level, d.wire_origin,
@@ -98,8 +103,13 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
           AND COALESCE(o.signed_at, o.published_at) >= TIMESTAMP '{start}'
           AND COALESCE(o.signed_at, o.published_at) < TIMESTAMP '{end}'
     """
+    return docs_sql, official_sql
+
+
+def _load_window(topic_id: str, start: str, end: str, *, previous: bool) -> list[DocRef]:
+    docs_sql, official_sql = sql_pair(topic_id, start, end)
     out: list[DocRef] = []
-    rows = list(_run_sql(docs_sql, limit=500))
+    rows = list(_run_sql(docs_sql, limit=500 if not previous else 1500))
     # A correction re-fetch (collectors/schema.sql: supersedes_id) replaces the row it supersedes. The
     # superseded row stays in the corpus marked `superseded` — it counts for spread and coverage, never as
     # evidence or an extraction origin (decided 2026-10-24, DECISIONS.md log; supersedes the 2026-10-23
@@ -109,9 +119,39 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
         ref = _docref(row, official=False)
         if int(row["id"]) in superseded:
             ref["superseded"] = True
+        if previous:
+            ref["from_previous_day"] = True
         out.append(ref)
-    for row in _run_sql(official_sql, limit=200):
-        out.append(_docref(row, official=True))
+    for row in _run_sql(official_sql, limit=200 if not previous else 600):
+        ref = _docref(row, official=True)
+        if previous:
+            ref["from_previous_day"] = True
+        out.append(ref)
+    return out
+
+
+def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture") -> list[DocRef]:
+    """`corpus` is "fixture" (the bundled sample day, no network) or "zetaris" (the day's documents through Lightning SQL).
+
+    With `research.previous_days` > 0 the Zetaris corpus also carries the documents of the previous edition
+    windows, marked `from_previous_day` (evidence for research round 2 only; see config/reasoning.toml).
+    A supersede chain that crosses the window boundary is resolved on the combined set.
+    """
+    if not _TOPIC_ID.match(topic_id):
+        raise ValueError(f"topic_id must be a slug like russia-ukraine-war, got {topic_id!r}")
+    date.fromisoformat(edition_date)  # raises on a malformed date before anything reaches SQL
+    if corpus == "fixture":
+        return load_fixture(topic_id, edition_date)
+    if corpus != "zetaris":
+        raise ValueError(f"unknown corpus {corpus!r}")
+    start, end = _edition_window(edition_date)
+    out = _load_window(topic_id, start, end, previous=False)
+    days = previous_days()
+    if days:
+        p_start, p_end = _previous_window(edition_date, days)
+        today_ids = {d["id"] for d in out}
+        # the windows are disjoint, so an id seen in both can only be the same row answered twice: keep today's
+        out += [d for d in _load_window(topic_id, p_start, p_end, previous=True) if d["id"] not in today_ids]
     doc_ids = [d["id"] for d in out]
     if len(set(doc_ids)) != len(doc_ids):
         raise ValueError("duplicate document ids in the day's corpus after namespacing; refusing to run on a corrupt corpus")
@@ -229,5 +269,6 @@ def load_fixture(topic_id: str, edition_date: str) -> list[DocRef]:
         ref = DocRef(**{k: v for k, v in d.items() if k not in ("topic_id", "supersedes_id")})
         if d["id"] in superseded_ids:
             ref["superseded"] = True  # spread and coverage only, never evidence (same rule as load_documents)
-        out.append(ref)
+        out.append(ref)  # a fixture document may carry from_previous_day itself (evidence only, like the Zetaris path)
+    check_wire_groups(out)
     return out

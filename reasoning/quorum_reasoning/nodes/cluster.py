@@ -155,7 +155,7 @@ def _headline(members: list[DocRef]) -> str:
 
 
 def run(state: RunState) -> dict:
-    docs = state["documents"]
+    docs = [d for d in state["documents"] if not d.get("from_previous_day")]  # events form only from the edition window
     merge_hi = float(config.get("clustering", "key_merge_overlap", 0.75))
     budget = int(config.get("clustering", "merge_questions_max", 80))
     errors: list[StepError] = []
@@ -273,8 +273,9 @@ def run(state: RunState) -> dict:
                 )
             )
         events.sort(key=lambda e: -len(e["document_ids"]))
+        previous = len(state["documents"]) - len(docs)
         s.decision = (
-            f"{len(events)} events from {len(docs)} documents; {merged['auto']} key merges in code, "
+            f"{len(events)} events from {len(docs)} documents" + (f" ({previous} earlier-day documents held for evidence only)" if previous else "") + f"; {merged['auto']} key merges in code, "
             f"model: {asked['pair']} pair / {asked['singleton']} singleton / {asked['chain']} chain questions, "
             f"{merged['pair'] + merged['singleton']} merged, {splits} split, {unsure} kept unconfirmed"
         )

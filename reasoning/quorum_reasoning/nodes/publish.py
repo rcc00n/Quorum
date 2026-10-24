@@ -96,6 +96,7 @@ def claim_view(c: Claim) -> dict:
                 "access_achieved": ev.get("access_achieved"),
                 "fetched_at": ev.get("fetched_at"),
                 "hash_mismatch": ev.get("hash_mismatch"),
+                "from_previous_day": bool(ev.get("from_previous_day")),
             }
             for ev in c["evidence"]
         ],

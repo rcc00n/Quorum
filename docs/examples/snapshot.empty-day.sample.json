@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-24T02:17:28Z",
+  "generated_at": "2026-10-24T02:24:42Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -107,7 +107,7 @@
       "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "score_importance",
@@ -222,7 +222,7 @@
       "iteration": 2,
       "event_id": "8ec9e4f49dc1",
       "decision": "round 2: 0 passages with a stance for 1 claims",
-      "reason": "widened to the rest of the day and official documents for thin claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -231,7 +231,7 @@
       "iteration": 2,
       "event_id": "c83a993b6c7f",
       "decision": "round 2: 0 passages with a stance for 1 claims",
-      "reason": "widened to the rest of the day and official documents for thin claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
       "duration_ms": 0
     },

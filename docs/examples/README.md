@@ -6,7 +6,7 @@ All three are rebuilt by `python scripts/regenerate_samples.py` (from `reasoning
 
 | File | What it is | Regenerate (from `reasoning/`, venv active) |
 | --- | --- | --- |
-| `snapshot.sample.json` | A normal day: two stories above the bar, two events in the roundup, one disputed claim, the critic's rejection and rewrite in `trace`. | `python -m quorum_reasoning.run --dry-run --out /tmp/out`, copy `/tmp/out/russia-ukraine-war/2026-10-22.json` |
+| `snapshot.sample.json` | A normal day: two stories above the bar, two events in the roundup, one verifier/fact-checker disagreement resolved by the third blind reviewer (all three verdicts on the claim), the critic's rejection and rewrite in `trace`. | `python -m quorum_reasoning.run --dry-run --out /tmp/out`, copy `/tmp/out/russia-ukraine-war/2026-10-22/v1.json` (the script writes the snapshot before the store, so `version` is 1 and `published_at` null in these files) |
 | `snapshot.empty-day.sample.json` | A completed quiet day: `status: empty`, no stories, `roundup.empty_day: true` with every event listed. Not the same as "no edition". | `python -m quorum_reasoning.run --dry-run --fixture usecases/quiet_day --out /tmp/out` |
 | `snapshot.partial.sample.json` | A run in which one node failed on a model call and the run went on: `status: partial`, `errors` names the node and event, the affected stories carry coverage counts but no framing labels. | one-off: `llm.json_task` made to raise for the `frame` task, then `graph.run_local(...)`; see the commit that added the file |
 

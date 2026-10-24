@@ -35,8 +35,8 @@ def coverage(all_docs: list[DocRef], event_doc_ids: list[int]) -> dict[str, list
     members = set(event_doc_ids)
     for d in all_docs:
         c = cohort_of(d)
-        if c is None:
-            continue
+        if c is None or d.get("from_previous_day"):
+            continue  # an earlier day's publication is evidence, not today's coverage
         active[c].add(d["source_id"])
         if d["id"] in members:
             covered[c].add(d["source_id"])

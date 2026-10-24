@@ -11,6 +11,15 @@ drafts_max = 3               # critique -> write, per event
 review_disputed_max = 1      # third blind pass per disagreed claim; never repeated (DECISIONS.md log, 2026-10-24)
 recursion_limit = 60         # LangGraph recursion limit per run
 
+[research]
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): research round 2 widens over the previous N edition days of
+# our own corpus (one more window in the same two SQL statements). Those documents are evidence only: they are
+# marked `from_previous_day`, never clustered into events, never counted for spread or coverage, and an evidence
+# row cut from one carries `from_previous_day: true`. Why: DECISIONS.md log 2026-10-23 (round 2 widens over our
+# own corpus, the day then previous days); a claim often rests on an earlier report, and a yesterday's law
+# confirms today's claim about it. GDELT and official sites of record stay DEFERRED (ARCHITECTURE § 10).
+previous_days = 2            # 0 disables; each day is one more 24-hour window before the edition window
+
 [clustering]
 # Superseded 2026-10-24 (kept for the record): similarity_threshold = 0.5 and borderline_band = 0.25 drove
 # the titles-only cosine. Clustering now groups by per-document event keys (nodes/cluster.py; decision in

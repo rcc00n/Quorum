@@ -71,8 +71,8 @@ def test_eval_live_fails_closed_too(no_route, capsys):
 
 def test_explicit_dry_run_is_unaffected(no_route, tmp_path):
     assert run_cli.main(["--dry-run", "--quiet", "--out", str(tmp_path)]) == 0
-    assert (tmp_path / TOPIC / f"{DAY}.json").is_file()
-    assert not (tmp_path / TOPIC / f"{DAY}.ledger.json").exists(), "a dry run makes no live calls, so no ledger"
+    assert (tmp_path / TOPIC / DAY / "v1.json").is_file() and (tmp_path / TOPIC / DAY / "latest.json").is_file()
+    assert not (tmp_path / TOPIC / DAY / "v1.ledger.json").exists(), "a dry run makes no live calls, so no ledger"
 
 
 # --- A2: the summary may not contradict the run's own counts ----------------------------------------------
@@ -228,12 +228,18 @@ def test_reply_without_json_is_a_counted_error_with_its_finish_reason(live_calls
 
 def test_ledger_is_written_next_to_the_snapshot_never_inside_it(fake_route, monkeypatch, tmp_path):
     """A live run's ledger lands in the private output directory; the snapshot carries only the counts."""
+    from quorum_reasoning import store
+
     llm.reset_calls()
     llm.calls.append({"task": "summary", "lane": "default", "route": "r", "served": "nvidia/test-model", "ms": 1, "attempts": 1, "http_status": 200, "finish_reason": "stop", "tokens_in": 1, "tokens_out": 1})
-    path = run_cli.write_ledger(tmp_path, TOPIC, DAY)
-    assert path == tmp_path / TOPIC / f"{DAY}.ledger.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    snap = {"topic_id": TOPIC, "edition_date": DAY, "version": 1, "published_at": None, "run_id": "r"}
+    path, version = store.publish(snap, tmp_path, ledger=llm.calls)
+    assert version == 1 and path == tmp_path / TOPIC / DAY / "v1.json"
+    ledger = run_cli.ledger_path(tmp_path, TOPIC, DAY, version)
+    assert ledger == tmp_path / TOPIC / DAY / "v1.ledger.json"
+    data = json.loads(ledger.read_text(encoding="utf-8"))
     assert data["calls"][0]["http_status"] == 200
+    assert "calls" not in json.loads(path.read_text(encoding="utf-8"))
     st = initial_state("t", TOPIC, DAY, dry_run=True)
     env_json = json.dumps(publish.envelope(st))
     assert "http_status" not in env_json and "finish_reason" not in env_json and '"task"' not in env_json

@@ -63,6 +63,8 @@ def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str, fetched
     )
     if not doc.get("official") and (doc["access_level"] == 2 or (fetched is not None and fetched.access_achieved == 2)):
         ev["by_headline"] = True  # DECISIONS.md › Sources: paywalled sources participate at level 2, marked "by headline"
+    if doc.get("from_previous_day"):
+        ev["from_previous_day"] = True
     return bind_quote(ev, doc, fetched)
 
 
@@ -70,7 +72,8 @@ def _candidates(state: RunState, event_doc_ids: list[int], round_no: int) -> lis
     docs = [d for d in state["documents"] if not d.get("superseded")]  # retracted text is not evidence; it still counts for spread
     if round_no <= 1:
         return [d for d in docs if d["id"] in event_doc_ids]
-    return [d for d in docs if d["id"] not in event_doc_ids]  # round 2: the rest of the day, official documents included
+    # round 2: the rest of the day, official documents and the previous edition days (config research.previous_days)
+    return [d for d in docs if d["id"] not in event_doc_ids]
 
 
 def run(state: RunState) -> dict:
@@ -121,7 +124,8 @@ def run(state: RunState) -> dict:
                         c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
                         found += 1
                 s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims"
-                s.reason = "event documents only" if round_no == 1 else "widened to the rest of the day and official documents for thin claims"
+                earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
+                s.reason = "event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims"
             except Exception as exc:  # noqa: BLE001 — a failed source must not kill the run; the trace shows it
                 errors.append(StepError(node="research", event_id=e["id"], message=str(exc)[:300]))
                 s.decision = f"round {round_no}: failed after {found} passages"

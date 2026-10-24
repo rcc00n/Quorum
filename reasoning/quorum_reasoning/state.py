@@ -29,6 +29,7 @@ class DocRef(TypedDict):
     doc_type: NotRequired[str | None]  # law | order | vote | ruling | statement | release
     text: NotRequired[str | None]  # only for official_docs (public domain); never for outlets
     superseded: NotRequired[bool]  # a correction replaced this row: spread and coverage only, never evidence
+    from_previous_day: NotRequired[bool]  # loaded from an earlier edition window for research round 2: evidence only, never an event, spread or coverage
     canonical_url: NotRequired[str | None]  # documents.canonical_url (tracking parameters stripped by collection)
     content_hash: NotRequired[str | None]  # documents.content_hash at collection: sha256(title + "\n" + lead + "\n" + body[:2000])
     fetched_at: NotRequired[str | None]  # when collection fetched the row (ISO 8601 UTC); official_docs.fetched_at for official rows
@@ -58,6 +59,7 @@ class Evidence(TypedDict):
     access_achieved: NotRequired[int | None]  # 1 full text was read, 2 headline and lead only (what the fetch achieved now, not the registry default)
     fetched_at: NotRequired[str | None]  # when the quoted text was fetched (ISO 8601 UTC); collection's fetched_at for text collection stored
     hash_mismatch: NotRequired[bool | None]  # True when content_hash_at_quote differs from documents.content_hash (the page changed since collection); None when no stored hash to compare
+    from_previous_day: NotRequired[bool]  # the quoted document was published in an earlier edition window (research round 2 widening)
 
 
 class Claim(TypedDict):

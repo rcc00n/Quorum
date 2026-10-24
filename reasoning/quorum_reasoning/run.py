@@ -8,9 +8,13 @@
     python -m quorum_reasoning.run --probe           # one real task: raw reply and token counts (is thinking off?)
     python -m quorum_reasoning.run --mermaid        # the graph as Mermaid, for docs/ARCHITECTURE.md
 
+    python -m quorum_reasoning.run --list            # every stored snapshot version under --out
+    python -m quorum_reasoning.run --show --topic russia-ukraine-war --date 2026-10-22 [--version 2]
+
 Two axes: --model dry|live (dry = deterministic stand-ins, no credits; also forced by QUORUM_DRY_RUN=1 or a
 missing key) and --corpus fixture|zetaris. --dry-run is the shortcut for --model dry --corpus fixture.
-Writes the snapshot to <out>/<topic>/<date>.json and prints the trace.
+Stores the snapshot as the next immutable version under <out>/<topic>/<date>/v<N>.json (store.py), refreshes
+latest.json, writes the private call ledger beside it, and prints the trace.
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import graph, llm
+from . import graph, llm, store
 
 
 def format_step(s: dict) -> str:
@@ -58,15 +62,21 @@ def live_mode_problem() -> str | None:
     return None
 
 
-def write_ledger(out_dir: Path, topic: str, date: str) -> Path | None:
-    """The per-run call ledger, next to the snapshot and never inside it: task, lane, route, answering model,
-    HTTP status, finish_reason, tokens, attempts, receipt id, error. Private evidence for the output directory."""
-    if not llm.calls:
-        return None
-    path = out_dir / topic / f"{date}.ledger.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"topic_id": topic, "edition_date": date, "calls": llm.calls}, ensure_ascii=False, indent=1), encoding="utf-8")
-    return path
+def ledger_path(out_dir: Path, topic: str, date: str, version: int) -> Path | None:
+    """Where the store put the run's private call ledger (task, lane, route, answering model, HTTP status,
+    finish_reason, tokens, attempts, receipt id, error), or None when the run made no live call."""
+    path = store.day_dir(out_dir, topic, date) / f"v{version}.ledger.json"
+    return path if path.is_file() else None
+
+
+def print_listing(out_dir: Path) -> None:
+    rows = store.listing(out_dir)
+    if not rows:
+        print(f"no snapshots under {out_dir}")
+        return
+    print(f"{'topic':<22}{'date':<12}{'v':>3}  {'status':<8}{'stories':>7}  {'fictional':<9} {'published_at':<21} sha256")
+    for r in rows:
+        print(f"{r['topic_id']:<22}{r['edition_date']:<12}{r['version']:>3}  {r['status']:<8}{r['stories']:>7}  {str(r['fictional']):<9} {r['published_at'] or '-':<21} {r['sha256']}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -77,7 +87,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--model", choices=["dry", "live"], default=None, help="dry: stand-ins, no credits; live: the route in .env")
     ap.add_argument("--corpus", choices=["fixture", "zetaris"], default=None, help="where the day's documents come from")
     ap.add_argument("--fixture", default=None, help="fixture day for --corpus fixture: sample_day (default) or e.g. usecases/quiet_day")
-    ap.add_argument("--out", default="snapshots", help="directory for the snapshot JSON")
+    ap.add_argument("--out", default="snapshots", help="store root: <out>/<topic>/<date>/v<N>.json")
+    ap.add_argument("--list", action="store_true", help="list every stored snapshot version under --out and exit")
+    ap.add_argument("--show", action="store_true", help="print one stored snapshot (--topic, --date, optional --version) and exit")
+    ap.add_argument("--version", type=int, default=None, help="with --show: the version to print (default: newest)")
     ap.add_argument("--mermaid", action="store_true", help="print the graph as Mermaid and exit")
     ap.add_argument("--models", action="store_true", help="list the routes the configured hotspot offers (GET /v1/models) and exit")
     ap.add_argument("--test-connection", action="store_true", help="one small completion per lane (default, fact_checker) and exit")
@@ -88,6 +101,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mermaid:
         print(graph.mermaid())
+        return 0
+    if args.list:
+        print_listing(Path(args.out))
+        return 0
+    if args.show:
+        try:
+            snap = store.load(Path(args.out), args.topic, args.date, args.version)
+        except FileNotFoundError as exc:
+            print(f"not found: {exc}", file=sys.stderr)
+            return 2
+        print(json.dumps(snap, ensure_ascii=False, indent=2))
         return 0
     if args.models or args.test_connection or args.probe:
         try:
@@ -128,10 +152,8 @@ def main(argv: list[str] | None = None) -> int:
         on_step = lambda rec: print(format_step(rec), flush=True)  # noqa: E731 — progress as each node finishes
     state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, on_step=on_step)
     snapshot = state["snapshot"]
-    out = Path(args.out) / args.topic / f"{args.date}.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
-    ledger = write_ledger(Path(args.out), args.topic, args.date)
+    out, version = store.publish(snapshot, Path(args.out), ledger=llm.calls)
+    ledger = ledger_path(Path(args.out), args.topic, args.date, version)
     if not args.quiet:
         print()
         prov = snapshot["provenance"]
@@ -141,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"model calls: {prov['model_calls']} ({prov['model_errors']} failed); answered by: {answered}")
         print(f"status: {snapshot['status']}; stories: {len(snapshot['stories'])}; roundup: {snapshot['roundup']['count']}; errors: {len(snapshot['errors'])}")
         print(f"summary ({snapshot['summary_source']}): {snapshot['summary']}")
-        print(f"snapshot: {out}")
+        print(f"snapshot: {out} (version {version}, published_at {snapshot['published_at']}, sha256 {store.sha256_of(out)})")
         if ledger:
             print(f"ledger (private, not part of the snapshot): {ledger}")
     return 0 if snapshot["status"] != "partial" else 2
