@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "ok",
-  "generated_at": "2026-10-24T03:35:18Z",
+  "generated_at": "2026-10-24T06:07:59Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -134,11 +134,6 @@
               "title": "Congress.gov",
               "url": "https://www.congress.gov/bill/119th-congress/house-bill/4521",
               "quote": "The President signed H.R. 4521, the Ukraine Security Assistance Act, into law on October 21."
-            },
-            {
-              "title": "Reuters",
-              "url": "https://www.reuters.com/world/us-ukraine-aid-bill-signed-2026-10-21/",
-              "quote": "The President signed the Ukraine aid bill into law on Tuesday."
             },
             {
               "title": "CNN",
@@ -862,26 +857,6 @@
             },
             {
               "stance": "supports",
-              "quote": "The President signed the Ukraine aid bill into law on Tuesday.",
-              "title": "Reuters",
-              "url": "https://www.reuters.com/world/us-ukraine-aid-bill-signed-2026-10-21/",
-              "independence_group": "reuters",
-              "found_by": "researcher",
-              "is_document": false,
-              "by_headline": true,
-              "source_id": "reuters",
-              "document_id": 102,
-              "official_doc_id": null,
-              "char_start": 42,
-              "char_end": 104,
-              "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
-              "access_achieved": 2,
-              "fetched_at": null,
-              "hash_mismatch": null,
-              "from_previous_day": false
-            },
-            {
-              "stance": "supports",
               "quote": "President signs Ukraine aid package into law.",
               "title": "CNN",
               "url": "https://www.cnn.com/2026/10/21/politics/ukraine-aid-signed",
@@ -976,26 +951,6 @@
               "char_end": 45,
               "content_hash_at_quote": "3717217ce7d33036898b94414e80f487e534734a55d6a921aca46c6ce4a3d145",
               "access_achieved": 1,
-              "fetched_at": null,
-              "hash_mismatch": null,
-              "from_previous_day": false
-            },
-            {
-              "stance": "supports",
-              "quote": "The President signed the Ukraine aid bill into law on Tuesday.",
-              "title": "Reuters",
-              "url": "https://www.reuters.com/world/us-ukraine-aid-bill-signed-2026-10-21/",
-              "independence_group": "reuters",
-              "found_by": "fact_checker",
-              "is_document": false,
-              "by_headline": true,
-              "source_id": "reuters",
-              "document_id": 102,
-              "official_doc_id": null,
-              "char_start": 42,
-              "char_end": 104,
-              "content_hash_at_quote": "a50077769cef5cf4cf1560b25755a302b2b1f127a7ed655f147eacc536488713",
-              "access_achieved": 2,
               "fetched_at": null,
               "hash_mismatch": null,
               "from_previous_day": false
@@ -1266,7 +1221,7 @@
           "status": "unverified",
           "verifier": "unverified",
           "fact_checker": "unverified",
-          "reason": "no supporting evidence beyond statements",
+          "reason": "no source supports it and at least one contradicts it",
           "reviewer_status": null,
           "reviewer_reason": "",
           "reviewer_quote": "",
@@ -2051,10 +2006,10 @@
       "node": "cluster",
       "iteration": 1,
       "event_id": null,
-      "decision": "4 events from 14 documents; 2 key merges in code, model: 11 pair / 1 singleton / 2 chain questions, 8 merged, 0 split, 0 kept unconfirmed",
+      "decision": "4 events from 14 documents; 7 key merges in code, model: 6 pair / 1 singleton / 2 chain questions, 3 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 24
+      "duration_ms": 20
     },
     {
       "node": "score_importance",
@@ -2097,9 +2052,9 @@
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
       "decision": "10 claims extracted",
-      "reason": "from 8 documents; level-2 sources contribute leads only, level-3 nothing",
+      "reason": "from 7 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 5
+      "duration_ms": 9
     },
     {
       "node": "extract_claims",
@@ -2117,7 +2072,7 @@
       "decision": "4 claims extracted",
       "reason": "from 2 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 7
     },
     {
       "node": "extract_claims",
@@ -2132,10 +2087,10 @@
       "node": "research",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
-      "decision": "round 1: 29 passages with a stance for 10 claims",
+      "decision": "round 1: 28 passages with a stance for 10 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 36
+      "duration_ms": 107
     },
     {
       "node": "research",
@@ -2207,7 +2162,7 @@
       "decision": "round 2: 0 passages with a stance for 3 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 22
     },
     {
       "node": "research",
@@ -2216,7 +2171,7 @@
       "decision": "round 2: 0 passages with a stance for 3 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 14
+      "duration_ms": 50
     },
     {
       "node": "research",
@@ -2225,7 +2180,7 @@
       "decision": "round 2: 0 passages with a stance for 2 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 5
+      "duration_ms": 20
     },
     {
       "node": "verify",
@@ -2258,10 +2213,10 @@
       "node": "fact_check",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
-      "decision": "6 confirmed, 0 disputed, 4 unverified from 20 own passages",
+      "decision": "6 confirmed, 0 disputed, 4 unverified from 19 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 59
+      "duration_ms": 128
     },
     {
       "node": "fact_check",
@@ -2270,7 +2225,7 @@
       "decision": "3 confirmed, 0 disputed, 0 unverified from 5 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 10
+      "duration_ms": 35
     },
     {
       "node": "fact_check",
@@ -2279,7 +2234,7 @@
       "decision": "1 confirmed, 0 disputed, 3 unverified from 2 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 10
+      "duration_ms": 32
     },
     {
       "node": "fact_check",
@@ -2288,7 +2243,7 @@
       "decision": "0 confirmed, 0 disputed, 2 unverified from 0 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 3
+      "duration_ms": 14
     },
     {
       "node": "adjudicate",
@@ -2396,7 +2351,7 @@
       "decision": "draft 1 rejected: 1 violation(s)",
       "reason": "standfirst: forbidden wording 'sweeping'; back to the writer",
       "model": null,
-      "duration_ms": 4
+      "duration_ms": 14
     },
     {
       "node": "critique",
@@ -2405,7 +2360,7 @@
       "decision": "draft 1 rejected: 1 violation(s)",
       "reason": "standfirst: forbidden wording 'sweeping'; back to the writer",
       "model": null,
-      "duration_ms": 2
+      "duration_ms": 5
     },
     {
       "node": "write",
@@ -2432,7 +2387,7 @@
       "decision": "draft 2 approved",
       "reason": "order, attribution, sourcing and wording rules all hold",
       "model": null,
-      "duration_ms": 1
+      "duration_ms": 7
     },
     {
       "node": "critique",
@@ -2450,7 +2405,7 @@
       "decision": "2 events in 2 group(s); empty day: False",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 2
     },
     {
       "node": "publish",
@@ -2459,7 +2414,7 @@
       "decision": "snapshot ok: 2 stories, roundup of 2",
       "reason": "built from state; the store versions it",
       "model": "stand-ins",
-      "duration_ms": 18
+      "duration_ms": 21
     }
   ]
 }
