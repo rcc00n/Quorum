@@ -111,9 +111,9 @@ def _load_window(topic_id: str, start: str, end: str, *, previous: bool) -> list
     out: list[DocRef] = []
     rows = list(_run_sql(docs_sql, limit=500 if not previous else 1500))
     # A correction re-fetch (collectors/schema.sql: supersedes_id) replaces the row it supersedes. The
-    # superseded row stays in the corpus marked `superseded` — it counts for spread and coverage, never as
-    # evidence or an extraction origin (decided 2026-10-24, DECISIONS.md log; supersedes the 2026-10-23
-    # drop-the-row rule, see README.md › Decisions).
+    # superseded row stays in the state marked `superseded` so the trace can show the chain; it is never
+    # evidence or an extraction origin, and since the chain-once rule (DECISIONS.md log 2026-10-24) the
+    # chain is one publication for spread and coverage, represented by its newest row (cluster, frame).
     superseded = {int(r["supersedes_id"]) for r in rows if r.get("supersedes_id") not in (None, "", "None")}
     for row in rows:
         ref = _docref(row, official=False)

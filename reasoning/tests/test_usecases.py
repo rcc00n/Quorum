@@ -125,7 +125,14 @@ def test_retraction_superseded_document_is_not_evidence(monkeypatch):
         assert c["origin_document_id"] != 9501, "a claim must not originate from retracted text"
         for ev in c["evidence"]:
             assert ev["document_id"] != 9501, "a document superseded within the day should not support a claim"
-    assert any(9501 in e["document_ids"] for e in state["events"]), "the superseded publication still counts for spread"
+    # chain-once rule (decided 2026-10-24, Yelysei's yes on the live-blog finding): the chain is one publication, its
+    # newest row 9503 represents it; 9501 stays in the state for the trace but is neither an event member nor a source
+    assert not any(9501 in e["document_ids"] for e in state["events"]), "a superseded version is folded into its chain's newest row"
+    assert any(9503 in e["document_ids"] for e in state["events"])
+    assert any(d["id"] == 9501 and d.get("superseded") for d in state["documents"]), "the chain stays visible in the state"
+    assert any("superseded versions folded" in s["decision"] for s in state["steps"] if s["node"] == "cluster")
+    urls = [src["url"] for s in state["snapshot"]["stories"] for src in s["sources"]] + [src["url"] for g in state["snapshot"]["roundup"]["groups"] for i in g["items"] for src in i["sources"]]
+    assert len(urls) == len(set(urls)), "one URL, one source entry"
 
 
 def test_roundup_label_disputed_exists():

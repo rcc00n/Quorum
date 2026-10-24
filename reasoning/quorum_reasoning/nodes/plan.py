@@ -26,13 +26,20 @@ def run(state: RunState) -> dict:
     llm.reset_calls()  # the ledger of live model calls is per run
     with step(state, "plan") as s:
         docs = state.get("documents") or load_documents(topic_id, edition_date, corpus=corpus)
-        today = [d for d in docs if not d.get("from_previous_day")]
-        earlier = len(docs) - len(today)
+        today_all = [d for d in docs if not d.get("from_previous_day")]
+        today = [d for d in today_all if not d.get("superseded")]
+        folded = len(today_all) - len(today)
+        earlier = len(docs) - len(today_all)
         official = sum(1 for d in today if d.get("official"))
         sources = sorted({d["source_id"] for d in today})
         rounds = config.get("loops", "research_rounds_max", 2)
         model_mode = "stand-ins (dry run)" if llm.is_dry_run(dry_run) else f"live, {llm.model_name()}"
-        s.decision = f"{len(today)} documents from {len(sources)} sources, {official} official" + (f"; {earlier} earlier-day documents for evidence only" if earlier else "") + f"; research budget {rounds} rounds per event"
+        s.decision = (
+            f"{len(today)} documents from {len(sources)} sources, {official} official"
+            + (f"; {folded} superseded versions folded into their chains (counted once)" if folded else "")
+            + (f"; {earlier} earlier-day documents for evidence only" if earlier else "")
+            + f"; research budget {rounds} rounds per event"
+        )
         s.reason = f"corpus: {corpus}, edition window ending 05:30 America/New_York; model: {model_mode}; every event gets the same budget"
         if corpus == "zetaris":
             s.reason += f"; article text via {fetcher_name()}"

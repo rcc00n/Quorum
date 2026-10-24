@@ -151,6 +151,12 @@ became the event-key redesign. The original questions follow for the record.
 - `collectors/sources.csv` has no defense.gov row; the eval task treats defense.gov documents as allowed
   official sources. Reuters, AP, NY Post, NYT and Guardian block the crawler this review's dataset was built
   with (the collectors' own RSS access is unaffected).
+- Decided 2026-10-24 (her question 5): level-2 rows of outlets that run wire copy (NYT, WSJ, The Atlantic; the
+  Reuters sitemap and AFP via France24 are agencies already) get no special treatment — a level-2 row contributes
+  headline and lead only and is marked `by_headline` on every evidence row. Residual risk, accepted: a reprint
+  credited only in the body of a level-2 document is unmarked and counts as the outlet's own group, so one wire
+  story plus such a reprint could confirm a claim. Bounded by the small set of level-2 outlets and by the blind
+  fact-checker; revisit if a live day shows it.
 - Title and lead hygiene at collection time would cut the main injection surface: strip control characters
   and HTML, cap lengths (titles ~300, leads ~600). Reasoning caps on its side too; two layers are better
   than one.
