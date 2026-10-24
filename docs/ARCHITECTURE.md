@@ -288,22 +288,46 @@ Built 2026-10-24: `store.py`, the file store (`reasoning/snapshots/<topic>/<date
 | Oct 26 | Transport to the portal with Vadim; end-to-end on the demo event; fixes | The portal renders the story page from a live snapshot |
 | Oct 27 | Demo video, slides, README, sponsor-technology write-up; submission by 23:45 UTC | Submitted |
 
-**Status after the review of 2026-10-23** (evidence states per AGENTS.md § 4; review report:
-[docs/reviews/2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-review.md)):
+**Status 2026-10-24** (evidence states per AGENTS.md § 4; kept current at every commit that changes a state;
+review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-review.md),
+[2026-10-23-nemotron-routing.md](reviews/2026-10-23-nemotron-routing.md),
+[2026-10-24-meterless-engine-proposal.md](reviews/2026-10-24-meterless-engine-proposal.md)):
 
-- TESTED, in dry run (66 tests passed, 2 xfailed = the recorded proposals A7 and D3): the rules layer
-  (confirmation, impact bar, writing rules); the graph's loops end to end (research round 2, blind
-  fact-check with a disputed claim, critic rejection and rewrite, escalation); the red-team hardening (wire
-  reprints share the wire's independence group, official ids namespaced, superseded rows dropped,
-  sentence-boundary quotes, DST-correct edition window); the untrusted-text layer (`untrusted.py`: payload
-  labels and caps, stance/origin/URL/claim validation, last-balanced-object reply parsing); roundup labels
-  incl. `Disputed` and `Single source`; eight use-case days (`fixtures/usecases/`); the eval harness
-  (`tests/eval.py`, 28 real claims — dry baseline: false confirmed 0, missed confirmed 7, disputed rate 5%).
-- IMPLEMENTED, not yet exercised live: the model route (`llm.py`), the Zetaris corpus SQL
-  (`tools/corpus.py`), the live `fetch_text` path, Studio wiring (`langgraph.json`). Dry-run tests do not
-  establish live integration; the Oct 23–24 live run remains the evidence gate.
-- NOT_STARTED: the `analysis` store, `server.py` (snapshot endpoint), `config/photos.toml` and the photo
-  tool, `tools/gdelt.py`, a live eval run (`tests/eval.py --live`, opt-in).
+- TESTED, in dry run on fixtures (116 tests): the rules layer (confirmation with the origin-group rule, impact
+  bar with the casualty reach rule, writing rules); the graph's loops end to end (research round 2, blind
+  fact-check, the third blind reviewer on a disagreement, critic rejection and rewrite, escalation); event-key
+  clustering with the chain check; the red-team hardening and the untrusted-text layer; roundup labels; eight
+  use-case days; the eval harness (28 real claims, dry baseline); fail-closed live mode and the summary
+  consistency check; the model-call path's retry and ledger accounting (against a fake client); quote binding on
+  every evidence row and the Zetaris string typing (against the row shapes of Anastasia's real Zetaris result);
+  the file store with immutable versions; previous-day evidence for round 2 (against a fake SQL per window).
+- TESTED by third parties, on fictional data: the direct NVIDIA route and the whole graph under a live model —
+  Vadim's independent run at `a8933ba` (Issue #2, NVIDIA-FIRST-01: 351 real Lightning responses, snapshot SHA
+  `8f86e67c…9017`, status ok, one summary defect since fixed here by `summary_contradiction`); Nightshift 1.2.3
+  routing on five synthetic completions (METERLESS-ROUTING-01: explicit Ultra id → Ultra, dispositions →
+  Lightning). Anastasia's live Zetaris query over `QUORUM_COLLECT` (collection block, COLLECT-02: 53 documents
+  / 1 official document for edition 2026-10-24) is INTEGRATED on her side and is the corpus this block has not
+  read yet.
+- IMPLEMENTED, not yet exercised live from this branch: the model route as changed on 2026-10-24 (`llm.py`), the
+  Zetaris corpus SQL with the previous windows (`tools/corpus.py`), the live `fetch_text` path through the
+  shared fetcher (`QUORUM_COLLECTORS_PATH`), request spacing (`min_interval_ms = 1600`, TESTED only once the
+  first live run completes), Studio wiring. Dry-run tests do not establish live integration.
+- BLOCKED: a genuine-corpus run — the collection Postgres and datasource `QUORUM_COLLECT` run on Anastasia's
+  machine and no network path or dump reaches reasoning's machine yet (Issue #2, the first concrete integration
+  blocker); the Nightshift route — the Windows runtime binds Windows loopback only, so a run must start from a
+  Windows Python venv or after an approved WSL networking change; the Meterless Engine feature — proposal
+  written, go/no-go and a checkout pending.
+- NOT_STARTED: a live eval run (`tests/eval.py --live`, opt-in); the sources-registry load for the coverage
+  denominators (`sources_missing` is still `[]`; product decision pending).
+- DEFERRED for the hackathon, stated here so nothing is implied (DECISIONS.md log, 2026-10-24): `server.py`
+  (snapshot endpoint, POST /runs, trace endpoint) and the SSH-tunnel transport — the integration transport is the
+  snapshot file plus its SHA-256 (PROPOSED to Vadim); the Postgres `analysis` schema beyond the file store;
+  `config/photos.toml` and the photo tool (`photo` stays `null`, the licence rule unchanged); `tools/gdelt.py`
+  and the official sites of record in research round 2; `quotes`/`coverage` table writes (PROPOSED: the snapshot
+  is the only cross-block contract; needs Anastasia's and Vadim's agreement); embeddings for clustering
+  (`nvidia/nemotron-3-embed-1b`); a claim-level correction envelope (§ 8 says it does not exist); corrections
+  published under new URLs (accepted gap, Anastasia's question 2); the model's own spectrum rating as a fifth
+  mode (DECISIONS default: no).
 
 ## 11. Decisions this document records
 
