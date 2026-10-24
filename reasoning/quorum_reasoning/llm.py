@@ -74,6 +74,10 @@ def _route(which: str = "default") -> tuple[str, str, str]:
     model = os.getenv("NEMOTRON_MODEL") or os.getenv("METERLESS_MODEL") or "meterless/auto"
     if which == "fact_checker":
         model = os.getenv("NEMOTRON_MODEL_FACT_CHECKER") or model
+    elif which == "reviewer":
+        # the third blind reviewer: its own route when set, else the fact-checker's (a different model than the
+        # verifier's lane when available — DECISIONS.md › Principles for handling facts, 2026-10-24)
+        model = os.getenv("NEMOTRON_MODEL_REVIEWER") or os.getenv("NEMOTRON_MODEL_FACT_CHECKER") or model
     return base.strip(), key.strip(), model.strip()
 
 

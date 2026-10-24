@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "partial",
-  "generated_at": "2026-10-24T02:05:04Z",
+  "generated_at": "2026-10-24T02:17:28Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -197,6 +197,30 @@
           ]
         },
         {
+          "kind": "fact",
+          "text": "Ukraine aid bill signed into law after Senate and House votes.",
+          "claim_ids": [
+            "374b0fc6da43"
+          ],
+          "sources": [
+            {
+              "title": "Reuters",
+              "url": "https://www.reuters.com/world/us-ukraine-aid-bill-signed-2026-10-21/",
+              "quote": "The President signed the Ukraine aid bill into law on Tuesday."
+            },
+            {
+              "title": "Breitbart",
+              "url": "https://www.breitbart.com/politics/2026/10/21/ukraine-aid-signed-cost/",
+              "quote": "Open-ended Ukraine aid bill signed into law."
+            },
+            {
+              "title": "The Daily Wire",
+              "url": "https://www.dailywire.com/news/ukraine-aid-bill-signed",
+              "quote": "Ukraine aid bill signed into law."
+            }
+          ]
+        },
+        {
           "kind": "statements",
           "text": "What follows are statements, not confirmed facts. The White House said today I signed the Ukraine Security Assistance Act. The White House said deliveries will begin within weeks. The White House said this assistance covers most of the air-defense gap for the winter. Officials said the first shipments are expected within three weeks.",
           "claim_ids": [
@@ -223,14 +247,6 @@
               "url": "https://www.cnn.com/2026/10/21/politics/ukraine-aid-signed"
             }
           ]
-        },
-        {
-          "kind": "not_confirmed",
-          "text": "Not confirmed. Ukraine aid bill signed into law after Senate and House votes — verifier says confirmed, fact-checker says unverified.",
-          "claim_ids": [
-            "374b0fc6da43"
-          ],
-          "sources": []
         }
       ],
       "claims": [
@@ -243,6 +259,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -331,6 +351,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -381,6 +405,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -583,6 +611,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -671,6 +703,10 @@
           "verifier": "unverified",
           "fact_checker": "unverified",
           "reason": "no supporting evidence beyond statements",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "statement",
@@ -721,6 +757,10 @@
           "verifier": "unverified",
           "fact_checker": "unverified",
           "reason": "no supporting evidence beyond statements",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "statement",
@@ -771,6 +811,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -992,6 +1036,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -1175,6 +1223,10 @@
           "verifier": "unverified",
           "fact_checker": "unverified",
           "reason": "no supporting evidence beyond statements",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "contradicts",
@@ -1221,10 +1273,14 @@
           "text": "Ukraine aid bill signed into law after Senate and House votes",
           "kind": "fact",
           "speaker": null,
-          "status": "disputed",
+          "status": "confirmed",
           "verifier": "confirmed",
           "fact_checker": "unverified",
-          "reason": "verifier says confirmed, fact-checker says unverified",
+          "reason": "verifier says confirmed, fact-checker says unverified; third reviewer sided with the verifier: confirmed",
+          "reviewer_status": "confirmed",
+          "reviewer_reason": "dry run: only the verifier chain holds supporting evidence; the other found nothing",
+          "reviewer_quote": "The President signed the Ukraine aid bill into law on Tuesday.",
+          "resolved_by": "reviewer",
           "evidence": [
             {
               "stance": "supports",
@@ -1447,6 +1503,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -1516,6 +1576,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -1642,6 +1706,10 @@
           "verifier": "confirmed",
           "fact_checker": "confirmed",
           "reason": "stated in a signed or adopted official document",
+          "reviewer_status": null,
+          "reviewer_reason": "",
+          "reviewer_quote": "",
+          "resolved_by": "agreement",
           "evidence": [
             {
               "stance": "supports",
@@ -1817,7 +1885,7 @@
       "decision": "14 documents from 12 sources, 3 official; research budget 2 rounds per event",
       "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "cluster",
@@ -1826,7 +1894,7 @@
       "decision": "4 events from 14 documents; 2 key merges in code, model: 11 pair / 1 singleton / 2 chain questions, 8 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 11
+      "duration_ms": 4
     },
     {
       "node": "score_importance",
@@ -1871,7 +1939,7 @@
       "decision": "10 claims extracted",
       "reason": "from 8 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 1
     },
     {
       "node": "extract_claims",
@@ -1907,7 +1975,7 @@
       "decision": "round 1: 29 passages with a stance for 10 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 16
+      "duration_ms": 7
     },
     {
       "node": "research",
@@ -1916,7 +1984,7 @@
       "decision": "round 1: 7 passages with a stance for 3 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "research",
@@ -1979,7 +2047,7 @@
       "decision": "round 2: 0 passages with a stance for 3 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 1
     },
     {
       "node": "research",
@@ -1988,7 +2056,7 @@
       "decision": "round 2: 0 passages with a stance for 3 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 8
+      "duration_ms": 4
     },
     {
       "node": "research",
@@ -1997,7 +2065,7 @@
       "decision": "round 2: 0 passages with a stance for 2 claims",
       "reason": "widened to the rest of the day and official documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 3
     },
     {
       "node": "verify",
@@ -2033,7 +2101,7 @@
       "decision": "6 confirmed, 0 disputed, 4 unverified from 20 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 22
+      "duration_ms": 14
     },
     {
       "node": "fact_check",
@@ -2042,7 +2110,7 @@
       "decision": "3 confirmed, 0 disputed, 0 unverified from 5 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 8
+      "duration_ms": 4
     },
     {
       "node": "fact_check",
@@ -2051,7 +2119,7 @@
       "decision": "1 confirmed, 0 disputed, 3 unverified from 2 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 5
+      "duration_ms": 3
     },
     {
       "node": "fact_check",
@@ -2060,14 +2128,14 @@
       "decision": "0 confirmed, 0 disputed, 2 unverified from 0 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "adjudicate",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
       "decision": "6 confirmed, 1 disputed, 3 unverified; 1 disagreement(s); rubric total 8 (confirmation 2)",
-      "reason": "above the bar",
+      "reason": "above the bar; 1 disagreement(s) go to the third blind reviewer",
       "model": null,
       "duration_ms": 0
     },
@@ -2108,6 +2176,24 @@
       "duration_ms": 0
     },
     {
+      "node": "review_disputed",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "sided with the verifier: confirmed",
+      "reason": "dry run: only the verifier chain holds supporting evidence; the other found nothing",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "review_disputed",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "1 disagreement(s) reviewed; bar re-applied: 2 of 4 events above, 0 flagged",
+      "reason": "a resolved claim changes an event's confirmed count; the rule and the cap are code",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
       "node": "frame",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
@@ -2129,7 +2215,7 @@
       "node": "write",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
-      "decision": "draft 1: 7 blocks from 5 confirmed, 4 statements, 1 open",
+      "decision": "draft 1: 7 blocks from 6 confirmed, 4 statements, 0 open",
       "reason": "first draft",
       "model": "stand-ins",
       "duration_ms": 0
@@ -2150,7 +2236,7 @@
       "decision": "draft 1 rejected: 1 violation(s)",
       "reason": "standfirst: forbidden wording 'sweeping'; back to the writer",
       "model": null,
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "critique",
@@ -2159,13 +2245,13 @@
       "decision": "draft 1 rejected: 1 violation(s)",
       "reason": "standfirst: forbidden wording 'sweeping'; back to the writer",
       "model": null,
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "write",
       "iteration": 2,
       "event_id": "84b6dd5f95fe",
-      "decision": "draft 2: 7 blocks from 5 confirmed, 4 statements, 1 open",
+      "decision": "draft 2: 7 blocks from 6 confirmed, 4 statements, 0 open",
       "reason": "rewrite after the critic: standfirst: forbidden wording 'sweeping'",
       "model": "stand-ins",
       "duration_ms": 0
@@ -2213,7 +2299,7 @@
       "decision": "snapshot partial: 2 stories, roundup of 2",
       "reason": "built from state; the store versions it",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     }
   ]
 }

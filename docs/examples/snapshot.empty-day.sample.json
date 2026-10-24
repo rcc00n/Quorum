@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-24T02:05:03Z",
+  "generated_at": "2026-10-24T02:17:28Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -107,7 +107,7 @@
       "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 0
     },
     {
       "node": "score_importance",
@@ -260,7 +260,7 @@
       "decision": "2 confirmed, 0 disputed, 0 unverified from 2 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "fact_check",
@@ -323,7 +323,7 @@
       "decision": "3 events in 2 group(s); empty day: True",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 0
     },
     {
       "node": "publish",

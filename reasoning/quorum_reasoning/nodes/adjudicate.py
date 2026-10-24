@@ -27,6 +27,37 @@ def event_confirmation(claims: list[Claim], documents_by_id: dict) -> tuple[int,
     return confirmation_points(best_groups, any_document), confirmed
 
 
+NO_CONFIRMED_CLAIM = "crosses the bar on points but no claim is confirmed after all research rounds"
+
+
+def score_event(e: Event, event_claims: list[Claim], by_id: dict) -> tuple[int, int]:
+    """Confirmation points and the review flag for one event, from its claims' final statuses and evidence.
+    Returns (points, confirmed claims). Called by `adjudicate` and again by `review_disputed`, whose resolved
+    claims change the confirmed count."""
+    points, confirmed = event_confirmation(event_claims, by_id)
+    r = e["rubric"] or build_rubric(0, 0, 0, 0, {})
+    e["rubric"] = build_rubric(r["legal_force"], r["reach"], r["irreversibility"], points, r["rationale"])
+    e["rubric"]["rationale"]["confirmation"] = {
+        2: "a signed document or two independent groups behind a claim",
+        1: "one independent group behind the best-supported claim",
+        0: "no independent support",
+    }[points]
+    if crosses_bar(e["rubric"]) and confirmed == 0 and event_claims:
+        e["needs_review"] = True
+        e["review_reason"] = NO_CONFIRMED_CLAIM
+    elif e["review_reason"] == NO_CONFIRMED_CLAIM:
+        e["needs_review"] = False  # a resolved claim lifted the flag this node set; other flags are not ours to clear
+        e["review_reason"] = ""
+    return points, confirmed
+
+
+def apply_bar(events: list[Event], claims: dict[str, Claim], by_id: dict) -> list[Event]:
+    """Scores every event from the current claim statuses and applies the bar and the cap. Returns the ordered events."""
+    for e in events:
+        score_event(e, [c for c in claims.values() if c["event_id"] == e["id"]], by_id)
+    return rank_and_cap(events)
+
+
 def run(state: RunState) -> dict:
     claims = {cid: dict(c) for cid, c in state["claims"].items()}
     events: list[Event] = [dict(e) for e in state["events"]]  # type: ignore[misc]
@@ -43,24 +74,17 @@ def run(state: RunState) -> dict:
                 final, why = adjudicate_rule(v, f)
                 c["final_status"] = final
                 c["adjudication"] = why
+                c["resolved_by"] = "agreement" if v == f else "dispute"  # the third pass may change this to "reviewer"
                 counts[final] += 1
                 disagreements += v != f
-            points, confirmed = event_confirmation(event_claims, by_id)
-            r = e["rubric"] or build_rubric(0, 0, 0, 0, {})
-            e["rubric"] = build_rubric(r["legal_force"], r["reach"], r["irreversibility"], points, r["rationale"])
-            e["rubric"]["rationale"]["confirmation"] = {
-                2: "a signed document or two independent groups behind a claim",
-                1: "one independent group behind the best-supported claim",
-                0: "no independent support",
-            }[points]
-            if crosses_bar(e["rubric"]) and confirmed == 0 and event_claims:
-                e["needs_review"] = True
-                e["review_reason"] = "crosses the bar on points but no claim is confirmed after all research rounds"
+            points, _ = score_event(e, event_claims, by_id)
             s.decision = (
                 f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified; "
                 f"{disagreements} disagreement(s); rubric total {e['rubric']['total']} (confirmation {points})"
             )
             s.reason = e["review_reason"] or ("above the bar" if crosses_bar(e["rubric"]) else "below the bar")
+            if disagreements:
+                s.reason += f"; {disagreements} disagreement(s) go to the third blind reviewer"
         steps.append(finish(state, s))
     ordered = rank_and_cap(events)
     above = [e for e in ordered if e["above_bar"]]
@@ -71,5 +95,10 @@ def run(state: RunState) -> dict:
     return {"claims": claims, "events": ordered, "steps": steps}
 
 
-def route(state: RunState) -> Literal["escalate", "frame"]:
+def route(state: RunState) -> Literal["review_disputed", "escalate", "frame"]:
+    """Disagreements go to the third blind reviewer first; the bar is re-applied there before escalate/frame."""
+    from .review_disputed import pending  # local import: review_disputed imports apply_bar from this module
+
+    if pending(state):
+        return "review_disputed"
     return "escalate" if any(e["needs_review"] and not e["above_bar"] for e in state["events"]) else "frame"

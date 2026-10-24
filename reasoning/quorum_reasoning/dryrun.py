@@ -170,6 +170,28 @@ def stance(p: dict[str, Any]) -> dict[str, Any]:
     return {"stance": "neutral", "reason": f"dry run: {share:.0%} of the claim's words in the passage"}
 
 
+def review_disputed(p: dict[str, Any]) -> dict[str, Any]:
+    """Twin of the third blind pass. A disagreement where one chain holds supporting evidence and the other
+    found nothing is a retrieval difference: side with the chain that has evidence, citing its first supporting
+    row. When any row contradicts the claim, or both chains hold evidence, keep the dispute."""
+    chains = {name: (p.get(name) or {}) for name in ("verifier", "fact_checker")}
+    rows = {name: list(ch.get("evidence") or []) for name, ch in chains.items()}
+    if any(r.get("stance") == "contradicts" for rs in rows.values() for r in rs):
+        return {"verdict": "disputed", "decisive_chain": None, "decisive_index": None, "decisive_quote": "", "reason": "dry run: a passage contradicts the claim"}
+    with_support = [name for name in ("verifier", "fact_checker") if any(r.get("stance") == "supports" for r in rows[name])]
+    if len(with_support) != 1:
+        return {"verdict": "disputed", "decisive_chain": None, "decisive_index": None, "decisive_quote": "", "reason": "dry run: neither chain alone is decisive"}
+    name = with_support[0]
+    first = next(r for r in rows[name] if r.get("stance") == "supports")
+    return {
+        "verdict": chains[name].get("verdict"),
+        "decisive_chain": name,
+        "decisive_index": first.get("index", 0),
+        "decisive_quote": first.get("quote", ""),
+        "reason": f"dry run: only the {name} chain holds supporting evidence; the other found nothing",
+    }
+
+
 def frame(p: dict[str, Any]) -> dict[str, Any]:
     docs = p.get("documents", [])
     first = (docs[0].get("title") if docs else "") or ""

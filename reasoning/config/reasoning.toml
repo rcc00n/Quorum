@@ -8,6 +8,7 @@ cap_per_day = 10       # at most this many stories per topic and day; no minimum
 [loops]
 research_rounds_max = 2      # verify -> research, per event
 drafts_max = 3               # critique -> write, per event
+review_disputed_max = 1      # third blind pass per disagreed claim; never repeated (DECISIONS.md log, 2026-10-24)
 recursion_limit = 60         # LangGraph recursion limit per run
 
 [clustering]

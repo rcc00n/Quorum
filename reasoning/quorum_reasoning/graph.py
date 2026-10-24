@@ -11,7 +11,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from . import config, ids
-from .nodes import adjudicate, cluster, critique, escalate, extract, fact_check, frame, plan, publish, research, roundup, score, verify, write
+from .nodes import adjudicate, cluster, critique, escalate, extract, fact_check, frame, plan, publish, research, review_disputed, roundup, score, verify, write
 from typing import Callable
 
 from .state import RunInput, RunState, StepRecord, run_input
@@ -27,6 +27,7 @@ def build() -> StateGraph:
     b.add_node("verify", verify.run)
     b.add_node("fact_check", fact_check.run)
     b.add_node("adjudicate", adjudicate.run)
+    b.add_node("review_disputed", review_disputed.run)
     b.add_node("escalate", escalate.run)
     b.add_node("frame", frame.run)
     b.add_node("write", write.run)
@@ -42,7 +43,8 @@ def build() -> StateGraph:
     b.add_edge("research", "verify")
     b.add_conditional_edges("verify", verify.route, {"research": "research", "fact_check": "fact_check"})
     b.add_edge("fact_check", "adjudicate")
-    b.add_conditional_edges("adjudicate", adjudicate.route, {"escalate": "escalate", "frame": "frame"})
+    b.add_conditional_edges("adjudicate", adjudicate.route, {"review_disputed": "review_disputed", "escalate": "escalate", "frame": "frame"})
+    b.add_conditional_edges("review_disputed", review_disputed.route, {"escalate": "escalate", "frame": "frame"})
     b.add_edge("escalate", "frame")
     b.add_edge("frame", "write")
     b.add_edge("write", "critique")

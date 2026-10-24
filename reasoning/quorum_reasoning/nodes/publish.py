@@ -69,7 +69,12 @@ def claim_view(c: Claim) -> dict:
         "status": c["final_status"],
         "verifier": c["verifier_status"],
         "fact_checker": c["fact_checker_status"],
-        "reason": c["adjudication"] if c["final_status"] == "disputed" else c["verifier_reason"],
+        "reason": c["adjudication"] if (c["final_status"] == "disputed" or c.get("resolved_by") == "reviewer") else c["verifier_reason"],
+        # the third blind pass (decided 2026-10-24): present on every claim so the page can show all three verdicts
+        "reviewer_status": c.get("reviewer_status"),
+        "reviewer_reason": c.get("reviewer_reason", ""),
+        "reviewer_quote": c.get("reviewer_quote", ""),
+        "resolved_by": c.get("resolved_by", "agreement" if c["verifier_status"] == c["fact_checker_status"] else "dispute"),
         "evidence": [
             {
                 "stance": ev["stance"],

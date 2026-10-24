@@ -74,6 +74,12 @@ class Claim(TypedDict):
     fact_checker_reason: str
     final_status: ClaimStatus | None
     adjudication: str
+    # the third blind pass (nodes/review_disputed.py), present only on claims the two checkers disagreed on
+    review_passes: NotRequired[int]
+    reviewer_status: NotRequired[ClaimStatus | None]  # the accepted verdict; None when the pass was invalid or failed
+    reviewer_reason: NotRequired[str]
+    reviewer_quote: NotRequired[str]  # the decisive words, found in the cited evidence row
+    resolved_by: NotRequired[str]  # agreement | reviewer | dispute
 
 
 class Rubric(TypedDict):

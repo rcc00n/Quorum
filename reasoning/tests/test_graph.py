@@ -31,7 +31,7 @@ def steps(state, node: str, event_id: str | None = "any"):
 
 def test_every_node_left_a_trace_row(state):
     nodes = {s["node"] for s in state["steps"]}
-    assert {"plan", "cluster", "score_importance", "extract_claims", "research", "verify", "fact_check", "adjudicate", "frame", "write", "critique", "roundup", "publish"} <= nodes
+    assert {"plan", "cluster", "score_importance", "extract_claims", "research", "verify", "fact_check", "adjudicate", "review_disputed", "frame", "write", "critique", "roundup", "publish"} <= nodes
     for s in state["steps"]:
         assert s["decision"], s
 
@@ -50,14 +50,23 @@ def test_verify_sends_thin_claims_back_to_research(state):
     assert any(s["iteration"] == 2 for s in steps(state, "verify"))
 
 
-def test_fact_checker_is_blind_and_disagreements_become_disputed(state):
-    claims = state["claims"].values()
+def test_fact_checker_is_blind_and_disagreements_go_to_the_third_reviewer(state):
+    claims = list(state["claims"].values())
     assert all(c["fact_checker_status"] for c in claims)
-    disputed = [c for c in claims if c["final_status"] == "disputed"]
-    assert disputed, "the dry run should produce at least one verifier/fact-checker disagreement"
-    for c in disputed:
-        assert c["verifier_status"] != c["fact_checker_status"]
+    disagreed = [c for c in claims if c["verifier_status"] != c["fact_checker_status"]]
+    assert disagreed, "the dry run should produce at least one verifier/fact-checker disagreement"
+    for c in disagreed:
         assert "verifier says" in c["adjudication"]
+        assert c["review_passes"] == 1 and c["resolved_by"] in ("reviewer", "dispute")
+        if c["resolved_by"] == "reviewer":
+            assert c["final_status"] == c["reviewer_status"] in (c["verifier_status"], c["fact_checker_status"])
+            assert c["reviewer_quote"] and any(c["reviewer_quote"] in ev["quote"] for ev in c["evidence"])
+        else:
+            assert c["final_status"] == "disputed"
+    review_steps = steps(state, "review_disputed")
+    assert len([s for s in review_steps if s["event_id"]]) == len(disagreed)
+    # the fixture's one disagreement is a retrieval difference (the fact-checker found nothing): resolved, all three verdicts kept
+    assert any(c["resolved_by"] == "reviewer" for c in disagreed)
 
 
 def test_signed_documents_confirm_and_statements_do_not(state):
@@ -158,5 +167,5 @@ def test_escalation_when_points_cross_the_bar_without_a_confirmed_claim():
 
 def test_graph_draws_itself():
     m = graph.mermaid()
-    for node in ("plan", "verify", "research", "fact_check", "adjudicate", "escalate", "critique", "write", "roundup", "publish"):
+    for node in ("plan", "verify", "research", "fact_check", "adjudicate", "review_disputed", "escalate", "critique", "write", "roundup", "publish"):
         assert node in m
