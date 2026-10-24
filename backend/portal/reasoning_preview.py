@@ -111,7 +111,7 @@ def timestamp(value):
         raise SnapshotError("invalid_reasoning_timestamp") from None
 
 
-def envelope(p, *, legacy_v3=False):
+def envelope(p, *, raw_sha256=None):
     generated = timestamp(p["generated_at"])
     expires = timestamp(p["expires_at"])
     published = p["published_at"]
@@ -169,7 +169,9 @@ def envelope(p, *, legacy_v3=False):
             )
         if "model_errors" in provenance:
             fail(
-                answered.get("error", 0) == provenance["model_errors"] or legacy_v3,
+                answered.get("error", 0) == provenance["model_errors"]
+                or (raw_sha256 == "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
+                    and answered.get("error") == 61 and provenance["model_errors"] == 63),
                 "inconsistent_model_error_count",
             )
     if "model_calls" in provenance and "model_errors" in provenance:
@@ -242,7 +244,7 @@ def parse_reasoning(raw):
     fail(edition_date(p["edition_date"]), "invalid_reasoning_date")
     # DECISION(2026-10-24, rcc00n/Codex): only the original provisional v3 bytes may
     # retain 61 transport errors / 63 total errors (two invalid JSON replies). Why: preserve history without relaxing new ledgers.
-    envelope(p, legacy_v3=hashlib.sha256(raw).hexdigest() == "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30")
+    envelope(p, raw_sha256=hashlib.sha256(raw).hexdigest())
     fail(type(p["version"]) is int and p["version"] > 0)
     fail(p["status"] in ("ok", "partial", "empty"))
     text(p["summary"])
