@@ -11,8 +11,12 @@ drafts_max = 3               # critique -> write, per event
 recursion_limit = 60         # LangGraph recursion limit per run
 
 [clustering]
-similarity_threshold = 0.5   # cosine on title word sets; above this two documents join one event
-borderline_band = 0.25       # within this band below the threshold the model is asked to confirm a merge
+# Superseded 2026-10-24 (kept for the record): similarity_threshold = 0.5 and borderline_band = 0.25 drove
+# the titles-only cosine. Clustering now groups by per-document event keys (nodes/cluster.py; decision in
+# reasoning/README.md › Decisions): near-identical keys merge in code, no shared entity or action stays
+# apart in code, the model answers only the in-between.
+key_merge_overlap = 0.75     # stemmed key-token overlap coefficient at/above which two documents merge with no model call
+merge_questions_max = 80     # model merge questions (pair, singleton, chain) per run; past it the fail-safe direction applies
 
 [writing]
 reading_minutes_max = 4

@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-23T04:19:09Z",
+  "generated_at": "2026-10-24T00:16:55Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -16,7 +16,11 @@
   "provenance": {
     "corpus": "fixture:usecases/quiet_day",
     "model": "stand-ins",
-    "fictional": true
+    "fact_checker_model": "stand-ins",
+    "fictional": true,
+    "model_calls": 0,
+    "answered_by": {},
+    "model_errors": 0
   },
   "bar": {
     "threshold": 6,
@@ -91,8 +95,8 @@
       "node": "cluster",
       "iteration": 1,
       "event_id": null,
-      "decision": "3 events from 4 documents; model asked on 0 borderline pairs, merged 0",
-      "reason": "title cosine >= 0.5 merges; band 0.25 below it goes to the model",
+      "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
+      "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "meterless/auto",
       "duration_ms": 0
     },
@@ -328,7 +332,7 @@
       "decision": "3 events in 1 group(s); empty day: True",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
       "model": "meterless/auto",
-      "duration_ms": 1
+      "duration_ms": 2
     },
     {
       "node": "publish",
@@ -337,7 +341,7 @@
       "decision": "snapshot empty: 0 stories, roundup of 3",
       "reason": "built from state; the store versions it",
       "model": "meterless/auto",
-      "duration_ms": 0
+      "duration_ms": 1
     }
   ]
 }

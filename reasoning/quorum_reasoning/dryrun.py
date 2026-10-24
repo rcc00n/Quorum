@@ -11,15 +11,77 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .text import containment, overlap, sentences as _sentences
+from .text import containment, overlap, overlap_coefficient, sentences as _sentences, stem, stems
 
 _SAID = re.compile(r"^(?P<who>.{2,60}?)\s+(?P<verb>said|says|announced|claims|claimed)\s+(?:that\s+)?(?P<what>.+)$", re.IGNORECASE)
 _ACCORDING = re.compile(r"^(?P<what>.+?),\s+according to\s+(?P<who>.+)$", re.IGNORECASE)
 
+# A small deed lexicon for the deterministic event-key twin. The live model names the action itself; the
+# twin only needs the fixture days' verbs, so stems are enough and additions are free.
+_DEEDS = {
+    stem(v)
+    for v in (
+        "sign approve adopt pass impose add announce resume visit strike kill attack sanction order vote "
+        "retract withdraw agree meet release publish amend void arrive extend suspend ban seize capture "
+        "destroy launch open close reject confirm deny appoint resign deliver ship exchange talk"
+    ).split()
+}
+_NUM = re.compile(r"\d[\d,.]*")
+
+
+def event_key(p: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic twin of the event-key extraction: the deed the title names, entities from the rest.
+
+    The action comes from the title alone, as the prompt instructs the live model ("a document that reports
+    two distinct happenings gets the key of the one its title names"); body text cannot buy a different deed.
+    """
+    joined = " ".join(s for s in (p.get("title") or "", p.get("lead") or "", (p.get("text") or "")[:1500]) if s)
+    title = (p.get("title") or "").strip()
+    action = sorted(stems(title) & _DEEDS)
+    entities = sorted(stems(joined) - _DEEDS)
+    return {
+        "canonical": title or (joined[:120]),
+        "actors": [],
+        "action": " ".join(action),
+        "object": entities,
+        "place": [],
+        "date": None,
+        "numbers": _NUM.findall(title)[:6],
+    }
+
+
+def _key_sets(side: dict[str, Any]) -> tuple[set[str], set[str], set[str]]:
+    """(action stems, entity stems, every stem incl. title and lead) for one side of a merge question."""
+    key = side.get("key") or {}
+    fields = " ".join(
+        str(x)
+        for x in (
+            [key.get("canonical") or "", key.get("date") or ""]
+            + list(key.get("actors") or [])
+            + list(key.get("object") or [])
+            + list(key.get("place") or [])
+            + list(key.get("numbers") or [])
+        )
+    )
+    action = stems(str(key.get("action") or "")) & _DEEDS  # the key's named deed only; other fields cannot buy one
+    entities = stems(fields) - _DEEDS
+    full = stems(" ".join([fields, str(key.get("action") or ""), side.get("title") or "", side.get("lead") or ""]))
+    return action, entities, full
+
 
 def merge_confirm(p: dict[str, Any]) -> dict[str, Any]:
-    same = p.get("similarity", 0.0) >= 0.35
-    return {"same_event": same, "reason": "dry run: similarity band decision"}
+    """Twin of the merge question, asymmetric like the recorded fail-safe directions. `pair`/`singleton`
+    merge only on the same named deed plus two shared entities, or one side's wording contained in the
+    other's (an unmerged pair costs a roundup line). `chain` splits only when the two members share
+    nothing at all — no deed, no entity, no containment (a false split weakens real confirmation)."""
+    a_act, a_ent, a_full = _key_sets(p.get("a") or {})
+    b_act, b_ent, b_full = _key_sets(p.get("b") or {})
+    contained = overlap_coefficient(a_full, b_full) >= 0.6
+    if p.get("mode") == "chain":
+        same = bool(a_act & b_act) or bool(a_ent & b_ent) or contained
+    else:
+        same = bool(a_act & b_act and len(a_ent & b_ent) >= 2) or contained
+    return {"same_event": same, "reason": "dry run: shared deed and entities" if same else "dry run: keys disagree"}
 
 
 def rubric(p: dict[str, Any]) -> dict[str, Any]:

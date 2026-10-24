@@ -56,6 +56,43 @@ def clip_sentences(text: str, limit: int) -> str:
     return cut.rsplit(" ", 1)[0] if " " in cut else cut
 
 
+_SUFFIXES = ("ingly", "edly", "ings", "ing", "ions", "ion", "ies", "es", "ed", "ly", "s")
+
+
+def stem(token: str) -> str:
+    """A light suffix stripper: signs/signed/signing -> sign, inspections -> inspect, talks -> talk.
+
+    A filter aid for grouping, never a judge (reasoning/README.md › Decisions, clustering 2026-10-24):
+    it only widens matches between inflections; the model decides borderline pairs.
+    """
+    t = token.lower()
+    for suf in _SUFFIXES:
+        if t.endswith(suf) and len(t) - len(suf) >= 3:
+            return t[: len(t) - len(suf)]
+    return t
+
+
+_STEM_STOP = {
+    stem(w)
+    for w in (
+        "the and for into onto under over between after before during from with that this these those its "
+        "are was were has have had will would can could says said say new also not when where while"
+    ).split()
+}
+
+
+def stems(text: str) -> set[str]:
+    """Stemmed significant tokens of `text`: `tokens` minus function words, each suffix-stripped."""
+    return {stem(t) for t in tokens(text)} - _STEM_STOP
+
+
+def overlap_coefficient(a: set[str], b: set[str]) -> float:
+    """|a ∩ b| / min(|a|, |b|): 1.0 when the smaller set is contained in the larger."""
+    if not a or not b:
+        return 0.0
+    return len(a & b) / min(len(a), len(b))
+
+
 def best_passage(claim_text: str, text: str) -> str:
     """The sentence of `text` that shares the most words with the claim; empty when nothing is shared."""
     cw = tokens(claim_text)

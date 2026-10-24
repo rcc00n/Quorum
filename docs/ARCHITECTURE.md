@@ -115,7 +115,7 @@ class RunState(TypedDict):                      # reasoning/quorum_reasoning/sta
 | Node | Input | Output | Model? |
 | --- | --- | --- | --- |
 | `plan` | topic, date, document counts | which events get a research budget (rounds), which sources failed today | no |
-| `cluster` | documents for the day | events; similarity by TF-IDF cosine in code, borderline merges confirmed by the model with the two leads as input | borderline only |
+| `cluster` | documents for the day | events; one structured event key per document from the model (actors, action, object, place, date, numbers); code buckets by stemmed key overlap — near-identical merges and no-shared-entity separations without a model call, the in-between as pair questions, a singleton second pass, and a least-similar-pair check inside every 3+ event (split on "no", kept and trace-marked on "unsure") | key per document; merge questions for the in-between only |
 | `score_importance` | each event's documents and official docs | rubric points with a one-line rationale each; total and `above_bar` by code; cap of ten by code | yes, for points |
 | `extract_claims` | fetched text of up to N documents per event (access level 1), leads only for level 2 | atomic claims with origin quote and offsets | yes |
 | `research` | claims, corpus via Zetaris, official docs; round 1 the event's own documents, round 2 the rest of the day's corpus and the official documents (planned additions: the previous days of our corpus, official sites of record, and the GDELT DOC API restricted to the domains in `sources`; Google News RSS dropped, see Loops) | candidate passages per claim with stance | yes, for stance |
@@ -155,7 +155,7 @@ class RunState(TypedDict):                      # reasoning/quorum_reasoning/sta
 | --- | --- | --- |
 | Claim extraction, stance, framing labels, writing, critique, roundup lines, summary | NVIDIA Nemotron via Meterless (`meterless/auto` or a named lane) | Same route as `smoke_test.py`; keys only in `.env`. |
 | Fact-checker | A different model when the rules allow; otherwise Nemotron with its own context and tools | Independence comes first from the blind context and separate tools, second from model diversity. |
-| Embeddings for clustering | None in v0: TF-IDF cosine in Python | Good enough for one topic and one day; swap later without touching the graph. |
+| Embeddings for clustering | None in v0: stemmed event-key overlap in Python | `nvidia/nemotron-3-embed-1b` is the later option for the overlap measure if the first live days show the filter still misses pairs; swap without touching the graph. |
 
 Cost controls: one topic-day is roughly 40 documents, 5 events above the bar, 10 claims each — on the order of a few hundred model calls. Level-2 documents send leads only. Research round 2 runs only for thin claims. Nothing in routine checks spends credits (`verify-all.sh` stays as is); the graph runs only when started.
 

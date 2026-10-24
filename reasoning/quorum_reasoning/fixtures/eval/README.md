@@ -61,3 +61,11 @@ rubric's judgment against `expected_above_bar`.
 
 Baseline (dry run, 2026-10-23): false confirmed 0, missed confirmed 7, disputed rate 5%, 7 of 28 claims
 not extracted; above-bar matches expected on 4 of 7 days.
+
+After the event-key clustering redesign (dry run, 2026-10-24): false confirmed 0, missed confirmed 7,
+disputed rate 5%, above-bar matches 3 of 7 days. The fragmentation is gone — the Kramatorsk bus-strike
+outlets now form one event and its toll claim carries cross-outlet evidence (npr + cnn), which was
+structurally impossible before — so the remaining `missed confirmed` distance is the stance stand-in's
+word-overlap bound, measurable only live. 2026-10-19 differs on above-bar because the merged drone-strike
+event now confirms a claim; the hand-applied `expected_above_bar` values predate the 2026-10-24 rubric
+sentence on confirmed deaths and are re-applied with it (see the day files' reasons).

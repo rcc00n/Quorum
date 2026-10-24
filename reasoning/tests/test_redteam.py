@@ -330,16 +330,10 @@ def test_a6_flagged_events_do_not_consume_cap_slots():
 # --- A7: transitive title merges chain unrelated documents into one event --------------------------------
 
 
-@pytest.mark.xfail(
-    reason="A7: union-find merges every pair above the similarity threshold transitively; a bridge title chains "
-    "two documents with zero shared words into one event, and research round 1 then searches both for every "
-    "claim of the event. Fixing this changes the recorded clustering decision (nodes/cluster.py): proposal in "
-    "docs/reviews/2026-10-23-reasoning-review.md.",
-    strict=True,
-)
 def test_a7_bridge_title_must_not_chain_unrelated_documents():
-    """A7. sim(T1,T2) and sim(T2,T3) are above the threshold, sim(T1,T3) is 0: T1 and T3 still end up in
-    one event, so a claim from T1's document can be 'confirmed' by T3's unrelated document."""
+    """A7 (fixed by the 2026-10-24 clustering redesign: event keys + the least-similar-pair chain check).
+    sim(T1,T2) and sim(T2,T3) are above the old threshold while sim(T1,T3) is 0: a bridge title used to
+    chain T1 and T3 into one event, letting T3's unrelated document 'confirm' a claim from T1."""
     d1 = make_doc(1, "fox-news", title="Senate panel approves interceptor funding")
     d2 = make_doc(2, "cnn", title="Senate panel approves grain corridor inspections")
     d3 = make_doc(3, "npr", title="Grain corridor inspections resume Monday")
