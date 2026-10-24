@@ -71,6 +71,15 @@ def run(state: RunState) -> dict:
             for c in event_claims:
                 v = c["verifier_status"] or "unverified"
                 f = c["fact_checker_status"] or "unverified"
+                if c.get("fact_check_skipped"):
+                    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a claim of an event that cannot reach the bar
+                    # keeps the verifier's verdict, says it was not double-checked, gets no `resolved_by` and is no
+                    # disagreement. Why: see docs/DECISIONS.md › Selecting major news (bar gate, 2026-10-24).
+                    c["final_status"] = c["verifier_status"] or "unverified"
+                    c["adjudication"] = "fact-check skipped: event cannot reach the impact bar; the verifier's verdict stands, not double-checked"
+                    c.pop("resolved_by", None)
+                    counts[c["final_status"]] += 1
+                    continue
                 unavailable = c.get("fact_checker_judged") == 0 and "failed" in c.get("fact_checker_reason", "")
                 if unavailable:
                     # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): when the fact-checker judged no passage at all

@@ -53,7 +53,8 @@ def test_verify_sends_thin_claims_back_to_research(state):
 def test_fact_checker_is_blind_and_disagreements_go_to_the_third_reviewer(state):
     claims = list(state["claims"].values())
     assert all(c["fact_checker_status"] for c in claims)
-    disagreed = [c for c in claims if c["verifier_status"] != c["fact_checker_status"]]
+    # claims of an event below the bar gate were never fact-checked (unverified by skip): not a disagreement
+    disagreed = [c for c in claims if c["verifier_status"] != c["fact_checker_status"] and not c.get("fact_check_skipped")]
     assert disagreed, "the dry run should produce at least one verifier/fact-checker disagreement"
     for c in disagreed:
         assert "verifier says" in c["adjudication"]

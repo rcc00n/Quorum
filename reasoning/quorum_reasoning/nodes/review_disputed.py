@@ -43,7 +43,8 @@ def is_disagreement(claim: Claim) -> bool:
 
 def pending(state: RunState) -> list[Claim]:
     max_passes = int(config.get("loops", "review_disputed_max", 1))
-    return [c for c in state["claims"].values() if is_disagreement(c) and c.get("review_passes", 0) < max_passes]
+    # a claim whose fact-check was skipped by the bar gate has no second verdict to reconcile (see nodes/adjudicate.py)
+    return [c for c in state["claims"].values() if is_disagreement(c) and not c.get("fact_check_skipped") and c.get("review_passes", 0) < max_passes]
 
 
 def _chain_payload(rows: list[Evidence]) -> list[dict[str, Any]]:

@@ -78,6 +78,7 @@ class Claim(TypedDict):
     final_status: ClaimStatus | None
     adjudication: str
     fact_checker_judged: NotRequired[int]  # stance calls the fact-checker completed for this claim; 0 with failures = unavailable
+    fact_check_skipped: NotRequired[bool]  # internal, never exported: the event cannot reach the impact bar, so no blind fact-check (bar gate)
     # the third blind pass (nodes/review_disputed.py), present only on claims the two checkers disagreed on
     review_passes: NotRequired[int]
     reviewer_status: NotRequired[ClaimStatus | None]  # the accepted verdict; None when the pass was invalid or failed

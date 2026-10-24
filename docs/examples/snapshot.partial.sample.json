@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "partial",
-  "generated_at": "2026-10-24T06:08:01Z",
+  "generated_at": "2026-10-24T17:22:50Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -1927,7 +1927,7 @@
       "decision": "14 documents from 12 sources, 3 official; research budget 2 rounds per event",
       "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
-      "duration_ms": 5
+      "duration_ms": 1
     },
     {
       "node": "cluster",
@@ -1936,7 +1936,7 @@
       "decision": "4 events from 14 documents; 7 key merges in code, model: 6 pair / 1 singleton / 2 chain questions, 3 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 21
+      "duration_ms": 17
     },
     {
       "node": "score_importance",
@@ -1981,7 +1981,7 @@
       "decision": "10 claims extracted",
       "reason": "from 7 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 16
+      "duration_ms": 5
     },
     {
       "node": "extract_claims",
@@ -1990,7 +1990,7 @@
       "decision": "3 claims extracted",
       "reason": "from 3 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "extract_claims",
@@ -1999,7 +1999,7 @@
       "decision": "4 claims extracted",
       "reason": "from 2 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 0
     },
     {
       "node": "extract_claims",
@@ -2008,7 +2008,7 @@
       "decision": "2 claims extracted",
       "reason": "from 1 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "research",
@@ -2017,7 +2017,7 @@
       "decision": "round 1: 28 passages with a stance for 10 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 66
+      "duration_ms": 44
     },
     {
       "node": "research",
@@ -2026,7 +2026,7 @@
       "decision": "round 1: 7 passages with a stance for 3 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 5
+      "duration_ms": 1
     },
     {
       "node": "research",
@@ -2035,7 +2035,7 @@
       "decision": "round 1: 3 passages with a stance for 4 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 0
     },
     {
       "node": "research",
@@ -2089,7 +2089,7 @@
       "decision": "round 2: 0 passages with a stance for 3 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 16
+      "duration_ms": 10
     },
     {
       "node": "research",
@@ -2098,7 +2098,7 @@
       "decision": "round 2: 0 passages with a stance for 3 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 25
+      "duration_ms": 20
     },
     {
       "node": "research",
@@ -2107,7 +2107,7 @@
       "decision": "round 2: 0 passages with a stance for 2 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 14
+      "duration_ms": 7
     },
     {
       "node": "verify",
@@ -2143,7 +2143,7 @@
       "decision": "6 confirmed, 0 disputed, 4 unverified from 19 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 154
+      "duration_ms": 115
     },
     {
       "node": "fact_check",
@@ -2152,25 +2152,25 @@
       "decision": "3 confirmed, 0 disputed, 0 unverified from 5 own passages",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 38
+      "duration_ms": 32
     },
     {
       "node": "fact_check",
       "iteration": 1,
       "event_id": "43c374b38b98",
-      "decision": "1 confirmed, 0 disputed, 3 unverified from 2 own passages",
-      "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "stand-ins",
-      "duration_ms": 33
+      "decision": "skipped: event cannot reach the impact bar; 4 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
     },
     {
       "node": "fact_check",
       "iteration": 1,
       "event_id": "150fcfcd869a",
-      "decision": "0 confirmed, 0 disputed, 2 unverified from 0 own passages",
-      "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "stand-ins",
-      "duration_ms": 18
+      "decision": "skipped: event cannot reach the impact bar; 2 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
     },
     {
       "node": "adjudicate",
@@ -2278,7 +2278,7 @@
       "decision": "draft 1 rejected: 1 violation(s)",
       "reason": "standfirst: forbidden wording 'sweeping'; back to the writer",
       "model": null,
-      "duration_ms": 7
+      "duration_ms": 2
     },
     {
       "node": "critique",
@@ -2314,7 +2314,7 @@
       "decision": "draft 2 approved",
       "reason": "order, attribution, sourcing and wording rules all hold",
       "model": null,
-      "duration_ms": 7
+      "duration_ms": 4
     },
     {
       "node": "critique",
@@ -2323,7 +2323,7 @@
       "decision": "draft 2 approved",
       "reason": "order, attribution, sourcing and wording rules all hold",
       "model": null,
-      "duration_ms": 5
+      "duration_ms": 1
     },
     {
       "node": "roundup",
@@ -2332,7 +2332,7 @@
       "decision": "2 events in 2 group(s); empty day: False",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "publish",
@@ -2341,7 +2341,7 @@
       "decision": "snapshot partial: 2 stories, roundup of 2",
       "reason": "built from state; the store versions it",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 0
     }
   ]
 }

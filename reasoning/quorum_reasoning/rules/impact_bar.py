@@ -40,6 +40,24 @@ def crosses_bar(rubric: Rubric) -> bool:
     )
 
 
+def threshold() -> int:
+    return int(config.get("impact_bar", "threshold", 6))
+
+
+def judged_points(rubric: Rubric) -> int:
+    """The three points the model judges before any evidence (everything but confirmation)."""
+    return rubric["legal_force"] + rubric["reach"] + rubric["irreversibility"]
+
+
+def cannot_reach_bar(rubric: Rubric | None) -> bool:
+    """True when the judged points plus the best possible confirmation score still fall short of the threshold:
+    the event cannot become a story whatever the evidence shows (DECISIONS.md › Selecting major news, bar gate).
+    No rubric means no score yet, and an unscored event is never gated."""
+    if not rubric:
+        return False
+    return judged_points(rubric) + POINT_RANGES["confirmation"][1] < threshold()
+
+
 def rank_and_cap(events: list[Event]) -> list[Event]:
     """Marks `above_bar` and `rank`. Up to cap_per_day stories; no minimum. Returns the events, ordered."""
     cap = config.get("impact_bar", "cap_per_day", 10)

@@ -61,7 +61,7 @@ def reading_minutes(e: Event) -> int:
 
 
 def claim_view(c: Claim) -> dict:
-    return {
+    view = {
         "id": c["id"],
         "text": c["text"],
         "kind": c["kind"],
@@ -101,6 +101,9 @@ def claim_view(c: Claim) -> dict:
             for ev in c["evidence"]
         ],
     }
+    if c.get("fact_check_skipped"):
+        view.pop("resolved_by")  # bar gate: nothing was resolved between two checkers (docs/DECISIONS.md › Selecting major news)
+    return view
 
 
 def story_view(state: RunState, e: Event) -> dict:

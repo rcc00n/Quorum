@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-24T06:07:59Z",
+  "generated_at": "2026-10-24T17:22:49Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -98,7 +98,7 @@
       "decision": "4 documents from 3 sources, 0 official; research budget 2 rounds per event",
       "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
-      "duration_ms": 13
+      "duration_ms": 2
     },
     {
       "node": "cluster",
@@ -107,7 +107,7 @@
       "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 6
+      "duration_ms": 0
     },
     {
       "node": "score_importance",
@@ -143,7 +143,7 @@
       "decision": "2 claims extracted",
       "reason": "from 2 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 9
+      "duration_ms": 0
     },
     {
       "node": "extract_claims",
@@ -224,7 +224,7 @@
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "research",
@@ -233,7 +233,7 @@
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 4
+      "duration_ms": 0
     },
     {
       "node": "verify",
@@ -242,7 +242,7 @@
       "decision": "0 confirmed, 0 disputed, 1 unverified; 1 thin",
       "reason": "thin claims but the research budget is spent: on to the fact-checker",
       "model": null,
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "verify",
@@ -257,28 +257,28 @@
       "node": "fact_check",
       "iteration": 1,
       "event_id": "b913ab53ff63",
-      "decision": "2 confirmed, 0 disputed, 0 unverified from 2 own passages",
-      "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "stand-ins",
-      "duration_ms": 1
+      "decision": "skipped: event cannot reach the impact bar; 2 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
     },
     {
       "node": "fact_check",
       "iteration": 1,
       "event_id": "8ec9e4f49dc1",
-      "decision": "0 confirmed, 0 disputed, 1 unverified from 0 own passages",
-      "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "stand-ins",
-      "duration_ms": 1
+      "decision": "skipped: event cannot reach the impact bar; 1 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
     },
     {
       "node": "fact_check",
       "iteration": 1,
       "event_id": "c83a993b6c7f",
-      "decision": "0 confirmed, 0 disputed, 1 unverified from 0 own passages",
-      "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
-      "model": "stand-ins",
-      "duration_ms": 1
+      "decision": "skipped: event cannot reach the impact bar; 1 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
     },
     {
       "node": "adjudicate",
