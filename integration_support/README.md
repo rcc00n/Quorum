@@ -12,6 +12,8 @@ Apply to a clean disposable combined tree with `git apply --check <patch>` follo
 
 3. `0003-offline-diagnostics.patch` — Vadim reviews. Adds `--offline` to existing doctor/verify wrappers without reading private config or contacting service clients. Six tooling tests pass; each offline command returns five local PASS and one deliberately BLOCKED live-evidence item. `--offline --inference` is rejected before config access.
 
+4. `0004-memory-storage-safety.patch` — additional Yelysei/Anastasia review required. Seven negative cases cover linked state/root/ledger, invalid ownership marker and type-coerced identity/fictional flags. Six original audit cases failed before correction; all 16 memory tests now pass using temporary TEST stores and the installed unchanged reference. Reject unrelated entries before reference reads/writes; exact JSON identity prevents Python bool/float equality from prioritizing a different record. Private operator-controlled storage is still required; this does not defend against concurrent malicious same-user mutation.
+
 ## Rehearsal pins
 
 - integration: `c3cc5ac4a65855769ab48e36a1d59d5cc1ae261d`

@@ -1,0 +1,117 @@
+diff --git a/reasoning/memory/sidecar.mjs b/reasoning/memory/sidecar.mjs
+index 9478a3e..1b727db 100644
+--- a/reasoning/memory/sidecar.mjs
++++ b/reasoning/memory/sidecar.mjs
+@@ -14,14 +14,31 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
+     if(request.dry_run!==false||process.env.QUORUM_DRY_RUN==='1'){console.log(JSON.stringify({rows:[],count:0,ledger_entries:0,disabled:true}));process.exit(0);}
+     const dir=process.env.QUORUM_HMEM_DIR;
+     if(!dir||!path.isAbsolute(dir))throw Error('Private external directory required');
++    // DECISION(2026-10-24, rcc00n/Codex): reject linked stores and validate ownership markers.
++    // Why: the reference engine follows file links when persisting state and its trust ledger.
++    const inspectStore=()=>{
++      for(let parent=dir;;parent=path.dirname(parent)) {
++        if(fs.existsSync(parent)&&(!fs.lstatSync(parent).isDirectory()||fs.lstatSync(parent).isSymbolicLink()))throw Error('Unsafe store path');
++        if(parent===path.dirname(parent))break;
++      }
++      if(!fs.existsSync(dir))return;
++      for(const name of fs.readdirSync(dir)) {
++        if(!['quorum-source-memory-v1','state.json','ledger.jsonl','quorum.lock','quorum.pending'].includes(name))throw Error('Unrelated store entry');
++        const stat=fs.lstatSync(path.join(dir,name));
++        if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1)throw Error('Unsafe store entry');
++      }
++    };
++    inspectStore();
+     if(request.action==='recall'&&!fs.existsSync(dir)){console.log(JSON.stringify({rows:[],count:0,ledger_entries:0}));process.exit(0);}
+     const marker=path.join(dir,'quorum-source-memory-v1');
+     if(fs.existsSync(dir)&&(!fs.existsSync(marker)&&fs.readdirSync(dir).length))throw Error('Existing unrelated directory rejected');
++    if(fs.existsSync(marker)&&fs.readFileSync(marker,'utf8')!=='quorum-source-memory-v1')throw Error('Invalid store marker');
+     fs.mkdirSync(dir,{recursive:true,mode:0o700});
+     if(!fs.existsSync(marker))fs.writeFileSync(marker,'quorum-source-memory-v1',{flag:'wx',mode:0o600});
+     const lock=path.join(dir,'quorum.lock'),pending=path.join(dir,'quorum.pending');
+     const fd=fs.openSync(lock,'wx',0o600);
+     try {
++      inspectStore();
+       if(fs.existsSync(pending))throw Error('Incomplete write needs owner inspection');
+       const engine=new HMEM({persistDir:dir,actor:'quorum-source-memory'}),before=engine.ledger.all().length;
+       let result;
+diff --git a/reasoning/quorum_reasoning/tools/memory.py b/reasoning/quorum_reasoning/tools/memory.py
+index 7246960..e0ae746 100644
+--- a/reasoning/quorum_reasoning/tools/memory.py
++++ b/reasoning/quorum_reasoning/tools/memory.py
+@@ -54,8 +54,8 @@ def remember(state,events):
+                 ns='official' if ev.get('official_doc_id') is not None else 'article'
+                 doc=docs.get((ns,ev.get('official_doc_id') if ns=='official' else ev.get('document_id')))
+                 if not doc or ev['stance']!='supports' or ev.get('source_id')!=doc['source_id'] or ev['url']!=doc['url']:continue
+-                if not isinstance(ev.get('char_start'),int) or not isinstance(ev.get('char_end'),int) or ev['char_start']<0 or ev['char_end']-ev['char_start']!=len(ev['quote']):continue
+-                if not re.fullmatch('[0-9a-f]{64}',ev.get('content_hash_at_quote') or '') or ev.get('access_achieved') not in (1,2):continue
++                if type(ev.get('char_start')) is not int or type(ev.get('char_end')) is not int or ev['char_start']<0 or ev['char_end']-ev['char_start']!=len(ev['quote']):continue
++                if not re.fullmatch('[0-9a-f]{64}',ev.get('content_hash_at_quote') or '') or type(ev.get('access_achieved')) is not int or ev.get('access_achieved') not in (1,2):continue
+                 rows.append(dict(base,kind='evidence-candidate',event_id=claim['event_id'],docref=identity(doc),
+                                  claim_id=claim['id'],claim_text=claim['text'],quote=ev['quote'],
+                                  **{k:ev.get(k) for k in ('char_start','char_end','content_hash_at_quote','access_achieved','fetched_at')}))
+@@ -81,10 +81,12 @@ def prioritize(state,event_id,query,ordered):
+         candidates=[]
+         for row in result['rows']:
+             r=row['record']
+-            if r['topic_id']!=state['topic_id'] or r['fictional']!=(state.get('corpus')=='fixture') or r['kind']!='evidence-candidate':continue
++            if r['topic_id']!=state['topic_id'] or type(r['fictional']) is not bool or r['fictional']!=(state.get('corpus')=='fixture') or r['kind']!='evidence-candidate':continue
+             if not as_time(start)<=as_time(r['docref']['published_at'])<as_time(end):continue
+             for doc in ordered:
+-                if not doc.get('superseded') and identity(doc)==r['docref'] and doc not in candidates:candidates.append(doc)
++                # DECISION(2026-10-24, rcc00n/Codex): compare serialized DocRefs with exact JSON types.
++                # Why: Python treats True, 1 and 1.0 as equal, weakening source identity.
++                if not doc.get('superseded') and json.dumps(identity(doc),sort_keys=True,allow_nan=False)==json.dumps(r['docref'],sort_keys=True,allow_nan=False) and doc not in candidates:candidates.append(doc)
+         rest=[doc for doc in ordered if doc not in candidates]
+         trace=_trace(state,event_id,f'recalled {len(candidates)} authorized source candidates',f"Reference H-MEM; fresh verification required; {result['ledger_entries']} ledger actions")
+         return candidates+rest,[trace],[]
+diff --git a/reasoning/tests/test_memory_storage_safety.py b/reasoning/tests/test_memory_storage_safety.py
+new file mode 100644
+index 0000000..f5bf647
+--- /dev/null
++++ b/reasoning/tests/test_memory_storage_safety.py
+@@ -0,0 +1,45 @@
++"""Negative audit cases use dedicated TEST stores and protected temporary files only."""
++from unittest.mock import patch
++import pytest
++from test_source_memory import state, live_memory, TEXT
++from quorum_reasoning.tools import memory
++
++
++def test_symlinked_state_is_rejected_without_reading_or_mutating_target(live_memory,tmp_path):
++    s=state();memory.remember(s,[])
++    original=(live_memory/'state.json').read_bytes()
++    target=tmp_path/'TEST-protected.json';target.write_bytes(original)
++    (live_memory/'state.json').unlink();(live_memory/'state.json').symlink_to(target)
++    with pytest.raises(Exception):memory._call(s,'recall',query=TEXT)
++    assert target.read_bytes()==original
++
++
++def test_symlinked_root_is_rejected(live_memory,tmp_path,monkeypatch):
++    s=state();memory.remember(s,[])
++    link=tmp_path/'TEST-link';link.symlink_to(live_memory,target_is_directory=True)
++    monkeypatch.setenv('QUORUM_HMEM_DIR',str(link))
++    with pytest.raises(Exception):memory._call(s,'recall',query=TEXT)
++
++
++def test_invalid_marker_does_not_claim_an_unrelated_directory(live_memory):
++    live_memory.mkdir();marker=live_memory/'quorum-source-memory-v1';marker.write_text('TEST unrelated marker')
++    with pytest.raises(Exception):memory._call(state(),'store',rows=[])
++    assert list(live_memory.iterdir())==[marker]
++
++
++@pytest.mark.parametrize('change',[lambda r:r['docref'].update(id=2.0),lambda r:r['docref'].update(access_level=True),lambda r:r.update(fictional=1)])
++def test_recall_identity_is_type_exact(live_memory,change):
++    s=state();memory.remember(s,[])
++    response=memory._call(s,'recall',query=TEXT);change(response['rows'][0]['record'])
++    with patch.object(memory,'_call',return_value=response):
++        ordered,steps,errors=memory.prioritize(s,'TEST-event',TEXT,s['documents'])
++    assert ordered==s['documents'] and not errors and 'recalled 0' in steps[0]['decision']
++
++
++def test_hardlinked_ledger_is_rejected(live_memory,tmp_path):
++    import os
++    s=state();memory.remember(s,[])
++    ledger=live_memory/'ledger.jsonl';target=tmp_path/'TEST-protected-ledger'
++    os.link(ledger,target);original=target.read_bytes()
++    with pytest.raises(Exception):memory._call(s,'recall',query=TEXT)
++    assert target.read_bytes()==original
