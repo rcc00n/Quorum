@@ -51,6 +51,8 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 
 ## Decisions
 
+2026-10-24 · rcc00n / Codex · Optional local `QUORUM_REASONING_PREVIEW_SIDECAR` binds snapshot hash, edition, run, status and window before exposing only provisional/capture/hash metadata. Why: genuine provisional output needs visible corpus limits without exporting private sidecar paths or changing strict production ingestion. This verifies the binding, not execution or row-manifest truth. Exact-byte historical v3 ledger handling is documented at `reasoning_preview.envelope` call; all other ledger checks remain strict.
+
 2026-10-24 · rcc00n / Codex · Opt-in reasoning previews join validated catalog metadata in the portal projection, leaving the original reasoning JSON and publication gates unchanged. Identity policy is canonical in `catalog_sources.bind_sources`; dates absent from the registry stay null. Why: real source ratings need exact identity and attribution without changing the owner snapshot contract.
 
 | Date | Who | What | Why |

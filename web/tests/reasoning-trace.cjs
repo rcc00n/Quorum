@@ -76,3 +76,9 @@ assert.deepEqual(
 console.log(
   "PASS: exact sample loop counts; event isolation, interleaving, no invented returns from repeat labels or absent stages (FICTIONAL/TEST)",
 );
+const { roundupCheckNotice } = require('../lib/reasoning-trace.ts');
+const skipped = {...step('fact_check', 1), decision: 'skipped: event cannot reach the impact bar; 2 claims not double-checked'};
+assert.match(roundupCheckNotice([skipped], 'TEST-event'), /Independent check skipped/);
+for (const trace of [undefined, [], [{...skipped, event_id: 'TEST-other'}], [{...skipped, node: 'verify'}], [step('fact_check', 1)]])
+  assert.match(roundupCheckNotice(trace, 'TEST-event'), /not established/);
+console.log('PASS: skipped independent-check notice; unknown, completed, cross-event and wrong-stage traces never imply verification');

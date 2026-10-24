@@ -1,14 +1,19 @@
 name: Portal regressions
+# DECISION(2026-10-24, rcc00n/Codex): cover integration and its PRs as well as web.
+# Why: the approved sequential merge workflow needs web regressions after owner changes.
 on:
   push:
-    branches: [feature/web-portals]
-    paths: ['backend/**', 'web/**', 'deploy/**', '.github/workflows/portal.yml']
+    branches: [feature/web-portals, integration]
+    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', '.github/workflows/portal.yml']
+  pull_request:
+    branches: [integration, master]
+    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', '.github/workflows/portal.yml']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   portal:
-    if: github.ref == 'refs/heads/feature/web-portals'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/feature/web-portals' || github.ref == 'refs/heads/integration'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:

@@ -26,7 +26,13 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
   const response = await context.request.get(root + "/api/preview/reasoning/");
   assert.equal(response.status(), 200);
   const result = await response.json();
-  assert.deepEqual(result.reasoning, sample);
+  const presented = structuredClone(sample);
+  if (presented.errors) presented.errors = presented.errors.map((error) => {
+    const message = typeof error === "string" ? error : error.message;
+    const safe = /^model route returned HTTP [45]\d{2}$/.test(message) ? message : "Recorded upstream failure; internal details withheld.";
+    return typeof error === "string" ? safe : {...error, message: safe};
+  });
+  assert.deepEqual(result.reasoning, presented);
   assert.equal(result.preview.sha256, sha256);
   assert.equal(result.preview.published, false);
   assert.equal(result.status, "demo");
@@ -47,7 +53,13 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
   await page.getByRole("heading", { name: "The daily perspective", exact: true }).waitFor();
   await page.getByText(banner, { exact: true }).waitFor();
   assert.equal(await page.locator(".r-topic-summary").textContent(), sample.summary);
-  assert.ok((await page.locator(".r-preview-limits").first().textContent()).includes("Not published"));
+  if (sample.errors?.length) {
+    const diagnostics = page.locator('.r-upstream-errors');
+    await diagnostics.locator('summary').click();
+    assert.equal(await diagnostics.locator('p').count(), sample.errors.length);
+    await diagnostics.locator('summary').click();
+  }
+  assert.ok((await page.locator(".r-preview-limits").first().textContent()).includes(sample.published_at === null ? "Not published" : `Reported publication: ${sample.published_at} (unverified)`));
   assert.ok((await page.locator(".r-preview-limits").first().textContent()).includes(expired ? "Expired hint" : "Expiry hint"));
   if (sample.provenance.model_calls !== undefined) {
     const provenance = await page.locator(".r-model-provenance").textContent();
@@ -73,7 +85,7 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
     const row = page.locator(".r-roundup-row").nth(i);
     assert.equal(await row.locator(":scope > a").textContent(), item.line);
     assert.equal(new URL(await row.locator(":scope > a").getAttribute("href"), root).searchParams.get("event"), item.event_id);
-    assert.equal((await row.locator(".help").textContent()).trim(), item.status + (item.needs_review ? " · needs review" : ""));
+    assert.equal((await row.locator(".help").first().textContent()).trim(), "Producer status: " + item.status + (item.needs_review ? " · needs review" : ""));
     assert.deepEqual(await row.locator(".r-sources a").evaluateAll((links) => links.map((a) => a.href)), [...new Set(item.sources.map((s) => new URL(s.url).href))]);
   }
   const traceRows = await page.locator(".r-trace>li").evaluateAll((rows) => rows.map((row) => ({
@@ -90,6 +102,20 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
     assert.ok(traceRows[i].iteration.includes(`Iteration ${step.iteration}`));
   }
   await page.screenshot({ path: path.join(output, "snapshot-topic-1440.png"), animations: "disabled" });
+  // Desktop/mobile coverage must run even when the real edition has zero stories.
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    assert.equal(await page.locator("body").evaluate((el) => el.scrollWidth > innerWidth), false);
+    await page.locator('#reasoning-roundup').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(output, `snapshot-roundup-${width}.png`), animations: "disabled" });
+  }
+  if (env.QUORUM_REASONING_PREVIEW_SIDECAR) {
+    const binding = JSON.parse(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_SIDECAR));
+    assert.equal(result.preview.corpus_binding.provisional, binding.provisional);
+    assert.equal(result.preview.corpus_binding.sidecar_sha256, digest(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_SIDECAR)));
+    await page.getByText(/PROVISIONAL CORPUS/).waitFor();
+  }
+  assert.equal(await page.locator(".r-roundup-row .r-check-notice").count(), roundup.length);
   for (const story of sample.stories) {
     await page.goto(root + "/preview/reasoning?event=" + story.event_id);
     await page.locator(".r-article h1").waitFor();
@@ -154,6 +180,20 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
       (n) => document.querySelectorAll(".r-trace>li").length === n,
       sample.trace.filter((step) => step.event_id === item.event_id).length,
     );
+  }
+  if (result.catalog_revision) {
+    await page.goto(root + '/preview/reasoning');
+    for (const mode of ['allsides', 'mbfc', 'adfontes', 'average']) {
+      await page.getByLabel('Rating mode', {exact:true}).selectOption(mode);
+      assert.equal(await page.locator('.source-row').count(), result.sources.length);
+    }
+    await page.locator('.rating-provenance').first().locator('summary').click();
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({width, height:1000});
+      await page.locator('.spectrum').scrollIntoViewIfNeeded();
+      assert.equal(await page.locator('body').evaluate(el => el.scrollWidth > innerWidth), false);
+      await page.screenshot({path:path.join(output, `snapshot-ratings-${width}.png`), animations:'disabled'});
+    }
   }
   assert.deepEqual(errors, []);
   assert.equal(digest(fs.readFileSync(sourceFile)), sha256);

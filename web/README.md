@@ -25,6 +25,8 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 
 ## Decisions
 
+2026-10-24 · rcc00n / Codex · Roundup verdicts are producer-attributed; exact event-scoped skipped-check trace rows show “not double-checked”, while absent claim evidence establishes no independent verification. Preserve original status/grouping and show all partial errors behind a counted disclosure. Why: below-bar cost gating must not silently weaken verification claims or bury the reading journey under diagnostics.
+
 2026-10-24 · rcc00n / Codex · Display joined registry provider labels/links/check dates and four calculated source-rating modes separately from recorded producer coverage cohorts; provenance is a keyboard-accessible disclosure. Why: source position calculations must not silently rewrite fixed cohort evidence or turn missing ratings into zero.
 
 | Date | Who | What | Why |

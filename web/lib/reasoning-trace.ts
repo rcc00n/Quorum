@@ -16,6 +16,13 @@ const stageNames: Record<string, string> = {
 };
 export const stageName = (node: string) =>
   stageNames[node] || node.replaceAll("_", " ");
+// DECISION(2026-10-24, rcc00n/Codex): scope skipped checks to the recorded event.
+// Why: a producer roundup verdict must not imply independent verification.
+export function roundupCheckNotice(steps: ReasoningStep[] | undefined, eventId: string) {
+  return steps?.some((s) => s.event_id === eventId && s.node === "fact_check" && /^skipped:/i.test(s.decision))
+    ? "Independent check skipped; not double-checked."
+    : "Independent verification is not established by this roundup entry; claim evidence is not supplied.";
+}
 export const loopPairs = [
   {
     id: "research",

@@ -14,6 +14,7 @@ import {
 import { Spectrum } from "./spectrum";
 import { ReasoningSpectrum } from "./reasoning-spectrum";
 import { ReasoningTimeline, previewHref } from "./reasoning-timeline";
+import { roundupCheckNotice } from "@/lib/reasoning-trace";
 function ReadingNavigation({
   run,
   story,
@@ -172,7 +173,7 @@ function Roundup({ run }: { run: ReasoningRun }) {
       <h2>Also today</h2>
       <p>
         {run.roundup.count} events in the supplied roundup. Statuses and sources
-        are preserved.
+        are preserved as producer labels; they do not establish independent verification.
       </p>
       {run.roundup.groups.map((g, index) => (
         <div className="r-roundup-group" key={index}>
@@ -181,9 +182,10 @@ function Roundup({ run }: { run: ReasoningRun }) {
             <article className="r-roundup-row" key={item.event_id}>
               <Link href={previewHref(run, item.event_id)}>{item.line}</Link>
               <p className="help">
-                {item.status}
+                Producer status: {item.status}
                 {item.needs_review ? " · needs review" : ""}
               </p>
+              <p className="r-check-notice help">{roundupCheckNotice(run.trace, item.event_id)}</p>
               <Sources sources={item.sources} />
             </article>
           ))}
@@ -307,6 +309,13 @@ export function ReasoningPreviewPage({
               These declarations do not establish a genuine sponsor run or
               publication.
             </p>
+            {data.preview.corpus_binding && (
+              <p className="r-preview-limits r-corpus-binding">
+                {data.preview.corpus_binding.provisional ? "PROVISIONAL CORPUS" : "Producer corpus capture"}
+                {" · "}As of {data.preview.corpus_binding.corpus_as_of_utc}.
+                {" "}Sidecar bound to these snapshot bytes; execution and corpus manifests remain producer declarations.
+              </p>
+            )}
             {(run.provenance.fact_checker_model !== undefined ||
               run.provenance.model_calls !== undefined ||
               run.provenance.answered_by !== undefined ||
@@ -334,13 +343,16 @@ export function ReasoningPreviewPage({
                   Missing sources:{" "}
                   {run.sources_missing.join(", ") || "None listed"}
                 </p>
-                {run.errors?.map((e, i) => (
-                  <p key={i}>
-                    {typeof e === "string"
-                      ? e
-                      : `${e.node}${e.event_id ? ` · ${e.event_id}` : ""}: ${e.message}`}
-                  </p>
-                ))}
+                {!!run.errors?.length && (
+                  <details className="r-upstream-errors">
+                    <summary>{run.errors.length} recorded upstream errors · inspect safe diagnostics</summary>
+                    {run.errors.map((e, i) => (
+                      <p key={i}>
+                        {typeof e === "string" ? e : `${e.node}${e.event_id ? ` · ${e.event_id}` : ""}: ${e.message}`}
+                      </p>
+                    ))}
+                  </details>
+                )}
               </aside>
             )}
             {eventId ? (
@@ -371,9 +383,10 @@ export function ReasoningPreviewPage({
                   <p className="eyebrow">ROUNDUP EVENT / {roundup.event_id}</p>
                   <h1>{roundup.line}</h1>
                   <p>
-                    {roundup.status}
+                    Producer status: {roundup.status}
                     {roundup.needs_review ? " · needs review" : ""}
                   </p>
+                  <p className="r-check-notice help">{roundupCheckNotice(run.trace, roundup.event_id)}</p>
                   {roundup.line_source === "title" && <p className="help">Source headline fallback; no generated roundup line was supplied.</p>}
                   <Sources sources={roundup.sources} />
                   <p className="r-unavailable">

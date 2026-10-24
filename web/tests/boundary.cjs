@@ -71,6 +71,7 @@ const run = (args, env) =>
     QUORUM_ENABLE_SNAPSHOT_PUBLICATION: reasoningMode ? "" : "1",
     QUORUM_ENABLE_REASONING_PREVIEW: reasoningMode ? "1" : "",
     QUORUM_REASONING_PREVIEW_FILE: path.join(temp, "reasoning.json"),
+    QUORUM_REASONING_PREVIEW_SIDECAR: process.env.QUORUM_TEST_REASONING_SIDECAR || "",
     QUORUM_TEST_REASONING_ONLY: reasoningMode ? "1" : "",
     PYTHONPATH: path.join(repo, "backend"),
     QUORUM_TEST_PASSWORD: password,
@@ -161,6 +162,10 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     args: ["--no-sandbox"],
   });
   if (reasoningMode) {
+    if (process.argv.includes("--roundup-checks")) {
+      await require("./roundup-checks.cjs")({ browser, root, env, password });
+      return;
+    }
     if (process.argv.includes("--catalog")) {
       await require("./catalog-checks.cjs")({ browser, root, env, password, temp });
       return;

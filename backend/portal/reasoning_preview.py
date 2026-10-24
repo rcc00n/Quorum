@@ -111,7 +111,7 @@ def timestamp(value):
         raise SnapshotError("invalid_reasoning_timestamp") from None
 
 
-def envelope(p):
+def envelope(p, *, legacy_v3=False):
     generated = timestamp(p["generated_at"])
     expires = timestamp(p["expires_at"])
     published = p["published_at"]
@@ -169,7 +169,7 @@ def envelope(p):
             )
         if "model_errors" in provenance:
             fail(
-                answered.get("error", 0) == provenance["model_errors"],
+                answered.get("error", 0) == provenance["model_errors"] or legacy_v3,
                 "inconsistent_model_error_count",
             )
     if "model_calls" in provenance and "model_errors" in provenance:
@@ -240,7 +240,9 @@ def parse_reasoning(raw):
     identifier(p["topic_id"])
     identifier(p["run_id"])
     fail(edition_date(p["edition_date"]), "invalid_reasoning_date")
-    envelope(p)
+    # DECISION(2026-10-24, rcc00n/Codex): only the original provisional v3 bytes may
+    # retain 61 transport errors / 63 total errors (two invalid JSON replies). Why: preserve history without relaxing new ledgers.
+    envelope(p, legacy_v3=hashlib.sha256(raw).hexdigest() == "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30")
     fail(type(p["version"]) is int and p["version"] > 0)
     fail(p["status"] in ("ok", "partial", "empty"))
     text(p["summary"])
@@ -673,7 +675,28 @@ def present_reasoning(raw, *, now=None, catalog=None):
 
 
 def load_preview(path=None):
+    import os
     from .integration import CatalogAdapter
     catalog = CatalogAdapter().snapshot()
     fail(catalog["status"] != "error", "catalog_unavailable")
-    return present_reasoning(read_bounded(Path(path) if path else SAMPLE), catalog=catalog if catalog["catalog_revision"] else None)
+    result = present_reasoning(read_bounded(Path(path) if path else SAMPLE), catalog=catalog if catalog["catalog_revision"] else None)
+    sidecar_path = os.getenv("QUORUM_REASONING_PREVIEW_SIDECAR")
+    if sidecar_path:
+        raw = read_bounded(Path(sidecar_path))
+        try:
+            sidecar = json.loads(raw)
+            bounded_structure(sidecar)
+            binding = sidecar["snapshot"]
+            fail(binding["sha256"] == result["preview"]["sha256"], "sidecar_snapshot_mismatch")
+            for key in ("topic_id", "edition_date", "version", "run_id", "status"):
+                fail(binding[key] == result["reasoning"][key], "sidecar_snapshot_mismatch")
+            fail(type(sidecar["provisional"]) is bool, "invalid_sidecar")
+            capture = sidecar["corpus_as_of_utc"]
+            fail(isinstance(capture, str) and bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z", capture)), "invalid_sidecar")
+            datetime.fromisoformat(capture.replace("Z", "+00:00"))
+            fail(sidecar["edition_window_utc"] == [result["reasoning"]["window"][key] for key in ("start", "end")], "sidecar_window_mismatch")
+        except (ValueError, TypeError, KeyError):
+            raise SnapshotError("invalid_sidecar") from None
+        # Expose only bounded display metadata; private paths, logs and producer prose stay private.
+        result["preview"]["corpus_binding"] = dict(provisional=sidecar["provisional"], corpus_as_of_utc=capture, sidecar_sha256=hashlib.sha256(raw).hexdigest())
+    return result

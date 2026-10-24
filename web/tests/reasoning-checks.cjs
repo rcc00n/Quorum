@@ -474,6 +474,7 @@ module.exports = async function ({ browser, root, env, password, temp }) {
   fs.writeFileSync(file, JSON.stringify(variant));
   await page.goto(root + "/preview/reasoning");
   await page.getByText("This preview is incomplete", { exact: true }).waitFor();
+  await page.locator('.r-upstream-errors > summary').click();
   await page
     .getByText("Recorded upstream failure; internal details withheld.", {
       exact: true,

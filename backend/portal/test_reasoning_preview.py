@@ -4,6 +4,7 @@ import copy
 import json
 import os
 import hashlib
+import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -18,6 +19,34 @@ def sample():
 
 
 class ReasoningMappingTests(SimpleTestCase):
+    def test_sidecar_binding_is_optional_bounded_and_never_changes_snapshot(self):
+        p = sample()
+        original = SAMPLE.read_bytes()
+        sidecar = dict(snapshot={key: p[key] for key in ("topic_id", "edition_date", "version", "run_id", "status")}, provisional=True,
+                       corpus_as_of_utc="2026-10-22T03:53Z", edition_window_utc=[p["window"][key] for key in ("start", "end")],
+                       private_evidence={"log": "TEST-private-path-must-not-escape"})
+        sidecar["snapshot"]["sha256"] = hashlib.sha256(original).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "TEST-sidecar.json"
+            with patch.dict(os.environ, {"QUORUM_REASONING_PREVIEW_SIDECAR": str(path)}):
+                path.write_text(json.dumps(sidecar))
+                result = load_preview(SAMPLE)
+                self.assertEqual(result["reasoning"], p)
+                self.assertTrue(result["preview"]["corpus_binding"]["provisional"])
+                self.assertNotIn("TEST-private-path", json.dumps(result))
+                for key, value in (("sha256", "0" * 64), ("run_id", "TEST-wrong-run"), ("version", 99)):
+                    bad = copy.deepcopy(sidecar)
+                    bad["snapshot"][key] = value
+                    path.write_text(json.dumps(bad))
+                    with self.subTest(key=key), self.assertRaises(SnapshotError):
+                        load_preview(SAMPLE)
+                for key, value in (("provisional", "true"), ("corpus_as_of_utc", "TEST-invalid"), ("edition_window_utc", [])):
+                    bad = copy.deepcopy(sidecar)
+                    bad[key] = value
+                    path.write_text(json.dumps(bad))
+                    with self.subTest(key=key), self.assertRaises(SnapshotError):
+                        load_preview(SAMPLE)
+
     def test_model_ledger_context_and_original_summary_are_preserved(self):
         p = sample()
         p["provenance"].update(
