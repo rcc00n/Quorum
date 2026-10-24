@@ -40,6 +40,7 @@ jobs:
           export PYTHONPATH="$GITHUB_WORKSPACE/integration_support/offline:$RUNNER_TEMP/quorum-rehearsal/reasoning"
           cd "$RUNNER_TEMP/quorum-rehearsal"
           python -m pytest reasoning/tests -q
+          python -c "from collectors import verify_collectors as v; v.check_csv(); assert 'FAIL' not in v.seen"
           python backend/manage.py test portal
           python -m unittest discover -s deploy -p 'test_*.py'
           python -m unittest discover -s scripts -p 'test_*.py'
