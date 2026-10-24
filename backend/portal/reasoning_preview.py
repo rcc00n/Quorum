@@ -709,31 +709,35 @@ def load_preview(path=None):
     result = present_reasoning(snapshot_raw, catalog=catalog if catalog["catalog_revision"] else None)
     sidecar_path = os.getenv("QUORUM_REASONING_PREVIEW_SIDECAR")
     if sidecar_path:
-        raw = read_bounded(Path(sidecar_path))
-        try:
-            sidecar = parse_preview_json(raw)
-            fail(isinstance(sidecar, dict), "invalid_sidecar")
-            binding = sidecar["snapshot"]
-            fail(isinstance(binding, dict), "invalid_sidecar")
-            fail(binding["sha256"] == result["preview"]["sha256"], "sidecar_snapshot_mismatch")
-            for key in ("topic_id", "edition_date", "version", "run_id", "status"):
-                expected = result["reasoning"][key]
-                fail(type(binding[key]) is type(expected) and binding[key] == expected, "sidecar_snapshot_mismatch")
-            if "bytes" in binding:
-                fail(type(binding["bytes"]) is int and binding["bytes"] == len(snapshot_raw), "sidecar_size_mismatch")
-            fail(type(sidecar["provisional"]) is bool, "invalid_sidecar")
-            fail(result["preview"]["provisional"] is not True or sidecar["provisional"], "sidecar_provisional_mismatch")
-            capture = sidecar["corpus_as_of_utc"]
-            fail(isinstance(capture, str) and bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z", capture)), "invalid_sidecar")
-            captured_at = datetime.fromisoformat(capture.replace("Z", "+00:00"))
-            # DECISION(2026-10-24, rcc00n/Codex): capture must fit the declared edition and precede generation.
-            # Why: a bound hash alone cannot validate contradictory provisional chronology.
-            fail(timestamp(result["reasoning"]["window"]["start"]) <= captured_at
-                 <= min(timestamp(result["reasoning"]["window"]["end"]), timestamp(result["reasoning"]["generated_at"])), "sidecar_capture_outside_window")
-            fail(sidecar["edition_window_utc"] == [result["reasoning"]["window"][key] for key in ("start", "end")], "sidecar_window_mismatch")
-        except (ValueError, TypeError, KeyError):
-            raise SnapshotError("invalid_sidecar") from None
-        # Expose only bounded display metadata; private paths, logs and producer prose stay private.
-        result["preview"]["provisional"] = sidecar["provisional"]
-        result["preview"]["corpus_binding"] = dict(provisional=sidecar["provisional"], corpus_as_of_utc=capture, sidecar_sha256=hashlib.sha256(raw).hexdigest())
+        bind_preview_sidecar(read_bounded(Path(sidecar_path)), snapshot_raw, result)
+    return result
+
+
+def bind_preview_sidecar(raw, snapshot_raw, result):
+    try:
+        sidecar = parse_preview_json(raw)
+        fail(isinstance(sidecar, dict), "invalid_sidecar")
+        binding = sidecar["snapshot"]
+        fail(isinstance(binding, dict), "invalid_sidecar")
+        fail(binding["sha256"] == result["preview"]["sha256"], "sidecar_snapshot_mismatch")
+        for key in ("topic_id", "edition_date", "version", "run_id", "status"):
+            expected = result["reasoning"][key]
+            fail(type(binding[key]) is type(expected) and binding[key] == expected, "sidecar_snapshot_mismatch")
+        if "bytes" in binding:
+            fail(type(binding["bytes"]) is int and binding["bytes"] == len(snapshot_raw), "sidecar_size_mismatch")
+        fail(type(sidecar["provisional"]) is bool, "invalid_sidecar")
+        fail(result["preview"]["provisional"] is not True or sidecar["provisional"], "sidecar_provisional_mismatch")
+        capture = sidecar["corpus_as_of_utc"]
+        fail(isinstance(capture, str) and bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z", capture)), "invalid_sidecar")
+        captured_at = datetime.fromisoformat(capture.replace("Z", "+00:00"))
+        # DECISION(2026-10-24, rcc00n/Codex): capture must fit the declared edition and precede generation.
+        # Why: a bound hash alone cannot validate contradictory provisional chronology.
+        fail(timestamp(result["reasoning"]["window"]["start"]) <= captured_at
+             <= min(timestamp(result["reasoning"]["window"]["end"]), timestamp(result["reasoning"]["generated_at"])), "sidecar_capture_outside_window")
+        fail(sidecar["edition_window_utc"] == [result["reasoning"]["window"][key] for key in ("start", "end")], "sidecar_window_mismatch")
+    except (ValueError, TypeError, KeyError):
+        raise SnapshotError("invalid_sidecar") from None
+    # Expose only bounded display metadata; private paths, logs and producer prose stay private.
+    result["preview"]["provisional"] = sidecar["provisional"]
+    result["preview"]["corpus_binding"] = dict(provisional=sidecar["provisional"], corpus_as_of_utc=capture, sidecar_sha256=hashlib.sha256(raw).hexdigest())
     return result
