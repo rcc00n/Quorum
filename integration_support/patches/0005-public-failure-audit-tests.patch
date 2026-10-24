@@ -1,0 +1,33 @@
+diff --git a/reasoning/tests/test_public_failures.py b/reasoning/tests/test_public_failures.py
+index 79e9bf0..73c86e2 100644
+--- a/reasoning/tests/test_public_failures.py
++++ b/reasoning/tests/test_public_failures.py
+@@ -26,3 +26,28 @@ def test_failed_summary_is_partial_and_safe_without_hiding_failure():
+     assert p['status']=='partial' and p['summary_source']=='fallback'
+     assert PRIVATE not in json.dumps(p['trace'])
+     assert PRIVATE in p['errors'][0]['message']
++
++
++@pytest.mark.parametrize('name',['research','fact_check','write','frame','review_disputed'])
++def test_remaining_failure_paths_preserve_status_without_public_exception(name):
++    from quorum_reasoning import llm
++    from quorum_reasoning.nodes import research, fact_check, write, frame, review_disputed
++    from test_per_call_failures import _state
++    from test_review_disputed import state_with, claim, SUPPORT_A, SUPPORT_B
++    state=_state()
++    if name in ('write','frame'):
++        state['events'][0]['above_bar']=True
++    if name=='review_disputed':
++        state=state_with([claim('TEST-claim','ev1','confirmed','unverified',[SUPPORT_A,SUPPORT_B])])
++    node=locals()[name]
++    with patch.object(llm,'is_dry_run',return_value=False), patch.object(llm,'json_task',side_effect=RuntimeError(PRIVATE)):
++        result=node.run(state)
++    assert result['errors'] and result['steps']
++    public={key:value for key,value in result.items() if key!='errors'}
++    assert PRIVATE not in json.dumps(public)
++    if name!='frame':  # Frame deliberately records only exception type even in its error summary.
++        assert PRIVATE in json.dumps(result['errors'])
++    if name=='review_disputed':
++        assert result['claims']['TEST-claim']['final_status']=='disputed'
++    if name=='fact_check':
++        assert all(c['fact_checker_status']=='unverified' for c in result['claims'].values())
