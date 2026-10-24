@@ -565,6 +565,19 @@ def parse_reasoning(raw):
                 "invalid_error_event_reference",
             )
             text(error["message"])
+    # DECISION(2026-10-24, rcc00n/Codex): document identity owns one source across an edition.
+    # Why: article and official numeric IDs use separate namespaces, but conflicting source joins must fail.
+    document_sources = {}
+    for story in p["stories"]:
+        for claim in story["claims"]:
+            for evidence in claim["evidence"]:
+                source_id = evidence.get("source_id")
+                for namespace in ("document_id", "official_doc_id"):
+                    doc_id = evidence.get(namespace)
+                    if doc_id is not None and source_id:
+                        key = (namespace, doc_id)
+                        fail(document_sources.get(key, source_id) == source_id, "conflicting_document_source")
+                        document_sources[key] = source_id
     return p
 
 

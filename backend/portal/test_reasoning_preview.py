@@ -47,6 +47,23 @@ class ReasoningMappingTests(SimpleTestCase):
                     with self.subTest(key=key), self.assertRaises(SnapshotError):
                         load_preview(SAMPLE)
 
+    def test_document_source_identity_is_stable_without_colliding_namespaces(self):
+        p = sample()
+        evidence = p["stories"][0]["claims"][0]["evidence"]
+        evidence.append(copy.deepcopy(evidence[0]))
+        first, second = evidence[0], evidence[-1]
+        first.update(document_id=777, official_doc_id=None, source_id="TEST-a")
+        second.update(document_id=777, official_doc_id=None, source_id="TEST-b")
+        with self.assertRaises(SnapshotError):
+            parse_reasoning(json.dumps(p).encode())
+        second.update(source_id="TEST-a")
+        self.assertEqual(parse_reasoning(json.dumps(p).encode()), p)
+        second.update(document_id=None, official_doc_id=777, source_id="TEST-b")
+        self.assertEqual(parse_reasoning(json.dumps(p).encode()), p)
+        # Incomplete optional bindings remain unknown, not guessed from another row.
+        second.update(source_id=None)
+        self.assertEqual(parse_reasoning(json.dumps(p).encode()), p)
+
     def test_model_ledger_context_and_original_summary_are_preserved(self):
         p = sample()
         p["provenance"].update(
