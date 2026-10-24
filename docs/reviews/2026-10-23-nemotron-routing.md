@@ -1,5 +1,18 @@
 # Nemotron routing diagnosis, 2026-10-23
 
+> **Addendum 2026-10-24 (Nightshift 1.2.3, third-party evidence).** Vadim's METERLESS-ROUTING-01
+> (Issue #2, 2026-10-23T23:45Z) ran five minimal completions against Nightshift **1.2.3** (lanes: Race
+> Lightning, Verify Ultra, his reported setup): `meterless/auto`, `meterless/fast`, `meterless/deep` and
+> `meterless/judge` all answered from Lightning 30B; the explicit id `nvidia/nemotron-3-ultra-550b-a55b`
+> answered from Ultra 550B, with `response.model`, `meterless.routed_model` and `winning_route` agreeing, and a
+> receipt id per call. This supersedes Q4's "explicit ids are substituted" for 1.2.3: an explicit Nemotron id
+> is now the way to put the fact-checker on a second model through Nightshift. What it does **not** show:
+> that the Verify-duty lane executed (the response proves model identity, not lane duty), that the selection
+> is guaranteed on every request (one success each), or anything about `chat_template_kwargs` passthrough
+> (Q3 stays open). Also observed: the Windows runtime listens on Windows loopback `127.0.0.1:8088` only; WSL2
+> under NAT gets ECONNREFUSED from both Linux `127.0.0.1` and the gateway, while a Windows process reaches it.
+> Q4, the limitations list and recommended configuration (b) are updated below in place, old text kept.
+
 Model access through Meterless Nightshift v1.2.2 and directly against `integrate.api.nvidia.com`: thinking
 mode, lane pinning, model availability, 500s. Evidence: this session's own probe chronology (recorded in
 the diagnostic brief), the public Meterless repository and site, NVIDIA's own repositories and docs, and
@@ -123,7 +136,9 @@ Consequences:
   `nvidia/...` ids were attempts at undocumented behaviour.
 - **Explicit `nvidia/...` ids in the model field have no documented semantics at all** — the observed
   silent, non-deterministic substitution is therefore a limitation to report, not a bug we can cite against
-  a contract.
+  a contract. *Superseded 2026-10-24 for Nightshift 1.2.3:* the explicit Ultra id selected Ultra in all
+  observed requests (METERLESS-ROUTING-01); the semantics stay undocumented, so `provenance.answered_by` and
+  the receipt remain the evidence, not the route string.
 - The same-week third-party capture matches ours exactly: `meterless/fast` and `meterless/deep` both landed
   on the Lightning lane; "deep currently lands on the same Lightning 30B lane as fast" and fixing it is "a
   Nightshift lane setting", i.e. server-side.
@@ -136,6 +151,13 @@ to **Judge** (re-create the lane choosing a judge-type job if the wizard has no 
 Nightshift v1.2.2 is not achievable from the client today — keep the recorded fallback (both lanes
 Lightning, fact-checker independence = blind context + own prompt role) for the demo, and the second model
 runs on the direct route in development. Report the pinning question to Meterless either way.
+
+*Updated 2026-10-24 (1.2.3):* the `text.deep` experiment is moot — `deep` and `judge` land on Lightning —
+and the setup to use is `NEMOTRON_MODEL=meterless/fast` with
+`NEMOTRON_MODEL_FACT_CHECKER=nvidia/nemotron-3-ultra-550b-a55b` (the explicit id, which 1.2.3 honours).
+`--test-connection` through Nightshift must show Lightning on the default lane and Ultra on the fact-checker
+lane before any graph run; the ledger's `served`/`receipt_id` per call is the evidence that it held for the
+whole run. Do not claim that the Verify-duty lane ran.
 
 ## Q5 — The 500s through Nightshift (44–137 s)
 
@@ -165,11 +187,15 @@ ranks, it does not pin); `/no_think` in the system prompt (Qwen3's switch, not N
 same day); `max_tokens` low enough that a thinking trace could consume the whole reply (guard added).
 
 Nightshift v1.2.2 limitations, to report to Meterless: no client-side model pinning and silent
-non-deterministic substitution of explicit model ids; `chat_template_kwargs` apparently not applied
-upstream (`max_tokens` is); the Runtime 1.4 contract unpublished (public contract stops at 0.90.0, spec
-"drop pending"); upstream errors flattened to bare 500s; the "Runtime endpoint is offline" banner stuck in
-LOCAL ONLY mode with loopback working (no public mention of this issue anywhere); no documented debug
-logging or request-body view in receipts.
+non-deterministic substitution of explicit model ids (*1.2.3, 2026-10-24: an explicit Nemotron id was
+honoured in every observed request; the pinning semantics remain undocumented*); `chat_template_kwargs`
+apparently not applied upstream (`max_tokens` is); the Runtime 1.4 contract unpublished (public contract
+stops at 0.90.0, spec "drop pending"); upstream errors flattened to bare 500s; the "Runtime endpoint is
+offline" banner stuck in LOCAL ONLY mode with loopback working (no public mention of this issue anywhere);
+no documented debug logging or request-body view in receipts; `meterless/deep` and `meterless/judge` rank
+onto the same Lightning lane as `fast` for small tasks (1.2.3), so dispositions cannot select the second
+model; the Windows runtime binds Windows loopback only, so a WSL2 client under NAT cannot reach it without
+a transport the user approves (Windows venv, mirrored networking or a port proxy — see reasoning/README.md).
 
 NVIDIA-side, not ours: Super-120B's global 404 since ~Oct 20; `/v1/models` listing uncallable functions;
 undocumented trial limits and timeouts.
@@ -186,6 +212,13 @@ routes `meterless/fast` (or the Q4 split if the duty experiment works), `reasoni
 if Nightshift drops it, correct if it forwards; per-minute throttle off unless receipts show upstream 429s.
 Evidence for the award write-up comes from `provenance.answered_by` plus the per-call `receipt_id` now in
 the ledger, matched to Console › Proof.
+
+*Updated 2026-10-24 (1.2.3):* `NEMOTRON_MODEL=meterless/fast`,
+`NEMOTRON_MODEL_FACT_CHECKER=nvidia/nemotron-3-ultra-550b-a55b`, `QUORUM_MIN_INTERVAL_MS=0` (the hotspot
+paces upstream; set a value only if receipts show upstream 429s), run from a client that can reach Windows
+loopback `127.0.0.1:8088` (a Windows Python venv, unless Yelysei approves a WSL networking change). Verify
+with `--test-connection` (Lightning on `default`, Ultra on `fact_checker`) before the graph; the ledger's
+`served` and `receipt_id` per call are the per-request proof.
 
 ## Local verification steps (nothing here can run from the cloud container)
 

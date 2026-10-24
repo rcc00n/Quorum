@@ -30,7 +30,10 @@ attribution_verbs = ["says", "said", "states", "stated", "claims", "claimed", "a
 
 [models]
 # One hotspot (Meterless Nightshift: MODEL_BASE_URL / MODEL_API_KEY), two lanes by env: NEMOTRON_MODEL for every
-# task, NEMOTRON_MODEL_FACT_CHECKER for the blind second check (falls back to NEMOTRON_MODEL when unset).
+# task, NEMOTRON_MODEL_FACT_CHECKER for the blind second check (falls back to NEMOTRON_MODEL when unset). Through
+# Nightshift 1.2.3 the fact-checker lane is pinned with the explicit id nvidia/nemotron-3-ultra-550b-a55b (honoured
+# in every observed request, 2026-10-23); dispositions (fast/deep/judge) all rank onto Lightning. The answering
+# model is read from each response (provenance.answered_by, ledger `served`/`receipt_id`), never assumed.
 default = "env:NEMOTRON_MODEL"
 fact_checker = "env:NEMOTRON_MODEL_FACT_CHECKER"
 temperature = 0.1
