@@ -13,7 +13,7 @@ from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin, origin_
 from ..state import Claim, DocRef, Evidence, RunState, StepError
 from ..text import best_passage, clip_sentences
 from ..tools.corpus import OFFICIAL_ID_OFFSET
-from ..tools.fetch_text import fetch_text
+from ..tools.fetch_text import FetchResult, fetch_result, find_quote
 from ..trace import finish, step
 
 
@@ -22,7 +22,23 @@ def already_seen(claim: Claim, doc: DocRef, found_by: str) -> bool:
     return any(ev[key] == doc["id"] and ev["found_by"] == found_by for ev in claim["evidence"])
 
 
-def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str) -> Evidence:
+def bind_quote(ev: Evidence, doc: DocRef, fetched: FetchResult | None) -> Evidence:
+    """Ties the evidence row to the text its quote was cut from: offsets, hash at quote time, achieved access,
+    fetch time, and whether the page changed since collection (work item A5; what Vadim asked for in
+    PORTAL_INTEGRATION.md: code-point [start, end) offsets, version/hash binding, achieved access)."""
+    if fetched is None:
+        return ev
+    span = find_quote(fetched.quote_text, ev["quote"])
+    ev["char_start"], ev["char_end"] = span if span else (None, None)
+    ev["content_hash_at_quote"] = fetched.content_hash
+    ev["access_achieved"] = fetched.access_achieved
+    ev["fetched_at"] = fetched.fetched_at
+    stored = doc.get("content_hash")
+    ev["hash_mismatch"] = (stored != fetched.content_hash) if (stored and fetched.content_hash) else None
+    return ev
+
+
+def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str, fetched: FetchResult | None = None) -> Evidence:
     is_doc = bool(doc.get("official")) and doc.get("doc_type") in DOCUMENT_TYPES_THAT_ESTABLISH
     if doc.get("official") and not is_doc and stance == "supports":
         stance = "statement"  # an official release is the party's words, not evidence for them
@@ -37,6 +53,7 @@ def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str) -> Evid
         quote=clip_sentences(passage, 300),
         document_id=None if doc.get("official") else doc["id"],
         official_doc_id=db_id if doc.get("official") else None,
+        source_id=doc["source_id"],
         independence_group=group,
         stance=stance,  # type: ignore[typeddict-item]
         found_by=found_by,
@@ -44,9 +61,9 @@ def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str) -> Evid
         title=doc["source_name"],
         is_document=is_doc,
     )
-    if not doc.get("official") and doc["access_level"] == 2:
+    if not doc.get("official") and (doc["access_level"] == 2 or (fetched is not None and fetched.access_achieved == 2)):
         ev["by_headline"] = True  # DECISIONS.md › Sources: paywalled sources participate at level 2, marked "by headline"
-    return ev
+    return bind_quote(ev, doc, fetched)
 
 
 def _candidates(state: RunState, event_doc_ids: list[int], round_no: int) -> list[DocRef]:
@@ -82,7 +99,8 @@ def run(state: RunState) -> dict:
                             continue  # a claim does not confirm itself; a signed document does confirm what it says
                         if already_seen(c, d, "researcher"):
                             continue
-                        passage = best_passage(c["text"], fetch_text(d, dry_run=state["dry_run"]) or "")
+                        fetched = fetch_result(d, dry_run=state["dry_run"])
+                        passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
                         if not passage:
                             continue
                         ans = llm.json_task(
@@ -100,7 +118,7 @@ def run(state: RunState) -> dict:
                         stance = untrusted.valid_stance(ans.get("stance"))
                         if stance == "neutral":
                             continue
-                        c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher")]
+                        c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
                         found += 1
                 s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims"
                 s.reason = "event documents only" if round_no == 1 else "widened to the rest of the day and official documents for thin claims"

@@ -17,7 +17,7 @@ from .. import llm, untrusted
 from ..rules.confirmation import origin_group, verdict
 from ..state import RunState, StepError
 from ..text import best_passage
-from ..tools.fetch_text import fetch_text
+from ..tools.fetch_text import fetch_result
 from ..trace import finish, step
 from .research import already_seen, evidence_from
 
@@ -41,7 +41,8 @@ def run(state: RunState) -> dict:
                             continue
                         if already_seen(c, d, "fact_checker"):
                             continue
-                        passage = best_passage(c["text"], fetch_text(d, dry_run=state["dry_run"]) or "")
+                        fetched = fetch_result(d, dry_run=state["dry_run"])
+                        passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
                         if not passage:
                             continue
                         ans = llm.json_task(
@@ -60,7 +61,7 @@ def run(state: RunState) -> dict:
                         stance = untrusted.valid_stance(ans.get("stance"))
                         if stance == "neutral":
                             continue
-                        c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker")]
+                        c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker", fetched)]
                         found += 1
                     own = [ev for ev in c["evidence"] if ev["found_by"] == "fact_checker"]
                     status, reason = verdict(own, origin_group(c, by_id))

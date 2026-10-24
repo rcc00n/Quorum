@@ -80,7 +80,8 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
     start, end = _edition_window(edition_date)
     docs_sql = f"""
         SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
-               d.url, d.title, d.lead, d.published_at, d.access_level, d.wire_origin, d.supersedes_id
+               d.url, d.canonical_url, d.title, d.lead, d.published_at, d.fetched_at, d.access_level, d.wire_origin,
+               d.supersedes_id, d.content_hash
         FROM {db}.documents d
         JOIN {db}.sources s ON s.id = d.source_id
         WHERE d.topic_id = '{topic_id}'
@@ -89,8 +90,8 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
     """
     official_sql = f"""
         SELECT o.id, o.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
-               o.url, o.title, '' AS lead, COALESCE(o.signed_at, o.published_at) AS published_at, 1 AS access_level,
-               NULL AS wire_origin, o.doc_type, o.full_text AS text
+               o.url, o.title, '' AS lead, COALESCE(o.signed_at, o.published_at) AS published_at, o.fetched_at,
+               1 AS access_level, NULL AS wire_origin, o.doc_type, o.full_text AS text
         FROM {db}.official_docs o
         JOIN {db}.sources s ON s.id = o.source_id
         WHERE o.topic_id = '{topic_id}'
@@ -103,7 +104,7 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
     # superseded row stays in the corpus marked `superseded` — it counts for spread and coverage, never as
     # evidence or an extraction origin (decided 2026-10-24, DECISIONS.md log; supersedes the 2026-10-23
     # drop-the-row rule, see README.md › Decisions).
-    superseded = {int(r["supersedes_id"]) for r in rows if r.get("supersedes_id")}
+    superseded = {int(r["supersedes_id"]) for r in rows if r.get("supersedes_id") not in (None, "", "None")}
     for row in rows:
         ref = _docref(row, official=False)
         if int(row["id"]) in superseded:
@@ -114,28 +115,92 @@ def load_documents(topic_id: str, edition_date: str, *, corpus: str = "fixture")
     doc_ids = [d["id"] for d in out]
     if len(set(doc_ids)) != len(doc_ids):
         raise ValueError("duplicate document ids in the day's corpus after namespacing; refusing to run on a corrupt corpus")
+    check_wire_groups(out)
     return out
 
 
+# The three wire agencies collectors/schema.sql allows in documents.wire_origin, lower-cased: the registry's
+# agency rows carry exactly these as independence_group (collectors/README.md › wire_origin).
+WIRE_GROUPS_BY_SCHEMA = {"ap", "reuters", "afp"}
+
+
+def check_wire_groups(docs: list[DocRef]) -> None:
+    """Aborts the run when a document's `wire_origin`, lower-cased, is not an agency's independence group.
+
+    Reasoning uses `wire_origin.lower()` as the independence group of a reprint (rules/confirmation.py,
+    nodes/research.py), so a value with no agency behind it would make a reprint its own "independent" group
+    and could confirm a claim by one wire story. Accepted: the schema's three values, and any agency group
+    present in the loaded corpus. The sources registry itself is not loaded yet (work item E3 will load it and
+    tighten this to the registry); until then the schema enum is the floor. Same invariant as
+    `collectors/verify_collectors.py` on the collection side (answer to Anastasia's question 1, 2026-10-24).
+    """
+    agency_groups = {d["independence_group"] for d in docs if d["kind"] == "agency"} | WIRE_GROUPS_BY_SCHEMA
+    bad = sorted({str(d["wire_origin"]) for d in docs if d.get("wire_origin") and str(d["wire_origin"]).strip().lower() not in agency_groups})
+    if bad:
+        raise ValueError(
+            f"wire_origin value(s) {bad} do not name an agency independence group ({sorted(agency_groups)}); "
+            "a reprint would count as its own independent source — fix collection or the registry before running"
+        )
+
+
+def _iso_utc(value) -> str:
+    """Normalises a timestamp Zetaris returns as a string to ISO 8601 UTC (`…T…Z`, whole seconds).
+
+    DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): Zetaris delivers every column as a string, timestamps
+    as `2026-10-24 01:09:20.0` or `2026-10-24 00:43:54.633` (space separator, fractional seconds, no zone);
+    they are stored TIMESTAMPTZ and read back in UTC, so a zone-less value is taken as UTC. Why: the state
+    documents `published_at` as ISO 8601 UTC, `cluster` and `frame` sort on the string, and the portal
+    validates `Z` timestamps; Anastasia's real Zetaris result (collectors/zetaris/evidence/, 2026-10-24) shows
+    the raw shape.
+    """
+    if value is None or value == "" or value == "None":
+        return ""
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        s = str(value).strip().replace("T", " ")
+        if s.endswith("Z"):
+            s = s[:-1]
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return str(value)  # unknown shape: left as delivered rather than invented
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _text_or_none(value) -> str | None:
+    return None if value in (None, "", "None") else str(value)
+
+
 def _docref(row: dict, *, official: bool) -> DocRef:
+    """One Zetaris row as a DocRef. Every value arrives as a string (ids, levels, timestamps, NULL as None or
+    "None"): ids and levels are cast, timestamps normalised by `_iso_utc`, empty strings become None."""
     ref = DocRef(
         id=int(row["id"]) + (OFFICIAL_ID_OFFSET if official else 0),
         source_id=str(row["source_id"]),
         source_name=str(row.get("source_name") or row["source_id"]),
         independence_group=str(row.get("independence_group") or row["source_id"]),
         kind=str(row.get("kind") or ("official" if official else "outlet")),
-        flank=row.get("flank"),
-        tier=row.get("tier"),
+        flank=_text_or_none(row.get("flank")),
+        tier=_text_or_none(row.get("tier")),
         url=str(row["url"]),
         title=str(row.get("title") or ""),
-        lead=str(row.get("lead") or ""),
-        published_at=str(row.get("published_at") or ""),
+        lead=str(_text_or_none(row.get("lead")) or ""),
+        published_at=_iso_utc(row.get("published_at")),
         access_level=int(row.get("access_level") or (1 if official else 3)),
-        wire_origin=row.get("wire_origin"),
+        wire_origin=_text_or_none(row.get("wire_origin")),
     )
+    if row.get("canonical_url") not in (None, "", "None"):
+        ref["canonical_url"] = str(row["canonical_url"])
+    if row.get("content_hash") not in (None, "", "None"):
+        ref["content_hash"] = str(row["content_hash"])
+    if row.get("fetched_at") not in (None, "", "None"):
+        ref["fetched_at"] = _iso_utc(row["fetched_at"])
     if official:
         ref["official"] = True
-        ref["doc_type"] = row.get("doc_type")
+        ref["doc_type"] = _text_or_none(row.get("doc_type"))
         ref["text"] = row.get("text")
     return ref
 

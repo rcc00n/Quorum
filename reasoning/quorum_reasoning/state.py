@@ -29,12 +29,22 @@ class DocRef(TypedDict):
     doc_type: NotRequired[str | None]  # law | order | vote | ruling | statement | release
     text: NotRequired[str | None]  # only for official_docs (public domain); never for outlets
     superseded: NotRequired[bool]  # a correction replaced this row: spread and coverage only, never evidence
+    canonical_url: NotRequired[str | None]  # documents.canonical_url (tracking parameters stripped by collection)
+    content_hash: NotRequired[str | None]  # documents.content_hash at collection: sha256(title + "\n" + lead + "\n" + body[:2000])
+    fetched_at: NotRequired[str | None]  # when collection fetched the row (ISO 8601 UTC); official_docs.fetched_at for official rows
 
 
 class Evidence(TypedDict):
+    """One passage with a stance. The quote is bound to the text it was cut from (work item A5, 2026-10-24):
+    code-point offsets `[char_start, char_end)` into the text named by `access_achieved` (1: the fetched article
+    text as `collectors.common.fetch_text` returned it, or the official document's `full_text`; 2: the string
+    `title + "\n" + lead`), the collectors' content hash of that text at fetch time, and whether it differs from
+    the hash collection stored for the document."""
+
     quote: str
     document_id: int | None
     official_doc_id: int | None
+    source_id: str  # registry id of the publishing source (sources.id)
     independence_group: str
     stance: Stance
     found_by: str  # researcher | verifier | fact_checker
@@ -42,6 +52,12 @@ class Evidence(TypedDict):
     title: str
     is_document: bool  # True when it comes from a signed/adopted official document
     by_headline: NotRequired[bool]  # True when the source is level 2: the passage comes from headline and lead only
+    char_start: NotRequired[int | None]  # code-point offset of `quote` in the quoted text, start-inclusive; None when not found verbatim
+    char_end: NotRequired[int | None]  # end-exclusive
+    content_hash_at_quote: NotRequired[str | None]  # collectors' formula over the quoted text at fetch time
+    access_achieved: NotRequired[int | None]  # 1 full text was read, 2 headline and lead only (what the fetch achieved now, not the registry default)
+    fetched_at: NotRequired[str | None]  # when the quoted text was fetched (ISO 8601 UTC); collection's fetched_at for text collection stored
+    hash_mismatch: NotRequired[bool | None]  # True when content_hash_at_quote differs from documents.content_hash (the page changed since collection); None when no stored hash to compare
 
 
 class Claim(TypedDict):

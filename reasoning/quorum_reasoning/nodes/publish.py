@@ -80,6 +80,17 @@ def claim_view(c: Claim) -> dict:
                 "found_by": ev["found_by"],
                 "is_document": ev["is_document"],
                 "by_headline": bool(ev.get("by_headline")),
+                # the collectors' own ids and the quote binding (A5): the portal can resolve the registry row and
+                # verify the quote against the same text later
+                "source_id": ev.get("source_id"),
+                "document_id": ev["document_id"],
+                "official_doc_id": ev["official_doc_id"],
+                "char_start": ev.get("char_start"),
+                "char_end": ev.get("char_end"),
+                "content_hash_at_quote": ev.get("content_hash_at_quote"),
+                "access_achieved": ev.get("access_achieved"),
+                "fetched_at": ev.get("fetched_at"),
+                "hash_mismatch": ev.get("hash_mismatch"),
             }
             for ev in c["evidence"]
         ],

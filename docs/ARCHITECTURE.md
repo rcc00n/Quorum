@@ -42,7 +42,7 @@ flowchart LR
 
 - Agents read only through Zetaris. One SQL query joins documents, the source registry with ratings and an official-document feed; this is the sponsor technology doing real work, not a wrapper.
 - Agents write to the `analysis` schema in the same Postgres directly (Zetaris is read-only for us), plus `quotes` and `coverage` rows in the collection schema, exactly as its README allows.
-- Article text is never stored. Reasoning calls the collection block's `fetch_text(url)` at analysis time, which honours robots.txt and the source's access level, and stores only verbatim quotes with offsets and the content hash. Official documents are read in full from `official_docs`.
+- Article text is never stored. Reasoning calls the collection block's `collectors.common.fetch_text(url, title=, lead=)` at analysis time, which honours robots.txt and the source's access level, and stores only verbatim quotes with code-point offsets, the content hash of the text at fetch time and the achieved access level (section 8, evidence rows). Official documents are read in full from `official_docs`. The SQL also carries `canonical_url`, `content_hash` and `fetched_at` per document so a quote's hash can be compared with the collected one.
 - The portal never reads `analysis` tables directly. It pulls published snapshots (section 8). Nothing from reasoning runs on the portal VPS.
 
 ## 4. Storage owned by reasoning
@@ -200,8 +200,16 @@ Reasoning publishes one snapshot per topic and edition day. The portal's adapter
       "claims": [
         {"id": "c2", "text": "First deliveries will reach the front within weeks", "status": "disputed",
          "verifier": "confirmed", "fact_checker": "unverified", "reason": "…",
-         "evidence": [{"stance": "supports", "quote": "…", "title": "AP", "url": "https://…", "independence_group": "ap", "quote_id": 120},
-                      {"stance": "contradicts", "quote": "…", "title": "Reuters", "url": "https://…", "independence_group": "reuters", "quote_id": 121}]}
+         "evidence": [{"stance": "supports", "quote": "…", "title": "AP", "url": "https://…", "independence_group": "ap",
+                       "found_by": "researcher", "is_document": false, "by_headline": false,
+                       "source_id": "ap", "document_id": 120, "official_doc_id": null,
+                       "char_start": 418, "char_end": 533, "content_hash_at_quote": "92682389…", "access_achieved": 1,
+                       "fetched_at": "2026-10-22T11:58:02Z", "hash_mismatch": false},
+                      {"stance": "contradicts", "quote": "…", "title": "Reuters", "url": "https://…", "independence_group": "reuters",
+                       "found_by": "fact_checker", "is_document": false, "by_headline": true,
+                       "source_id": "reuters", "document_id": 121, "official_doc_id": null,
+                       "char_start": 0, "char_end": 96, "content_hash_at_quote": "efff94d1…", "access_achieved": 2,
+                       "fetched_at": "2026-10-22T07:30:11Z", "hash_mismatch": null}]}
       ],
       "spectrum": {
         "rating_mode": "average",
@@ -229,7 +237,7 @@ Reasoning publishes one snapshot per topic and edition day. The portal's adapter
 
 **Versions and corrections.** A rerun of the same topic-day yields `version + 1` with the same `edition_date`; versions are immutable. Corrections enter through collection (`documents.supersedes_id`): a superseded document is dropped from the corpus of the next run, so a claim it alone supported falls back to `unverified` in the next version. There is no claim-level correction envelope (prior claim → replacement claim) yet; that is an open item, not an implied feature. Ids: `event_id` and claim ids are stable hashes (ids.py); `document_id` and `official_doc_id` on evidence rows are the collectors' own numeric ids, kept in two fields so the two sequences never collide.
 
-Fields the implementation adds on top of the shape above (all optional for the portal): top-level `summary_source` (`"model"`, or `"fallback"` when the model's summary failed or contradicted the run's own counts; then `errors` carries a `publish` entry and `status` is `partial`), `errors` (the run's recoverable failures) and `trace` (every step record: node, iteration, event_id, decision, reason, model, duration_ms); per story `review_reason`, `critic_notes`, `drafts` and `sources`; per claim `kind`, `speaker` and, on each evidence row, `found_by` (researcher or fact_checker), `is_document` and `by_headline` (true when the passage comes from a level-2 source's headline and lead only); per roundup item `line_source` ("model", or "title" when the line is the fallback raw headline); a trace step may carry `detail` (audit rows its decision summarises, e.g. extract's dropped claims). `photo` is `null` until the photo tool exists.
+Fields the implementation adds on top of the shape above (all optional for the portal): top-level `summary_source` (`"model"`, or `"fallback"` when the model's summary failed or contradicted the run's own counts; then `errors` carries a `publish` entry and `status` is `partial`), `errors` (the run's recoverable failures) and `trace` (every step record: node, iteration, event_id, decision, reason, model, duration_ms); per story `review_reason`, `critic_notes`, `drafts` and `sources`; per claim `kind`, `speaker` and, on each evidence row, `found_by` (researcher or fact_checker), `is_document`, `by_headline` (true when the passage comes from a headline and lead only: a level-2 source, or a level-1 page robots.txt refused at fetch time) and the quote binding of 2026-10-24 — `source_id` (registry id), `document_id` or `official_doc_id` (the collectors' own ids, exactly one non-null), `char_start`/`char_end` (Unicode code-point offsets, end-exclusive, into the text the quote was cut from: the fetched article text or the official `full_text` at `access_achieved` 1, the string `title + "\n" + lead` at `access_achieved` 2; null when the quote was not found verbatim), `content_hash_at_quote` (the collectors' `content_hash` formula over that text at fetch time), `access_achieved`, `fetched_at` and `hash_mismatch` (true when the fetched hash differs from `documents.content_hash`, i.e. the page changed since collection; null when there is no stored hash to compare); per roundup item `line_source` ("model", or "title" when the line is the fallback raw headline); a trace step may carry `detail` (audit rows its decision summarises, e.g. extract's dropped claims). `photo` is `null` until the photo tool exists.
 
 Mapping to the portal's current `Event`: `established` ← `article` blocks of kind `fact` and `context`; `statements` ← the `statements` block; `disputed` ← claims with status disputed; `unknown` ← the `not_confirmed` block; `coverage` ← `spectrum.coverage` as lines; `importance.label` ← `rubric.total` with its rationale; `summary` ← `standfirst`; `digests[].summary` ← `roundup` rendered as text. New fields the portal does not render yet: `article` as prose, `photo`, `rubric`, `trace_ref`, `needs_review`, `status: empty` for quiet days. Ordering is upstream: `stories` are already ranked.
 
