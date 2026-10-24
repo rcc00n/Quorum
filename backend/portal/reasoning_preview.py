@@ -193,7 +193,9 @@ def public_error(error):
     return safe if isinstance(error, str) else {**error, "message": safe}
 
 
-def parse_reasoning(raw):
+# DECISION(2026-10-24, rcc00n/Codex): sidecars use the snapshot's strict JSON parser.
+# Why: duplicate keys and non-finite values cannot have two interpretations at this boundary.
+def parse_preview_json(raw):
     fail(len(raw) <= MAX_BYTES, "payload_too_large")
 
     def pairs(items):
@@ -216,6 +218,11 @@ def parse_reasoning(raw):
     except (ValueError, UnicodeError, RecursionError):
         raise SnapshotError("invalid_reasoning_json") from None
     bounded_structure(p)
+    return p
+
+
+def parse_reasoning(raw):
+    p = parse_preview_json(raw)
     obj(
         p,
         [
@@ -686,8 +693,7 @@ def load_preview(path=None):
     if sidecar_path:
         raw = read_bounded(Path(sidecar_path))
         try:
-            sidecar = json.loads(raw)
-            bounded_structure(sidecar)
+            sidecar = parse_preview_json(raw)
             binding = sidecar["snapshot"]
             fail(binding["sha256"] == result["preview"]["sha256"], "sidecar_snapshot_mismatch")
             for key in ("topic_id", "edition_date", "version", "run_id", "status"):
