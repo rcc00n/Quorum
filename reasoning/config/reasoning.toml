@@ -75,3 +75,8 @@ max_tokens = 1500                 # ceiling per reply; every task answers in far
 # documented cap is the starting point and the observed 3500 ms the fallback. Verified only by the first live
 # run on this branch: until then this value is IMPLEMENTED, not TESTED.
 min_interval_ms = 1600            # pause between live calls; env QUORUM_MIN_INTERVAL_MS overrides
+# Per-lane pause, measured per model route (llm.min_interval_ms; decision there): the Ultra-550B lane answered 429 to a
+# 1600 ms cadence on the first genuine run while Lightning never did. Env QUORUM_MIN_INTERVAL_MS_FACT_CHECKER /
+# QUORUM_MIN_INTERVAL_MS_REVIEWER override; 0 through Nightshift.
+min_interval_ms_fact_checker = 4000
+min_interval_ms_reviewer = 4000

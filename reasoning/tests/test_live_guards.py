@@ -245,3 +245,33 @@ def test_ledger_is_written_next_to_the_snapshot_never_inside_it(fake_route, monk
     assert "http_status" not in env_json and "finish_reason" not in env_json and '"task"' not in env_json
     assert publish.envelope(st)["provenance"]["model_calls"] == 1
     llm.reset_calls()
+
+
+# --- per-lane pacing (2026-10-24, from the first genuine run) ----------------------------------------------
+
+
+def test_lane_pacing_reads_lane_config_then_env_then_shared(monkeypatch):
+    monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS", raising=False)
+    monkeypatch.delenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER", raising=False)
+    assert llm.min_interval_ms() == int(llm.config.get("models", "min_interval_ms"))
+    assert llm.min_interval_ms("fact_checker") == int(llm.config.get("models", "min_interval_ms_fact_checker")) > llm.min_interval_ms()
+    monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS_FACT_CHECKER", "0")
+    assert llm.min_interval_ms("fact_checker") == 0, "the lane's env override wins (Nightshift paces upstream)"
+    monkeypatch.setenv("QUORUM_MIN_INTERVAL_MS", "0")
+    assert llm.min_interval_ms() == 0 and llm.min_interval_ms("reviewer") == int(llm.config.get("models", "min_interval_ms_reviewer"))
+
+
+def test_throttle_waits_per_route_not_only_per_process(monkeypatch):
+    waits = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: waits.append(round(s, 1)))
+    monkeypatch.setattr(llm, "min_interval_ms", lambda which="default": 0 if which == "default" else 4000)
+    llm._last_call_by_route.clear()
+    llm._throttle("fact_checker", "ultra")
+    llm._throttle("default", "lightning")  # another route: no lane wait
+    llm._throttle("fact_checker", "ultra")  # same route again within 4 s: waits
+    assert len(waits) == 1 and 3.0 <= waits[0] <= 4.0
+
+
+def test_rate_limit_retry_waits_longer_than_a_server_error():
+    assert llm._retry_wait(_status_error(429)) == llm.RETRY_RATE_LIMIT_WAIT_S > llm._retry_wait(_status_error(503))
+    assert llm._retry_wait(_status_error(429, {"retry-after": "7"})) == 7.0

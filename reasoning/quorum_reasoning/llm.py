@@ -287,28 +287,50 @@ def _request_extras() -> dict[str, Any]:
     return extras
 
 
-def min_interval_ms() -> int:
-    """Pause between two live calls: QUORUM_MIN_INTERVAL_MS when set (Nightshift runs set it to 0), else
-    config/reasoning.toml › models.min_interval_ms (the direct route's trial cap; see the decision there)."""
+def min_interval_ms(which: str = "default") -> int:
+    """Pause before a live call on a lane. The lane's own value wins when configured (`QUORUM_MIN_INTERVAL_MS_<LANE>`
+    env, else `models.min_interval_ms_<lane>` in config/reasoning.toml); otherwise the shared value
+    (`QUORUM_MIN_INTERVAL_MS`, else `models.min_interval_ms`). Nightshift runs set the shared value to 0.
+
+    DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): the fact-checker and reviewer lanes pace themselves
+    separately, and the pause is measured per model route, not per process. Why: on the first genuine run
+    (edition 2026-10-24, direct route) every HTTP 429 came from the Ultra-550B lane — the fact-checker fires up
+    to eight Ultra calls per claim back to back — while Lightning never refused; one shared 1600 ms pause
+    cannot respect two different per-minute caps.
+    """
+    for name in ((f"QUORUM_MIN_INTERVAL_MS_{which.upper()}",) if which != "default" else ()):
+        raw = os.getenv(name, "").strip()
+        if raw:
+            return max(0, int(raw))
+    if which != "default":
+        lane_value = config.get("models", f"min_interval_ms_{which}", None)
+        if lane_value is not None:
+            return max(0, int(lane_value))
     raw = os.getenv("QUORUM_MIN_INTERVAL_MS", "").strip()
     if raw:
         return max(0, int(raw))
     return int(config.get("models", "min_interval_ms", 0) or 0)
 
 
-def _throttle() -> None:
-    """Keeps at least min_interval_ms() between two live calls (the provider's per-minute cap)."""
+_last_call_by_route: dict[str, float] = {}
+
+
+def _throttle(which: str = "default", route: str = "") -> None:
+    """Keeps at least min_interval_ms(which) since the last call to the same model route (the provider's
+    per-minute cap is per model), and at least the shared pause since any call at all."""
     global _last_call_at
-    gap = min_interval_ms() / 1000.0
-    if gap > 0:
-        wait = _last_call_at + gap - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-    _last_call_at = time.monotonic()
+    now = time.monotonic()
+    shared = min_interval_ms() / 1000.0
+    lane = min_interval_ms(which) / 1000.0
+    wait = max(_last_call_at + shared - now, _last_call_by_route.get(route, 0.0) + lane - now, 0.0)
+    if wait > 0:
+        time.sleep(wait)
+    _last_call_at = _last_call_by_route[route] = time.monotonic()
 
 
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 RETRY_DEFAULT_WAIT_S = 5.0
+RETRY_RATE_LIMIT_WAIT_S = 15.0  # a 429 without Retry-After: the first live run showed 5 s was not enough on the Ultra lane
 RETRY_MAX_WAIT_S = 60.0
 
 
@@ -322,7 +344,7 @@ def _retry_wait(exc: Exception) -> float | None:
     if isinstance(exc, APIStatusError):
         if exc.status_code not in RETRY_STATUSES:
             return None
-        wait = RETRY_DEFAULT_WAIT_S
+        wait = RETRY_RATE_LIMIT_WAIT_S if exc.status_code == 429 else RETRY_DEFAULT_WAIT_S
         header = exc.response.headers.get("retry-after") if getattr(exc, "response", None) is not None else None
         if header:
             try:
@@ -352,7 +374,7 @@ def _create(model: str, messages: list[dict[str, str]], temperature: float, entr
     while True:
         attempt += 1
         entry["attempts"] = attempt
-        _throttle()
+        _throttle(entry.get("lane", "default"), model)
         try:
             raw = _client().chat.completions.with_raw_response.create(model=model, temperature=temperature, messages=messages, **_request_extras())
             return raw.parse(), int(raw.status_code)
