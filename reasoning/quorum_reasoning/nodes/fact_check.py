@@ -34,15 +34,22 @@ def run(state: RunState) -> dict:
         with step(state, "fact_check", event_id=e["id"], model=llm.model_name("fact_checker")) as s:
             counts: Counter[str] = Counter()
             found = 0
-            try:
-                for c in event_claims:
-                    pool = [d for d in docs if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "fact_checker")]
-                    # the fact-checker has the researcher's access to the whole corpus; the same code ranking bounds its calls
-                    for d in rank_candidates(c["text"], pool, dry_run=state["dry_run"]):
-                        fetched = fetch_result(d, dry_run=state["dry_run"])
-                        passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
-                        if not passage:
-                            continue
+            failed: list[str] = []
+            # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a failed stance call skips that one passage and the
+            # loop goes on; the claim's verdict comes from the passages that were judged, and the event's trace row and
+            # one StepError carry the failure count. Why: on the first genuine run one HTTP 429 aborted the whole
+            # event's fact-check, 155 of 189 claims were marked "fact-checker failed; treated as unverified", and
+            # every disagreement that produced was an artifact of the error path, not of the evidence.
+            for c in event_claims:
+                failed_before = len(failed)
+                pool = [d for d in docs if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "fact_checker")]
+                # the fact-checker has the researcher's access to the whole corpus; the same code ranking bounds its calls
+                for d in rank_candidates(c["text"], pool, dry_run=state["dry_run"]):
+                    fetched = fetch_result(d, dry_run=state["dry_run"])
+                    passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
+                    if not passage:
+                        continue
+                    try:
                         ans = llm.json_task(
                             "stance",
                             {
@@ -56,25 +63,23 @@ def run(state: RunState) -> dict:
                             dry_run=state["dry_run"],
                             which="fact_checker",
                         )
-                        stance = untrusted.valid_stance(ans.get("stance"))
-                        if stance == "neutral":
-                            continue
-                        c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker", fetched)]
-                        found += 1
-                    own = [ev for ev in c["evidence"] if ev["found_by"] == "fact_checker"]
-                    status, reason = verdict(own, origin_group(c, by_id))
-                    c["fact_checker_status"] = status
-                    c["fact_checker_reason"] = reason
-                    counts[status] += 1
-                s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages"
-                s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier"
-            except Exception as exc:  # noqa: BLE001
-                errors.append(StepError(node="fact_check", event_id=e["id"], message=str(exc)[:300]))
-                for c in event_claims:
-                    if c["fact_checker_status"] is None:
-                        c["fact_checker_status"] = "unverified"
-                        c["fact_checker_reason"] = "fact-checker failed; treated as unverified"
-                s.decision = "failed; unchecked claims treated as unverified"
-                s.reason = str(exc)[:200]
+                    except Exception as exc:  # noqa: BLE001 — one passage lost, the claim and the event go on
+                        failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
+                        continue
+                    stance = untrusted.valid_stance(ans.get("stance"))
+                    if stance == "neutral":
+                        continue
+                    c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "fact_checker", fetched)]
+                    found += 1
+                own = [ev for ev in c["evidence"] if ev["found_by"] == "fact_checker"]
+                status, reason = verdict(own, origin_group(c, by_id))
+                c["fact_checker_status"] = status
+                lost = len(failed) - failed_before
+                c["fact_checker_reason"] = reason + (f" ({lost} stance call(s) failed for this claim)" if lost else "")
+                counts[status] += 1
+            s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "")
+            s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + (f"; failures: {failed[0]}" if failed else "")
+            if failed:
+                errors.append(StepError(node="fact_check", event_id=e["id"], message=f"{len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
         steps.append(finish(state, s))
     return {"claims": claims, "steps": steps, "errors": errors}

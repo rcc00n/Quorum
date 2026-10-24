@@ -114,16 +114,17 @@ def run(state: RunState) -> dict:
         targets = event_claims if round_no == 1 else [c for c in event_claims if is_thin(c["evidence"], origin_group(c, by_id))]
         with step(state, "research", event_id=e["id"], model=llm.model_name()) as s:
             found = 0
-            try:
-                for c in targets:
-                    pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
-                    # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
-                    candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"])
-                    for d in candidates:
-                        fetched = fetch_result(d, dry_run=state["dry_run"])
-                        passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
-                        if not passage:
-                            continue
+            failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
+            for c in targets:
+                pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
+                # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
+                candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"])
+                for d in candidates:
+                    fetched = fetch_result(d, dry_run=state["dry_run"])
+                    passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
+                    if not passage:
+                        continue
+                    try:
                         ans = llm.json_task(
                             "stance",
                             {
@@ -136,18 +137,19 @@ def run(state: RunState) -> dict:
                             },
                             dry_run=state["dry_run"],
                         )
-                        stance = untrusted.valid_stance(ans.get("stance"))
-                        if stance == "neutral":
-                            continue
-                        c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
-                        found += 1
-                s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims"
-                earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
-                s.reason = "event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims"
-            except Exception as exc:  # noqa: BLE001 — a failed source must not kill the run; the trace shows it
-                errors.append(StepError(node="research", event_id=e["id"], message=str(exc)[:300]))
-                s.decision = f"round {round_no}: failed after {found} passages"
-                s.reason = str(exc)[:200]
+                    except Exception as exc:  # noqa: BLE001
+                        failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
+                        continue
+                    stance = untrusted.valid_stance(ans.get("stance"))
+                    if stance == "neutral":
+                        continue
+                    c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
+                    found += 1
+            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "")
+            earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
+            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + (f"; failures: {failed[0]}" if failed else "")
+            if failed:
+                errors.append(StepError(node="research", event_id=e["id"], message=f"round {round_no}: {len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
             rounds[e["id"]] = round_no
         steps.append(finish(state, s))
     return {"claims": claims, "research_rounds": rounds, "steps": steps, "errors": errors}
