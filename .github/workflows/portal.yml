@@ -3,7 +3,7 @@ name: Portal regressions
 # Why: the approved sequential merge workflow needs web regressions after owner changes.
 on:
   push:
-    branches: [feature/web-portals, integration]
+    branches: ["feature/web-*", integration]
     paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', '.github/workflows/portal.yml']
   pull_request:
     branches: [integration, master]
@@ -13,7 +13,7 @@ permissions:
   contents: read
 jobs:
   portal:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/feature/web-portals' || github.ref == 'refs/heads/integration'
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/feature/web-') || github.ref == 'refs/heads/integration'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
@@ -33,3 +33,18 @@ jobs:
       - run: python backend/manage.py portal_snapshot validate --file backend/portal/fixtures/analysis-demo.json
       - run: bash deploy/build-web.sh && node web/tests/ratings.cjs && node web/tests/editorial.cjs && node web/tests/reasoning-trace.cjs
       - run: QUORUM_PYTHON=python node web/tests/contract.cjs
+      # DECISION(2026-10-24, rcc00n/Codex): browser checks use disposable fictional inputs and external tooling.
+      # Why: integration CI must exercise auth, partial output and skipped-check UI without private corpora or provider calls.
+      - name: Install isolated browser test tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/quorum-browser" --no-audit --no-fund --ignore-scripts playwright@1.64.1
+          node "$RUNNER_TEMP/quorum-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Run authenticated browser regressions
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/quorum-browser/node_modules/playwright
+          QUORUM_SCREENSHOTS: ${{ runner.temp }}/quorum-screenshots
+          QUORUM_PYTHON: python
+        run: |
+          node web/tests/boundary.cjs
+          node web/tests/boundary.cjs --reasoning
+          node web/tests/boundary.cjs --reasoning --roundup-checks
