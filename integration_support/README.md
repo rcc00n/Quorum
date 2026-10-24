@@ -24,3 +24,16 @@ Local merge sequence retained all owner decision-log rows verbatim and unioned a
 ## Decisions
 
 2026-10-24 · rcc00n / Codex · Publish review patches and offline tooling on a branch based on integration, keeping rehearsal merges local. Why: owners can review/apply minimal changes without pushing their unmerged histories or the disposable merges through another PR.
+
+## Reproduce safely
+
+```bash
+python3 -m unittest discover -s integration_support -p 'test_*.py'
+python3 integration_support/rehearse.py --repo <existing-quorum-checkout> \
+  --destination <NEW-external-disposable-path> --with-proposed-patches
+python3 integration_support/check_tree.py --root <that-disposable-path>
+```
+
+The tool uses only the pinned local Git objects, creates a new detached worktree, resolves only the known additive conflicts, verifies every owner decision row, and optionally rehearses all three proposed patches. It never fetches, pushes or touches an existing destination. The new support CI repeats that exact process, tests the combined Python components on 3.11 with sockets blocked, and keeps web/production gates separate. Reference-HMEM and private-original tests are skipped when their external prerequisites are absent; local evidence below includes them.
+
+Offline command checks prove local tooling only: their one BLOCKED item deliberately preserves the absence of live integration evidence. Static schema/enum and registry checks do not establish PostgreSQL migrations or live collection. Existing Nightshift receipts prove five historical tiny routing responses (four nonce probes reported uncached, explicit Ultra selected Ultra); they do not prove a complete Nightshift-powered reasoning workflow or receipt signature verification. No new inference request was made.

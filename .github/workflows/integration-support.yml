@@ -1,0 +1,49 @@
+name: Offline integration support
+on:
+  push:
+    branches: [support/offline-integration-hmem]
+    paths: ['integration_support/**', '.github/workflows/integration-support.yml']
+  pull_request:
+    branches: [integration]
+    paths: ['integration_support/**', '.github/workflows/integration-support.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check conflict safety and reproduce pinned disposable merges
+        run: |
+          git config user.name 'Quorum offline rehearsal'
+          git config user.email 'ci@users.noreply.github.com'
+          python -m unittest discover -s integration_support -p 'test_*.py'
+          python integration_support/rehearse.py --repo "$GITHUB_WORKSPACE" --destination "$RUNNER_TEMP/quorum-rehearsal" --with-proposed-patches
+          python integration_support/check_tree.py --root "$RUNNER_TEMP/quorum-rehearsal"
+      - name: Install test dependencies outside the repository
+        run: |
+          python -m pip install -r "$RUNNER_TEMP/quorum-rehearsal/backend/requirements.txt"
+          python -m pip install -e "$RUNNER_TEMP/quorum-rehearsal/reasoning[dev]"
+      - name: Test combined Python components with sockets blocked
+        env:
+          QUORUM_DRY_RUN: '1'
+          DJANGO_DEBUG: '1'
+          QUORUM_PORTAL_DATA: ${{ runner.temp }}/quorum-test-auth
+        run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE/integration_support/offline:$RUNNER_TEMP/quorum-rehearsal/reasoning"
+          cd "$RUNNER_TEMP/quorum-rehearsal"
+          python -m pytest reasoning/tests -q
+          python backend/manage.py test portal
+          python -m unittest discover -s deploy -p 'test_*.py'
+          python -m unittest discover -s scripts -p 'test_*.py'
+          python backend/manage.py check
+          python backend/manage.py makemigrations --check --dry-run
+          python backend/manage.py portal_snapshot validate --file backend/portal/fixtures/analysis-demo.json
+          python scripts/checks.py verify --offline || test "$?" -eq 2
