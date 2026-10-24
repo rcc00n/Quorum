@@ -26,8 +26,8 @@ def event(eid: str, doc_ids: list[int]) -> Event:
                  article=[], drafts=0, versions=[], critic_status=None, critic_notes="", framing={}, review_reason="")
 
 
-def claim(cid: str, eid: str, origin: int) -> Claim:
-    return Claim(id=cid, event_id=eid, text="The Senate passed the aid bill 68-30 on Tuesday", kind="number", origin_document_id=origin, evidence=[],
+def claim(cid: str, eid: str, origin: int, text: str = "The Senate passed the aid bill 68-30 on Tuesday") -> Claim:
+    return Claim(id=cid, event_id=eid, text=text, kind="number", origin_document_id=origin, evidence=[],
                  verifier_status=None, verifier_reason="", fact_checker_status=None, fact_checker_reason="", final_status=None, adjudication="")
 
 
@@ -47,7 +47,8 @@ def _state():
     st = initial_state("t", TOPIC, DAY, dry_run=False)
     st["documents"] = [doc(1, "cnn"), doc(2, "reuters"), doc(3, "afp"), doc(4, "npr")]
     st["events"] = [event("ev1", [1, 2, 3, 4])]
-    st["claims"] = {"c1": claim("c1", "ev1", 1), "c2": claim("c2", "ev1", 1)}
+    # two different claim texts: identical ones would share their stance questions (research.stance_question)
+    st["claims"] = {"c1": claim("c1", "ev1", 1), "c2": claim("c2", "ev1", 1, "The Senate passed the aid bill on Tuesday")}
     return st
 
 

@@ -170,6 +170,9 @@ def stance(p: dict[str, Any]) -> dict[str, Any]:
     return {"stance": "neutral", "reason": f"dry run: {share:.0%} of the claim's words in the passage"}
 
 
+stance_document = stance  # same shape and the same stand-in; only the live prompt differs (research.stance_task)
+
+
 def review_disputed(p: dict[str, Any]) -> dict[str, Any]:
     """Twin of the third blind pass. A disagreement where one chain holds supporting evidence and the other
     found nothing is a retrieval difference: side with the chain that has evidence, citing its first supporting

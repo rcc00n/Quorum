@@ -23,6 +23,28 @@ def already_seen(claim: Claim, doc: DocRef, found_by: str) -> bool:
     return any(ev[key] == db_id and ev["found_by"] == found_by for ev in claim["evidence"])
 
 
+def stance_task(doc: DocRef) -> str:
+    """The prompt a stance call on this document uses: `stance_document` for an official law, order, vote or ruling
+    (the extra paragraph on what such a document establishes), `stance` for everything else."""
+    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): the official-document paragraph lives only in
+    # prompts/stance_document.md, chosen here per document; prompts/stance.md no longer carries it. Why: it cost ~165
+    # input tokens per copy on every stance call (two copies since e2b9a81), and in 1772 stance calls over two live
+    # runs no passage came from a law/order/vote/ruling, so it never applied.
+    return "stance_document" if doc.get("official") and doc.get("doc_type") in DOCUMENT_TYPES_THAT_ESTABLISH else "stance"
+
+
+def stance_question(role: str, claim_text: str, passage: str, doc: DocRef) -> tuple[str, str, str, str, str | None, bool]:
+    """The identity of one stance question within a node run: who asks, about which claim, which passage, from which
+    source. doc_type and the official flag are part of it because they pick the prompt (stance_task) and the payload."""
+    # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): within one node run for one event, a stance question already
+    # asked (same role, claim text, passage text, source_id, doc_type, official flag) is not asked again; the earlier
+    # answer is reused (in fact_check it counts as judged for the claim), and evidence_from still builds one row per
+    # document. Why: ~1.7% of stance calls on two live runs were exact
+    # repeats (two documents yielding the same passage, or two claims with identical text); verdicts count independence
+    # groups, not rows, so the second row of the same source never counts twice.
+    return (role, claim_text, passage, doc["source_id"], doc.get("doc_type"), bool(doc.get("official")))
+
+
 def bind_quote(ev: Evidence, doc: DocRef, fetched: FetchResult | None) -> Evidence:
     """Ties the evidence row to the text its quote was cut from: offsets, hash at quote time, achieved access,
     fetch time, and whether the page changed since collection (work item A5; what Vadim asked for in
@@ -122,6 +144,8 @@ def run(state: RunState) -> dict:
         with step(state, "research", event_id=e["id"], model=llm.model_name()) as s:
             found = 0
             failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
+            asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at stance_question)
+            repeats = 0
             for c in targets:
                 pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
                 # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
@@ -131,28 +155,33 @@ def run(state: RunState) -> dict:
                     passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
                     if not passage:
                         continue
-                    try:
-                        ans = llm.json_task(
-                            "stance",
-                            {
-                                "claim": untrusted.clip(c["text"], untrusted.CAP_CLAIM),
-                                "passage": untrusted.clip(passage, untrusted.CAP_PASSAGE),
-                                "source": d["source_name"],
-                                "source_kind": d["kind"],
-                                "doc_type": d.get("doc_type"),
-                                "role": "researcher",
-                            },
-                            dry_run=state["dry_run"],
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
-                        continue
-                    stance = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
+                    question = stance_question("researcher", c["text"], passage, d)
+                    if question in asked:
+                        stance = asked[question]
+                        repeats += 1
+                    else:
+                        try:
+                            ans = llm.json_task(
+                                stance_task(d),
+                                {
+                                    "claim": untrusted.clip(c["text"], untrusted.CAP_CLAIM),
+                                    "passage": untrusted.clip(passage, untrusted.CAP_PASSAGE),
+                                    "source": d["source_name"],
+                                    "source_kind": d["kind"],
+                                    "doc_type": d.get("doc_type"),
+                                    "role": "researcher",
+                                },
+                                dry_run=state["dry_run"],
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
+                            continue  # a failed question is not remembered: a repeat of it is asked again
+                        stance = asked[question] = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
                     if stance == "neutral":
                         continue
                     c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
                     found += 1
-            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "")
+            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "")
             earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
             s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + (f"; failures: {failed[0]}" if failed else "")
             if failed:
