@@ -163,6 +163,14 @@ def check_invariants(cur) -> None:
         emit("FAIL", "doc_type enum", f"unknown values {sorted(found - DOC_TYPES)}")
     else:
         emit("PASS", "doc_type enum", f"values in use {sorted(found)} ⊆ {sorted(DOC_TYPES)}")
+    # topic_match is set on every topic-tagged document (schema.sql DECISION 2026-10-24; migrations_003 backfills).
+    cur.execute("SELECT count(*) FILTER (WHERE topic_match IS NULL), count(*) FROM documents WHERE topic_id IS NOT NULL")
+    n_null, n_topic = cur.fetchone()
+    if n_null:
+        emit("FAIL", "topic_match", f"{n_null} of {n_topic} topic-tagged documents have no topic_match; run migrations_003")
+    else:
+        cur.execute("SELECT topic_match, count(*) FROM documents WHERE topic_id IS NOT NULL GROUP BY 1 ORDER BY 1")
+        emit("PASS", "topic_match", "set on all topic-tagged documents: " + ", ".join(f"{k}={v}" for k, v in cur.fetchall()))
     # Invariant 3: exactly one topic id across documents and official_docs, and it is the one run.py collects.
     cur.execute("SELECT DISTINCT topic_id FROM documents UNION SELECT DISTINCT topic_id FROM official_docs")
     topics = {row[0] for row in cur.fetchall()}

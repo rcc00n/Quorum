@@ -10,7 +10,7 @@ from html import unescape
 
 import feedparser
 
-from collectors.common import Doc, Fetcher, extract_text, matches_topic, parse_dt, upsert_document, upsert_official_doc
+from collectors.common import Doc, Fetcher, extract_text, matches_topic, parse_dt, topic_match_of, upsert_document, upsert_official_doc
 
 log = logging.getLogger("collectors.rss")
 _TAGS = re.compile(r"<[^>]+>")
@@ -97,7 +97,8 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> 
             link = entry.get("link")
             if not title or not link:
                 continue
-            if terms and not matches_topic(f"{title} {lead or ''}", terms):
+            match = topic_match_of(title, lead, terms) if terms else None
+            if terms and not match:
                 continue
             stats["matched"] += 1
             byline = entry.get("author")
@@ -123,6 +124,7 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> 
             doc = Doc(
                 source_id=source["id"], topic_id=topic["id"] if topic else None, url=link, title=title, lead=lead,
                 byline=byline, published_at=published, access_level=level, lang=source["lang"], body_for_hash=body,
+                topic_match=match,
             )
             if upsert_document(conn, doc) is not None:
                 stats["inserted"] += 1

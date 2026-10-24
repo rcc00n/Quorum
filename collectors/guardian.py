@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 
-from collectors.common import Doc, Fetcher, env, parse_dt, upsert_document
+from collectors.common import Doc, Fetcher, env, parse_dt, upsert_document, topic_match_of
 
 log = logging.getLogger("collectors.guardian")
 API = "https://content.guardianapis.com/search"
@@ -39,6 +39,8 @@ def collect(conn, fetcher: Fetcher, topic: dict, *, pages: int = 1) -> dict:
                 lead=fields.get("trailText"), byline=fields.get("byline"),
                 published_at=parse_dt(item.get("webPublicationDate")), access_level=1,
                 body_for_hash=fields.get("bodyText"),
+                # the Content API searched the whole article: a term absent from title and lead was found in the body
+                topic_match=topic_match_of(item["webTitle"], fields.get("trailText"), topic["query_terms"]) or "body",
             )
             if upsert_document(conn, doc) is not None:
                 stats["inserted"] += 1

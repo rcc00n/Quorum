@@ -131,6 +131,16 @@ def matches_topic(text: str, query_terms: Iterable[str]) -> bool:
             return True
     return False
 
+
+def topic_match_of(title: str, lead: str | None, query_terms: Iterable[str]) -> str | None:
+    """'title' when a term is in the headline, 'lead' when only in the summary, else None (documents.topic_match)."""
+    terms = list(query_terms)
+    if matches_topic(title, terms):
+        return "title"
+    if lead and matches_topic(lead, terms):
+        return "lead"
+    return None
+
 # ------------------------------------------------------------ hashing ----
 
 _TRACKING = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "cmpid", "ito"}
@@ -265,6 +275,7 @@ class Doc:
     access_level: int
     lang: str = "en"
     body_for_hash: str | None = None  # used for the hash only, never stored
+    topic_match: str | None = None  # 'title' | 'lead' | 'body' (schema.sql DECISION 2026-10-24)
 
 
 def upsert_document(conn: psycopg.Connection, d: Doc) -> int | None:
@@ -290,12 +301,14 @@ def upsert_document(conn: psycopg.Connection, d: Doc) -> int | None:
         cur.execute(
             """
             INSERT INTO documents (source_id, topic_id, url, canonical_url, title, lead, byline, published_at,
-                                   lang, access_level, content_hash, wire_origin, wire_origin_version, supersedes_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                   lang, access_level, content_hash, wire_origin, wire_origin_version, supersedes_id,
+                                   topic_match)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (d.source_id, d.topic_id, d.url, canon, d.title, d.lead, d.byline, d.published_at, d.lang,
-             d.access_level, h, wire, WIRE_RULE_VERSION if wire else None, prev["id"] if prev else None),
+             d.access_level, h, wire, WIRE_RULE_VERSION if wire else None, prev["id"] if prev else None,
+             d.topic_match),
         )
         new_id = cur.fetchone()["id"]
     conn.commit()

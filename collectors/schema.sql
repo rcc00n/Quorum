@@ -54,6 +54,12 @@ CREATE TABLE IF NOT EXISTS documents (
     wire_origin   TEXT CHECK (wire_origin IN ('AP', 'Reuters', 'AFP')),
     wire_origin_version TEXT,                              -- rule/model version that set wire_origin
     supersedes_id BIGINT REFERENCES documents(id),         -- set when a re-fetch found a changed hash
+    -- DECISION(2026-10-24, Anastasia/Claude Code): where the topic's query terms matched at collection: 'title' (a term in
+    -- the headline), 'lead' (only in the RSS summary, matched before the 600-character cap) or 'body' (neither; the
+    -- Guardian Content API searched the article body).
+    -- Why: a term that appears only in the lead is often a passing mention (Issue #2, Yelysei 2026-10-24, "topic noise");
+    -- reasoning can weight or drop by this flag without collection deciding relevance for it. Backfilled by migrations_003.
+    topic_match   TEXT CHECK (topic_match IN ('title', 'lead', 'body')),
     UNIQUE (canonical_url, content_hash)
 );
 CREATE INDEX IF NOT EXISTS documents_topic_published ON documents (topic_id, published_at DESC);
