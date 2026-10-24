@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from typing import TypedDict, Protocol
+from .catalog_sources import FIELDS
 
 
 class Topic(TypedDict):
@@ -50,7 +51,8 @@ class CatalogAdapter:
             return snapshot
         # Only an operator-configured local export is accepted. No provider request or inference.
         try:
-            catalog = json.loads(Path(path).read_text())
+            from .snapshot_store import read_bounded
+            catalog = json.loads(read_bounded(Path(path)))
             topics = catalog["topics"]
             sources = catalog["sources"]
             if not isinstance(topics, list) or not isinstance(sources, list):
@@ -78,6 +80,8 @@ class CatalogAdapter:
                     or not 0 < audience < float("inf")
                 ):
                     raise ValueError()
+            from .catalog_sources import validate_sources
+            validate_sources(sources)
             if not isinstance(catalog.get("revision"), str):
                 raise ValueError()
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
@@ -94,18 +98,7 @@ class CatalogAdapter:
         snapshot.update(
             topics=[{key: t[key] for key in ("id", "name")} for t in topics],
             sources=[
-                {
-                    key: s.get(key)
-                    for key in (
-                        "id",
-                        "name",
-                        "domain",
-                        "allsides",
-                        "mbfc",
-                        "adfontes",
-                        "audience",
-                    )
-                }
+                {key: s.get(key) for key in FIELDS if key in s or key in FIELDS[:7]}
                 for s in sources
             ],
             catalog_revision=catalog["revision"],

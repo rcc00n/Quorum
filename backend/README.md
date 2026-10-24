@@ -51,6 +51,8 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 
 ## Decisions
 
+2026-10-24 · rcc00n / Codex · Opt-in reasoning previews join validated catalog metadata in the portal projection, leaving the original reasoning JSON and publication gates unchanged. Identity policy is canonical in `catalog_sources.bind_sources`; dates absent from the registry stay null. Why: real source ratings need exact identity and attribution without changing the owner snapshot contract.
+
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
 | 2026-10-23 | rcc00n / Codex | Local preview labels follow the producer fictional flag; collected-corpus declarations remain unverified, deterministic stand-ins are explicit, and all inputs remain unpublished | Permit honest inspection of real local corpus experiments without granting publication authority; source/quote provenance gaps remain visible |

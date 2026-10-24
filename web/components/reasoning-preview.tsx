@@ -11,6 +11,7 @@ import {
   Sources,
   ClaimReference,
 } from "./reasoning-evidence";
+import { Spectrum } from "./spectrum";
 import { ReasoningSpectrum } from "./reasoning-spectrum";
 import { ReasoningTimeline, previewHref } from "./reasoning-timeline";
 function ReadingNavigation({
@@ -462,6 +463,10 @@ export function ReasoningPreviewPage({
             </section>
           </>
         ) : null}
+        {data?.catalog_revision && !loading && !error && !eventId && <section className="r-section registry-catalog">
+          <h2>Source registry</h2><p>Real catalog definitions · revision {data.catalog_revision}. Ratings describe sources, not verification of this snapshot. Producer cohort counts remain unchanged.</p>
+          <Spectrum sources={data.sources} />
+        </section>}
       </main>
       <footer className="r-footer">
         Quorum · Recorded evidence, open to inspection. Development preview

@@ -20,6 +20,9 @@ export type Source = {
   audience: number | null;
   audience_source_url?: string | null;
   audience_as_of?: string | null;
+  ratings_checked_at?: string | null;
+  rating_labels?: { allsides: string | null; mbfc: string | null; adfontes: string | null };
+  flank?: "left" | "right" | "center" | null;
   kind?: "agency" | "outlet" | "official" | "military";
   tier?: "major" | "minor" | null;
   independence_group?: string;

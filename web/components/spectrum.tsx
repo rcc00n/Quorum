@@ -111,6 +111,16 @@ export function Spectrum({ sources }: { sources: Source[] }) {
                   </span>
                 </>
               )}
+                {s.rating_provenance && <details className="rating-provenance">
+                  <summary title="Inspect provider labels, source URLs and registry dates">Rating provenance: {s.name}</summary>
+                  <p>Registry checked: {s.ratings_checked_at || "Not supplied"}</p>
+                  {(["allsides", "mbfc", "adfontes"] as const).map(provider => <p key={provider}>
+                    {provider === "allsides" ? "AllSides" : provider === "mbfc" ? "MBFC" : "Ad Fontes"}: {s[provider] === null ? "Unrated" : s[provider]}
+                    {s.rating_labels?.[provider] ? ` · ${s.rating_labels[provider]}` : ""}{" "}
+                    {s.rating_provenance?.[provider] && safeUrl(s.rating_provenance[provider]!) && <a href={safeUrl(s.rating_provenance[provider]!)} target="_blank" rel="noopener noreferrer">Provider source</a>}
+                  </p>)}
+                  {s.audience_source_url && safeUrl(s.audience_source_url) && <p><a href={safeUrl(s.audience_source_url)} target="_blank" rel="noopener noreferrer">Audience source</a> · Reporting date: {s.audience_as_of || "Not supplied"}</p>}
+                </details>}
             </div>
           );
         })

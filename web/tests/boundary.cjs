@@ -66,7 +66,7 @@ const run = (args, env) =>
     DJANGO_ALLOWED_HOSTS: "127.0.0.1",
     DJANGO_CSRF_ORIGINS: root,
     QUORUM_PORTAL_DATA: path.join(temp, "auth"),
-    QUORUM_CATALOG_PATH: "",
+    QUORUM_CATALOG_PATH: process.env.QUORUM_TEST_CATALOG_FILE || "",
     QUORUM_SNAPSHOT_ROOT: reasoningMode ? "" : path.join(temp, "snapshots"),
     QUORUM_ENABLE_SNAPSHOT_PUBLICATION: reasoningMode ? "" : "1",
     QUORUM_ENABLE_REASONING_PREVIEW: reasoningMode ? "1" : "",
@@ -161,6 +161,10 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     args: ["--no-sandbox"],
   });
   if (reasoningMode) {
+    if (process.argv.includes("--catalog")) {
+      await require("./catalog-checks.cjs")({ browser, root, env, password, temp });
+      return;
+    }
     await require(reasoningFile ? "./reasoning-snapshot-checks.cjs" : "./reasoning-checks.cjs")({
       browser,
       root,

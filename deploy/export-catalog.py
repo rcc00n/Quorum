@@ -35,6 +35,10 @@ for row in csv.DictReader(
     source = {key: row[key] for key in ("id", "name", "domain")}
     for key in ("allsides", "mbfc", "adfontes", "audience"):
         source[key] = float(row[key]) if row[key] else None
+    for key in ("kind", "flank", "tier", "independence_group", "audience_source_url", "ratings_checked_at", "audience_as_of"):
+        source[key] = row.get(key) or None
+    source["rating_provenance"] = {key: row.get(key + "_source_url") or None for key in ("allsides", "mbfc", "adfontes")}
+    source["rating_labels"] = {key: row.get(key + "_label") or None for key in ("allsides", "mbfc", "adfontes")}
     sources.append(source)
 catalog = {
     "revision": revision,

@@ -25,6 +25,8 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 
 ## Decisions
 
+2026-10-24 · rcc00n / Codex · Display joined registry provider labels/links/check dates and four calculated source-rating modes separately from recorded producer coverage cohorts; provenance is a keyboard-accessible disclosure. Why: source position calculations must not silently rewrite fixed cohort evidence or turn missing ratings into zero.
+
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
 | 2026-10-23 | rcc00n / Codex | Preserve and display reported responding-model/count provenance and upstream context claim kinds; external snapshot acceptance copies original bytes into disposable preview data and compares them through authenticated HTTP, TypeScript and DOM | Verify the real-model FICTIONAL artifact without changing its prose, replacing old fixtures or enabling publication; validation bounds remain canonical in backend/README.md |

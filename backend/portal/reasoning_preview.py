@@ -556,7 +556,7 @@ def parse_reasoning(raw):
     return p
 
 
-def present_reasoning(raw, *, now=None):
+def present_reasoning(raw, *, now=None, catalog=None):
     p = parse_reasoning(raw)
     if "errors" in p:
         p["errors"] = [public_error(e) for e in p["errors"]]
@@ -572,6 +572,8 @@ def present_reasoning(raw, *, now=None):
         missing_provenance.remove("original document/source IDs")
     if evidence and all(e.get("access_achieved") is not None and e.get("fetched_at") is not None for e in evidence):
         missing_provenance.remove("achieved access levels and retrieval timestamps")
+    from .catalog_sources import bind_sources
+    resolve = bind_sources(p, catalog["sources"]) if catalog else lambda value: None
     events = []
     source_rows = {}
     for s in sorted(p["stories"], key=lambda s: s["rank"]):
@@ -587,7 +589,11 @@ def present_reasoning(raw, *, now=None):
                 mbfc=None,
                 adfontes=None,
             )
-            sources.append(row)
+            bound = resolve(value)
+            if bound:
+                row = dict(bound)
+            if not any(s["id"] == row["id"] for s in sources):
+                sources.append(row)
             source_rows[row["id"]] = row
         event = dict(
             id=s["event_id"],
@@ -631,9 +637,9 @@ def present_reasoning(raw, *, now=None):
         events.append(event)
     return dict(
         status="demo",
-        catalog_revision=None,
+        catalog_revision=catalog["catalog_revision"] if catalog else None,
         topics=[dict(id=p["topic_id"], name=p["topic_id"])],
-        sources=list(source_rows.values()),
+        sources=catalog["sources"] if catalog else list(source_rows.values()),
         events=events,
         digests=[
             dict(date=p["edition_date"], topic_id=p["topic_id"], summary=p["summary"])
@@ -667,4 +673,7 @@ def present_reasoning(raw, *, now=None):
 
 
 def load_preview(path=None):
-    return present_reasoning(read_bounded(Path(path) if path else SAMPLE))
+    from .integration import CatalogAdapter
+    catalog = CatalogAdapter().snapshot()
+    fail(catalog["status"] != "error", "catalog_unavailable")
+    return present_reasoning(read_bounded(Path(path) if path else SAMPLE), catalog=catalog if catalog["catalog_revision"] else None)

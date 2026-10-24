@@ -43,11 +43,9 @@ export function ReasoningSpectrum({
         </label>
       </div>
       <p className="r-unavailable" role="status">
-        Individual source ratings and audience estimates are not supplied.{" "}
-        {mode !== sp.rating_mode
-          ? `${names[mode]} cohorts cannot be recalculated. `
-          : ""}
-        Counts below remain the recorded {names[sp.rating_mode]} cohorts.
+        {sources.some(s => s.rating_provenance) ? "Source ratings below are calculated from the joined registry. " : "Individual source ratings and audience estimates are not supplied. "}
+        {mode !== sp.rating_mode ? `${names[mode]} does not change the producer's coverage counts. ` : ""}
+        Counts below remain the producer's fixed registry cohorts (reported as {names[sp.rating_mode]}).
       </p>
       <div className="r-cohort-head" aria-hidden="true">
         <span>Left</span>

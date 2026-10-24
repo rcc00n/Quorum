@@ -2828,3 +2828,15 @@ details[open] > summary > .r-disclosure-icon {
 .r-trace summary > span:nth-child(2) {
   min-width: 0;
 }
+
+/* Catalog provenance is separate from producer cohort counts. */
+.rating-provenance { font-size: .8rem; margin-block: .4rem; overflow-wrap: anywhere; }
+.rating-provenance p { margin-block: .35rem; }
+.registry-catalog { overflow-wrap: anywhere; }
+.source-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(32px, 1.2fr) auto;
+  align-items: center;
+}
+.source-row > span:last-of-type { white-space: nowrap; }
+.source-row .rating-provenance { grid-column: 1 / -1; }
