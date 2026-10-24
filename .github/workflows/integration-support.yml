@@ -11,6 +11,11 @@ permissions:
   contents: read
 jobs:
   offline-rehearsal:
+    strategy:
+      fail-fast: false
+      matrix:
+        patch-profile: [all-provisional, web-owned]
+    name: offline-rehearsal (${{ matrix.patch-profile }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -27,8 +32,13 @@ jobs:
         run: |
           git config user.name 'Quorum offline rehearsal'
           git config user.email 'ci@users.noreply.github.com'
+          node integration_support/test_demo.cjs
           python -m unittest discover -s integration_support -p 'test_*.py'
-          python integration_support/rehearse.py --repo "$GITHUB_WORKSPACE" --destination "$RUNNER_TEMP/quorum-rehearsal" --with-proposed-patches
+          patch_args=(--with-proposed-patches)
+          if [[ '${{ matrix.patch-profile }}' == 'web-owned' ]]; then
+            patch_args=(--patch-profile web-owned --require-current)
+          fi
+          python integration_support/rehearse.py --repo "$GITHUB_WORKSPACE" --destination "$RUNNER_TEMP/quorum-rehearsal" "${patch_args[@]}"
           python integration_support/check_tree.py --root "$RUNNER_TEMP/quorum-rehearsal"
           git -C "$RUNNER_TEMP/quorum-rehearsal" diff --check f59e75840c9aee67ca35a8f44bf5dd42747af75f HEAD
       - name: Install test dependencies outside the repository
