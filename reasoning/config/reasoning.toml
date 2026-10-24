@@ -19,6 +19,14 @@ recursion_limit = 60         # LangGraph recursion limit per run
 # own corpus, the day then previous days); a claim often rests on an earlier report, and a yesterday's law
 # confirms today's claim about it. GDELT and official sites of record stay DEFERRED (ARCHITECTURE § 10).
 previous_days = 2            # 0 disables; each day is one more 24-hour window before the edition window
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): research round 2 and the fact-checker judge at most
+# candidates_per_claim documents per claim, chosen by code — the documents whose best passage shares the most words
+# with the claim (text.best_passage score), ties by publication time. Round 1 (the event's own documents) is not
+# capped. Why: the first real corpus (edition 2026-10-24: 43 documents + 65 earlier-day documents, 70 claims on
+# stand-ins) gave an upper bound of ~6 700 stance calls per round and ~6 800 for the fact-checker — hours at the
+# direct route's spacing; a passage that shares no words with the claim is never judged `supports`, so ranking by
+# overlap drops the pairs the model would have called neutral anyway. 0 = no cap.
+candidates_per_claim = 8
 
 [clustering]
 # Superseded 2026-10-24 (kept for the record): similarity_threshold = 0.5 and borderline_band = 0.25 drove
@@ -26,7 +34,10 @@ previous_days = 2            # 0 disables; each day is one more 24-hour window b
 # reasoning/README.md › Decisions): near-identical keys merge in code, no shared entity or action stays
 # apart in code, the model answers only the in-between.
 key_merge_overlap = 0.75     # stemmed key-token overlap coefficient at/above which two documents merge with no model call
-merge_questions_max = 80     # model merge questions (pair, singleton, chain) per run; past it the fail-safe direction applies
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): 160, up from 80. Why: the first real corpus (43 documents)
+# exhausted 80 pair questions in the first pass and left 32 of 34 events as singletons — the fail-safe "no merge"
+# direction makes cross-outlet confirmation unreachable when the budget runs out before the singleton pass.
+merge_questions_max = 160    # model merge questions (pair, singleton, chain) per run; past it the fail-safe direction applies
 
 [writing]
 reading_minutes_max = 4

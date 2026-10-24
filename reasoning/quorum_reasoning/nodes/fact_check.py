@@ -19,7 +19,7 @@ from ..state import RunState, StepError
 from ..text import best_passage
 from ..tools.fetch_text import fetch_result
 from ..trace import finish, step
-from .research import already_seen, evidence_from
+from .research import already_seen, evidence_from, rank_candidates
 
 
 def run(state: RunState) -> dict:
@@ -36,11 +36,9 @@ def run(state: RunState) -> dict:
             found = 0
             try:
                 for c in event_claims:
-                    for d in docs:
-                        if d["id"] == c["origin_document_id"] and not d.get("official"):
-                            continue
-                        if already_seen(c, d, "fact_checker"):
-                            continue
+                    pool = [d for d in docs if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "fact_checker")]
+                    # the fact-checker has the researcher's access to the whole corpus; the same code ranking bounds its calls
+                    for d in rank_candidates(c["text"], pool, dry_run=state["dry_run"]):
                         fetched = fetch_result(d, dry_run=state["dry_run"])
                         passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
                         if not passage:

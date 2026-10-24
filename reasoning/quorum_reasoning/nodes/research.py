@@ -11,7 +11,7 @@ from __future__ import annotations
 from .. import config, llm, untrusted
 from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin, origin_group
 from ..state import Claim, DocRef, Evidence, RunState, StepError
-from ..text import best_passage, clip_sentences
+from ..text import best_passage, clip_sentences, tokens
 from ..tools.corpus import OFFICIAL_ID_OFFSET
 from ..tools.fetch_text import FetchResult, fetch_result, find_quote
 from ..trace import finish, step
@@ -76,6 +76,25 @@ def _candidates(state: RunState, event_doc_ids: list[int], round_no: int) -> lis
     return [d for d in docs if d["id"] not in event_doc_ids]
 
 
+def rank_candidates(claim_text: str, docs: list[DocRef], *, dry_run: bool, cap: int | None = None) -> list[DocRef]:
+    """The documents worth a stance call for this claim: those whose best passage shares the most words with it,
+    at most `research.candidates_per_claim` (0 = all), ties broken by publication time (newest first). Documents
+    with no shared word are dropped (their best passage is empty: nothing to judge). Code only, no model call;
+    the ranking is the engineering bound recorded in config/reasoning.toml."""
+    cap = int(config.get("research", "candidates_per_claim", 0) or 0) if cap is None else cap
+    cw = tokens(claim_text)
+    scored = []
+    for d in docs:
+        fetched = fetch_result(d, dry_run=dry_run)
+        passage = best_passage(claim_text, (fetched.text if fetched else None) or "")
+        if not passage:
+            continue
+        scored.append((len(cw & tokens(passage)), d["published_at"], d))
+    ordered = sorted(scored, key=lambda t: (t[0], t[1]), reverse=True)  # most shared words first, then the newest
+    out = [d for _, _, d in ordered]
+    return out[:cap] if cap > 0 else out
+
+
 def run(state: RunState) -> dict:
     max_rounds = config.get("loops", "research_rounds_max", 2)
     claims = {cid: dict(c) for cid, c in state["claims"].items()}
@@ -97,11 +116,10 @@ def run(state: RunState) -> dict:
             found = 0
             try:
                 for c in targets:
-                    for d in _candidates(state, e["document_ids"], round_no):
-                        if d["id"] == c["origin_document_id"] and not d.get("official"):
-                            continue  # a claim does not confirm itself; a signed document does confirm what it says
-                        if already_seen(c, d, "researcher"):
-                            continue
+                    pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
+                    # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
+                    candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"])
+                    for d in candidates:
                         fetched = fetch_result(d, dry_run=state["dry_run"])
                         passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
                         if not passage:
