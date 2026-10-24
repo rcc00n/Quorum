@@ -14,6 +14,8 @@ CREATE DATASOURCE QUORUM_COLLECT DESCRIBE BY "Quorum data-collection block: sour
 
 REGISTER DATASOURCE TABLES ('sources', 'topics', 'documents', 'official_docs', 'quotes', 'coverage') FROM QUORUM_COLLECT;
 
+-- After ALTER TABLE on the Postgres side, re-run REGISTER DATASOURCE TABLES ('<table>') FROM QUORUM_COLLECT for that
+-- table; Zetaris keeps the column list it saw at registration (verified 2026-10-24 with sources).
 -- Checks (each on its own):
 -- SHOW DATASOURCES;
 -- SHOW DATASOURCE TABLES QUORUM_COLLECT WITH STATISTICS;

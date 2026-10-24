@@ -12,9 +12,19 @@ CREATE TABLE IF NOT EXISTS sources (
     independence_group   TEXT NOT NULL,                    -- agencies: own name; reprints collapse here
     audience             BIGINT,                           -- monthly visits, hand-entered
     audience_source_url  TEXT,
-    allsides             REAL,                             -- mapped to [-1, 1], NULL if unrated
+    allsides             REAL,                             -- mapped to [-1, 1], NULL if unrated; mapping: docs/DECISIONS.md › Spectrum ratings
     mbfc                 REAL,
     adfontes             REAL,
+    -- DECISION(2026-10-24, Anastasia/Claude Code): every rating/audience figure cites its source. Label columns keep the
+    -- rating as printed by the rater ("Lean Left", "LEFT-CENTER"); the REAL columns above are the mapped value.
+    -- ratings_checked_at is the day all figures of the row were read. Why: a mapped number is not checkable without
+    -- the page it came from; DECISIONS.md requires audience_source_url, the same holds for the three ratings.
+    allsides_label       TEXT,
+    allsides_source_url  TEXT,
+    mbfc_label           TEXT,
+    mbfc_source_url      TEXT,
+    adfontes_source_url  TEXT,
+    ratings_checked_at   DATE,
     rss_urls             TEXT[] NOT NULL DEFAULT '{}',
     access_level_default SMALLINT NOT NULL DEFAULT 1 CHECK (access_level_default IN (1, 2, 3)),
     country              TEXT,

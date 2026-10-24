@@ -67,10 +67,14 @@ def load_sources_csv(conn: psycopg.Connection, path: Path = HERE / "sources.csv"
                 """
                 INSERT INTO sources (id, name, domain, kind, flank, tier, independence_group, audience,
                                      audience_source_url, allsides, mbfc, adfontes, rss_urls,
-                                     access_level_default, country, lang)
+                                     access_level_default, country, lang,
+                                     allsides_label, allsides_source_url, mbfc_label, mbfc_source_url,
+                                     adfontes_source_url, ratings_checked_at)
                 VALUES (%(id)s, %(name)s, %(domain)s, %(kind)s, %(flank)s, %(tier)s, %(independence_group)s,
                         %(audience)s, %(audience_source_url)s, %(allsides)s, %(mbfc)s, %(adfontes)s,
-                        %(rss_urls)s, %(access_level_default)s, %(country)s, %(lang)s)
+                        %(rss_urls)s, %(access_level_default)s, %(country)s, %(lang)s,
+                        %(allsides_label)s, %(allsides_source_url)s, %(mbfc_label)s, %(mbfc_source_url)s,
+                        %(adfontes_source_url)s, %(ratings_checked_at)s)
                 ON CONFLICT (id) DO UPDATE SET
                     name = EXCLUDED.name, domain = EXCLUDED.domain, kind = EXCLUDED.kind,
                     flank = EXCLUDED.flank, tier = EXCLUDED.tier,
@@ -78,7 +82,10 @@ def load_sources_csv(conn: psycopg.Connection, path: Path = HERE / "sources.csv"
                     audience_source_url = EXCLUDED.audience_source_url, allsides = EXCLUDED.allsides,
                     mbfc = EXCLUDED.mbfc, adfontes = EXCLUDED.adfontes, rss_urls = EXCLUDED.rss_urls,
                     access_level_default = EXCLUDED.access_level_default, country = EXCLUDED.country,
-                    lang = EXCLUDED.lang
+                    lang = EXCLUDED.lang,
+                    allsides_label = EXCLUDED.allsides_label, allsides_source_url = EXCLUDED.allsides_source_url,
+                    mbfc_label = EXCLUDED.mbfc_label, mbfc_source_url = EXCLUDED.mbfc_source_url,
+                    adfontes_source_url = EXCLUDED.adfontes_source_url, ratings_checked_at = EXCLUDED.ratings_checked_at
                 """,
                 {
                     "id": r["id"], "name": r["name"], "domain": r["domain"], "kind": r["kind"],
@@ -92,6 +99,13 @@ def load_sources_csv(conn: psycopg.Connection, path: Path = HERE / "sources.csv"
                     "rss_urls": [u for u in (r["rss_urls"] or "").split("|") if u],
                     "access_level_default": int(r["access_level_default"] or 1),
                     "country": r["country"] or None, "lang": r["lang"] or "en",
+                    # provenance columns (migrations_002); absent in older CSVs -> NULL
+                    "allsides_label": r.get("allsides_label") or None,
+                    "allsides_source_url": r.get("allsides_source_url") or None,
+                    "mbfc_label": r.get("mbfc_label") or None,
+                    "mbfc_source_url": r.get("mbfc_source_url") or None,
+                    "adfontes_source_url": r.get("adfontes_source_url") or None,
+                    "ratings_checked_at": r.get("ratings_checked_at") or None,
                 },
             )
     conn.commit()

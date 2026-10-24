@@ -72,6 +72,22 @@ def check_csv() -> None:
         return
     unrated = sum(1 for r in rows if r["kind"] == "outlet" and not any((r["allsides"], r["mbfc"], r["adfontes"])))
     emit("PASS", "sources.csv", f"{len(rows)} sources; {unrated} outlets still without ratings (source-audit task)")
+    # Provenance: a figure without its source URL, or a rated row without ratings_checked_at, is not a figure we can
+    # show (schema.sql DECISION 2026-10-24). Mapped values must be inside [-1, 1] (docs/DECISIONS.md › Spectrum ratings).
+    bad: list[str] = []
+    for r in rows:
+        for col, url in (("allsides", "allsides_source_url"), ("mbfc", "mbfc_source_url"), ("adfontes", "adfontes_source_url"), ("audience", "audience_source_url")):
+            if r.get(col) and not r.get(url):
+                bad.append(f"{r['id']}.{col} without {url}")
+            if col != "audience" and r.get(col) and not -1.0 <= float(r[col]) <= 1.0:
+                bad.append(f"{r['id']}.{col}={r[col]} outside [-1, 1]")
+        if any((r["allsides"], r["mbfc"], r["adfontes"], r["audience"])) and not r.get("ratings_checked_at"):
+            bad.append(f"{r['id']} rated but ratings_checked_at empty")
+    if bad:
+        emit("FAIL", "ratings provenance", "; ".join(bad[:8]) + (" …" if len(bad) > 8 else ""))
+    else:
+        rated = sum(1 for r in rows if any((r["allsides"], r["mbfc"], r["adfontes"])))
+        emit("PASS", "ratings provenance", f"{rated} rated rows, every figure cites a source URL and a check date")
     # Invariant 1 (registry side): every wire value, lowercased, is exactly one agency row's independence_group.
     agency_groups = {r["independence_group"] for r in rows if r["kind"] == "agency"}
     expected = {w.lower() for w in WIRE_VALUES}
