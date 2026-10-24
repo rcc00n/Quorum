@@ -51,12 +51,12 @@ def previous_window(edition_date: str) -> tuple[str, str]:
 
 
 def sql_pair(topic: str, start: str, end: str) -> tuple[str, str]:
-    """The two statements reasoning runs (yelysei/agents@0224ca6, tools/corpus.py), verbatim except that official_docs
+    """The two statements reasoning runs (yelysei/agents@c1b37f9, tools/corpus.py), verbatim except that official_docs
     omits full_text here (sanitized) and d.lead is not selected. Reasoning runs the same pair a second time over the
     previous two edition windows (research round 2); evidence.py reports that window too, see previous_window()."""
     docs = f"""SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,
        d.url, d.canonical_url, d.title, d.published_at, d.fetched_at, d.access_level, d.wire_origin,
-       d.supersedes_id, d.content_hash
+       d.supersedes_id, d.content_hash, d.topic_match
 FROM {DB}.documents d
 JOIN {DB}.sources s ON s.id = d.source_id
 WHERE d.topic_id = '{topic}'
@@ -83,7 +83,7 @@ def sanitize_doc(r: dict) -> dict:
         "id": r.get("id"), "source_id": r.get("source_id"), "independence_group": r.get("independence_group"),
         "flank": r.get("flank"), "tier": r.get("tier"), "published_at": str(r.get("published_at")),
         "access_level": r.get("access_level"), "wire_origin": r.get("wire_origin"),
-        "supersedes_id": r.get("supersedes_id"), "content_hash": r.get("content_hash"),
+        "supersedes_id": r.get("supersedes_id"), "content_hash": r.get("content_hash"), "topic_match": r.get("topic_match"),
         "url": r.get("url"), "title_80": (r.get("title") or "")[:80],
     }
 
@@ -134,6 +134,7 @@ def main() -> int:
             "count": len(docs),
             "by_source": breakdown(docs, "source_id"), "by_access_level": breakdown(docs, "access_level"),
             "by_wire_origin": breakdown(docs, "wire_origin"), "by_flank": breakdown(docs, "flank"),
+            "by_topic_match": breakdown(docs, "topic_match"),
             "sample": [sanitize_doc(r) for r in docs[: args.sample]],
         },
         "official_docs": {

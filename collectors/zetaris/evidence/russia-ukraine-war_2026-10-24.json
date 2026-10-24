@@ -1,9 +1,9 @@
 {
   "evidence_for": "Issue #2 \u2014 authorized Zetaris query over the collected corpus (data-collection block)",
-  "run_at_utc": "2026-10-24T03:03:54Z",
+  "run_at_utc": "2026-10-24T04:20:07Z",
   "branch": "data-collection",
-  "commit": "d1fe0a0",
-  "schema_sha256_16": "c7e816d195a31d74",
+  "commit": "f2e1500",
+  "schema_sha256_16": "b94677518ececfa2",
   "datasource": "QUORUM_COLLECT",
   "route": "Zetaris REST /sql-editor/sqls/run via agent/tools_zetaris.py",
   "topic_id": "russia-ukraine-war",
@@ -13,7 +13,7 @@
     "2026-10-24T09:30:00Z"
   ],
   "sql": {
-    "documents": "SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,\n       d.url, d.canonical_url, d.title, d.published_at, d.fetched_at, d.access_level, d.wire_origin,\n       d.supersedes_id, d.content_hash\nFROM QUORUM_COLLECT.documents d\nJOIN QUORUM_COLLECT.sources s ON s.id = d.source_id\nWHERE d.topic_id = 'russia-ukraine-war'\n  AND d.published_at >= TIMESTAMP '2026-10-23T09:30:00Z' AND d.published_at < TIMESTAMP '2026-10-24T09:30:00Z'\nORDER BY d.published_at DESC",
+    "documents": "SELECT d.id, d.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,\n       d.url, d.canonical_url, d.title, d.published_at, d.fetched_at, d.access_level, d.wire_origin,\n       d.supersedes_id, d.content_hash, d.topic_match\nFROM QUORUM_COLLECT.documents d\nJOIN QUORUM_COLLECT.sources s ON s.id = d.source_id\nWHERE d.topic_id = 'russia-ukraine-war'\n  AND d.published_at >= TIMESTAMP '2026-10-23T09:30:00Z' AND d.published_at < TIMESTAMP '2026-10-24T09:30:00Z'\nORDER BY d.published_at DESC",
     "official_docs": "SELECT o.id, o.source_id, s.name AS source_name, s.independence_group, s.kind, s.flank, s.tier,\n       o.url, o.title, o.doc_type, o.doc_number, COALESCE(o.signed_at, o.published_at) AS published_at, o.fetched_at,\n       length(o.full_text) AS full_text_chars\nFROM QUORUM_COLLECT.official_docs o\nJOIN QUORUM_COLLECT.sources s ON s.id = o.source_id\nWHERE o.topic_id = 'russia-ukraine-war'\n  AND COALESCE(o.signed_at, o.published_at) >= TIMESTAMP '2026-10-23T09:30:00Z'\n  AND COALESCE(o.signed_at, o.published_at) < TIMESTAMP '2026-10-24T09:30:00Z'\nORDER BY published_at DESC"
   },
   "documents": {
@@ -48,6 +48,11 @@
       "left": 35,
       "right": 18
     },
+    "by_topic_match": {
+      "body": 16,
+      "lead": 15,
+      "title": 34
+    },
     "sample": [
       {
         "id": "235",
@@ -60,6 +65,7 @@
         "wire_origin": null,
         "supersedes_id": null,
         "content_hash": "0901f53e77ebd3a6bdd4ebb5f320ee02483014957866bc988636560d769764ec",
+        "topic_match": "title",
         "url": "https://www.thedailybeast.com/melania-trumps-cynical-new-ukraine-war-scheme-threatens-to-upstage-donald-trump",
         "title_80": "Melania Trump\u2019s Cynical New Ukraine War Scheme Threatens to Upstage Donald Trump"
       },
@@ -74,6 +80,7 @@
         "wire_origin": null,
         "supersedes_id": "229",
         "content_hash": "be4b1e09e32be5b50777ed93509e7977e422ae45254cde3b6f337370d612db65",
+        "topic_match": "body",
         "url": "https://www.theguardian.com/us-news/live/2026/oct/23/trump-florida-midterms-ramaswamy-latest-updates",
         "title_80": "Ramaswamy accuses Acton of \u2018lying\u2019 about attack ad, but court records contradict"
       },
@@ -88,6 +95,7 @@
         "wire_origin": null,
         "supersedes_id": "217",
         "content_hash": "11ecc9799d5b7dbfced61c44227c45d744d9b5eaaccf5e47b4688f0f003f0f2b",
+        "topic_match": "body",
         "url": "https://www.theguardian.com/us-news/live/2026/oct/23/trump-florida-midterms-ramaswamy-latest-updates",
         "title_80": "Ramaswamy accuses Acton of \u2018lying\u2019 about attack ad, but court records contradict"
       },
@@ -102,6 +110,7 @@
         "wire_origin": null,
         "supersedes_id": "154",
         "content_hash": "92682389321ad3e442eb975662f0f428e653f2c7a22d3c0773e40a07a34d565b",
+        "topic_match": "body",
         "url": "https://www.theguardian.com/us-news/live/2026/oct/23/trump-florida-midterms-ramaswamy-latest-updates",
         "title_80": "Ramaswamy accuses Acton of \u2018lying\u2019 about attack ad, but court records contradict"
       },
@@ -116,6 +125,7 @@
         "wire_origin": null,
         "supersedes_id": null,
         "content_hash": "efff94d168724f84ba6517814a708217ae469a7b026a48a711a29629485a91b0",
+        "topic_match": "title",
         "url": "https://www.reuters.com/business/autos-transportation/us-has-years-asked-musk-alter-starlink-service-ukraine-middle-east-sources-say-2026-10-24/",
         "title_80": "US has for years asked Musk to alter Starlink service in Ukraine, Middle East, s"
       }
