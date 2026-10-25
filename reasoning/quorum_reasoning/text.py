@@ -96,7 +96,14 @@ _STEM_STOP = {
         "are was were has have had will would can could says said say new also not when where while "
         # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): more function words. Why: "about" was one of the five
         # topic-frequent stems on the real corpus (research.topic_frequent) and displaced a content stem.
-        "about more than who which been other their there should"
+        "about more than who which been other their there should "
+        # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): weak words that carry no fact (verbs of saying and
+        # motion, time words, fillers). Why: on the attempt-6 journal a diesel-exports passage "supported" a
+        # midterms-date claim on just/day/midterm (window coverage 0.6); stems feed fact compositions, coverage and
+        # cluster keys. Owner-delegated decision (coordinator, 2026-10-25). SPAN_NEGATIONS (untrusted) is a separate
+        # list: "still" remains a short-span marker there.
+        "just come came comes coming day days also new like make made take took get got way time year years week "
+        "weeks month months today yesterday tomorrow back still people says said say told"
     ).split()
 }
 

@@ -14,7 +14,7 @@ PHRASE = "climate policy and carbon tax"
 
 @pytest.fixture
 def no_route(monkeypatch):
-    for var in ("MODEL_BASE_URL", "MODEL_API_KEY", "METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN"):
+    for var in ("MODEL_BASE_URL", "MODEL_API_KEY", "METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN", "METERLESS_TOKEN"):  # alias since f175c44
         monkeypatch.setenv(var, "")
     monkeypatch.delenv("QUORUM_DRY_RUN", raising=False)
 
