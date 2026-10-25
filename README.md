@@ -28,7 +28,7 @@ The full set of decisions — scope, principles, source list, cohort rules, UI, 
 | --- | --- |
 | Data | [Zetaris](https://www.zetaris.com/) — one SQL layer over all sources |
 | Reasoning | NVIDIA Nemotron via Meterless; additional LLMs for independent review where the rules allow |
-| Reasoning orchestration | Python + LangGraph, LangGraph Studio for development and the demo; design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Reasoning orchestration | Python + LangGraph, LangGraph Studio for development and the demo; design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), code in [`reasoning/`](reasoning/README.md) |
 | Web | Next.js + TypeScript frontend; Django auth, API and Quorum Control |
 | Development | Vadim uses Codex; team members use their own assistants (Codex, Claude Code); shared rules in [AGENTS.md](AGENTS.md), organizer-update evidence in [docs/RULES_CHECK.md](docs/RULES_CHECK.md); one branch per member, `master` through pull requests |
 
@@ -41,6 +41,8 @@ The full set of decisions — scope, principles, source list, cohort rules, UI, 
 | `docs/DECISIONS.md` | Product and architecture decisions, with a change log at the end |
 | `docs/ARCHITECTURE.md` | Reasoning block: the LangGraph graph, rules, analysis schema, snapshot contract for the portal, build plan |
 | `docs/SETUP.md`, `docs/SPONSOR_SETUP.md`, `docs/MANUAL_ACTIONS.md` | Local environment: WSL2, Docker, the official Zetaris platform bundle, remaining manual steps |
+| `docs/examples/snapshot.sample.json` | A dry-run reasoning snapshot (fictional content, real shape): the test dataset for the portal |
+| `reasoning/` | The reasoning block: LangGraph graph, rules, prompts, dry-run fixture, tests; `reasoning/README.md` says how to run it |
 | `agent/tools_zetaris.py` | Read-only Lightning SQL against the local Zetaris REST API |
 | `smoke_test.py` | Checks the Data (Zetaris) and Power (Nemotron via Meterless/NVIDIA) layers from the participant setup guide |
 | `scripts/` | `doctor.sh`, `verify-all.sh`, service helpers, security check |

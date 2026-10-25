@@ -1,0 +1,230 @@
+{
+  "_note": "Expected statuses are assigned by the rules in docs/ARCHITECTURE.md section 6, applied to the documents in days/<date>.json: confirmed needs a law/order/vote/ruling official document or support from two different independence_groups; a party's statement is never evidence for its own content; everything else is unverified. Justification quotes marked verbatim:false are reconstructed from search-result summaries. See README.md.",
+  "claims": [
+    {
+      "id": "e01", "edition_date": "2026-10-09",
+      "claim": "A Russian strike beside passenger buses in Kramatorsk killed 30 people",
+      "expected_status": "disputed",
+      "expected_reason": "NPR and Breitbart report 30 killed; CNN reports at least 33 killed in the same bus strike. Two independence groups support 30, one contradicts it with a different toll.",
+      "justification": {"quote": "Russian strikes on Ukraine's public buses leave 30 dead as blackouts worsen in Kyiv", "url": "https://www.npr.org/2026/10/08/g-s1-147106/russia-ukraine-war", "source": "npr", "verbatim": true},
+      "counter_justification": {"quote": "Russian strike kills at least 33 in eastern Ukraine in deadliest single attack this year", "url": "https://www.cnn.com/2026/10/08/europe/deadly-bus-strike-russia-ukraine-intl", "source": "cnn", "verbatim": true},
+      "doc_ids": [90901, 90903, 90902]
+    },
+    {
+      "id": "e02", "edition_date": "2026-10-09",
+      "claim": "The strike was the deadliest single attack in Ukraine this year",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (cnn) only.",
+      "justification": {"quote": "Russian strike kills at least 33 in eastern Ukraine in deadliest single attack this year", "url": "https://www.cnn.com/2026/10/08/europe/deadly-bus-strike-russia-ukraine-intl", "source": "cnn", "verbatim": true},
+      "doc_ids": [90902]
+    },
+    {
+      "id": "e03", "edition_date": "2026-10-09",
+      "claim": "Russian drones targeted police officers who were helping victims of the strike",
+      "expected_status": "unverified",
+      "expected_reason": "A statement by Ukrainian police carried by one group (cnn); the police are a party to the event.",
+      "justification": {"quote": "Police said Russian drones targeted officers who were helping victims of the strike.", "url": "https://www.cnn.com/2026/10/08/europe/deadly-bus-strike-russia-ukraine-intl", "source": "cnn", "verbatim": false},
+      "doc_ids": [90902]
+    },
+    {
+      "id": "e04", "edition_date": "2026-10-09",
+      "claim": "Officials suspended public transport in Kramatorsk and Sloviansk",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (npr) only.",
+      "justification": {"quote": "Local officials suspended public transport in Kramatorsk and Sloviansk.", "url": "https://www.npr.org/2026/10/08/g-s1-147106/russia-ukraine-war", "source": "npr", "verbatim": false},
+      "doc_ids": [90901]
+    },
+    {
+      "id": "e05", "edition_date": "2026-10-10",
+      "claim": "Trump announced that the United States will get diesel from Russia",
+      "expected_status": "confirmed",
+      "expected_reason": "The announcement itself is reported as a fact by three independence groups (npr, fox-news, new-republic).",
+      "justification": {"quote": "Trump says U.S. to get diesel from Russia, relaxing pressure on Moscow to ease prices before midterms", "url": "https://www.npr.org/2026/10/09/nx-s1-5996912/trump-says-u-s-to-get-diesel-from-russia-relaxing-pressure-on-moscow-to-ease-prices-before-midterms", "source": "npr", "verbatim": true},
+      "doc_ids": [91001, 91002, 91003]
+    },
+    {
+      "id": "e06", "edition_date": "2026-10-10",
+      "claim": "The Treasury Department issued a temporary license allowing Russian diesel to be supplied to the global market",
+      "expected_status": "confirmed",
+      "expected_reason": "Reported as a fact by two independence groups (npr, fox-news).",
+      "justification": {"quote": "The Treasury Department then issued a temporary license allowing Russian diesel to be supplied to the global market.", "url": "https://www.npr.org/2026/10/10/nx-s1-5996938/u-s-and-russia-tout-diesel-deal-to-ease-sanctions-and-reopen-fuel-flows", "source": "npr", "verbatim": false},
+      "doc_ids": [91001, 91002]
+    },
+    {
+      "id": "e07", "edition_date": "2026-10-10",
+      "claim": "The diesel license runs through April 7, 2027",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (fox-news) only; the license document itself is not in the corpus.",
+      "justification": {"quote": "Fox reports the license runs through April 7, 2027.", "url": "https://www.foxnews.com/politics/trump-tries-different-approach-russia-bring-americans-relief-amid-ongoing-war-ukraine", "source": "fox-news", "verbatim": false},
+      "doc_ids": [91002]
+    },
+    {
+      "id": "e08", "edition_date": "2026-10-10",
+      "claim": "The diesel deal is valued at 7 billion dollars",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (fox-news) only; an analyst disputes how much is new revenue, but no second source states the figure.",
+      "justification": {"quote": "Fox reports a $7 billion value.", "url": "https://www.foxnews.com/politics/trump-tries-different-approach-russia-bring-americans-relief-amid-ongoing-war-ukraine", "source": "fox-news", "verbatim": false},
+      "doc_ids": [91002]
+    },
+    {
+      "id": "e09", "edition_date": "2026-10-12",
+      "claim": "Trump announced an energy ceasefire between Russia and Ukraine",
+      "expected_status": "confirmed",
+      "expected_reason": "The announcement itself is reported as a fact by two independence groups (fox-news, npr).",
+      "justification": {"quote": "Trump announced a partial Russia-Ukraine ceasefire. Did either country know about it?", "url": "https://www.npr.org/2026/10/12/nx-s1-5998808/trump-announced-a-partial-russia-ukraine-ceasefire-did-either-country-know-about-it", "source": "npr", "verbatim": true},
+      "doc_ids": [91201, 91202]
+    },
+    {
+      "id": "e10", "edition_date": "2026-10-12",
+      "claim": "Russia and Ukraine agreed to stop attacks on each other's energy facilities",
+      "expected_status": "unverified",
+      "expected_reason": "Only Trump's own statement asserts the agreement; neither Moscow nor Kyiv confirmed it. A statement is not evidence for its content.",
+      "justification": {"quote": "Neither Moscow nor Kyiv confirmed it, and the White House said Russia had not agreed.", "url": "https://www.npr.org/2026/10/12/nx-s1-5998808/trump-announced-a-partial-russia-ukraine-ceasefire-did-either-country-know-about-it", "source": "npr", "verbatim": false},
+      "doc_ids": [91201, 91202]
+    },
+    {
+      "id": "e11", "edition_date": "2026-10-12",
+      "claim": "The initial focus of the energy ceasefire is oil refineries",
+      "expected_status": "unverified",
+      "expected_reason": "A statement by a White House official carried by one group (npr).",
+      "justification": {"quote": "A White House official said the initial focus was oil refineries, with power plants and grids possibly added later.", "url": "https://www.npr.org/2026/10/12/nx-s1-5998808/trump-announced-a-partial-russia-ukraine-ceasefire-did-either-country-know-about-it", "source": "npr", "verbatim": false},
+      "doc_ids": [91202]
+    },
+    {
+      "id": "e12", "edition_date": "2026-10-14",
+      "claim": "Russian forces hit at least six energy facilities after the ceasefire announcement",
+      "expected_status": "unverified",
+      "expected_reason": "Zelenskyy's statement carried by one group (fox-news); a party's words are not evidence for their content.",
+      "justification": {"quote": "Zelenskyy said Russian forces hit at least six energy facilities after the announcement", "url": "https://www.foxnews.com/world/zelenskyy-blasts-putin-defying-trumps-ceasefire-push-sends-pointed-message-white-house", "source": "fox-news", "verbatim": false},
+      "doc_ids": [91401]
+    },
+    {
+      "id": "e13", "edition_date": "2026-10-14",
+      "claim": "Allies gave Ukraine no warning of the impending Russian missile attack",
+      "expected_status": "unverified",
+      "expected_reason": "Zelensky's statement carried by one group (cnn).",
+      "justification": {"quote": "Allies gave Ukraine no warning of impending missile attack, Zelensky says", "url": "https://www.cnn.com/2026/10/13/europe/ukraine-zelensky-missile-latam-intl", "source": "cnn", "verbatim": true},
+      "doc_ids": [91402]
+    },
+    {
+      "id": "e14", "edition_date": "2026-10-14",
+      "claim": "The Trump administration warned Ukraine it could cut off intelligence sharing",
+      "expected_status": "unverified",
+      "expected_reason": "Zelenskyy's statement in one interview (npr).",
+      "justification": {"quote": "The Trump administration warns Ukraine it could cut off intel, Zelenskyy tells NPR", "url": "https://www.npr.org/2026/10/13/nx-s1-6000051/ukraine-zelenskyy-npr-interview-russia-war", "source": "npr", "verbatim": true},
+      "doc_ids": [91403]
+    },
+    {
+      "id": "e15", "edition_date": "2026-10-14",
+      "claim": "Six Republican senators joined Democrats in urging Trump to reverse the diesel deal",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (npr) only in this corpus slice.",
+      "justification": {"quote": "Six Republican senators joined Democrats this week in urging Trump to reverse the decision", "url": "https://www.npr.org/2026/10/13/g-s1-147871/trump-russia-diesel-deal-congressional-response", "source": "npr", "verbatim": false},
+      "doc_ids": [91405]
+    },
+    {
+      "id": "e16", "edition_date": "2026-10-14",
+      "claim": "European officials criticized the deal easing sanctions on Russian diesel",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (npr) in this corpus slice; CNN's coverage of European reactions fell on an earlier edition day.",
+      "justification": {"quote": "Trump's diesel deal with Putin angers Europe", "url": "https://www.npr.org/2026/10/13/nx-s1-5998764/trumps-diesel-deal-with-putin-angers-europe", "source": "npr", "verbatim": true},
+      "doc_ids": [91404]
+    },
+    {
+      "id": "e17", "edition_date": "2026-10-17",
+      "claim": "The rate of duty on goods from the Russian Federation shall be increased by 500 percent ad valorem",
+      "expected_status": "confirmed",
+      "expected_reason": "Stated in a signed executive order (doc_type order).",
+      "justification": {"quote": "The rate of duty on goods from the Russian Federation shall be increased by 500 percent ad valorem", "url": "https://www.federalregister.gov/documents/2026/10/21/2026-21599/implementing-the-lindsey-o-graham-sanctioning-russia-and-iran-act-of-2026", "source": "federal-register", "verbatim": false},
+      "doc_ids": [91701]
+    },
+    {
+      "id": "e18", "edition_date": "2026-10-17",
+      "claim": "The executive order waives the duties provided for in sections 112 and 113 of the Graham Act",
+      "expected_status": "confirmed",
+      "expected_reason": "Stated in a signed executive order; CNN reports the waiver as a fact.",
+      "justification": {"quote": "waives the application of any duties provided for in sections 112 and 113", "url": "https://www.federalregister.gov/documents/2026/10/21/2026-21599/implementing-the-lindsey-o-graham-sanctioning-russia-and-iran-act-of-2026", "source": "federal-register", "verbatim": false},
+      "doc_ids": [91701, 91702]
+    },
+    {
+      "id": "e19", "edition_date": "2026-10-17",
+      "claim": "Sanctions imposed with respect to the harmful activities of the Government of the Russian Federation remain in effect",
+      "expected_status": "confirmed",
+      "expected_reason": "Stated in the signed executive order. The fact is what the document says; whether every sanction operates as stated is a separate question.",
+      "justification": {"quote": "it says the existing Russia harmful-activities sanctions remain in effect", "url": "https://www.federalregister.gov/documents/2026/10/21/2026-21599/implementing-the-lindsey-o-graham-sanctioning-russia-and-iran-act-of-2026", "source": "federal-register", "verbatim": false},
+      "doc_ids": [91701]
+    },
+    {
+      "id": "e20", "edition_date": "2026-10-17",
+      "claim": "Trump waived Russia-related sanctions under the Graham Act before they took effect",
+      "expected_status": "confirmed",
+      "expected_reason": "A signed order waives the duties, and CNN reports the waiver as a fact: document support plus one group.",
+      "justification": {"quote": "Trump waives Russia-related sanctions before they kick in, prompting backlash from Ukraine and US lawmakers", "url": "https://www.cnn.com/2026/10/16/europe/us-ukraine-russia-sanctions-intl-hnk", "source": "cnn", "verbatim": true},
+      "doc_ids": [91702, 91701]
+    },
+    {
+      "id": "e21", "edition_date": "2026-10-19",
+      "claim": "Ukrainian drones set fire to the St. Petersburg Oil Terminal",
+      "expected_status": "confirmed",
+      "expected_reason": "Reported as a fact by four independence groups (cnn, breitbart, daily-beast, npr).",
+      "justification": {"quote": "St. Petersburg Oil Terminal Set Ablaze Amid Ukraine Drone Strikes", "url": "https://www.breitbart.com/national-security/2026/10/18/st-petersburg-oil-terminal-set-ablaze-amid-massive-wave-of-ukraine-drone-strikes/", "source": "breitbart", "verbatim": true},
+      "doc_ids": [91901, 91902, 91903, 91905]
+    },
+    {
+      "id": "e22", "edition_date": "2026-10-19",
+      "claim": "Russia's Defense Ministry destroyed 1,015 Ukrainian drones over 15 regions",
+      "expected_status": "unverified",
+      "expected_reason": "The figure comes from Russia's Defense Ministry, a party to the event; carried by one group (cnn).",
+      "justification": {"quote": "Russia's Defense Ministry said it destroyed 1,015 Ukrainian drones over 15 Russian regions.", "url": "https://www.cnn.com/2026/10/18/europe/ukraine-russia-drone-attack-trump-intl", "source": "cnn", "verbatim": false},
+      "doc_ids": [91904]
+    },
+    {
+      "id": "e23", "edition_date": "2026-10-19",
+      "claim": "One person was killed and 15 injured in the attack on St. Petersburg",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (daily-beast) carries this casualty count in this corpus slice; another account cites five wounded, but no document in the slice carries it.",
+      "justification": {"quote": "the Daily Beast cites one killed and 15 injured", "url": "https://www.thedailybeast.com/vladimir-putins-hometown-st-petersburg-goes-up-in-flames-in-defiant-overnight-ukraine-attack", "source": "daily-beast", "verbatim": false},
+      "doc_ids": [91903]
+    },
+    {
+      "id": "e24", "edition_date": "2026-10-19",
+      "claim": "Trump criticized Zelensky after Ukraine's drone attack on Russia",
+      "expected_status": "confirmed",
+      "expected_reason": "Reported as a fact by two independence groups (cnn, npr).",
+      "justification": {"quote": "Trump slams Zelensky after Ukraine defies US president with major attack on Russia", "url": "https://www.cnn.com/2026/10/18/europe/ukraine-russia-drone-attack-trump-intl", "source": "cnn", "verbatim": true},
+      "doc_ids": [91904, 91905]
+    },
+    {
+      "id": "e25", "edition_date": "2026-10-22",
+      "claim": "Russia launched 21 missiles and 210 drones at Ukraine overnight",
+      "expected_status": "unverified",
+      "expected_reason": "The figures come from the Ukrainian Air Force, a party to the event; one group (cnn) in this corpus slice.",
+      "justification": {"quote": "The attack on Ukraine involved 21 missiles and 210 drones.", "url": "https://www.cnn.com/2026/10/21/europe/us-envoy-witkoff-putin-talks-russia-ukraine-intl", "source": "cnn", "verbatim": false},
+      "doc_ids": [92201]
+    },
+    {
+      "id": "e26", "edition_date": "2026-10-22",
+      "claim": "Putin said he would be willing to resume talks with Ukraine and the United States after November 10",
+      "expected_status": "unverified",
+      "expected_reason": "One group (cnn) in this corpus slice carries the statement.",
+      "justification": {"quote": "Putin said he would be willing to resume talks with Ukraine and the United States after November 10.", "url": "https://www.cnn.com/2026/10/21/europe/us-envoy-witkoff-putin-talks-russia-ukraine-intl", "source": "cnn", "verbatim": false},
+      "doc_ids": [92201]
+    },
+    {
+      "id": "e27", "edition_date": "2026-10-22",
+      "claim": "Ukraine is again receiving early warnings from partners about incoming Russian missiles",
+      "expected_status": "unverified",
+      "expected_reason": "Zelenskyy's statement carried by one group (npr).",
+      "justification": {"quote": "Zelenskyy says early warning system for Russian missile attacks resumes", "url": "https://www.npr.org/2026/10/21/g-s1-149026/zelenskyy-russian-missiles-warning", "source": "npr", "verbatim": true},
+      "doc_ids": [92202]
+    },
+    {
+      "id": "e28", "edition_date": "2026-10-22",
+      "claim": "Massive strikes hit Kyiv hours after Putin agreed to fresh peace talks",
+      "expected_status": "unverified",
+      "expected_reason": "One independence group (cnn) in this corpus slice. Real-world coverage was broader, but the rule is applied to the documents provided.",
+      "justification": {"quote": "Massive strikes hit Kyiv hours after Putin agrees to fresh peace talks", "url": "https://www.cnn.com/2026/10/21/europe/us-envoy-witkoff-putin-talks-russia-ukraine-intl", "source": "cnn", "verbatim": true},
+      "doc_ids": [92201]
+    }
+  ]
+}

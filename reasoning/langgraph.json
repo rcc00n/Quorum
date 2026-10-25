@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "quorum": "quorum_reasoning.graph:graph"
+  },
+  "env": "../.env"
+}

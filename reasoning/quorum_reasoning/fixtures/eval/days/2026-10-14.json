@@ -1,0 +1,44 @@
+{
+  "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-14",
+  "expected_above_bar": 0,
+  "expected_above_bar_reason": "Every event of the day rests on statements by interested parties (Zelenskyy on energy strikes, warnings and intelligence; senators' letter reported by one group): no claim is confirmable by two independent groups or a document, so confirmation stays at 0-1 and the totals stay below 6.",
+  "documents": [
+    {
+      "id": 91401, "source_id": "fox-news", "source_name": "Fox News", "independence_group": "fox-news", "kind": "outlet",
+      "flank": "right", "tier": "major", "url": "https://www.foxnews.com/world/zelenskyy-blasts-putin-defying-trumps-ceasefire-push-sends-pointed-message-white-house",
+      "title": "Zelenskyy says Russia attacked energy grid after Trump ceasefire call",
+      "lead": "President Zelenskyy said Russian forces hit at least six energy facilities after the ceasefire announcement.",
+      "published_at": "2026-10-13T12:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 91402, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.cnn.com/2026/10/13/europe/ukraine-zelensky-missile-latam-intl",
+      "title": "Allies gave Ukraine no warning of impending missile attack, Zelensky says",
+      "lead": "President Zelensky said allies gave Ukraine no warning of an impending Russian missile attack.",
+      "published_at": "2026-10-13T10:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 91403, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/13/nx-s1-6000051/ukraine-zelenskyy-npr-interview-russia-war",
+      "title": "The Trump administration warns Ukraine it could cut off intel, Zelenskyy tells NPR",
+      "lead": "President Zelenskyy said the Trump administration warned Ukraine it could cut off intelligence sharing.",
+      "published_at": "2026-10-13T11:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 91404, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/13/nx-s1-5998764/trumps-diesel-deal-with-putin-angers-europe",
+      "title": "Trump's diesel deal with Putin angers Europe",
+      "lead": "European officials criticized the deal easing sanctions on Russian diesel.",
+      "published_at": "2026-10-13T15:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 91405, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/13/g-s1-147871/trump-russia-diesel-deal-congressional-response",
+      "title": "GOP Senators join Democrats seeking to stop Russia diesel deal",
+      "lead": "Six Republican senators joined Democrats in urging President Trump to reverse the Russia diesel deal.",
+      "published_at": "2026-10-13T17:00:00Z", "access_level": 1, "wire_origin": null
+    }
+  ]
+}

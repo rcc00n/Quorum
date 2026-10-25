@@ -46,3 +46,7 @@ pgdata/
 # Portal build output (dependencies and runtime stay outside the repository)
 .next/
 *.tsbuildinfo
+# reasoning block: run output and the LangGraph dev server state
+reasoning/snapshots/
+.langgraph_api/
+*.egg-info/

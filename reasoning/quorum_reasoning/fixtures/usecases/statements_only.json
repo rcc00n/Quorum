@@ -1,0 +1,15 @@
+{
+  "_note": "Fictional use-case day (workstream D): an official release with no independent coverage. The release is the party's words (DECISIONS.md > Principles for handling facts): claims stay statements, nothing is confirmed, the roundup says statements only.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-06",
+  "documents": [
+    {
+      "id": 9601, "source_id": "whitehouse", "source_name": "The White House", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.whitehouse.gov/fiction/2026/11/06/statement-convoy-security/",
+      "title": "Statement on convoy security measures", "lead": "",
+      "published_at": "2026-11-05T15:00:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "release",
+      "text": "Convoy escorts will continue through the winter. Escort coverage has been extended to night sailings."
+    }
+  ]
+}
