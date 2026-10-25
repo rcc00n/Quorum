@@ -119,9 +119,11 @@ async function main(args) {
     await page.goto(root+'/preview/reasoning');await page.getByLabel('Rating mode',{exact:true}).waitFor();
     for(const [i,mode] of ['allsides','mbfc','adfontes','average'].entries()) {
       await page.getByLabel('Rating mode',{exact:true}).selectOption(mode);
-      await page.locator('.spectrum').scrollIntoViewIfNeeded();
+      // Keep the actual selector and chart visible; the spectrum section includes a long source list.
+      await page.getByLabel('Rating mode',{exact:true}).evaluate(el=>scrollTo({top:scrollY+el.getBoundingClientRect().top-160,behavior:'instant'}));
+      assert.ok(await page.getByLabel('Rating mode',{exact:true}).evaluate(el=>{const r=el.getBoundingClientRect();return r.top>=100&&r.bottom<innerHeight;}));
       assert.equal(await page.locator('.source-row').count(),40);
-      if(i===3){const detail=page.locator('.rating-provenance').first();await detail.locator('summary').click();}
+      if(i===3){await hold(162);const detail=page.locator('.rating-provenance').first();await detail.locator('summary').click();}
       await hold(125+i*15);
     }
     await page.locator('.r-corpus-binding').scrollIntoViewIfNeeded();await hold(185);
