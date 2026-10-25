@@ -202,6 +202,7 @@ def test_run_maps_rate_limit_abort_to_exit_3(fake_route_env, monkeypatch, tmp_pa
         raise llm.RateLimitAbort(MODEL, 2)
 
     monkeypatch.setattr(graph, "run_local", refuse)
+    monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None)  # the 127.0.0.1:9 route is Meterless: never the real daemon pipe
     assert run_cli.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 3
     err = capsys.readouterr().err
     assert f"refusing to continue: route {MODEL} is drained (2 refused calls in 10 min)" in err
