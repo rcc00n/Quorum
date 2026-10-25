@@ -47,6 +47,19 @@ class Command(BaseCommand):
                           provisional=result['preview']['provisional'])
             sidecar = parse_preview_json(sidecar_raw)
             producer = sidecar['producer']
+            if 'commit_of_the_publishing_process' in producer:
+                require(commit.startswith(producer['commit_of_the_publishing_process']), 'producer_commit_mismatch')
+                try:
+                    config = subprocess.check_output(['git', 'show', f'{commit}:reasoning/config/reasoning.toml'],
+                        cwd=Path(__file__).resolve().parents[4], stderr=subprocess.DEVNULL)
+                except subprocess.CalledProcessError:
+                    raise SnapshotError('producer_config_unavailable') from None
+                report.update(producer_commit=commit, git_config_sha256=hashlib.sha256(config).hexdigest(),
+                              git_config_crlf_sha256=hashlib.sha256(config.replace(b'\n', b'\r\n')).hexdigest())
+                # Prefixes plus a reproduction command are not a full original config attestation.
+                report['issues'].extend(['producer_config_hash_incomplete'] + artifact_review_issues(options['sha256']))
+                self.stdout.write(json.dumps(report, sort_keys=True))
+                raise CommandError('Reasoning acceptance blocked; inspect safe report codes', returncode=1)
             prefix = re.match(r'^([0-9a-f]{7,40})(?:\s|$)', producer['commit'])
             require(prefix is not None and commit.startswith(prefix[1]), 'producer_commit_mismatch')
             declared = producer['config_sha256']

@@ -113,7 +113,14 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
     const binding = JSON.parse(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_SIDECAR));
     assert.equal(result.preview.corpus_binding.provisional, binding.provisional);
     assert.equal(result.preview.corpus_binding.sidecar_sha256, digest(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_SIDECAR)));
-    await page.getByText(/PROVISIONAL CORPUS/).waitFor();
+    if (binding.snapshot.sha256_file_bytes) {
+      await page.getByText(/CLOSED EDITION \(producer-declared\)/).waitFor();
+      await page.getByRole('alert').filter({hasText:'IMPACT REVIEW PENDING:'}).waitFor();
+      assert.equal(result.preview.corpus_binding.closed_edition, true);
+      assert.ok(result.preview.warnings.some(w => w.includes('has not passed independent impact review')));
+    } else {
+      await page.getByText(/PROVISIONAL CORPUS/).waitFor();
+    }
   }
   assert.equal(await page.locator(".r-roundup-row .r-check-notice").count(), roundup.length);
   for (const story of sample.stories) {
@@ -139,6 +146,13 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
       assert.equal(await row.locator(".r-final strong").textContent(), claim.status);
       assert.equal(await row.locator(".r-final p").textContent(), claim.reason || "No final rationale supplied.");
       assert.ok((await row.locator(".r-agreement").textContent()).includes(claim.verifier === claim.fact_checker ? "Reviewers agree" : "Reviewers disagree"));
+      if (claim.resolved_by) {
+        const review = row.locator('aside.r-disagreement');
+        assert.equal(await review.locator('strong').textContent(), `Resolution: ${claim.resolved_by}`);
+        assert.ok((await review.textContent()).includes(claim.reviewer_status ?? 'No accepted verdict supplied'));
+        if (claim.reviewer_reason) assert.ok((await review.locator('p').allTextContents()).includes(claim.reviewer_reason));
+        if (claim.reviewer_quote) assert.equal(await review.locator('blockquote').textContent(), claim.reviewer_quote);
+      }
       for (const [i, verdict, evidence] of [
         [0, claim.verifier, claim.evidence.filter((e) => ["researcher", "verifier"].includes(e.found_by))],
         [1, claim.fact_checker, claim.evidence.filter((e) => e.found_by === "fact_checker")],

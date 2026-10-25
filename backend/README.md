@@ -91,3 +91,10 @@ its owner-disclosed impact contradiction. Producer score and claims are unchange
 the advisory does not bypass JSON, provenance or publisher validation. The raw
 artifact and independent D5/ledger verification remain necessary. The existing
 warning array carries this local editorial disclosure; no producer contract changes.
+
+The original closed-v4 sidecar uses a different historical format. Its exact
+SHA-pinned bytes can bind only the exact original snapshot for a private preview;
+unknown/mutated closed-format sidecars fail. Edition end is shown as a boundary,
+never invented as a corpus capture timestamp. Its config hashes are truncated:
+local Git hashes are reported independently, and full metadata acceptance remains
+blocked along with impact review. The production publisher is unchanged.

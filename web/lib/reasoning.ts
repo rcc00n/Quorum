@@ -176,7 +176,7 @@ export type ReasoningPreview = {
   expiry_hint: "expired" | "within_hint";
   sha256: string;
   provisional?: boolean | null;
-  corpus_binding?: { provisional: boolean; corpus_as_of_utc: string; sidecar_sha256: string };
+  corpus_binding?: { provisional: boolean; corpus_as_of_utc?: string; closed_edition?: boolean; edition_window_end_utc?: string; sidecar_sha256: string };
   missing_provenance: string[];
   warnings: string[];
 };

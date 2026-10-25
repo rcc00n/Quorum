@@ -20,6 +20,7 @@ from .snapshot_store import read_bounded
 
 SAMPLE = Path(__file__).parent / "fixtures/reasoning-demo/snapshot.sample.json"
 HISTORICAL_V3_SHA256 = "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
+GENUINE_V4_SIDECAR_SHA256 = "f55c3304afd92b9f763ddb04357f3ec0c7a8860e9ee3ddcf63b69a4bcff7c6d0"
 GENUINE_V4_SHA256 = "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79"
 
 
@@ -735,10 +736,33 @@ def load_preview(path=None):
     return result
 
 
+def bind_closed_v4_sidecar(raw, snapshot_raw, result, sidecar):
+    # DECISION(2026-10-25, rcc00n/Codex): support only the pinned historical closed-v4 sidecar bytes.
+    # Why: this producer format omits full config hashes; display binding must not imply full acceptance.
+    fail(hashlib.sha256(raw).hexdigest() == GENUINE_V4_SIDECAR_SHA256, "unsupported_closed_sidecar")
+    fail(hashlib.sha256(snapshot_raw).hexdigest() == GENUINE_V4_SHA256, "sidecar_snapshot_mismatch")
+    binding, run, p = sidecar['snapshot'], sidecar['run'], result['reasoning']
+    fail(binding['sha256_file_bytes'] == result['preview']['sha256'], 'sidecar_snapshot_mismatch')
+    fail(type(binding['size_bytes']) is int and binding['size_bytes'] == len(snapshot_raw), 'sidecar_size_mismatch')
+    for key, expected in dict(status=p['status'], stories=len(p['stories']), roundup=p['roundup']['count'],
+                              errors=len(p.get('errors', [])), published_at=p['published_at']).items():
+        fail(type(binding[key]) is type(expected) and binding[key] == expected, 'sidecar_snapshot_mismatch')
+    fail(sidecar['provisional'] is False and run['run_id'] == p['run_id'], 'sidecar_snapshot_mismatch')
+    fail(sidecar['corpus']['edition_window_utc'] == [p['window'][k] for k in ('start', 'end')], 'sidecar_window_mismatch')
+    for key in ('model_calls', 'model_errors', 'answered_by'):
+        fail(run[key] == p['provenance'][key], 'sidecar_snapshot_mismatch')
+    result['preview']['provisional'] = False
+    result['preview']['corpus_binding'] = dict(provisional=False, closed_edition=True,
+        edition_window_end_utc=p['window']['end'], sidecar_sha256=hashlib.sha256(raw).hexdigest())
+    return result
+
+
 def bind_preview_sidecar(raw, snapshot_raw, result):
     try:
         sidecar = parse_preview_json(raw)
         fail(isinstance(sidecar, dict), "invalid_sidecar")
+        if isinstance(sidecar.get('snapshot'), dict) and 'sha256_file_bytes' in sidecar['snapshot']:
+            return bind_closed_v4_sidecar(raw, snapshot_raw, result, sidecar)
         binding = sidecar["snapshot"]
         fail(isinstance(binding, dict), "invalid_sidecar")
         fail(binding["sha256"] == result["preview"]["sha256"], "sidecar_snapshot_mismatch")

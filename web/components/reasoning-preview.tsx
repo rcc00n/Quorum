@@ -336,8 +336,8 @@ export function ReasoningPreviewPage({
             )}
             {data.preview.corpus_binding && (
               <p className="r-preview-limits r-corpus-binding">
-                {data.preview.corpus_binding.provisional ? "PROVISIONAL CORPUS" : "Producer corpus capture"}
-                {" · "}As of {data.preview.corpus_binding.corpus_as_of_utc}.
+                {data.preview.corpus_binding.closed_edition ? "CLOSED EDITION (producer-declared)" : data.preview.corpus_binding.provisional ? "PROVISIONAL CORPUS" : "Producer corpus capture"}
+                {" · "}{data.preview.corpus_binding.closed_edition ? `Edition ends ${data.preview.corpus_binding.edition_window_end_utc}` : `As of ${data.preview.corpus_binding.corpus_as_of_utc}`}.
                 {" "}Sidecar bound to these snapshot bytes; execution and corpus manifests remain producer declarations.
               </p>
             )}
