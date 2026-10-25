@@ -31,10 +31,17 @@ CREATE TABLE IF NOT EXISTS sources (
     lang                 TEXT NOT NULL DEFAULT 'en'
 );
 
+-- DECISION(2026-10-25, Anastasia/Claude Code): this table is the source of truth for topics. The web app inserts a row
+-- when a user adds a topic (id = slug, name, query_terms from reasoning's `topic_terms`); the collector reads the active
+-- rows at the start of every pass, oldest first (created_at), so a new topic is collected within 15 minutes without a
+-- rebuild. Rows are never deleted (documents reference them): `active = false` retires a topic. Why: topics are free
+-- text typed by the user (Issue #2, Yelysei 2026-10-25), so a dictionary baked into the image cannot be the truth.
 CREATE TABLE IF NOT EXISTS topics (
-    id          TEXT PRIMARY KEY,
+    id          TEXT PRIMARY KEY CHECK (id ~ '^[a-z0-9][a-z0-9-]{0,63}$'),  -- same slug rule as reasoning's --topic
     name        TEXT NOT NULL,
-    query_terms TEXT[] NOT NULL DEFAULT '{}'
+    query_terms TEXT[] NOT NULL DEFAULT '{}',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),                        -- collection order: first topic wins a shared document
+    active      BOOLEAN NOT NULL DEFAULT true                              -- false = retired; rows stay for the FKs
 );
 
 CREATE TABLE IF NOT EXISTS documents (
