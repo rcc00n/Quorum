@@ -478,7 +478,9 @@ def test_seed_journal_loads_replay_without_a_checkpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(llm, "journal_loaded_for", None)  # main() sets it; restore so no later test keeps a stale ledger
     monkeypatch.setattr(llm, "current_run_id", None)
     monkeypatch.setattr(llm, "journal_path", None)
-    monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None, raising=False)
+    # DECISION(2026-10-24, rcc00n/Codex): stub route discovery for this journal-only test.
+    # Why: graph execution is already stubbed; replay regression must not require real credentials.
+    monkeypatch.setattr(llm, "route_configured", lambda: True)
     monkeypatch.setenv("QUORUM_DRY_RUN", "0")
     rc = run_cli.main(["--topic", "russia-ukraine-war", "--date", "2026-10-24", "--model", "live", "--attempt", "7", "--seed-journal", "--quiet", "--out", str(tmp_path)])
     assert rc == 3 and seen == {"calls": 1, "replay": 1, "resume": False}, (rc, seen)
