@@ -326,6 +326,9 @@ export function ReasoningPreviewPage({
               These declarations do not establish a genuine sponsor run or
               publication.
             </p>
+            {data.preview.warnings.filter((warning) => warning.startsWith("IMPACT REVIEW PENDING:")).map((warning) => (
+              <p className="r-preview-limits" role="alert" key={warning}>{warning}</p>
+            ))}
             {data.preview.provisional && !data.preview.corpus_binding && (
               <p className="r-preview-limits r-corpus-binding">
                 PROVISIONAL CORPUS · Capture metadata unavailable; no sidecar is bound to this preview.

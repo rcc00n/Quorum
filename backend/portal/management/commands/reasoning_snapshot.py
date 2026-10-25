@@ -5,7 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
-from portal.reasoning_preview import bind_preview_sidecar, parse_preview_json, present_reasoning
+from portal.reasoning_preview import artifact_review_issues, bind_preview_sidecar, parse_preview_json, present_reasoning
 from portal.snapshot_store import read_bounded
 from portal.snapshot_validation import SnapshotError
 
@@ -62,6 +62,7 @@ class Command(BaseCommand):
             report.update(producer_commit=commit, declared_config_sha256=declared, git_config_sha256=actual)
             require(actual == declared, 'producer_config_mismatch')
             report['metadata_valid'] = True
+            report['issues'].extend(artifact_review_issues(options['sha256']))
         except SnapshotError as exc:
             report['issues'].append(str(exc))
         except (OSError, ValueError, TypeError, KeyError):

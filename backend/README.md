@@ -83,3 +83,11 @@ python backend/manage.py reasoning_snapshot --file <private-original.json> --sha
 ```
 
 The JSON report separates `compatible` from `metadata_valid`. A config discrepancy exits nonzero; even matching metadata keeps `execution_verified`, `source_text_verified` and `published` false. It never rewrites inputs. Optional local tests take `QUORUM_TEST_GENUINE_SNAPSHOT`; CI skips those two private-original tests and uses synthetic negative cases instead.
+
+### Historical v4 editorial hold
+
+The exact original closed-v4 hash has a preview advisory and acceptance hold for
+its owner-disclosed impact contradiction. Producer score and claims are unchanged;
+the advisory does not bypass JSON, provenance or publisher validation. The raw
+artifact and independent D5/ledger verification remain necessary. The existing
+warning array carries this local editorial disclosure; no producer contract changes.

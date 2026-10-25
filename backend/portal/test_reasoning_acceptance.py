@@ -53,3 +53,20 @@ class ReasoningAcceptanceTests(SimpleTestCase):
         for options in (dict(sha256='0'*64),dict(sidecar_sha256='1'*64),dict(sha256='short'),
                         dict(producer_commit='not-a-commit'),dict(producer_commit='b'*40),dict(file='/missing/TEST-private-path')):
             with self.subTest(options=list(options)):self.run_report(blocked=True,**options)
+
+    def test_editorial_hold_blocks_acceptance_even_with_matching_metadata(self):
+        with patch('portal.management.commands.reasoning_snapshot.artifact_review_issues',
+                   return_value=['impact_score_review_required']):
+            report = self.run_report(blocked=True)
+        self.assertTrue(report['metadata_valid'])
+        self.assertEqual(report['issues'], ['impact_score_review_required'])
+
+    def test_v4_hold_is_exact_hash_only_and_never_changes_parser_rules(self):
+        from .reasoning_preview import GENUINE_V4_SHA256, HISTORICAL_V3_SHA256, artifact_review_issues, artifact_review_notices
+        self.assertEqual(artifact_review_issues(GENUINE_V4_SHA256), ['impact_score_review_required'])
+        for sha in (HISTORICAL_V3_SHA256, '0' * 64, GENUINE_V4_SHA256[:-1] + '0'):
+            self.assertEqual(artifact_review_issues(sha), [])
+            self.assertEqual(artifact_review_notices(sha), [])
+        notices = ' '.join(artifact_review_notices(GENUINE_V4_SHA256))
+        self.assertIn('producer score 6 is preserved', notices)
+        self.assertIn('has not passed independent impact review', notices)

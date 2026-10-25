@@ -20,6 +20,28 @@ from .snapshot_store import read_bounded
 
 SAMPLE = Path(__file__).parent / "fixtures/reasoning-demo/snapshot.sample.json"
 HISTORICAL_V3_SHA256 = "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
+GENUINE_V4_SHA256 = "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79"
+
+
+def artifact_review_issues(sha256):
+    # DECISION(2026-10-25, rcc00n/Codex): pin an editorial hold to the owner-disclosed v4 bytes.
+    # Why: conditional/reversible rationale conflicts with irreversibility 1; do not rescore producer output.
+    return ["impact_score_review_required"] if sha256 == GENUINE_V4_SHA256 else []
+
+
+def artifact_review_notices(sha256):
+    if not artifact_review_issues(sha256):
+        return []
+    return [
+        "IMPACT REVIEW PENDING: producer score 6 is preserved. The owner reports a conditional and "
+        "reversible irreversibility rationale; assigning 0 instead of 1 would yield 5, below the story "
+        "threshold of 6. This story has not passed independent impact review. Publication is blocked.",
+        "Ledger scope: the owner reports 1674 recorded calls include replayed and unused rows from "
+        "earlier attempts, including 6 errors. These are not current-attempt spending or failure totals. "
+        "Original execution receipts and the D5 source-verification report require separate acceptance.",
+    ]
+
+
 SAMPLE_REVISION = "6ea82434d0f06cefb51f5536732ceac68e9780ef"
 MISSING = [
     "original document/source IDs",
@@ -682,7 +704,7 @@ def present_reasoning(raw, *, now=None, catalog=None):
             # Why: missing metadata must not erase a known corpus limitation.
             provisional=True if hashlib.sha256(raw).hexdigest() == HISTORICAL_V3_SHA256 else None,
             missing_provenance=missing_provenance,
-            warnings=[
+            warnings=artifact_review_notices(hashlib.sha256(raw).hexdigest()) + [
                 (
                     "FICTIONAL data; links and quotations are illustrative, not verified news."
                     if p["provenance"]["fictional"]
