@@ -1,4 +1,5 @@
-"""Impact bar (DECISIONS.md › Selecting major news). Points are judged by the model; the sum, the gate and the cap are code."""
+"""Impact bar (DECISIONS.md › Selecting major news). `reach` is judged by the model; legal force and irreversibility are
+mapped here from facts the model reports; confirmation, the sum, the gate and the cap are code."""
 
 from __future__ import annotations
 
@@ -6,6 +7,33 @@ from .. import config
 from ..state import Event, Rubric
 
 POINT_RANGES = {"legal_force": (0, 2), "reach": (0, 3), "irreversibility": (0, 2), "confirmation": (0, 2)}
+
+
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): the model reports closed-set facts (legal_status, act_state) and
+# these tables map them to the legal_force and irreversibility points; an unknown or missing fact scores 0. Why: on the
+# 2026-10-24 run a model-judged irreversibility of 1 contradicted its own rationale ("conditional and reversible", 0)
+# and put the day's only story exactly at the threshold; a fact is checkable, a free point is not. Failing toward 0
+# keeps an unreadable answer below the bar, never above it.
+LEGAL_STATUS_POINTS = {"none": 0, "statement_or_proposal": 1, "adopted_or_ruled": 2}
+ACT_STATE_POINTS = {"announced_or_threatened": 0, "adopted_reversible": 1, "executed_irreversible": 2}
+
+
+def fact_value(value: object, allowed: dict[str, int]) -> str | None:
+    """The closed-set fact as reported (case and surrounding spaces ignored), or None when it is missing or not in the set."""
+    if not isinstance(value, str):
+        return None
+    v = value.strip().lower()
+    return v if v in allowed else None
+
+
+def legal_force_points(legal_status: object) -> int:
+    v = fact_value(legal_status, LEGAL_STATUS_POINTS)
+    return LEGAL_STATUS_POINTS[v] if v else 0
+
+
+def irreversibility_points(act_state: object) -> int:
+    v = fact_value(act_state, ACT_STATE_POINTS)
+    return ACT_STATE_POINTS[v] if v else 0
 
 
 def clamp_points(name: str, value: int) -> int:

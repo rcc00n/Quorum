@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "ok",
-  "generated_at": "2026-10-24T17:22:49Z",
+  "generated_at": "2026-10-25T01:51:26Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -43,9 +43,9 @@
         "confirmation": 2,
         "total": 8,
         "rationale": {
-          "legal_force": "an adopted document is in the corpus",
+          "legal_force": "adopted_or_ruled: an adopted document is in the corpus",
           "reach": "national scope in the headlines",
-          "irreversibility": "completed or signed act",
+          "irreversibility": "executed_irreversible: completed or signed act",
           "confirmation": "a signed document or two independent groups behind a claim"
         }
       },
@@ -1491,9 +1491,9 @@
         "confirmation": 2,
         "total": 7,
         "rationale": {
-          "legal_force": "an adopted document is in the corpus",
+          "legal_force": "adopted_or_ruled: an adopted document is in the corpus",
           "reach": "national scope in the headlines",
-          "irreversibility": "adopted but reversible by a later act",
+          "irreversibility": "adopted_reversible: adopted but reversible by a later act",
           "confirmation": "a signed document or two independent groups behind a claim"
         }
       },
@@ -2000,7 +2000,7 @@
       "decision": "14 documents from 12 sources, 3 official; research budget 2 rounds per event",
       "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
-      "duration_ms": 2
+      "duration_ms": 1
     },
     {
       "node": "cluster",
@@ -2009,14 +2009,14 @@
       "decision": "4 events from 14 documents; 7 key merges in code, model: 6 pair / 1 singleton / 2 chain questions, 3 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 13
+      "duration_ms": 22
     },
     {
       "node": "score_importance",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
       "decision": "legal_force 2, reach 2, irreversibility 2 (confirmation pending)",
-      "reason": "legal_force: an adopted document is in the corpus; reach: national scope in the headlines; irreversibility: completed or signed act",
+      "reason": "legal_force: adopted_or_ruled: an adopted document is in the corpus; reach: national scope in the headlines; irreversibility: executed_irreversible: completed or signed act",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -2025,7 +2025,7 @@
       "iteration": 1,
       "event_id": "5e4a66f922db",
       "decision": "legal_force 2, reach 2, irreversibility 1 (confirmation pending)",
-      "reason": "legal_force: an adopted document is in the corpus; reach: national scope in the headlines; irreversibility: adopted but reversible by a later act",
+      "reason": "legal_force: adopted_or_ruled: an adopted document is in the corpus; reach: national scope in the headlines; irreversibility: adopted_reversible: adopted but reversible by a later act",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -2034,7 +2034,7 @@
       "iteration": 1,
       "event_id": "43c374b38b98",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
-      "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -2043,7 +2043,7 @@
       "iteration": 1,
       "event_id": "150fcfcd869a",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
-      "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -2054,7 +2054,7 @@
       "decision": "10 claims extracted",
       "reason": "from 7 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 10
+      "duration_ms": 6
     },
     {
       "node": "extract_claims",
@@ -2072,7 +2072,7 @@
       "decision": "4 claims extracted",
       "reason": "from 2 documents; level-2 sources contribute leads only, level-3 nothing",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "extract_claims",
@@ -2087,10 +2087,10 @@
       "node": "research",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
-      "decision": "round 1: 28 passages with a stance for 10 claims",
+      "decision": "round 1: 28 passages with a stance for 10 claims; 14 passages below relevance",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 45
+      "duration_ms": 52
     },
     {
       "node": "research",
@@ -2099,7 +2099,7 @@
       "decision": "round 1: 7 passages with a stance for 3 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 5
+      "duration_ms": 3
     },
     {
       "node": "research",
@@ -2159,28 +2159,28 @@
       "node": "research",
       "iteration": 2,
       "event_id": "84b6dd5f95fe",
-      "decision": "round 2: 0 passages with a stance for 3 claims",
+      "decision": "round 2: 0 passages with a stance for 3 claims; 5 passages below relevance",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 5
+      "duration_ms": 13
     },
     {
       "node": "research",
       "iteration": 2,
       "event_id": "43c374b38b98",
-      "decision": "round 2: 0 passages with a stance for 3 claims",
+      "decision": "round 2: 0 passages with a stance for 3 claims; 7 passages below relevance",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 18
+      "duration_ms": 22
     },
     {
       "node": "research",
       "iteration": 2,
       "event_id": "150fcfcd869a",
-      "decision": "round 2: 0 passages with a stance for 2 claims",
+      "decision": "round 2: 0 passages with a stance for 2 claims; 1 passages below relevance",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
       "model": "stand-ins",
-      "duration_ms": 14
+      "duration_ms": 11
     },
     {
       "node": "verify",
@@ -2213,19 +2213,19 @@
       "node": "fact_check",
       "iteration": 1,
       "event_id": "84b6dd5f95fe",
-      "decision": "6 confirmed, 0 disputed, 4 unverified from 19 own passages",
+      "decision": "6 confirmed, 0 disputed, 4 unverified from 19 own passages; 21 passages below relevance",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 99
+      "duration_ms": 114
     },
     {
       "node": "fact_check",
       "iteration": 1,
       "event_id": "5e4a66f922db",
-      "decision": "3 confirmed, 0 disputed, 0 unverified from 5 own passages",
+      "decision": "3 confirmed, 0 disputed, 0 unverified from 5 own passages; 6 passages below relevance",
       "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier",
       "model": "stand-ins",
-      "duration_ms": 19
+      "duration_ms": 31
     },
     {
       "node": "fact_check",
@@ -2333,7 +2333,7 @@
       "decision": "draft 1: 7 blocks from 6 confirmed, 4 statements, 0 open",
       "reason": "first draft",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "write",
@@ -2351,7 +2351,7 @@
       "decision": "draft 1 rejected: 1 violation(s)",
       "reason": "standfirst: forbidden wording 'sweeping'; back to the writer",
       "model": null,
-      "duration_ms": 6
+      "duration_ms": 5
     },
     {
       "node": "critique",
@@ -2369,7 +2369,7 @@
       "decision": "draft 2: 7 blocks from 6 confirmed, 4 statements, 0 open",
       "reason": "rewrite after the critic: standfirst: forbidden wording 'sweeping'",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "write",
@@ -2387,7 +2387,7 @@
       "decision": "draft 2 approved",
       "reason": "order, attribution, sourcing and wording rules all hold",
       "model": null,
-      "duration_ms": 3
+      "duration_ms": 8
     },
     {
       "node": "critique",
@@ -2396,7 +2396,7 @@
       "decision": "draft 2 approved",
       "reason": "order, attribution, sourcing and wording rules all hold",
       "model": null,
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "roundup",
@@ -2414,7 +2414,7 @@
       "decision": "snapshot ok: 2 stories, roundup of 2",
       "reason": "built from state; the store versions it",
       "model": "stand-ins",
-      "duration_ms": 19
+      "duration_ms": 26
     }
   ]
 }

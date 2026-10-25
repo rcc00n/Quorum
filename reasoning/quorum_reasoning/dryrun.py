@@ -89,11 +89,11 @@ def rubric(p: dict[str, Any]) -> dict[str, Any]:
     low = titles.lower()
     doc_types = {d.get("doc_type") for d in p.get("documents", []) if d.get("official")}
     if doc_types & {"law", "order", "vote", "ruling"}:
-        legal, legal_why = 2, "an adopted document is in the corpus"
+        legal, legal_why = "adopted_or_ruled", "an adopted document is in the corpus"
     elif doc_types & {"statement", "release"}:
-        legal, legal_why = 1, "official statement only"
+        legal, legal_why = "statement_or_proposal", "official statement only"
     else:
-        legal, legal_why = 0, "no official document"
+        legal, legal_why = "none", "no official document"
     if any(k in low for k in ("congress", "senate", "president", "federal", "nationwide", "law", "sanctions", "parliament")):
         reach, reach_why = 2, "national scope in the headlines"
     elif any(k in low for k in ("dead", "killed", "casualt", "displaced", "evacuat")):
@@ -103,16 +103,16 @@ def rubric(p: dict[str, Any]) -> dict[str, Any]:
     else:
         reach, reach_why = 1, "scope not stated; regional assumed"
     if any(k in low for k in ("signed", "completed", "killed", "destroyed", "exchange")):
-        irr, irr_why = 2, "completed or signed act"
+        irr, irr_why = "executed_irreversible", "completed or signed act"
     elif any(k in low for k in ("adopt", "approv", "pass", "amend", "impose")):
-        irr, irr_why = 1, "adopted but reversible by a later act"
+        irr, irr_why = "adopted_reversible", "adopted but reversible by a later act"
     else:
-        irr, irr_why = 0, "announcement or talks"
+        irr, irr_why = "announced_or_threatened", "announcement or talks"
     return {
-        "legal_force": legal,
+        "legal_status": legal,
+        "act_state": irr,
         "reach": reach,
-        "irreversibility": irr,
-        "rationale": {"legal_force": legal_why, "reach": reach_why, "irreversibility": irr_why},
+        "rationale": {"legal_status": legal_why, "act_state": irr_why, "reach": reach_why},
     }
 
 

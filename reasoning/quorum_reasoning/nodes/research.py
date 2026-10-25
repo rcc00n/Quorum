@@ -3,7 +3,9 @@
 Round 1 searches the event's own documents. Round 2 (requested by `verify` for thin claims) widens to every
 document of the day and all official documents. Stance per passage is a model judgment; which passages
 exist, which groups they belong to and how many rounds run are code. The model's stance answer is untrusted:
-only the four allowed stance words are accepted, anything else counts as neutral (untrusted.valid_stance).
+only the four allowed stance words are accepted, anything else counts as neutral (untrusted.valid_stance), and a
+`contradicts` without a verbatim `contradicted_span` counts as neutral (untrusted.checked_stance). A passage that
+carries too little of the claim is not asked about at all (relevant).
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ from __future__ import annotations
 from .. import config, llm, untrusted
 from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin, origin_group
 from ..state import Claim, DocRef, Evidence, RunState, StepError
-from ..text import best_passage, clip_sentences, tokens
+from ..text import best_passage, clip_sentences, containment, tokens
 from ..tools.corpus import OFFICIAL_ID_OFFSET
 from ..tools.fetch_text import FetchResult, fetch_result, find_quote
 from ..trace import finish, step
@@ -31,6 +33,17 @@ def stance_task(doc: DocRef) -> str:
     # input tokens per copy on every stance call (two copies since e2b9a81), and in 1772 stance calls over two live
     # runs no passage came from a law/order/vote/ruling, so it never applied.
     return "stance_document" if doc.get("official") and doc.get("doc_type") in DOCUMENT_TYPES_THAT_ESTABLISH else "stance"
+
+
+def relevant(claim_text: str, passage: str) -> bool:
+    """True when the passage carries at least `research.stance_min_overlap` of the claim's tokens (text.containment):
+    the pre-call guard both stance nodes apply before asking the model."""
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): no stance call for a passage that holds less than
+    # research.stance_min_overlap (0.15) of the claim's tokens; the step decision counts the skips. A cost guard: at
+    # 0.15 it loses 8 of 222 supports (3.6%), removes 24 contradicts and saves 110 of 2 606 calls (4%) on the
+    # 2026-10-24 run-3/5 journals, while 0.25 cost 11% of supports and the D5 noise mostly survived it; the noise
+    # guard is the post-call span check (untrusted.checked_stance). Numbers in config/reasoning.toml.
+    return containment(claim_text, passage) >= float(config.get("research", "stance_min_overlap", 0.0) or 0.0)
 
 
 def stance_question(role: str, claim_text: str, passage: str, doc: DocRef) -> tuple[str, str, str, str, str | None, bool]:
@@ -60,6 +73,12 @@ def bind_quote(ev: Evidence, doc: DocRef, fetched: FetchResult | None) -> Eviden
     comparable = bool(stored and fetched.content_hash) and not (doc["access_level"] == 1 and fetched.access_achieved == 2)  # a lead-only fallback hashes no body
     ev["hash_mismatch"] = (stored != fetched.content_hash) if comparable else None
     return ev
+
+
+def relevance_note(irrelevant: int, ungrounded: int) -> str:
+    """The step-decision suffix counting the two relevance guards; empty when neither fired."""
+    parts = ([f"{irrelevant} passages below relevance"] if irrelevant else []) + ([f"{ungrounded} contradictions ungrounded"] if ungrounded else [])
+    return f"; {', '.join(parts)}" if parts else ""
 
 
 def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str, fetched: FetchResult | None = None) -> Evidence:
@@ -146,6 +165,7 @@ def run(state: RunState) -> dict:
             failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at stance_question)
             repeats = 0
+            irrelevant = ungrounded = 0  # the two relevance guards (decisions at relevant and untrusted.checked_stance)
             for c in targets:
                 pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
                 # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
@@ -154,6 +174,9 @@ def run(state: RunState) -> dict:
                     fetched = fetch_result(d, dry_run=state["dry_run"])
                     passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
                     if not passage:
+                        continue
+                    if not relevant(c["text"], passage):
+                        irrelevant += 1
                         continue
                     question = stance_question("researcher", c["text"], passage, d)
                     if question in asked:
@@ -176,12 +199,14 @@ def run(state: RunState) -> dict:
                         except Exception as exc:  # noqa: BLE001
                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
                             continue  # a failed question is not remembered: a repeat of it is asked again
-                        stance = asked[question] = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
+                        stance, downgraded = untrusted.checked_stance(ans, passage, c["text"], require_span=not llm.is_dry_run(state["dry_run"]))  # the stand-in answers whenever llm.is_dry_run
+                        ungrounded += downgraded
+                        asked[question] = stance
                     if stance == "neutral":
                         continue
                     c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
                     found += 1
-            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "")
+            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded)
             earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
             s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + (f"; failures: {failed[0]}" if failed else "")
             if failed:

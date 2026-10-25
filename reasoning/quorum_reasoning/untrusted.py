@@ -5,7 +5,7 @@ instructions aimed at the model ("ignore previous instructions", fake JSON repli
 Transport-level escaping already exists: payloads are JSON-encoded, so hostile text cannot break out of a
 string value. What this module adds is the semantic layer: labelling payload text as data (DATA_NOTE),
 bounding how much untrusted text one payload may carry (clip), and validating what the model returns
-against the state before it is used (valid_stance, grounded_in, known_urls, parse_json_object).
+against the state before it is used (valid_stance, checked_stance, grounded_in, known_urls, parse_json_object).
 
 No model, no I/O. Thresholds here are not product decisions; they bound payload sizes and reject invented
 model output, nothing a judge would ask "why this number?" about at product level.
@@ -17,7 +17,7 @@ import json
 import re
 from typing import Any
 
-from .text import containment, sentences, tokens
+from .text import containment, sentences, stems, tokens
 
 # Prefixed to every live model payload (llm.json_task). The prompts carry the same rule.
 DATA_NOTE = (
@@ -61,6 +61,65 @@ def clip(text: Any, limit: int) -> str:
 def valid_stance(value: Any) -> str:
     """The stance if it is one of the four allowed words, else `neutral` (fail-safe: neutral is discarded)."""
     return value if isinstance(value, str) and value in STANCES else "neutral"
+
+
+_TYPOGRAPHY = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "«": '"', "»": '"', "–": "-", "—": "-", "…": "..."})
+_NON_WORD = re.compile(r"[^\w]+")
+
+
+def _words(text: str) -> list[str]:
+    """The word sequence a verbatim check compares: typography made plain (curly quotes, guillemets, dashes,
+    ellipsis), case-folded, every run of punctuation or whitespace one separator."""
+    return _NON_WORD.sub(" ", (text or "").translate(_TYPOGRAPHY).lower()).split()
+
+
+def span_in(span: Any, passage: str) -> bool:
+    """True when `span` is a string whose words occur as a contiguous run of the passage's words (case, whitespace,
+    punctuation and typographic variants ignored). Whole words only: "war" is not found in "warning"."""
+    if not isinstance(span, str):
+        return False
+    s = _words(span)
+    return bool(s) and f" {' '.join(s)} " in f" {' '.join(_words(passage))} "
+
+
+SPAN_WORDS_MIN = 2
+
+
+def span_contradicts_claim(span: str, claim_text: str) -> bool:
+    """True when the span has at least SPAN_WORDS_MIN words and shares a significant stem with the claim (text.stems:
+    function words dropped, suffixes stripped)."""
+    return len(_words(span)) >= SPAN_WORDS_MIN and bool(stems(span) & stems(claim_text))
+
+
+def checked_stance(answer: Any, passage: str, claim_text: str, *, require_span: bool = True) -> tuple[str, bool]:
+    """The stance of a stance reply after the post-call relevance guard, and whether a contradiction was downgraded.
+
+    `supports`, `statement` and `neutral` pass through valid_stance unchanged. A `contradicts` stays only when its
+    `contradicted_span` is found as a word run in the passage the model was shown (span_in), has at least two words
+    and shares a significant stem with the claim (span_contradicts_claim); otherwise it becomes `neutral` and the
+    second value is True, so the caller counts it.
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): the span must have >= 2 words and share a stem with the claim.
+    Why: a grounding-only check lets any run of the passage pass ("Getty Images", "Tuesday"); requiring overlap with
+    the claim ties the span to the fact being contradicted. Words, not text.tokens, count toward the two: tokens
+    drops words under three characters, and "killed 31" is a two-word span. Owner's decision (Yelysei, 2026-10-25).
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a `contradicts` must quote the passage words that assert the
+    opposite, else it is neutral; a reply without the field (an old reply) counts as ungrounded too. Why: on the
+    2026-10-24 canonical run (D5) captions, a Kyiv-strike passage, a live-blog line and a Pope/Kremlin passage came
+    back `contradicts`, and one contradiction disputes a claim against two independent supports; replay keys include
+    the prompt hash, so old replies are not replayed under the new prompt. `require_span=False` is only for the
+    dry-run stand-in (dryrun.stance, deterministic code that never writes a span): its contradictions stay.
+    """
+    stance = valid_stance(answer.get("stance") if isinstance(answer, dict) else None)
+    if stance != "contradicts":
+        return stance, False
+    span = answer.get("contradicted_span")  # type: ignore[union-attr]
+    if span is None and not require_span:
+        return stance, False
+    if span_in(span, passage) and span_contradicts_claim(span, claim_text):
+        return stance, False
+    return "neutral", True
 
 
 _NUMBER = re.compile(r"\d[\d.,]*")

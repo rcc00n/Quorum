@@ -1,9 +1,11 @@
-"""score_importance: the model judges three rubric points per event with a one-line rationale each.
+"""score_importance: per event the model reports two facts (legal_status, act_state) and judges `reach`, each with a
+one-line rationale; code maps the facts to the legal_force and irreversibility points (rules/impact_bar.py).
 
 Confirmation points are not judged here: `adjudicate` computes them from the verified claims and only then
-applies the bar and the cap (rules/impact_bar.py). The three judged points are stored now so the trace shows
-what the model thought before any evidence was gathered. The model's answer is untrusted: points that are
-not integers count as 0 (build_rubric clamps the ranges), a failed call scores the event 0 and records the
+applies the bar and the cap (rules/impact_bar.py). The three pre-evidence points are stored now so the trace shows
+what the model reported before any evidence was gathered. The model's answer is untrusted: a `reach` that is not
+an integer counts as 0 (build_rubric clamps the ranges), a missing or unknown fact counts as 0, numeric legal_force /
+irreversibility in an old-shape answer are ignored, and a failed call scores the event 0 and records the
 error — the fail-safe direction is below the bar, never above it.
 """
 
@@ -12,8 +14,8 @@ from __future__ import annotations
 from typing import Any
 
 from .. import llm, untrusted
-from ..rules.impact_bar import build_rubric
-from ..state import DocRef, RunState, StepError
+from ..rules.impact_bar import ACT_STATE_POINTS, LEGAL_STATUS_POINTS, build_rubric, fact_value
+from ..state import DocRef, Rubric, RunState, StepError
 from ..trace import finish, step
 
 
@@ -29,11 +31,33 @@ def _point(ans: dict[str, Any], name: str) -> int:
         return 0
 
 
-def _rationale(ans: dict[str, Any]) -> dict[str, str]:
+def _why(ans: dict[str, Any], *keys: str) -> str:
     r = ans.get("rationale")
     if not isinstance(r, dict):
-        return {}
-    return {str(k): untrusted.clip(v, untrusted.CAP_LABEL) for k, v in r.items()}
+        return ""
+    for k in keys:
+        if r.get(k) not in (None, ""):
+            return untrusted.clip(r[k], untrusted.CAP_LABEL)
+    return ""
+
+
+def _fact(ans: dict[str, Any], field: str, allowed: dict[str, int], *why_keys: str) -> tuple[int, str]:
+    """The point mapped from a reported fact, and the rationale prefixed by that fact (or by "fact not reported")."""
+    fact = fact_value(ans.get(field), allowed)
+    why = _why(ans, field, *why_keys)
+    head = fact if fact else "fact not reported"
+    return (allowed[fact] if fact else 0), (f"{head}: {why}" if why else head)
+
+
+def _rubric(ans: dict[str, Any]) -> Rubric:
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): legal_force and irreversibility come from the reported facts
+    # only; numeric legal_force / irreversibility in the answer are ignored. Why: a free point contradicted its own
+    # rationale on the 2026-10-24 run (see rules/impact_bar.py). The rationale keys stay legal_force / reach /
+    # irreversibility, the shape the portal reads.
+    legal, legal_why = _fact(ans, "legal_status", LEGAL_STATUS_POINTS, "legal_force")
+    irr, irr_why = _fact(ans, "act_state", ACT_STATE_POINTS, "irreversibility")
+    rationale = {"legal_force": legal_why, "reach": _why(ans, "reach"), "irreversibility": irr_why}
+    return build_rubric(legal, _point(ans, "reach"), irr, 0, rationale)
 
 
 def run(state: RunState) -> dict:
@@ -60,7 +84,7 @@ def run(state: RunState) -> dict:
                     },
                     dry_run=state["dry_run"],
                 )
-                e["rubric"] = build_rubric(_point(ans, "legal_force"), _point(ans, "reach"), _point(ans, "irreversibility"), 0, _rationale(ans))
+                e["rubric"] = _rubric(ans)
                 r = e["rubric"]
                 s.decision = f"legal_force {r['legal_force']}, reach {r['reach']}, irreversibility {r['irreversibility']} (confirmation pending)"
                 s.reason = "; ".join(f"{k}: {v}" for k, v in r["rationale"].items())

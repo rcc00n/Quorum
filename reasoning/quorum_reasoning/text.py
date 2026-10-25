@@ -14,8 +14,19 @@ _SENT = re.compile(
 )
 
 
+# A line break (one or more, with any surrounding whitespace) always ends a sentence.
+_LINES = re.compile(r"\s*\n\s*")
+
+
 def sentences(text: str) -> list[str]:
-    return [s.strip() for s in _SENT.split(text or "") if s.strip()]
+    """The sentences of `text`: each line split at sentence ends (abbreviation-aware, _SENT); a newline is a hard
+    boundary. Every sentence is a verbatim substring of `text` (stripped), so a quote cut from one is found in it.
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a newline ends a sentence. Why: a photo credit line glued to
+    the next paragraph ("…/Getty Images", blank line, "Meanwhile, …") became one passage; in the 2026-10-24 run-3/5
+    journals 37 stance rows whose passage starts with such a caption came back `contradicts` (D5).
+    """
+    return [s.strip() for line in _LINES.split(text or "") for s in _SENT.split(line) if s.strip()]
 
 
 def tokens(text: str) -> set[str]:
@@ -48,12 +59,14 @@ def clip_sentences(text: str, limit: int) -> str:
     text = (text or "").strip()
     if len(text) <= limit:
         return text
-    out = ""
+    # the prefix is cut from `text` itself, not re-joined, so the quote stays verbatim when sentences are separated
+    # by a newline or several spaces (a newline is a sentence boundary, see sentences)
+    out, pos = "", 0
     for sent in sentences(text):
-        candidate = (out + " " + sent).strip()
-        if len(candidate) > limit:
+        end = text.find(sent, pos) + len(sent)
+        if end > limit:
             break
-        out = candidate
+        out, pos = text[:end], end
     if out:
         return out
     cut = text[:limit]

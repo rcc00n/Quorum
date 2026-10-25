@@ -27,6 +27,14 @@ previous_days = 2            # 0 disables; each day is one more 24-hour window b
 # direct route's spacing; a passage that shares no words with the claim is never judged `supports`, so ranking by
 # overlap drops the pairs the model would have called neutral anyway. 0 = no cap.
 candidates_per_claim = 8
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a stance call is made only when the passage holds at least
+# stance_min_overlap of the claim's tokens (text.containment; research.relevant); below it the passage is skipped
+# and counted ("N passages below relevance"). 0.15 makes it a cost guard; the noise guard is the post-call
+# `contradicted_span` check (untrusted.checked_stance). Why: offline on the 2026-10-24 run-3/5 journals (2 606
+# stance answers), 0.25 removed 25 of 222 supports (11%) for 146 of 714 contradicts (20%) and the D5 noise examples
+# mostly survived it (captions 0.21-0.64, Kyiv passages 0.20-0.56); 0.15 loses 8 of 222 supports (3.6%), removes
+# 24 contradicts and saves 110 calls (4%).
+stance_min_overlap = 0.15    # 0 disables
 
 [clustering]
 # Superseded 2026-10-24 (kept for the record): similarity_threshold = 0.5 and borderline_band = 0.25 drove

@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-24T17:22:49Z",
+  "generated_at": "2026-10-25T01:51:27Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -98,7 +98,7 @@
       "decision": "4 documents from 3 sources, 0 official; research budget 2 rounds per event",
       "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
-      "duration_ms": 2
+      "duration_ms": 0
     },
     {
       "node": "cluster",
@@ -107,14 +107,14 @@
       "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 3
     },
     {
       "node": "score_importance",
       "iteration": 1,
       "event_id": "b913ab53ff63",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
-      "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -123,7 +123,7 @@
       "iteration": 1,
       "event_id": "8ec9e4f49dc1",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
-      "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -132,7 +132,7 @@
       "iteration": 1,
       "event_id": "c83a993b6c7f",
       "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
-      "reason": "legal_force: no official document; reach: scope not stated; regional assumed; irreversibility: announcement or talks",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -170,7 +170,7 @@
       "decision": "round 1: 2 passages with a stance for 2 claims",
       "reason": "event documents only",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 2
     },
     {
       "node": "research",
@@ -332,7 +332,7 @@
       "decision": "snapshot empty: 0 stories, roundup of 3",
       "reason": "built from state; the store versions it",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 2
     }
   ]
 }
