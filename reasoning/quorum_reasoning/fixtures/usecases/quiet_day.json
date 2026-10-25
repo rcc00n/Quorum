@@ -1,0 +1,33 @@
+{
+  "_note": "Fictional use-case day (docs/reviews/2026-10-23-reasoning-review.md, workstream D): a quiet day. No event reaches the impact bar; the snapshot must say status empty and the roundup must carry every event (DECISIONS.md > Selecting major news: No minimum).",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-01",
+  "documents": [
+    {
+      "id": 9101, "source_id": "guardian", "source_name": "The Guardian", "independence_group": "guardian", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.theguardian.com/fiction/2026/nov/01/grain-corridor-talks-vienna",
+      "title": "Delegations meet in Vienna for grain corridor talks", "lead": "",
+      "published_at": "2026-10-31T10:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "Delegations met in Vienna for grain corridor talks. The agenda covers inspection schedules for the corridor."
+    },
+    {
+      "id": 9102, "source_id": "reuters", "source_name": "Reuters", "independence_group": "reuters", "kind": "agency",
+      "flank": null, "tier": null, "url": "https://www.reuters.com/fiction/grain-corridor-talks-open-2026-11-01/",
+      "title": "Grain corridor talks open in Vienna", "lead": "Delegations meet in Vienna for talks on the grain corridor.",
+      "published_at": "2026-10-31T11:00:00Z", "access_level": 2, "wire_origin": null
+    },
+    {
+      "id": 9103, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/fiction/2026/11/01/museum-reopens-lviv",
+      "title": "Museum reopens in Lviv after winter repairs", "lead": "",
+      "published_at": "2026-10-31T12:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "The museum reopened in Lviv after winter repairs."
+    },
+    {
+      "id": 9104, "source_id": "reuters", "source_name": "Reuters", "independence_group": "reuters", "kind": "agency",
+      "flank": null, "tier": null, "url": "https://www.reuters.com/fiction/wheat-futures-eased-2026-11-01/",
+      "title": "Wheat futures eased in Tuesday trading", "lead": "Wheat futures eased in Tuesday trading, brokers reported.",
+      "published_at": "2026-10-31T13:00:00Z", "access_level": 2, "wire_origin": null
+    }
+  ]
+}
