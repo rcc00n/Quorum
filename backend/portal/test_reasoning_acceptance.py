@@ -114,3 +114,12 @@ class ReasoningAcceptanceTests(SimpleTestCase):
                     report = self.run_report(config=config, blocked=True)
                     self.assertFalse(report['metadata_valid'])
                     self.assertEqual(report['issues'], [issue])
+
+
+    def test_closed_producer_prefix_must_be_a_real_commit_reference(self):
+        for value in ('', 'aaaaaa', 'a'*41, True, 123, 'aaaaaaa:private'):
+            with self.subTest(value=type(value).__name__):
+                config = self.closed_producer(commit_of_the_publishing_process=value)
+                report = self.run_report(config=config, blocked=True)
+                self.assertFalse(report['metadata_valid'])
+                self.assertEqual(report['issues'], ['producer_commit_mismatch'])

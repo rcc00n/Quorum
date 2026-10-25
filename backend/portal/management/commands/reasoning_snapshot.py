@@ -48,7 +48,9 @@ class Command(BaseCommand):
             sidecar = parse_preview_json(sidecar_raw)
             producer = sidecar['producer']
             if 'commit_of_the_publishing_process' in producer:
-                require(commit.startswith(producer['commit_of_the_publishing_process']), 'producer_commit_mismatch')
+                prefix = producer['commit_of_the_publishing_process']
+                require(isinstance(prefix, str) and re.fullmatch(r'[0-9a-f]{7,40}', prefix)
+                        and commit.startswith(prefix), 'producer_commit_mismatch')
                 try:
                     config = subprocess.check_output(['git', 'show', f'{commit}:reasoning/config/reasoning.toml'],
                         cwd=Path(__file__).resolve().parents[4], stderr=subprocess.DEVNULL)
