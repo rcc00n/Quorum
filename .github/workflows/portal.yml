@@ -4,10 +4,10 @@ name: Portal regressions
 on:
   push:
     branches: ["feature/web-*", integration]
-    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', '.github/workflows/portal.yml']
+    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', 'agent/**', 'scripts/**', 'docs/examples/**', '.github/workflows/portal.yml']
   pull_request:
     branches: [integration, master]
-    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', '.github/workflows/portal.yml']
+    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', 'agent/**', 'scripts/**', 'docs/examples/**', '.github/workflows/portal.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -48,3 +48,48 @@ jobs:
           node web/tests/boundary.cjs
           node web/tests/boundary.cjs --reasoning
           node web/tests/boundary.cjs --reasoning --roundup-checks
+
+  combined-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DJANGO_DEBUG: '1'
+      QUORUM_DRY_RUN: '1'
+      # Synthetic route for the legacy seed-journal test; sockets remain blocked.
+      MODEL_BASE_URL: 'http://127.0.0.1:1'
+      MODEL_API_KEY: 'TEST-offline-only'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r backend/requirements.txt -e './reasoning[dev]'
+      # DECISION(2026-10-24, rcc00n/Codex): combined checks block all Python sockets.
+      # Why: fixtures and replay tests must never consume credits or establish sponsor acceptance.
+      - name: Verify reasoning, collection contracts and actual snapshot handoff offline
+        run: |
+          mkdir -p "$RUNNER_TEMP/offline"
+          cat > "$RUNNER_TEMP/offline/sitecustomize.py" <<'PY'
+          import socket
+          def blocked(*args, **kwargs):
+              raise OSError('OFFLINE TEST: network connection blocked')
+          socket.socket.connect = blocked
+          socket.socket.connect_ex = blocked
+          socket.create_connection = blocked
+          PY
+          export PYTHONPATH="$RUNNER_TEMP/offline:$PWD/reasoning:$PWD/backend"
+          python -m pytest reasoning/tests -q
+          python -c "from collectors import verify_collectors as v; v.check_csv(); assert 'FAIL' not in v.seen"
+          python -m unittest discover -s scripts -p 'test_*.py'
+          python -m quorum_reasoning.run --dry-run --quiet --out "$RUNNER_TEMP/quorum-dry"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from portal.reasoning_preview import load_preview
+          paths = [*Path('docs/examples').glob('snapshot*.json'), *Path(os.environ['RUNNER_TEMP'], 'quorum-dry').glob('*/20*/v*.json')]
+          assert len(paths) >= 4, 'Missing canonical or freshly generated snapshots'
+          for path in paths:
+              load_preview(path)
+          print('PASS: canonical samples and fresh dry graph output accepted by portal; fictional, unpublished')
+          PY
+          bash scripts/verify-all.sh --offline || test "$?" -eq 2
