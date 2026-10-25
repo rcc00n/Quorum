@@ -115,9 +115,18 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
     assert.equal(result.preview.corpus_binding.sidecar_sha256, digest(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_SIDECAR)));
     if (binding.snapshot.sha256_file_bytes) {
       await page.getByText(/CLOSED EDITION \(producer-declared\)/).waitFor();
-      await page.getByRole('alert').filter({hasText:'IMPACT REVIEW PENDING:'}).waitFor();
       assert.equal(result.preview.corpus_binding.closed_edition, true);
-      assert.ok(result.preview.warnings.some(w => w.includes('has not passed independent impact review')));
+      const heldV4 = sha256 === "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79" ||
+        sample.run_id === "2026-10-24-russia-ukraine-war-5";
+      assert.equal(result.preview.warnings.some(w => w.includes('has not passed independent impact review')), heldV4);
+      if (heldV4) {
+        await page.getByRole('alert').filter({hasText:'IMPACT REVIEW PENDING:'}).waitFor();
+      } else {
+        assert.equal(await page.getByRole('alert').filter({hasText:'IMPACT REVIEW PENDING:'}).count(), 0);
+        assert.equal(sample.stories.length, 0);
+        assert.ok(result.preview.warnings.some(w => w.includes("not this attempt's spending")));
+        assert.equal(result.preview.published, false);
+      }
     } else {
       await page.getByText(/PROVISIONAL CORPUS/).waitFor();
     }
