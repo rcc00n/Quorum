@@ -33,3 +33,10 @@ The Playwright version must have its matching FFmpeg revision in the selected ca
 The recorder checks exact original hashes, a clean candidate and matching compiled receipt before starting. It creates only its own disposable loopback services/accounts, blocks external browser requests, never follows publisher links and stops its children afterward. Recordings/captions/receipts stay outside Git. `narration.vtt` is a timed speaking/caption script; the captured WebM is silent and needs final human narration/edit/review. The receipt explicitly keeps publication, execution attestation, owner memory adoption and sponsor completion false. Never upload it automatically.
 
 Human pass: check the first and final frames, captions, voice timing, source attribution, no visible credentials, correct provisional labels and no unsupported sponsor claim. Keep the final export within the actual organizer video limit; the 230-second target leaves editing margin beneath the current four-minute checklist gate. Slides, workspace selection, organizer compliance and final submission remain separate.
+
+
+## Recorded acceptance
+
+A full genuine-data rehearsal completed at 229.8 seconds (silent WebM), with VTT narration captions, immutable-original receipt and a separate artifact hash manifest outside Git. Chromium decoded the file for visual inspection. Review caught the spectrum section centering on its long source list; the recorder now asserts that the real rating selector stays in view during each mode switch, then opens source attribution separately. The original-hash, 40-source authenticated catalog binding, four modes and final limitation matrix are mandatory checks, not optional fixture fallbacks.
+
+Native original-file acceptance was also rerun: presentation-compatible, `producer_config_mismatch`, no execution/source-text verification and no publication. These limits stay in the speaking script. The video is a private rehearsal artifact; narration audio, human privacy/content review, final export/slides and submission remain unfinished.
