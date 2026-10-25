@@ -104,7 +104,9 @@ async function main(args) {
       if(url.startsWith(root+'/')||url===require('node:url').pathToFileURL(path.join(output,'release-matrix.html')).href)return route.continue();
       return route.abort();
     });
-    const start=Date.now(),hold=async seconds=>{const remaining=start+seconds*1000-Date.now();if(remaining>0)await page.waitForTimeout(remaining);};
+    // DECISION(2026-10-24, rcc00n/Codex): schedule capture against monotonic time and verify sustained selections.
+    // Why: wall-clock corrections must not skip a rating scene or misalign the speaking script.
+    const start=performance.now(),hold=async seconds=>{const remaining=start+seconds*1000-performance.now();if(remaining>0)await page.waitForTimeout(remaining);};
     await page.goto(root+'/dashboard');await page.locator('main').waitFor();await hold(12);
     await page.goto(root+'/preview/reasoning');await page.getByText('UNPUBLISHED / CORPUS EXPERIMENT',{exact:true}).waitFor();
     assert.equal(await page.locator('.r-roundup-row').count(),28);assert.equal(await page.locator('.r-story-row').count(),0);await hold(32);
@@ -119,12 +121,15 @@ async function main(args) {
     await page.goto(root+'/preview/reasoning');await page.getByLabel('Rating mode',{exact:true}).waitFor();
     for(const [i,mode] of ['allsides','mbfc','adfontes','average'].entries()) {
       await page.getByLabel('Rating mode',{exact:true}).selectOption(mode);
+      assert.equal(await page.getByLabel('Rating mode',{exact:true}).inputValue(),mode);
       // Keep the actual selector and chart visible; the spectrum section includes a long source list.
       await page.getByLabel('Rating mode',{exact:true}).evaluate(el=>scrollTo({top:scrollY+el.getBoundingClientRect().top-160,behavior:'instant'}));
       assert.ok(await page.getByLabel('Rating mode',{exact:true}).evaluate(el=>{const r=el.getBoundingClientRect();return r.top>=100&&r.bottom<innerHeight;}));
       assert.equal(await page.locator('.source-row').count(),40);
       if(i===3){await hold(162);const detail=page.locator('.rating-provenance').first();await detail.locator('summary').click();}
       await hold(125+i*15);
+      assert.equal(await page.getByLabel('Rating mode',{exact:true}).inputValue(),mode);
+      console.log('PASS: sustained recorded rating mode '+mode);
     }
     await page.locator('.r-corpus-binding').scrollIntoViewIfNeeded();await hold(185);
     await page.locator('.r-upstream-errors > summary').click();await hold(195);
