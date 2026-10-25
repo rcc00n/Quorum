@@ -70,3 +70,14 @@ class ReasoningAcceptanceTests(SimpleTestCase):
         notices = ' '.join(artifact_review_notices(GENUINE_V4_SHA256))
         self.assertIn('producer score 6 is preserved', notices)
         self.assertIn('has not passed independent impact review', notices)
+
+    def test_known_run_hold_survives_reencoding_without_extending_parser_exceptions(self):
+        from .reasoning_preview import artifact_review_issues, artifact_review_notices
+        self.assertEqual(artifact_review_issues('0' * 64, '2026-10-24-russia-ukraine-war-5'),
+                         ['impact_score_review_required'])
+        self.assertTrue(artifact_review_notices('0' * 64, '2026-10-24-russia-ukraine-war-5'))
+        self.assertEqual(artifact_review_issues('0' * 64, 'TEST-other-run'), [])
+        with patch('portal.management.commands.reasoning_snapshot.artifact_review_issues',
+                   return_value=['impact_score_review_required']) as review:
+            self.run_report(blocked=True)
+        review.assert_called_once_with(self.options['sha256'], json.loads(self.raw)['run_id'])

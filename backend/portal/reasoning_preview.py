@@ -24,14 +24,14 @@ GENUINE_V4_SIDECAR_SHA256 = "f55c3304afd92b9f763ddb04357f3ec0c7a8860e9ee3ddcf63b
 GENUINE_V4_SHA256 = "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79"
 
 
-def artifact_review_issues(sha256):
-    # DECISION(2026-10-25, rcc00n/Codex): pin an editorial hold to the owner-disclosed v4 bytes.
+def artifact_review_issues(sha256, run_id=None):
+    # DECISION(2026-10-25, rcc00n/Codex): retain an editorial hold for the original v4 hash or its known run identity.
     # Why: conditional/reversible rationale conflicts with irreversibility 1; do not rescore producer output.
-    return ["impact_score_review_required"] if sha256 == GENUINE_V4_SHA256 else []
+    return ["impact_score_review_required"] if sha256 == GENUINE_V4_SHA256 or run_id == "2026-10-24-russia-ukraine-war-5" else []
 
 
-def artifact_review_notices(sha256):
-    if not artifact_review_issues(sha256):
+def artifact_review_notices(sha256, run_id=None):
+    if not artifact_review_issues(sha256, run_id):
         return []
     return [
         "IMPACT REVIEW PENDING: producer score 6 is preserved. The owner reports a conditional and "
@@ -705,7 +705,7 @@ def present_reasoning(raw, *, now=None, catalog=None):
             # Why: missing metadata must not erase a known corpus limitation.
             provisional=True if hashlib.sha256(raw).hexdigest() == HISTORICAL_V3_SHA256 else None,
             missing_provenance=missing_provenance,
-            warnings=artifact_review_notices(hashlib.sha256(raw).hexdigest()) + [
+            warnings=artifact_review_notices(hashlib.sha256(raw).hexdigest(), p["run_id"]) + [
                 (
                     "FICTIONAL data; links and quotations are illustrative, not verified news."
                     if p["provenance"]["fictional"]

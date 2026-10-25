@@ -57,7 +57,7 @@ class Command(BaseCommand):
                 report.update(producer_commit=commit, git_config_sha256=hashlib.sha256(config).hexdigest(),
                               git_config_crlf_sha256=hashlib.sha256(config.replace(b'\n', b'\r\n')).hexdigest())
                 # Prefixes plus a reproduction command are not a full original config attestation.
-                report['issues'].extend(['producer_config_hash_incomplete'] + artifact_review_issues(options['sha256']))
+                report['issues'].extend(['producer_config_hash_incomplete'] + artifact_review_issues(options['sha256'], p['run_id']))
                 self.stdout.write(json.dumps(report, sort_keys=True))
                 raise CommandError('Reasoning acceptance blocked; inspect safe report codes', returncode=1)
             prefix = re.match(r'^([0-9a-f]{7,40})(?:\s|$)', producer['commit'])
@@ -75,7 +75,7 @@ class Command(BaseCommand):
             report.update(producer_commit=commit, declared_config_sha256=declared, git_config_sha256=actual)
             require(actual == declared, 'producer_config_mismatch')
             report['metadata_valid'] = True
-            report['issues'].extend(artifact_review_issues(options['sha256']))
+            report['issues'].extend(artifact_review_issues(options['sha256'], p['run_id']))
         except SnapshotError as exc:
             report['issues'].append(str(exc))
         except (OSError, ValueError, TypeError, KeyError):

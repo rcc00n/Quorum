@@ -38,6 +38,10 @@ class ClosedV4Tests(SimpleTestCase):
         self.assertTrue(result['preview']['corpus_binding']['closed_edition'])
         self.assertFalse(result['preview']['published'])
         self.assertNotIn('api_keys', json.dumps(result['preview']))
+        # Formatting cannot erase the editorial hold; it still cannot bind the historical sidecar.
+        reencoded = json.dumps(p).encode()
+        self.assertIn('has not passed independent impact review', ' '.join(present_reasoning(reencoded)['preview']['warnings']))
+        with self.assertRaises(SnapshotError):bind_preview_sidecar(sidecar, reencoded, present_reasoning(reencoded))
         for altered in (sidecar+b'\n', sidecar.replace(b'false', b'true', 1)):
             with self.assertRaises(SnapshotError):bind_preview_sidecar(altered, raw, present_reasoning(raw))
         with self.assertRaises(SnapshotError):bind_preview_sidecar(sidecar, SAMPLE.read_bytes(), present_reasoning(SAMPLE.read_bytes()))
