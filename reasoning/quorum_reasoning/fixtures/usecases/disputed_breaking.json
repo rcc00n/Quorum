@@ -1,0 +1,31 @@
+{
+  "_note": "Fictional use-case day (workstream D): a breaking event with contradictory reports. One outlet repeats the destruction claim, another carries a denial. The claim must end disputed with both evidence chains visible in the snapshot.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-02",
+  "documents": [
+    {
+      "id": 9201, "source_id": "guardian", "source_name": "The Guardian", "independence_group": "guardian", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.theguardian.com/fiction/2026/nov/02/kharkiv-power-plant-strike",
+      "title": "Strike destroyed thermal power plant in Kharkiv region, nationwide blackouts reported",
+      "lead": "Grid operator restored power to parts of the Kharkiv region overnight.",
+      "published_at": "2026-11-01T06:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "Strike destroyed thermal power plant in Kharkiv region. Grid operator restored power to parts of the Kharkiv region overnight."
+    },
+    {
+      "id": 9202, "source_id": "fox-news", "source_name": "Fox News", "independence_group": "fox-news", "kind": "outlet",
+      "flank": "right", "tier": "major", "url": "https://www.foxnews.com/fiction/kharkiv-plant-destroyed",
+      "title": "Strike destroyed thermal power plant in Kharkiv region, blackouts nationwide",
+      "lead": "",
+      "published_at": "2026-11-01T07:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "A strike destroyed the thermal power plant in the Kharkiv region, and blackouts were reported nationwide. The grid operator restored power to parts of the Kharkiv region overnight."
+    },
+    {
+      "id": 9203, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/fiction/2026/11/02/kharkiv-plant-operator",
+      "title": "Strike destroyed thermal power plant in Kharkiv region, blackouts reported nationwide",
+      "lead": "",
+      "published_at": "2026-11-01T08:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "Officials said the strike did not destroy the thermal power plant in the Kharkiv region, and blackouts were not nationwide. Power was restored overnight to parts of the Kharkiv region by the grid operator."
+    }
+  ]
+}

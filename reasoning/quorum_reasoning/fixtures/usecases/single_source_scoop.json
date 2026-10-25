@@ -1,0 +1,15 @@
+{
+  "_note": "Fictional use-case day (workstream D): a single-source scoop. One outlet alone reports it; it must never cross the bar (confirmation 0) and the roundup must label it single source (DECISIONS.md > Selecting major news).",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-04",
+  "documents": [
+    {
+      "id": 9401, "source_id": "breitbart", "source_name": "Breitbart", "independence_group": "breitbart", "kind": "outlet",
+      "flank": "right", "tier": "minor", "url": "https://www.breitbart.com/fiction/2026/11/04/draft-plan-headquarters/",
+      "title": "Exclusive: draft plan would move western command headquarters",
+      "lead": "A draft plan would move the western command headquarters to a new site, the outlet has learned.",
+      "published_at": "2026-11-03T09:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "Exclusive: draft plan would move western command headquarters. A draft plan would move the western command headquarters to a new site, the outlet has learned."
+    }
+  ]
+}

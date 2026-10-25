@@ -1,0 +1,28 @@
+{
+  "_note": "Fictional use-case day (workstream D): a retraction within the day. Document 9503 supersedes 9501 (collectors/schema.sql documents.supersedes_id). Reasoning currently ignores supersedes_id; the test records the gap.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-05",
+  "documents": [
+    {
+      "id": 9502, "source_id": "guardian", "source_name": "The Guardian", "independence_group": "guardian", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.theguardian.com/fiction/2026/nov/05/odesa-bridge-collapse",
+      "title": "Odesa port bridge collapse killed four workers", "lead": "",
+      "published_at": "2026-11-04T08:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "Odesa port bridge collapse killed four workers, the port authority log shows."
+    },
+    {
+      "id": 9501, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.cnn.com/fiction/2026/11/05/odesa-bridge-collapse",
+      "title": "Bridge collapse in Odesa port killed four workers", "lead": "",
+      "published_at": "2026-11-04T09:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "The bridge collapse in the Odesa port killed four workers."
+    },
+    {
+      "id": 9503, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.cnn.com/fiction/2026/11/05/odesa-bridge-collapse-correction",
+      "title": "Correction: bridge collapse in Odesa port killed workers", "lead": "",
+      "published_at": "2026-11-04T14:00:00Z", "access_level": 1, "wire_origin": null, "supersedes_id": 9501,
+      "text": "The bridge collapse in the Odesa port did not kill four workers. Two workers were killed in the bridge collapse at the Odesa port."
+    }
+  ]
+}

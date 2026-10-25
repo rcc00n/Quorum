@@ -1,0 +1,36 @@
+{
+  "_note": "Fictional use-case day (workstream D): two events the same day with the same actor. Clustering must keep them apart: shared actor words alone must not merge unrelated events.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-07",
+  "documents": [
+    {
+      "id": 9701, "source_id": "cnn", "source_name": "CNN", "independence_group": "cnn", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.cnn.com/fiction/2026/11/07/rail-modernization-order",
+      "title": "President signs rail modernization order at Ohio ceremony", "lead": "",
+      "published_at": "2026-11-06T10:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "President signs rail modernization order at Ohio ceremony."
+    },
+    {
+      "id": 9702, "source_id": "reuters", "source_name": "Reuters", "independence_group": "reuters", "kind": "agency",
+      "flank": null, "tier": null, "url": "https://www.reuters.com/fiction/rail-modernization-order-2026-11-07/",
+      "title": "Rail modernization order signed by President at Ohio ceremony",
+      "lead": "The rail modernization order was signed at a ceremony in Ohio.",
+      "published_at": "2026-11-06T11:00:00Z", "access_level": 2, "wire_origin": null
+    },
+    {
+      "id": 9703, "source_id": "guardian", "source_name": "The Guardian", "independence_group": "guardian", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.theguardian.com/fiction/2026/nov/07/kyiv-visit-port-talks",
+      "title": "President announces visit to Kyiv for port talks", "lead": "",
+      "published_at": "2026-11-06T12:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "President announces visit to Kyiv for port talks."
+    },
+    {
+      "id": 9704, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/fiction/2026/11/07/kyiv-visit-port-talks",
+      "title": "President to visit Kyiv for port talks, office announces",
+      "lead": "The visit to Kyiv for port talks was announced by the office.",
+      "published_at": "2026-11-06T13:00:00Z", "access_level": 1, "wire_origin": null,
+      "text": "President to visit Kyiv for port talks, office announces. The visit to Kyiv for port talks was announced by the office."
+    }
+  ]
+}
