@@ -195,7 +195,7 @@ def run(state: RunState) -> dict:
                 summary, summary_source = fallback_summary(len(state["events"]), len(stories), n_review), "fallback"
         except Exception as exc:  # noqa: BLE001
             summary_errors.append(StepError(node="publish", event_id=None, message=f"summary model call failed: {str(exc)[:200]}; fallback text used"))
-            s.reason = untrusted.public_failure(exc) + " Summary fallback used."
+            s.reason = "summary model call: " + untrusted.public_failure(exc) + "; fallback text"
             summary, summary_source = fallback_summary(len(state["events"]), len(stories), n_review), "fallback"
         errors = list(state.get("errors", [])) + summary_errors
         status = "partial" if errors else ("empty" if not stories else "ok")

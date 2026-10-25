@@ -26,6 +26,7 @@ def test_failed_summary_is_partial_and_safe_without_hiding_failure():
     assert p['status']=='partial' and p['summary_source']=='fallback'
     assert PRIVATE not in json.dumps(p['trace'])
     assert PRIVATE in p['errors'][0]['message']
+    assert p['trace'][-1]['reason'] == "summary model call: " + untrusted.public_failure(RuntimeError(PRIVATE)) + "; fallback text"
 
 
 @pytest.mark.parametrize('name',['research','fact_check','write','frame','review_disputed'])
