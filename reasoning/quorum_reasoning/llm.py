@@ -36,6 +36,8 @@ def _env() -> None:
         _loaded = True
 
 
+METERLESS_DEFAULT_BASE_URL = "http://127.0.0.1:8088/v1"  # the Windows runtime's loopback port (decision in `_route`)
+DIRECT_ROUTE_HOST_SUFFIX = "nvidia.com"  # integrate.api.nvidia.com: the direct route; any other base URL is the Meterless runtime
 APP_NAME = "quorum-reasoning"  # the meterless-app header: how the request shows up in Nightshift's receipts
 TIMEOUT_S = 180  # a model load on the hotspot can take minutes (Setup Guide › Power)
 
@@ -142,8 +144,12 @@ def _route(which: str = "default") -> tuple[str, str, str]:
     a pinned model id from GET /v1/models); the NVIDIA key itself lives in Nightshift's Providers tab, never here.
     """
     _env()
-    base = os.getenv("MODEL_BASE_URL") or os.getenv("METERLESS_BASE_URL") or ""
-    key = os.getenv("MODEL_API_KEY") or os.getenv("METERLESS_RUNTIME_TOKEN") or ""
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): MODEL_BASE_URL / MODEL_API_KEY keep precedence; the Meterless
+    # pair is read when they are blank: the token from METERLESS_RUNTIME_TOKEN or its alias METERLESS_TOKEN, the URL from
+    # METERLESS_BASE_URL or, when only a Meterless token is set, METERLESS_DEFAULT_BASE_URL (127.0.0.1:8088). Why: the
+    # owner's machine keeps the Runtime token under METERLESS_TOKEN with METERLESS_BASE_URL blank, and the runtime
+    # listens on 8088, not 8080 (verified by hand 2026-10-25, GET /v1/models listed both Nemotron ids).
+    base, key, _ = _route_family()
     model = os.getenv("NEMOTRON_MODEL") or os.getenv("METERLESS_MODEL") or "meterless/auto"
     if which == "fact_checker":
         model = os.getenv("NEMOTRON_MODEL_FACT_CHECKER") or model
@@ -154,7 +160,51 @@ def _route(which: str = "default") -> tuple[str, str, str]:
     return base.strip(), key.strip(), model.strip()
 
 
+def _is_direct_url(base: str) -> bool:
+    """True for NVIDIA's own endpoint (integrate.api.nvidia.com), the direct route."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(base).hostname or "").lower()
+    return host == DIRECT_ROUTE_HOST_SUFFIX or host.endswith("." + DIRECT_ROUTE_HOST_SUFFIX)
+
+
+def _route_family() -> tuple[str, str, str | None]:
+    """(base URL, key, problem): base and key resolved as one family.
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a Meterless token (METERLESS_RUNTIME_TOKEN / METERLESS_TOKEN)
+    is used only with a Meterless base URL (MODEL_BASE_URL or METERLESS_BASE_URL pointing anywhere but NVIDIA, or the
+    8088 default), and MODEL_API_KEY never pairs with a METERLESS_BASE_URL; a mixed pair is reported as `problem`, so
+    `route_configured()` is False and `run.live_mode_problem()` names it. Why: review of this branch (2026-10-25): an
+    NVIDIA URL with a Meterless token, or the other way round, sends a credential to the wrong service."""
+    model_base = (os.getenv("MODEL_BASE_URL") or "").strip()
+    meterless_base = (os.getenv("METERLESS_BASE_URL") or "").strip()
+    model_key = (os.getenv("MODEL_API_KEY") or "").strip()
+    meterless_key = (os.getenv("METERLESS_RUNTIME_TOKEN") or os.getenv("METERLESS_TOKEN") or "").strip()
+    base = model_base or meterless_base
+    key = model_key or meterless_key
+    if not base and not model_key and meterless_key:
+        base = METERLESS_DEFAULT_BASE_URL
+    problem = None
+    if key and base:
+        if not model_key and _is_direct_url(base):
+            problem = "mixed model route: NVIDIA base URL with a Meterless token (set MODEL_API_KEY, or point the URL at the Meterless runtime)"
+        elif model_key and not model_base:
+            problem = "mixed model route: METERLESS_BASE_URL with MODEL_API_KEY (blank MODEL_API_KEY and set METERLESS_TOKEN, or set MODEL_BASE_URL)"
+    return base, key, problem
+
+
+def route_problem() -> str | None:
+    """Why the configured base URL and key do not form one route, or None."""
+    _env()
+    return _route_family()[2]
+
+
 def _client():
+    # DECISION(2026-10-25, rcc00n/Codex): enforce credential-family checks at the SDK boundary.
+    # Why: diagnostic entrypoints bypass the live-run guard and must never send a token to the wrong service.
+    problem = route_problem()
+    if problem:
+        raise ValueError(problem)
     from openai import OpenAI  # imported lazily: not needed in dry run
 
     base, key, _ = _route()
@@ -226,8 +276,9 @@ def probe(which: str = "default") -> dict[str, Any]:
     }
 
 
-def test_connection(which: str = "default") -> dict[str, str]:
-    """One small chat completion on a lane. Returns the route asked for and the model that answered."""
+def test_connection(which: str = "default") -> dict[str, Any]:
+    """One small chat completion on a lane. Returns the route asked for and the model that answered; on the Meterless
+    route also `provider_model`, `routed_model`, `receipt_id`, `hmem_injected` and `substituted` (None when the lane held)."""
     base, key, model = _route(which)
     if not (base and key):
         raise RuntimeError("no model route configured: set MODEL_BASE_URL and MODEL_API_KEY (or METERLESS_*) in .env")
@@ -237,13 +288,30 @@ def test_connection(which: str = "default") -> dict[str, str]:
         messages=[{"role": "system", "content": _prompt("connection_test")}, {"role": "user", "content": "Reply with the single word: ready"}],
         **_request_extras(),
     )
-    return {"lane": which, "route": model, "answered_by": getattr(completion, "model", "") or "", "reply": (completion.choices[0].message.content or "").strip()[:40]}
+    out: dict[str, Any] = {"lane": which, "route": model, "answered_by": getattr(completion, "model", "") or "", "reply": (completion.choices[0].message.content or "").strip()[:40]}
+    met = _meterless(completion)
+    if met:
+        out.update(
+            provider_model=str(met.get("provider_model") or ""),
+            routed_model=str(met.get("routed_model") or ""),
+            receipt_id=str(met.get("receipt_id") or ""),
+            hmem_injected=_hmem_injected(met),
+            substituted=substituted_lane(model, met),
+        )
+    return out
+
+
+def on_meterless() -> bool:
+    """True when the configured base URL is not NVIDIA's own endpoint, i.e. the request goes through the Meterless
+    runtime (Nightshift). Decides the replay-key partition; the lane check reads the response itself."""
+    base, _, _ = _route()
+    return bool(base) and not _is_direct_url(base)
 
 
 def route_configured() -> bool:
     """True when MODEL_BASE_URL and MODEL_API_KEY (or the METERLESS_* names) are both set."""
     base, key, _ = _route()
-    return bool(base and key)
+    return bool(base and key) and route_problem() is None
 
 
 def is_dry_run(state_flag: bool) -> bool:
@@ -284,6 +352,66 @@ def _served_and_receipt(completion: Any, route: str) -> tuple[str, str]:
     if routed and (served.startswith("meterless/") or not served):
         served = routed
     return served, str(met.get("receipt_id") or "")
+
+
+def _meterless(completion: Any) -> dict[str, Any]:
+    """The response's `meterless` object (empty on the direct route or when the field is not a dict)."""
+    met = (getattr(completion, "model_extra", None) or {}).get("meterless") or {}
+    return met if isinstance(met, dict) else {}
+
+
+def _hmem_injected(met: dict[str, Any]) -> int | None:
+    """How many H-MEM records the runtime injected into the prompt, from the receipt (`receipt.hmem.injected`, or the
+    signed envelope's copy); None when the response carries no receipt, 0 when the receipt says nothing was injected.
+
+    Nightshift 1.2.3 (engine/js/engine/orchestrator.js, runChat): before the phase loop it prepends a system message of
+    up to `hmemTopK` "prior vetted answers" retrieved by scope (`meterless-scope`) and app (`meterless-app`); the sync
+    chat path exposes no per-request switch (`noMemory` is set only by the jobs plane). The count is disclosed per row."""
+    if not met:
+        return None
+    receipt = met.get("receipt")
+    if not isinstance(receipt, dict):
+        env = met.get("receipt_envelope")
+        body = env.get("body") if isinstance(env, dict) else None
+        receipt = body.get("receipt") if isinstance(body, dict) else None
+    hmem = (receipt or {}).get("hmem") if isinstance(receipt, dict) else None
+    if hmem is None:
+        hmem = met.get("hmem")
+    if hmem is None:
+        return 0 if isinstance(receipt, dict) else None  # a receipt without an hmem block: nothing injected
+    value = hmem.get("injected", hmem.get("count")) if isinstance(hmem, dict) else hmem
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None  # unparsable: left undisclosed rather than guessed
+    return value
+
+
+def substituted_lane(requested: str, met: dict[str, Any]) -> str | None:
+    """The model the runtime answered with instead of an explicitly pinned one, or None when the lane held.
+
+    Only explicit model ids are checked (`meterless/*` dispositions are ranked, not pinned): every present value of
+    `provider_model` (the pin the runtime accepted) and `routed_model` (the model that answered) must equal the id
+    asked for. Mentor's contract (2026-10-25): exact id in `model`, `provider_model` must equal it."""
+    if not met or not requested or requested.startswith("meterless/"):
+        return None
+    for field in ("provider_model", "routed_model"):
+        value = str(met.get(field) or "")
+        if value and value != requested:
+            return value
+    return None
+
+
+class RouteSubstituted(ValueError):
+    """The runtime answered a pinned lane with another model; the node skips the passage like any failed call."""
+
+
+def lane_unverified_count() -> int:
+    """Ledger rows on a pinned Meterless lane whose response carried no model evidence (decision in `json_task`)."""
+    return sum(1 for c in calls if c.get("lane_unverified"))
+
+
+def substitution_count() -> int:
+    """Ledger rows whose pinned lane was answered by another model (decision in `json_task`)."""
+    return sum(1 for c in calls if c.get("route_substituted"))
 
 
 _last_call_at = 0.0
@@ -596,6 +724,12 @@ def _request_key(task: str, which: str, model: str, messages: list[dict[str, str
         "extras": _request_extras(),
         "payload": payload,
     }
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): requests through the Meterless runtime carry
+    # `"endpoint": "meterless"` in the key material; direct-route keys are unchanged. Why: the body sent is the same on
+    # both routes, so without it a direct-route journal would replay its answers on a Meterless run (and back), and
+    # the restored rows would claim receipts of the other route; existing direct-route journals keep replaying.
+    if on_meterless():
+        material["endpoint"] = "meterless"
     canonical = json.dumps(material, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -662,6 +796,32 @@ def json_task(task: str, payload: dict[str, Any], *, dry_run: bool, which: str =
         entry["reasoning_tokens"] = int(reasoning_tokens or 0)
     if receipt_id:
         entry["receipt_id"] = receipt_id
+    met = _meterless(completion)
+    injected = _hmem_injected(met)
+    if injected is not None:
+        entry["receipt_hmem_injected"] = injected  # disclosure only; see _hmem_injected
+    if isinstance(met.get("from_cache"), bool):
+        entry["receipt_from_cache"] = met["from_cache"]
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): on a pinned lane (explicit model id), a Meterless response whose
+    # `provider_model` or `routed_model` differs from the id asked for is an error row (`served` "error", the answering
+    # model in `answered_model`, `route_substituted: true`, counted by `substitution_count()`), its reply is neither
+    # used nor journalled for replay, and RouteSubstituted is raised so the node skips that passage. Why: the owner
+    # requires exact-lane identity for the blind fact-checker; an answer from another model is not that check.
+    substitute = substituted_lane(model, met)
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): on the Meterless route a pinned lane whose response has no
+    # `meterless` block, or neither provider_model nor routed_model, is served but marked `lane_unverified: true`
+    # (`lane_unverified_count()`), not an error. Why: review of this branch: absent evidence is not a substitution,
+    # but it must not pass as a verified lane either.
+    if substitute is None and model and not model.startswith("meterless/") and on_meterless():
+        if not (met.get("provider_model") or met.get("routed_model")):
+            entry["lane_unverified"] = True
+    if substitute is not None:
+        entry.update(served="error", answered_model=substitute, route_substituted=True, error=f"route substituted {substitute} for {model}")
+        calls.append(entry)
+        _journal(entry, payload)
+        if _verbose():
+            print(f"  · {task:<15} {which:<13} {substitute:<42} SUBSTITUTED for {model}", file=sys.stderr, flush=True)
+        raise RouteSubstituted(f"{task}: {entry['error']}")
     text = (choice.message.content if choice is not None and choice.message else None) or ""
     obj = parse_json_object(text)
     if obj is None:

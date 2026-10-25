@@ -23,7 +23,7 @@ from quorum_reasoning.nodes import publish
 from quorum_reasoning.state import initial_state
 
 TOPIC, DAY = "russia-ukraine-war", "2026-10-22"
-ROUTE_VARS = ("MODEL_BASE_URL", "MODEL_API_KEY", "METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN")
+ROUTE_VARS = ("MODEL_BASE_URL", "MODEL_API_KEY", "METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN", "METERLESS_TOKEN")  # METERLESS_TOKEN: alias since f175c44
 
 
 @pytest.fixture
