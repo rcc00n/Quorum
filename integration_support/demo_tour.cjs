@@ -53,6 +53,7 @@ Offline checks demonstrate implemented capabilities. H-MEM hooks remain a defaul
 `;
 }
 async function main(args) {
+  const scenesOnly=args[0]==='--scenes';if(scenesOnly)args=args.slice(1);
   const [candidate,snapshot,sidecar,output,matrix]=args.map(p=>path.resolve(p));
   assert.equal(args.length,5,'Use candidate snapshot sidecar NEW-output matrix-html');
   externalNewOutput(output);
@@ -89,7 +90,7 @@ async function main(args) {
     browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
     // DECISION(2026-10-24, rcc00n/Codex): a 230-second private capture leaves margin below four minutes.
     // Why: the requested 3–5 minute rehearsal must also fit the existing submission checklist's 1–4 minute gate.
-    context=await browser.newContext({viewport:{width:1440,height:900},recordVideo:{dir:output,size:{width:1440,height:900}}});
+    context=await browser.newContext({viewport:{width:1440,height:900},...(scenesOnly?{}:{recordVideo:{dir:output,size:{width:1440,height:900}}})});
     const session=await (await context.request.get(root+'/api/session/')).json();
     assert.equal((await context.request.post(root+'/api/login/',{headers:{'X-CSRFToken':session.csrfToken,Origin:root},data:{username:'DEMO-boundary-reader',password}})).status(),200);
     const payload=await (await context.request.get(root+'/api/preview/reasoning/')).json();
@@ -106,7 +107,12 @@ async function main(args) {
     });
     // DECISION(2026-10-24, rcc00n/Codex): schedule capture against monotonic time and verify sustained selections.
     // Why: wall-clock corrections must not skip a rating scene or misalign the speaking script.
-    const start=performance.now(),hold=async seconds=>{const remaining=start+seconds*1000-performance.now();if(remaining>0)await page.waitForTimeout(remaining);};
+    const start=performance.now(),hold=async seconds=>{
+      // DECISION(2026-10-25, rcc00n/Codex): optional still captures retain real authenticated UI states.
+      // Why: offline final edits need auditable mode/attribution frames without relying on capture timestamps.
+      if(scenesOnly){await page.screenshot({path:path.join(output,`scene-${seconds}.png`)});return;}
+      const remaining=start+seconds*1000-performance.now();if(remaining>0)await page.waitForTimeout(remaining);
+    };
     await page.goto(root+'/dashboard');await page.locator('main').waitFor();await hold(12);
     await page.goto(root+'/preview/reasoning');await page.getByText('UNPUBLISHED / CORPUS EXPERIMENT',{exact:true}).waitFor();
     assert.equal(await page.locator('.r-roundup-row').count(),28);assert.equal(await page.locator('.r-story-row').count(),0);await hold(32);
@@ -138,9 +144,9 @@ async function main(args) {
     assert.deepEqual(errors,[]);
     assert.equal(sha(fs.readFileSync(snapshot)),PINS.snapshot);assert.equal(sha(fs.readFileSync(sidecar)),PINS.sidecar);
     await context.close();context=null;
-    fs.renameSync(await video.path(),path.join(output,'quorum-demo-rehearsal.webm'));
-    fs.writeFileSync(path.join(output,'receipt.json'),JSON.stringify({duration_target_seconds:230,snapshot_sha256:PINS.snapshot,sidecar_sha256:PINS.sidecar,candidate:execFileSync('git',['rev-parse','HEAD'],{cwd:candidate,encoding:'utf8'}).trim(),published:false,execution_attested:false,owner_memory_adopted:false,sponsor_completion:false},null,2)+'\n',{mode:0o600});
-    console.log('PASS: private 230-second genuine demo rehearsal; original hashes unchanged; no inference/publication; narration captions and receipt saved');
+    if(!scenesOnly)fs.renameSync(await video.path(),path.join(output,'quorum-demo-rehearsal.webm'));
+    fs.writeFileSync(path.join(output,'receipt.json'),JSON.stringify({capture_type:scenesOnly?'authenticated-stills':'timed-video',duration_target_seconds:scenesOnly?null:230,snapshot_sha256:PINS.snapshot,sidecar_sha256:PINS.sidecar,candidate:execFileSync('git',['rev-parse','HEAD'],{cwd:candidate,encoding:'utf8'}).trim(),published:false,execution_attested:false,owner_memory_adopted:false,sponsor_completion:false},null,2)+'\n',{mode:0o600});
+    console.log('PASS: private '+(scenesOnly?'authenticated still-scene capture':'230-second target demo rehearsal')+'; original hashes unchanged; no inference/publication; captions and receipt saved');
   } finally {
     if(context)await context.close();if(browser)await browser.close();
     child.kill('SIGINT');

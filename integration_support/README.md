@@ -25,6 +25,8 @@ Local merge sequence retained all owner decision-log rows verbatim and unioned a
 
 ## Decisions
 
+2026-10-25 UTC · rcc00n / Codex · `demo_tour.cjs --scenes` captures authenticated original-evidence stills without a timed movie. Why: final offline edits need deterministic, auditable rating/provenance frames while preserving all existing original-hash, catalog and publication guards.
+
 2026-10-24 · rcc00n / Codex · `--patch-profile web-owned --require-current` applies only independent web/deployment/diagnostic patches and refuses stale fetched owner pins before worktree creation. Why: unapproved reasoning/privacy/memory proposals must remain distinguishable from the candidate used for the genuine demo. This is a module decision; owner merge approvals are still required.
 
 2026-10-24 · rcc00n / Codex · Publish review patches and offline tooling on a branch based on integration, keeping rehearsal merges local. Why: owners can review/apply minimal changes without pushing their unmerged histories or the disposable merges through another PR.
@@ -89,3 +91,6 @@ Fetch first, then use this profile: it does not contact any service itself. Patc
 
 
 Release-candidate evidence and the timed private recording procedure are in [RELEASE_MATRIX.md](RELEASE_MATRIX.md) and [DEMO.md](DEMO.md). These supplement the canonical tracker/release checklist. The candidate applies five web-owned patches; full owner-patch tests and sponsor proposals remain separately labelled. Demo recordings, originals, captions, receipts and packaged releases remain outside Git.
+
+
+For private submission editing, `demo_tour.cjs --scenes` accepts the same five paths/environment as the timed recorder and writes actual UI screenshots plus an explicit authenticated-stills receipt. It does not alter the product DOM or original snapshot/sidecar. It remains local-only and does not claim a timed video or sponsor completion.
