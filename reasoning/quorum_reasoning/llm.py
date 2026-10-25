@@ -49,6 +49,7 @@ calls: list[dict[str, Any]] = []
 # request/receipt journal; `load_journal` restores the ledger of a resumed run from it.
 journal_path: Path | None = None
 current_run_id: str | None = None  # set by run.py; stamped on every ledger row and journal line
+journal_loaded_for: str | None = None  # set by run.py after load_journal(): the run id whose ledger/replay the loaded rows serve
 
 # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a resumed run replays answers from its own journal: every
 # served call journals its raw reply (`reply`) and a `request_key` (sha256 over task, lane, route, the rendered

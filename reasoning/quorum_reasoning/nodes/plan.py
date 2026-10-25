@@ -23,8 +23,12 @@ def run(state: RunState) -> dict:
     if corpus not in ("fixture", "zetaris"):
         raise ValueError(f"corpus must be fixture or zetaris, got {corpus!r}")
     clear_cache()  # article texts live for one run only
-    if not llm.calls or not all(c.get("run_id") == state.get("run_id") for c in llm.calls):
-        llm.reset_calls()  # the ledger of live model calls is per run (a resumed run reloads its own journal first)
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): the ledger is per run; it is kept when run.py loaded this run
+    # id's journal (`llm.journal_loaded_for`), whatever run_id the rows carry, because a seeded journal (--seed-journal)
+    # legitimately holds an earlier attempt's rows. Why: the old row-stamp check wiped a seeded ledger and its replay
+    # queues at the first node, so attempt 4 of 2026-10-24 paid again for calls it should have replayed.
+    if llm.journal_loaded_for != state.get("run_id") and (not llm.calls or not all(c.get("run_id") == state.get("run_id") for c in llm.calls)):
+        llm.reset_calls()
     with step(state, "plan") as s:
         docs = state.get("documents") or load_documents(topic_id, edition_date, corpus=corpus)
         today_all = [d for d in docs if not d.get("from_previous_day")]

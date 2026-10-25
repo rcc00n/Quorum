@@ -479,3 +479,23 @@ def test_seed_journal_loads_replay_without_a_checkpoint(tmp_path, monkeypatch):
     monkeypatch.setenv("QUORUM_DRY_RUN", "0")
     rc = run_cli.main(["--topic", "russia-ukraine-war", "--date", "2026-10-24", "--model", "live", "--attempt", "7", "--seed-journal", "--quiet", "--out", str(tmp_path)])
     assert rc == 3 and seen == {"calls": 1, "replay": 1, "resume": False}, (rc, seen)
+
+
+def test_plan_keeps_a_seeded_ledger_and_replay(tmp_path, monkeypatch):
+    """A journal seeded from an earlier attempt carries that attempt's run_id; plan must not wipe it (attempt 4 regression)."""
+    import json
+    from quorum_reasoning.nodes import plan
+    from quorum_reasoning.state import initial_state
+
+    row = {"task": "stance", "lane": "default", "route": "m", "served": "m", "attempts": 1, "ms": 1, "tokens_in": 1, "tokens_out": 1,
+           "request_key": "k" * 64, "reply": "{}", "run_id": "2026-10-24-russia-ukraine-war-3", "payload": {}}
+    j = tmp_path / "j.jsonl"; j.write_text(json.dumps(row) + chr(10), encoding="utf-8")
+    llm.reset_calls(); llm.load_journal(j)
+    st = initial_state("2026-10-24-russia-ukraine-war-4", "russia-ukraine-war", "2026-10-24", dry_run=True)
+    monkeypatch.setattr(llm, "journal_loaded_for", "2026-10-24-russia-ukraine-war-4")
+    plan.run(st)
+    assert len(llm.calls) == 1 and sum(len(q) for q in llm.replay.values()) == 1
+    monkeypatch.setattr(llm, "journal_loaded_for", None)
+    plan.run(st)
+    assert llm.calls == [] and llm.replay == {}  # without the marker the old per-run wipe still applies
+    llm.reset_calls()

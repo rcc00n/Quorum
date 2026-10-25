@@ -173,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
             # night); resuming it would publish those verdicts, restarting without replay would repay ~1500 calls.
             llm.reset_calls()
             loaded = llm.load_journal(llm.journal_path)
+            llm.journal_loaded_for = rid  # plan.run keeps the loaded ledger/replay for this run id even when rows carry an earlier attempt's run_id
             print(f"{'resuming' if args.resume else 'seeding'} {rid}: {loaded} journalled calls restored into the ledger", file=sys.stderr)
     try:
         state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, attempt=args.attempt, on_step=on_step, checkpoint_path=checkpoint, resume=args.resume)
