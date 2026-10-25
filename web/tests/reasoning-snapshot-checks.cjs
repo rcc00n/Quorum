@@ -126,6 +126,9 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
         assert.equal(sample.stories.length, 0);
         assert.ok(result.preview.warnings.some(w => w.includes("not this attempt's spending")));
         assert.equal(result.preview.published, false);
+        await page.getByRole('alert').filter({hasText:'Edition review:'}).waitFor();
+        const review = await page.getByRole('alert').filter({hasText:'Edition review:'}).textContent();
+        assert.ok(review.includes(sample.version === 5 ? 'superseded' : 'D5 report'));
       }
     } else {
       await page.getByText(/PROVISIONAL CORPUS/).waitFor();
