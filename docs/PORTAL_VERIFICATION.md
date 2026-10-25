@@ -432,7 +432,7 @@ hosted CI skips private originals explicitly. Historical pinned fictional fixtur
 remain unchanged. Current canonical samples regenerated outside Git match their
 committed semantics apart from actual generation time/durations.
 
-Local combined tests: reasoning 540 PASS; Django 79 PASS with all five private
+Local combined tests: reasoning 540 PASS; Django 80 PASS with all five private
 original tests enabled; deployment 12 PASS; tooling 10 PASS. Source-bound Next
 build/typecheck, current/historical API TypeScript models, registry/ratings/editorial
 and trace checks pass. Actual v5/v6 HTTP/Chromium acceptance exercises original
@@ -446,3 +446,10 @@ then #9 with the exact owner-specified conflict resolution. No rebase, force-pus
 paid inference, runtime-memory setting, production change or publisher activation.
 Final master approval still requires owner review of the final integration SHA;
 the user's permission to merge after that review is already recorded in Issue #2.
+
+Additional package checkpoint `91cd66f`: actual archive has 2663 safe entries,
+SHA-256 `4a949eaf824314f2d37a6635b88411299e576f357ee51c20d5342d9118a42671`.
+Packaged Django/standalone Next start on new loopback ports; a restored disposable
+account passes CSRF login and the authenticated feed remains pending with
+publication disabled. This is local rehearsal only; target-host deployment and
+production restore remain unauthorized and untested for this release.
