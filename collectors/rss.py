@@ -10,7 +10,7 @@ from html import unescape
 
 import feedparser
 
-from collectors.common import Doc, Fetcher, extract_text, matches_topic, parse_dt, topic_match_of, upsert_document, upsert_official_doc
+from collectors.common import Doc, Fetcher, extract_text, first_topic_match, parse_dt, upsert_document, upsert_official_doc
 
 log = logging.getLogger("collectors.rss")
 _TAGS = re.compile(r"<[^>]+>")
@@ -50,16 +50,18 @@ def _entries(content: bytes) -> list[dict]:
     return out
 
 
-def collect_official_feed(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> dict:
+def collect_official_feed(conn, fetcher: Fetcher, source: dict, topics: list[dict]) -> dict:
     """RSS of a government body (whitehouse.gov, defense.gov, state.gov): press releases, briefings, transcripts.
+
+    `topics` is the ordered list of active topics (load_topics); each feed is walked once and every entry is stored
+    under the first topic that matches it (first_topic_match in common.py; decision: README › Decisions, 2026-10-25).
 
     DECISION(2026-10-23, Anastasia/Claude Code): these go to official_docs with doc_type 'release' (the body's own
     words), never to documents, and the page text is stored in full (public domain). Why: DECISIONS.md › Principles
     — an official statement is a statement, not media coverage and not an establishing document; reasoning's
     confirmation rule reads doc_type verbatim, and 'release' never confirms.
     """
-    stats = {"seen": 0, "matched": 0, "inserted": 0}
-    terms = topic["query_terms"] if topic else []
+    stats = {"seen": 0, "matched": 0, "inserted": 0, "by_topic": {t["id"]: 0 for t in topics}}
     for feed_url in source["rss_urls"]:
         resp = fetcher.get(feed_url, respect_robots=False)
         if resp is None:
@@ -69,7 +71,10 @@ def collect_official_feed(conn, fetcher: Fetcher, source: dict, topic: dict | No
             title = _strip(entry.get("title")) or ""
             lead = _strip(entry.get("summary") or entry.get("description"))
             link = entry.get("link")
-            if not title or not link or (terms and not matches_topic(f"{title} {lead or ''}", terms)):
+            if not title or not link:
+                continue
+            topic, _match = first_topic_match(title, lead, topics)
+            if topic is None:
                 continue
             stats["matched"] += 1
             page = fetcher.get(link)
@@ -82,18 +87,22 @@ def collect_official_feed(conn, fetcher: Fetcher, source: dict, topic: dict | No
                 # denies the bot therefore produces no official_docs rows (whitehouse.gov and defense.gov allow it).
                 stats["skipped"] = stats.get("skipped", 0) + 1
                 continue
-            if upsert_official_doc(conn, source_id=source["id"], topic_id=topic["id"] if topic else None, url=link,
+            if upsert_official_doc(conn, source_id=source["id"], topic_id=topic["id"], url=link,
                                    doc_type="release", doc_number=None, title=title, full_text=text,
                                    signed_at=None, published_at=parse_dt(entry.get("published") or entry.get("updated"))):
                 stats["inserted"] += 1
+                stats["by_topic"][topic["id"]] += 1
     log.info("%s (official): %s", source["id"], stats)
     return stats
 
 
-def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> dict:
-    """Walk every feed of one source. Returns counters."""
-    stats = {"seen": 0, "matched": 0, "inserted": 0, "level2": 0}
-    terms = topic["query_terms"] if topic else []
+def collect_source(conn, fetcher: Fetcher, source: dict, topics: list[dict]) -> dict:
+    """Walk every feed of one source once, matching every active topic. Returns counters.
+
+    `topics` is the ordered list from load_topics; an entry goes to the first topic that matches it (first_topic_match
+    in common.py; decision: README › Decisions, 2026-10-25) and is skipped when none does.
+    """
+    stats = {"seen": 0, "matched": 0, "inserted": 0, "level2": 0, "by_topic": {t["id"]: 0 for t in topics}}
     for feed_url in source["rss_urls"]:
         resp = fetcher.get(feed_url, respect_robots=False)  # feeds are published for machines
         if resp is None:
@@ -105,8 +114,8 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> 
             link = entry.get("link")
             if not title or not link:
                 continue
-            match = topic_match_of(title, lead, terms) if terms else None
-            if terms and not match:
+            topic, match = first_topic_match(title, lead, topics)
+            if topic is None:
                 continue
             stats["matched"] += 1
             byline = entry.get("author")
@@ -130,11 +139,12 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topic: dict | None) -> 
                         continue
                     body = _body_text(page.text)
             doc = Doc(
-                source_id=source["id"], topic_id=topic["id"] if topic else None, url=link, title=title, lead=lead,
+                source_id=source["id"], topic_id=topic["id"], url=link, title=title, lead=lead,
                 byline=byline, published_at=published, access_level=level, lang=source["lang"], body_for_hash=body,
                 topic_match=match,
             )
             if upsert_document(conn, doc) is not None:
                 stats["inserted"] += 1
+                stats["by_topic"][topic["id"]] += 1
     log.info("%s: %s", source["id"], stats)
     return stats

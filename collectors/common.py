@@ -165,6 +165,21 @@ def topic_match_of(title: str, lead: str | None, query_terms: Iterable[str]) -> 
         return "lead"
     return None
 
+
+def first_topic_match(title: str, lead: str | None, topics: list[dict]) -> tuple[dict, str] | tuple[None, None]:
+    """The first topic in list order whose terms match, with where it matched: (topic, 'title' | 'lead').
+
+    Each topic is {"id", "name", "query_terms"} as load_topics returns them (collection order: created_at, id); the
+    per-topic rule is topic_match_of, unchanged. Returns (None, None) when no topic matches, so the caller skips.
+
+    Decision: collectors/README.md › Decisions, 2026-10-25 (single feed walk, first topic in collection order wins).
+    """
+    for topic in topics:
+        match = topic_match_of(title, lead, topic["query_terms"])
+        if match:
+            return topic, match
+    return None, None
+
 # ------------------------------------------------------------ hashing ----
 
 _TRACKING = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "cmpid", "ito"}
