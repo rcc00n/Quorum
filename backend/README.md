@@ -101,3 +101,6 @@ blocked along with impact review. The production publisher is unchanged.
 
 
 2026-10-25 · rcc00n / Codex · Closed v5/v6 private preview sidecars are bound only to their exact original SHA-256 pairs, as v4 was; no generic closed-sidecar format is enabled. Why: inspect the current owner handoff without weakening original-file binding, production validation, execution checks or the historical v4 impact hold. `QUORUM_TEST_CLOSED_HANDOFF_DIR` enables the private-original pair tests locally; hosted CI skips them explicitly.
+
+
+The read-only acceptance command compares both complete LF and CRLF config hashes for the closed v5/v6 sidecars. Successful `metadata_valid` still leaves execution/source verification and publication false. Historical v4 keeps its incomplete original-sidecar diagnostic and impact hold; a separately supplied attestation never silently edits or overrides the original metadata.
