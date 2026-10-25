@@ -6,10 +6,12 @@ import sys
 from pathlib import PurePosixPath
 
 paths = subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0')
+# DECISION(2026-10-25, rcc00n/Codex): scan every token suffix and numbered model-key slot.
+# Why: Meterless aliases and operator key rotation must not bypass the public-index secret check.
 patterns = [rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
             rb'(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|nvapi-[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16})',
             rb'https?://[^\s/@:]+:[^\s/@]+@',
-            rb'(?im)^[ \t]*(?:[A-Z_]*(?:API_KEY|ACCESS_TOKEN|SECRET_KEY|PASSWORD|RUNTIME_TOKEN))[ \t]*=[ \t]*[\"\']?[A-Za-z0-9_+/=-]{12,}']
+            rb'(?im)^[ \t]*(?:[A-Z_]*(?:API_KEY(?:_[0-9]+)?|TOKEN|SECRET_KEY|PASSWORD))[ \t]*=[ \t]*[\"\']?[A-Za-z0-9_+/=-]{12,}']
 failed = False
 count = 0
 for raw in paths:

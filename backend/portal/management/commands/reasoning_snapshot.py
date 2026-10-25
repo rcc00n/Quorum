@@ -48,7 +48,9 @@ class Command(BaseCommand):
             sidecar = parse_preview_json(sidecar_raw)
             producer = sidecar['producer']
             if 'commit_of_the_publishing_process' in producer:
-                require(commit.startswith(producer['commit_of_the_publishing_process']), 'producer_commit_mismatch')
+                prefix = producer['commit_of_the_publishing_process']
+                require(isinstance(prefix, str) and re.fullmatch(r'[0-9a-f]{7,40}', prefix)
+                        and commit.startswith(prefix), 'producer_commit_mismatch')
                 try:
                     config = subprocess.check_output(['git', 'show', f'{commit}:reasoning/config/reasoning.toml'],
                         cwd=Path(__file__).resolve().parents[4], stderr=subprocess.DEVNULL)
@@ -56,10 +58,19 @@ class Command(BaseCommand):
                     raise SnapshotError('producer_config_unavailable') from None
                 report.update(producer_commit=commit, git_config_sha256=hashlib.sha256(config).hexdigest(),
                               git_config_crlf_sha256=hashlib.sha256(config.replace(b'\n', b'\r\n')).hexdigest())
-                # Prefixes plus a reproduction command are not a full original config attestation.
-                report['issues'].extend(['producer_config_hash_incomplete'] + artifact_review_issues(options['sha256'], p['run_id']))
+                # DECISION(2026-10-25, rcc00n/Codex): compare both complete LF/CRLF declarations for v5/v6.
+                # Why: matching config metadata is useful but cannot prove execution or lift the v4 impact hold.
+                declared = [producer.get(key) for key in ('config_sha256_git_blob_lf', 'config_sha256_working_copy_crlf')]
+                if all(isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) for value in declared):
+                    require(declared == [report['git_config_sha256'], report['git_config_crlf_sha256']], 'producer_config_mismatch')
+                    report['metadata_valid'] = True
+                else:
+                    report['issues'].append('producer_config_hash_incomplete')
+                report['issues'].extend(artifact_review_issues(options['sha256'], p['run_id']))
                 self.stdout.write(json.dumps(report, sort_keys=True))
-                raise CommandError('Reasoning acceptance blocked; inspect safe report codes', returncode=1)
+                if report['issues']:
+                    raise CommandError('Reasoning acceptance blocked; inspect safe report codes', returncode=1)
+                return
             prefix = re.match(r'^([0-9a-f]{7,40})(?:\s|$)', producer['commit'])
             require(prefix is not None and commit.startswith(prefix[1]), 'producer_commit_mismatch')
             declared = producer['config_sha256']

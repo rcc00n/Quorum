@@ -389,3 +389,67 @@ historical impact disposition, Meterless → Nemotron proof, owner H-MEM decisio
 approved production bridge and target-host release/security/restore acceptance.
 The next canonical paid run belongs to the reasoning owner and needs separate spend
 agreement. Existing collection work and provenance review are not requested again.
+
+## Original closed v5/v6 intake — 2026-10-25
+
+Owner: Vadim / Codex. Original snapshots, sidecars, D5 reports and separately named
+v4/v5/v6 attestations were received privately. Originals were read only and their
+byte lengths/SHA-256 checked before and after intake. Nothing from the private
+bundles or execution logs is committed.
+
+| Artifact | Snapshot SHA-256 | Stories / roundup / trace | State |
+| --- | --- | --- | --- |
+| Historical v4 | `ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79` | 1 / 26 / 235 | Original impact hold retained |
+| Superseded v5 | `8704f1c66285e66bde5e804aad28bd26f81ed8d04a5cebf4f2f153866ae0da15` | 0 / 27 / 219 | Metadata compatible; superseded by v6 |
+| Current owner v6 | `b376ec698a42d24491b85c876078956c29e0fdbeb05fafe8e93ae9ba7650af39` | 0 / 27 / 219 | Metadata compatible; unpublished local preview |
+
+All 7 config revision receipts and 38 prompt receipts reproduce from Git, including
+LF and CRLF SHA-256. Available handover-file receipts match snapshot/sidecar/report
+bytes; ledger aggregate declarations agree with snapshot model totals. V6 labels
+are 3 confirmed, 2 disputed, 4 statements only and 18 single source. The owner's D5
+reports unresolved relevance/label/rubric limitations; quote identity alone never
+establishes relevance or correctness. V6 contains no exported story claims.
+
+Original raw ledgers, journals, logs and checkpoints are absent from this download.
+Their hashes/counters and multiset reconciliation are owner-attested declarations;
+this intake does not independently verify process execution, replay consumption,
+spending, blind verification or source text. No retrospective process receipt was
+created. The separate v4 attestation supplies full config receipts and explains the
+historical score, but does not rewrite its old sidecar or lift its publication hold.
+
+Native read-only v5/v6 checks now compare both complete declared config hashes and
+report `compatible: true`, `metadata_valid: true`, `execution_verified: false`,
+`source_text_verified: false`, `published: false`. V4 remains blocked with
+`producer_config_hash_incomplete` and `impact_score_review_required` against its
+unchanged original sidecar. No generic closed-sidecar format or production input
+validation was relaxed: only the exact original v4/v5/v6 SHA-pairs can bind.
+
+Reproduce with the existing `reasoning_snapshot` command and original file hashes,
+then `boundary.cjs --reasoning --reasoning-file <original>` with the matching
+`QUORUM_TEST_REASONING_SIDECAR` and expected snapshot SHA. Use
+`QUORUM_TEST_CLOSED_HANDOFF_DIR` to enable both later-original pair/native tests;
+hosted CI skips private originals explicitly. Historical pinned fictional fixtures
+remain unchanged. Current canonical samples regenerated outside Git match their
+committed semantics apart from actual generation time/durations.
+
+Local combined tests: reasoning 540 PASS; Django 80 PASS with all five private
+original tests enabled; deployment 12 PASS; tooling 10 PASS. Source-bound Next
+build/typecheck, current/historical API TypeScript models, registry/ratings/editorial
+and trace checks pass. Actual v5/v6 HTTP/Chromium acceptance exercises original
+prose/status/grouping, all 27 roundup items, every trace step, sources, four rating
+modes and three widths, preserving unpublished/expired/independent-check warnings.
+Private reports/screenshots remain under
+`~/.local/share/quorum/experiments/evidence-intake-20261025/`.
+
+Approved integration sequence: #18 into reasoning, confirmed #16 into integration,
+then #9 with the exact owner-specified conflict resolution. No rebase, force-push,
+paid inference, runtime-memory setting, production change or publisher activation.
+Final master approval still requires owner review of the final integration SHA;
+the user's permission to merge after that review is already recorded in Issue #2.
+
+Additional package checkpoint `91cd66f`: actual archive has 2663 safe entries,
+SHA-256 `4a949eaf824314f2d37a6635b88411299e576f357ee51c20d5342d9118a42671`.
+Packaged Django/standalone Next start on new loopback ports; a restored disposable
+account passes CSRF login and the authenticated feed remains pending with
+publication disabled. This is local rehearsal only; target-host deployment and
+production restore remain unauthorized and untested for this release.
