@@ -65,7 +65,7 @@ def test_threshold_is_configured():
 
 @pytest.mark.parametrize("node", NODES)
 def test_a_low_overlap_passage_is_not_asked_and_is_counted(live_path, monkeypatch, node):
-    json_task, calls = stub({"stance": "supports", "reason": "x"})
+    json_task, calls = stub({"stance": "supports", "reason": "x", "supporting_span": "Russian drones struck"})
     monkeypatch.setattr(llm, "json_task", json_task)
     out = node.run(_state([doc(1, "origin", ON_TOPIC), doc(2, "cnn", ON_TOPIC), doc(3, "wapo", OFF_TOPIC)]))
     assert len(calls) == 1 and calls[0].startswith("Russian drones")
@@ -103,8 +103,8 @@ def test_an_ungrounded_contradiction_becomes_neutral_and_is_counted(live_path, m
     assert "; 1 contradictions ungrounded" in out["steps"][0]["decision"]
 
 
-@pytest.mark.parametrize("stance", ["supports", "statement"])
-def test_supports_and_statement_need_no_span(live_path, monkeypatch, stance):
+@pytest.mark.parametrize("stance", ["statement"])
+def test_statement_needs_no_span(live_path, monkeypatch, stance):
     json_task, _ = stub({"stance": stance, "reason": "x"})
     monkeypatch.setattr(llm, "json_task", json_task)
     out = research.run(_state([doc(1, "origin", ON_TOPIC), doc(2, "cnn", ON_TOPIC)]))
@@ -117,7 +117,8 @@ def _c(span, passage=DENIAL, claim=CLAIM, **kw):
 
 
 def test_checked_stance_unit():
-    assert untrusted.checked_stance({"stance": "supports"}, "anything", CLAIM) == ("supports", False)
+    assert untrusted.checked_stance({"stance": "supports"}, "anything", CLAIM) == ("neutral", True)  # no supporting_span
+    assert untrusted.checked_stance({"stance": "supports"}, "anything", CLAIM, require_span=False) == ("supports", False)  # stand-in
     assert untrusted.checked_stance({"stance": "bogus"}, "anything", CLAIM) == ("neutral", False)
     assert untrusted.checked_stance(None, "anything", CLAIM) == ("neutral", False)
     assert _c("“did not strike the Kyiv power station”") == ("contradicts", False)
@@ -232,7 +233,7 @@ def test_clip_sentences_stays_verbatim_across_a_newline():
 
 @pytest.mark.parametrize("node", NODES)
 def test_quote_after_the_split_is_found_at_its_offsets(live_path, monkeypatch, node):
-    json_task, _ = stub({"stance": "supports", "reason": "x"})
+    json_task, _ = stub({"stance": "supports", "reason": "x", "supporting_span": "Russian drones struck"})
     monkeypatch.setattr(llm, "json_task", json_task)
     out = node.run(_state([doc(1, "origin", ON_TOPIC), doc(2, "cnn", CAPTION_TEXT)]))
     (ev,) = out["claims"]["c1"]["evidence"]
@@ -246,7 +247,7 @@ def test_may_and_march_are_not_date_markers():
 
     assert "may" not in untrusted.SPAN_DATE_WORDS and "march" not in untrusted.SPAN_DATE_WORDS
     passage = "Officials said troops may withdraw from Kursk on March 3 after talks."
-    claim = "Troops will withdraw from Kursk on March 5."
+    claim = "Soldiers will withdraw from Kursk on March 5."  # one composition stem shared (withdraw): no composition pass
     short = untrusted.checked_stance({"stance": "contradicts", "contradicted_span": "troops may withdraw"}, passage, claim)
     dated = untrusted.checked_stance({"stance": "contradicts", "contradicted_span": "on March 3"}, passage, claim)
     assert short[0] == "neutral" and dated[0] == "contradicts"
@@ -325,7 +326,7 @@ def test_both_nodes_send_the_window_and_the_title(live_path, monkeypatch, node):
 
     def json_task(task, payload, **kw):
         payloads.append(payload)
-        return {"stance": "supports", "reason": "x"}
+        return {"stance": "supports", "reason": "x", "supporting_span": "Russian drones struck"}
 
     monkeypatch.setattr(llm, "json_task", json_task)
     d = doc(2, "cnn", LONG)
@@ -360,7 +361,7 @@ def test_coverage_threshold_is_configured():
 
 
 def test_excluded_stems_are_named_in_the_reason(live_path, monkeypatch):
-    json_task, _ = stub({"stance": "supports", "reason": "x"})
+    json_task, _ = stub({"stance": "supports", "reason": "x", "supporting_span": "Russian drones struck"})
     monkeypatch.setattr(llm, "json_task", json_task)
     monkeypatch.setattr(research, "STANCE_FREQUENT_MIN_DOCS", 2)
     docs = [doc(1, "origin", ON_TOPIC), doc(2, "cnn", ON_TOPIC)]
@@ -392,7 +393,7 @@ def test_frequent_exclusion_is_on_at_thirty_documents():
 
 
 def test_small_day_reason_says_the_exclusion_is_off(live_path, monkeypatch):
-    json_task, _ = stub({"stance": "supports", "reason": "x"})
+    json_task, _ = stub({"stance": "supports", "reason": "x", "supporting_span": "Russian drones struck"})
     monkeypatch.setattr(llm, "json_task", json_task)
     out = fact_check.run(_state([doc(1, "origin", ON_TOPIC), doc(2, "cnn", ON_TOPIC)]))
     assert "; topic-frequent exclusion off (2 documents)" in out["steps"][0]["reason"]
@@ -507,7 +508,7 @@ def test_full_stem_fallback_and_its_note():
 
 
 def test_full_stem_note_in_the_step_reason(live_path, monkeypatch):
-    json_task, _ = stub({"stance": "supports", "reason": "x"})
+    json_task, _ = stub({"stance": "supports", "reason": "x", "supporting_span": "Russian drones struck"})
     monkeypatch.setattr(llm, "json_task", json_task)
     monkeypatch.setattr(research, "STANCE_FREQUENT_MIN_DOCS", 2)
     docs = [doc(1, "origin", ON_TOPIC), doc(2, "cnn", ON_TOPIC)]
@@ -517,3 +518,67 @@ def test_full_stem_note_in_the_step_reason(live_path, monkeypatch):
     st["claims"]["c1"]["text"] = "Russian drones struck Kyiv"
     out = research.run(st)
     assert "; 1 claims kept their full stem set" in out["steps"][0]["reason"]
+
+
+# --- supporting span (live probe, 2026-10-25) and short spans by fact composition ---------------------------------
+
+@pytest.mark.parametrize("span, kept", [
+    ("Russian drones struck the Kyiv power station", True),
+    ("struck", True),  # no length minimum for supports
+    ("Russian  DRONES struck", True),
+    (None, False),
+    ("", False),
+    ("the satellite service was restored", False),  # not in the passage
+    ("officials said", False),  # in the passage, no fact-composition stem of the claim
+], ids=["clause", "one-word", "normalised", "missing", "empty", "not-in-passage", "off-claim"])
+def test_supporting_span_rule(span, kept):
+    ans = {"stance": "supports"} | ({} if span is None else {"supporting_span": span})
+    assert untrusted.checked_stance(ans, ON_TOPIC, CLAIM) == (("supports", False) if kept else ("neutral", True))
+
+
+def test_supporting_span_uses_the_fact_composition_with_its_fallback():
+    claim = "Trump spoke with Zelensky about Starlink"
+    passage = "Trump spoke with Zelensky on Monday, officials said."
+    frequent = {"trump", "zelensky", "spoke"}
+    # composition {starlink} (two stems left would be needed for the fallback: here one remains, so full set is used)
+    assert text.fact_composition(claim, frequent) == text.stems(claim)
+    ans = {"stance": "supports", "supporting_span": "Trump spoke with Zelensky"}
+    assert untrusted.checked_stance(ans, passage, claim, frequent=frequent) == ("supports", False)
+    claim2 = "Trump spoke with Zelensky about Starlink satellite outages"
+    assert untrusted.checked_stance(ans, passage, claim2, frequent=frequent) == ("neutral", True), "only frequent names shared"
+
+
+@pytest.mark.parametrize("node", NODES)
+def test_an_ungrounded_support_is_counted(live_path, monkeypatch, node):
+    json_task, _ = stub({"stance": "supports", "reason": "x", "supporting_span": "More follows"})
+    monkeypatch.setattr(llm, "json_task", json_task)
+    out = node.run(_state([doc(1, "origin", ON_TOPIC), doc(2, "cnn", ON_TOPIC)]))
+    assert out["claims"]["c1"]["evidence"] == []
+    assert "; 1 supports ungrounded" in out["steps"][0]["decision"]
+    assert "contradictions ungrounded" not in out["steps"][0]["decision"]
+
+
+def test_dry_run_stand_in_support_is_exempt():
+    ans = dryrun.stance({"claim": CLAIM, "passage": ON_TOPIC, "role": "researcher", "source_kind": "outlet"})
+    assert ans["stance"] == "supports" and "supporting_span" not in ans
+    assert research.judged_stance(ans, CLAIM, ON_TOPIC, set(), live=False) == ("supports", None)
+
+
+@pytest.mark.parametrize("span, passage, claim, kept", [
+    ("still experiencing restrictions", "Soldiers said they were still experiencing restrictions on Starlink.",
+     "Starlink restrictions for Ukrainian soldiers ended and service is back to normal", True),  # marker "still"
+    ("Starlink restrictions remain", "Starlink restrictions remain in place, soldiers said.",
+     "Starlink restrictions on Ukrainian units were lifted", True),
+    ("no longer working", "The terminals are no longer working, soldiers said.", "Starlink terminals at the front work again", True),
+    ("terminals at the front", "Soldiers said terminals at the front lost signal.", "Starlink terminals at the front work again", True),  # 2 composition stems
+    ("terminals lost signal", "Soldiers said terminals lost signal.", "Starlink terminals at the front work again", False),  # 1 stem, no marker
+], ids=["still", "remain", "no-longer", "two-composition-stems", "one-stem-no-marker"])
+def test_short_span_markers_and_composition(span, passage, claim, kept):
+    ans = {"stance": "contradicts", "contradicted_span": span}
+    assert untrusted.checked_stance(ans, passage, claim) == (("contradicts", False) if kept else ("neutral", True))
+
+
+def test_bare_longer_is_not_a_negation_marker():
+    from quorum_reasoning import untrusted
+
+    assert "longer" not in untrusted.SPAN_NEGATIONS and "no" in untrusted.SPAN_NEGATIONS

@@ -61,7 +61,7 @@ def run(state: RunState) -> dict:
             judged_calls = 0
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at research.stance_question)
             repeats = 0
-            irrelevant = ungrounded = off_fact = 0  # the relevance guards (decisions at research.relevant, untrusted.checked_stance, untrusted.off_fact)
+            irrelevant = ungrounded = off_fact = supports_ungrounded = 0  # the relevance guards (decisions at research.relevant, untrusted.checked_stance, untrusted.off_fact)
             frequent, n_docs = topic_frequent(state)
             live = not llm.is_dry_run(state["dry_run"])
             for c in event_claims:
@@ -100,6 +100,7 @@ def run(state: RunState) -> dict:
                         stance, why = judged_stance(ans, c["text"], passage, frequent, live=live, context=(before, after))
                         ungrounded += why == "ungrounded"
                         off_fact += why == "off-fact"
+                        supports_ungrounded += why == "support ungrounded"
                         asked[question] = stance
                     if stance == "neutral":
                         continue
@@ -113,7 +114,7 @@ def run(state: RunState) -> dict:
                 c["fact_checker_reason"] = reason + (f" ({lost} stance call(s) failed for this claim)" if lost else "")
                 c["fact_checker_judged"] = judged  # 0 with failures = unavailable, not a verdict (adjudicate reads it)
                 counts[status] += 1
-            s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact)
+            s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact, supports_ungrounded)
             s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + excluded_note(frequent, n_docs, [c["text"] for c in event_claims]) + (f"; failures: {failed[0]}" if failed else "")
             if failed:
                 errors.append(StepError(node="fact_check", event_id=e["id"], message=f"{len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))

@@ -17,7 +17,7 @@ import json
 import re
 from typing import Any
 
-from .text import composition_coverage, containment, different_day, sentences, stated_dates, stems, tokens
+from .text import composition_coverage, containment, different_day, fact_composition, sentences, stated_dates, stems, tokens
 
 # Prefixed to every live model payload (llm.json_task). The prompts carry the same rule.
 DATA_NOTE = (
@@ -99,7 +99,8 @@ def span_in(span: Any, passage: str) -> bool:
 # near-sentence. Owner's decision (Yelysei, 2026-10-25). Supersedes the plain ">= 2 words" minimum of the same day.
 SPAN_MIN_WORDS = 5
 SPAN_SHORT_MIN_WORDS = 2
-SPAN_NEGATIONS = frozenset({"not", "no", "never", "denied", "denies", "deny", "without", "nor", "cannot"})
+# negations plus state words that deny a change ("still experiencing", "remains closed", "no longer"); Yelysei, 2026-10-25
+SPAN_NEGATIONS = frozenset({"not", "no", "never", "denied", "denies", "deny", "without", "nor", "cannot", "still", "remains", "remain"})  # "no longer" passes on "no"; bare "longer" matched "longer range"
 SPAN_DATE_WORDS = frozenset(  # "may" and "march" (and "mar") left out: ordinary verb/noun; dates with a digit pass on the digit
     "january february april june july august september october november december "
     "jan feb apr jun jul aug sep sept oct nov dec "
@@ -118,22 +119,36 @@ def _short_span_marker(span: str, words: list[str]) -> bool:
     )
 
 
-def span_contradicts_claim(span: str, claim_text: str) -> bool:
-    """True when the span is long enough for its kind (SPAN_MIN_WORDS, or SPAN_SHORT_MIN_WORDS with a number, date
-    word or negation) and shares a significant stem with the claim (text.stems: function words dropped, suffixes
-    stripped). Words are counted as written, not as text.tokens: "killed 31" is two words."""
+def span_contradicts_claim(span: str, claim_text: str, frequent: set[str] | frozenset = frozenset()) -> bool:
+    """True when the span is long enough for its kind and shares a significant stem with the claim (text.stems:
+    function words dropped, suffixes stripped). Long enough: SPAN_MIN_WORDS, or SPAN_SHORT_MIN_WORDS with a number,
+    date word or negation/state word, or with at least COMPOSITION_STEMS_MIN stems of the claim's fact composition
+    (text.fact_composition with `frequent`). Words are counted as written, not as text.tokens: "killed 31" is two.
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a short span also passes when it shares two fact-composition
+    stems with the claim, and "still", "remains", "no longer" count as markers. Why: the live probe lost a real
+    contradiction ("still experiencing restrictions" against "back to normal") to the marker rule.
+    """
     words = _words(span)
     if len(words) < SPAN_SHORT_MIN_WORDS:
         return False
     if len(words) < SPAN_MIN_WORDS and not _short_span_marker(span, words):
-        return False
+        if len(stems(span) & fact_composition(claim_text, set(frequent))) < COMPOSITION_STEMS_MIN:
+            return False
     return bool(stems(span) & stems(claim_text))
 
 
-def checked_stance(answer: Any, passage: str, claim_text: str, *, require_span: bool = True) -> tuple[str, bool]:
+def span_supports_claim(span: str, claim_text: str, frequent: set[str] | frozenset = frozenset()) -> bool:
+    """True when a supporting span shares at least one stem with the claim's fact composition (no length minimum)."""
+    return bool(stems(span) & fact_composition(claim_text, set(frequent)))
+
+
+def checked_stance(answer: Any, passage: str, claim_text: str, *, require_span: bool = True, frequent: set[str] | frozenset = frozenset()) -> tuple[str, bool]:
     """The stance of a stance reply after the post-call relevance guard, and whether a contradiction was downgraded.
 
-    `supports`, `statement` and `neutral` pass through valid_stance unchanged. A `contradicts` stays only when its
+    `statement` and `neutral` pass through valid_stance unchanged. A `supports` stays only when its `supporting_span`
+    is a word run of the passage and shares a fact-composition stem with the claim (span_supports_claim); else it is
+    `neutral` and the second value True. A `contradicts` stays only when its
     `contradicted_span` is found as a word run in the passage the model was shown (span_in), is long enough for its
     kind and shares a significant stem with the claim (span_contradicts_claim, decision at SPAN_MIN_WORDS); otherwise
     it becomes `neutral` and the second value is True, so the caller counts it.
@@ -152,12 +167,17 @@ def checked_stance(answer: Any, passage: str, claim_text: str, *, require_span: 
     dry-run stand-in (dryrun.stance, deterministic code that never writes a span): its contradictions stay.
     """
     stance = valid_stance(answer.get("stance") if isinstance(answer, dict) else None)
-    if stance != "contradicts":
+    if stance not in ("contradicts", "supports"):
         return stance, False
-    span = answer.get("contradicted_span")  # type: ignore[union-attr]
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a `supports` must quote the passage words that state the same
+    # fact (`supporting_span`), sharing a fact-composition stem with the claim; no length minimum and no coverage
+    # share. Why: the live probe labelled a Kyiv-strike passage `supports` for a satellite-service claim, and a support
+    # feeds confirmation, which has no other guard than the two-group rule. Owner's decision (Yelysei, 2026-10-25).
+    key, rule = ("contradicted_span", span_contradicts_claim) if stance == "contradicts" else ("supporting_span", span_supports_claim)
+    span = answer.get(key)  # type: ignore[union-attr]
     if span is None and not require_span:
         return stance, False
-    if span_in(span, passage) and span_contradicts_claim(span, claim_text):
+    if span_in(span, passage) and rule(span, claim_text, frequent):
         return stance, False
     return "neutral", True
 

@@ -135,13 +135,14 @@ def contradiction_coverage(span: object) -> float:
 
 
 def judged_stance(ans: object, claim_text: str, passage: str, frequent: set[str], *, live: bool, context: tuple[str, str] = ("", "")) -> tuple[str, str | None]:
-    """The stance after the post-call guards and, when downgraded, why: "ungrounded" (untrusted.checked_stance) or
+    """The stance after the post-call guards and, when downgraded, why: "ungrounded" or "support ungrounded" (untrusted.checked_stance) or
     "off-fact" (untrusted.off_fact over the passage and its context window: the fact composition is not covered, or
     another stated day). `live` is False when the dry-run stand-in answered (llm.is_dry_run): it writes no span, and
     its contradictions stay."""
-    stance, downgraded = untrusted.checked_stance(ans, passage, claim_text, require_span=live)
+    asked_stance = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
+    stance, downgraded = untrusted.checked_stance(ans, passage, claim_text, require_span=live, frequent=frequent)
     if downgraded:
-        return "neutral", "ungrounded"
+        return "neutral", ("support ungrounded" if asked_stance == "supports" else "ungrounded")
     if stance == "contradicts" and live:
         span = ans.get("contradicted_span") if isinstance(ans, dict) else None
         if untrusted.off_fact(claim_text, passage, span, frequent, contradiction_coverage(span), " ".join(clipped_context(*context))):
@@ -160,12 +161,13 @@ def excluded_note(frequent: set[str], n_docs: int, claim_texts: list[str] | tupl
     return f"; topic-frequent stems excluded from fact compositions: {', '.join(sorted(frequent))}" + (f"; {kept} claims kept their full stem set" if kept else "")
 
 
-def relevance_note(irrelevant: int, ungrounded: int, off_fact: int = 0) -> str:
+def relevance_note(irrelevant: int, ungrounded: int, off_fact: int = 0, supports_ungrounded: int = 0) -> str:
     """The step-decision suffix counting the relevance guards; empty when none fired."""
     parts = (
         ([f"{irrelevant} passages below relevance"] if irrelevant else [])
         + ([f"{ungrounded} contradictions ungrounded"] if ungrounded else [])
         + ([f"{off_fact} contradictions off-fact"] if off_fact else [])
+        + ([f"{supports_ungrounded} supports ungrounded"] if supports_ungrounded else [])
     )
     return f"; {', '.join(parts)}" if parts else ""
 
@@ -254,7 +256,7 @@ def run(state: RunState) -> dict:
             failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at stance_question)
             repeats = 0
-            irrelevant = ungrounded = off_fact = 0  # the relevance guards (decisions at relevant, untrusted.checked_stance, untrusted.off_fact)
+            irrelevant = ungrounded = off_fact = supports_ungrounded = 0  # the relevance guards (decisions at relevant, untrusted.checked_stance, untrusted.off_fact)
             frequent, n_docs = topic_frequent(state)
             live = not llm.is_dry_run(state["dry_run"])  # the stand-in answers whenever llm.is_dry_run
             for c in targets:
@@ -286,12 +288,13 @@ def run(state: RunState) -> dict:
                         stance, why = judged_stance(ans, c["text"], passage, frequent, live=live, context=(before, after))
                         ungrounded += why == "ungrounded"
                         off_fact += why == "off-fact"
+                        supports_ungrounded += why == "support ungrounded"
                         asked[question] = stance
                     if stance == "neutral":
                         continue
                     c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
                     found += 1
-            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact)
+            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact, supports_ungrounded)
             earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
             s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + excluded_note(frequent, n_docs, [c["text"] for c in targets]) + (f"; failures: {failed[0]}" if failed else "")
             if failed:

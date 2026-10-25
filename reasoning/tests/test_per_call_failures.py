@@ -38,7 +38,7 @@ def flaky(fail_on: set[int]):
         calls["n"] += 1
         if calls["n"] in fail_on:
             raise RuntimeError("Error code: 429 - Too Many Requests")
-        return {"stance": "supports", "reason": "test"}
+        return {"stance": "supports", "reason": "test", "supporting_span": "The Senate passed the aid bill"}  # a grounded support (untrusted.checked_stance)
 
     return json_task, calls
 

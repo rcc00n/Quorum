@@ -110,3 +110,13 @@ def test_threatened_not_adopted_stays_below_the_bar_even_with_numeric_ones(monke
     ev = _event("e1")
     ev["rubric"] = final
     assert rank_and_cap([ev])[0]["above_bar"] is False
+
+
+def test_rubric_prompt_completed_acts_and_document_ids():
+    """Live probe 2026-10-25: a completed prisoner swap came back announced_or_threatened and no rationale cited a document."""
+    from quorum_reasoning import llm
+
+    prompt = llm._prompt("rubric")
+    assert "A reported completed act (exchanged, swapped, killed, destroyed, delivered, signed into law, ratified, withdrawn) is \"executed_irreversible\" even when the documents are news reports" in prompt
+    assert "\"announced_or_threatened\" is only for what has not happened yet or is conditional" in prompt
+    assert "starts with the id of the document it relies on" in prompt

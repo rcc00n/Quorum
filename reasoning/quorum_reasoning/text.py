@@ -93,7 +93,10 @@ _STEM_STOP = {
     stem(w)
     for w in (
         "the and for into onto under over between after before during from with that this these those its "
-        "are was were has have had will would can could says said say new also not when where while"
+        "are was were has have had will would can could says said say new also not when where while "
+        # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): more function words. Why: "about" was one of the five
+        # topic-frequent stems on the real corpus (research.topic_frequent) and displaced a content stem.
+        "about more than who which been other their there should"
     ).split()
 }
 
@@ -110,10 +113,34 @@ def overlap_coefficient(a: set[str], b: set[str]) -> float:
     return len(a & b) / min(len(a), len(b))
 
 
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a sentence matching one of these is page furniture (photo
+# credits, image and newsletter UI, related-link labels) and is never a stance passage or part of its context window.
+# Applied only when choosing passages (passage_window, best_passage), never to the stored text, so quote offsets stay
+# valid. Why: 37 caption passages were labelled `contradicts` in the 2026-10-24 journals (D5); the newline split
+# handles captions followed by a newline, these Guardian-style ones run on without one. Silent: nothing counts them.
+BOILERPLATE_PATTERNS = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"^(?:photograph|photo|image)\s*:",
+        r"/\s*getty images",
+        r"getty images\W*$",
+        r"view image in fullscreen",
+        r"^(?:advertisement|read more|related\s*:.*|skip past\b.*|sign up\b.*(?:newsletter|email|alerts|updates).*)\W*$",  # whole short UI lines only, never prose that merely starts with the same word
+    )
+)
+
+
+def is_boilerplate(sentence: str) -> bool:
+    """True when the sentence matches one of BOILERPLATE_PATTERNS."""
+    s = (sentence or "").strip()
+    return any(p.search(s) for p in BOILERPLATE_PATTERNS)
+
+
 def passage_window(claim_text: str, text: str, n: int) -> tuple[str, str, str]:
     """(before, passage, after): the sentence of `text` sharing the most words with the claim (the first on a tie;
-    empty when nothing is shared) and up to `n` sentences on each side, joined by a space; empty at the edges."""
-    sents = sentences(text)
+    empty when nothing is shared) and up to `n` sentences on each side, joined by a space; empty at the edges.
+    Boilerplate sentences (is_boilerplate) are neither candidates nor context."""
+    sents = [s for s in sentences(text) if not is_boilerplate(s)]
     cw = tokens(claim_text)
     best, best_score = -1, 0
     for i, sent in enumerate(sents):
