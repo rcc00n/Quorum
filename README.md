@@ -18,6 +18,10 @@ Built by team **Quorum** for the [Open Agent Hackathon 2026](https://hackathon.g
 
 The full set of decisions — scope, principles, source list, cohort rules, UI, stack, demo plan, open questions — is in [docs/DECISIONS.md](docs/DECISIONS.md). That file is the source of truth; code that contradicts it is a bug.
 
+## Web Integration: Start Here
+
+[Web handoff and owner notifications](docs/TEAM_HANDOFF.md) → [current adapter/contract](docs/PORTAL_INTEGRATION.md) → [reproducible tests](docs/PORTAL_VERIFICATION.md#current-reproducible-checks). Reasoning 1.0 preview is FICTIONAL/local-only; production publication remains disabled.
+
 ## Stack
 
 | Layer | Technology |
@@ -26,7 +30,7 @@ The full set of decisions — scope, principles, source list, cohort rules, UI, 
 | Reasoning | NVIDIA Nemotron via Meterless; additional LLMs for independent review where the rules allow |
 | Reasoning orchestration | Python + LangGraph, LangGraph Studio for development and the demo; design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), code in [`reasoning/`](reasoning/README.md) |
 | Web | Next.js + TypeScript frontend; Django auth, API and Quorum Control |
-| Development | Each team member uses their own AI assistant (Codex, Claude Code); shared rules in [AGENTS.md](AGENTS.md), organizer-update evidence in [docs/RULES_CHECK.md](docs/RULES_CHECK.md); one branch per member, `master` through pull requests |
+| Development | Vadim uses Codex; team members use their own assistants (Codex, Claude Code); shared rules in [AGENTS.md](AGENTS.md), organizer-update evidence in [docs/RULES_CHECK.md](docs/RULES_CHECK.md); one branch per member, `master` through pull requests |
 
 ## Repository layout
 
@@ -48,7 +52,7 @@ The full set of decisions — scope, principles, source list, cohort rules, UI, 
 
 ## Working agreements
 
-Everyone on the team codes with a different AI assistant (Codex, Claude Code); the shared rules are tool-independent. To keep choices visible across tools, [AGENTS.md](AGENTS.md) requires every non-trivial decision to be recorded where it applies: project-wide ones in `docs/DECISIONS.md`, module-level ones in that folder's `README.md`, file-level ones as a `DECISION(...)` comment at the spot — in the same commit as the code, and never overriding someone else's decision silently. If a task contradicts `docs/DECISIONS.md`, change the decision first, then the code.
+Vadim uses Codex; other team members use their own assistants (including Claude Code); the shared rules are tool-independent. To keep choices visible across tools, [AGENTS.md](AGENTS.md) requires every non-trivial decision to be recorded where it applies: project-wide ones in `docs/DECISIONS.md`, module-level ones in that folder's `README.md`, file-level ones as a `DECISION(...)` comment at the spot — in the same commit as the code, and never overriding someone else's decision silently. If a task contradicts `docs/DECISIONS.md`, change the decision first, then the code.
 
 ## Environment
 

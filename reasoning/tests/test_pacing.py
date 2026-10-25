@@ -480,6 +480,9 @@ def test_seed_journal_loads_replay_without_a_checkpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(llm, "journal_path", None)
     monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None, raising=False)
     monkeypatch.setenv("QUORUM_DRY_RUN", "0")
+    # pin a model route so the test does not depend on the developer's .env (it failed on a clean integration checkout)
+    monkeypatch.setenv("MODEL_BASE_URL", "http://127.0.0.1:9/v1")
+    monkeypatch.setenv("MODEL_API_KEY", "test-token-not-real")
     rc = run_cli.main(["--topic", "russia-ukraine-war", "--date", "2026-10-24", "--model", "live", "--attempt", "7", "--seed-journal", "--quiet", "--out", str(tmp_path)])
     assert rc == 3 and seen == {"calls": 1, "replay": 1, "resume": False}, (rc, seen)
 
