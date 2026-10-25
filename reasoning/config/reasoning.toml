@@ -1,0 +1,131 @@
+# Reasoning block configuration. Changing a threshold here is a product decision: record it in docs/DECISIONS.md.
+
+[impact_bar]
+threshold = 6          # minimum rubric total (legal_force 0-2 + reach 0-3 + irreversibility 0-2 + confirmation 0-2)
+confirmation_min = 1   # a story needs at least one independent source
+cap_per_day = 10       # at most this many stories per topic and day; no minimum
+
+[loops]
+research_rounds_max = 2      # verify -> research, per event
+drafts_max = 3               # critique -> write, per event
+review_disputed_max = 1      # third blind pass per disagreed claim; never repeated (DECISIONS.md log, 2026-10-24)
+recursion_limit = 60         # LangGraph recursion limit per run
+
+[research]
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): research round 2 widens over the previous N edition days of
+# our own corpus (one more window in the same two SQL statements). Those documents are evidence only: they are
+# marked `from_previous_day`, never clustered into events, never counted for spread or coverage, and an evidence
+# row cut from one carries `from_previous_day: true`. Why: DECISIONS.md log 2026-10-23 (round 2 widens over our
+# own corpus, the day then previous days); a claim often rests on an earlier report, and a yesterday's law
+# confirms today's claim about it. GDELT and official sites of record stay DEFERRED (ARCHITECTURE § 10).
+previous_days = 2            # 0 disables; each day is one more 24-hour window before the edition window
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): research round 2 and the fact-checker judge at most
+# candidates_per_claim documents per claim, chosen by code — the documents whose best passage shares the most words
+# with the claim (text.best_passage score), ties by publication time. Round 1 (the event's own documents) is not
+# capped. Why: the first real corpus (edition 2026-10-24: 43 documents + 65 earlier-day documents, 70 claims on
+# stand-ins) gave an upper bound of ~6 700 stance calls per round and ~6 800 for the fact-checker — hours at the
+# direct route's spacing; a passage that shares no words with the claim is never judged `supports`, so ranking by
+# overlap drops the pairs the model would have called neutral anyway. 0 = no cap.
+candidates_per_claim = 8
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a stance call is made only when the passage holds at least
+# stance_min_overlap of the claim's tokens (text.containment; research.relevant); below it the passage is skipped
+# and counted ("N passages below relevance"). 0.15 makes it a cost guard; the noise guard is the post-call
+# `contradicted_span` check (untrusted.checked_stance). Why: offline on the 2026-10-24 run-3/5 journals (2 606
+# stance answers), 0.25 removed 25 of 222 supports (11%) for 146 of 714 contradicts (20%) and the D5 noise examples
+# mostly survived it (captions 0.21-0.64, Kyiv passages 0.20-0.56); 0.15 loses 8 of 222 supports (3.6%), removes
+# 24 contradicts and saves 110 calls (4%).
+stance_min_overlap = 0.15    # 0 disables
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a `contradicts` counts only when the passage covers at least
+# stance_coverage of the claim's fact composition (its stems minus the run's 5 most frequent stems and
+# any stem in > 30% of the documents' titles+leads) and at least 2 of those stems (untrusted.off_fact). Why: a shared
+# entity ("Trump") does not tie a contradiction to the same fact (D5). Offline on the 2026-10-24 run-3/5 journals
+# (passage only; corpus frequency approximated from the journal's 599 unique claims+passages, which excluded trump,
+# ukraine, president, his, russia): median coverage is 0.36 for supports and 0.17 for contradicts. Kept contradicts
+# vs supports clearing the same bar: 0.3 → 163/714 vs 136/222; 0.4 → 78/714 vs 94/222; 0.5 → 45/714 vs 70/222.
+# D5 noise at 0.4: Ramaswamy 0/2 and Pope/Kremlin 0/9 kept (max 0.17 / 0.21), Kyiv 2/16 (0.64), captions 14/37
+# (measured on glued caption+sentence passages, which the newline split now separates). 0.4 rather than 0.5: the
+# supports show that a same-fact single sentence covers >= 0.4 in 42% of cases but >= 0.5 in only 32%, and a lost
+# true contradiction lets a disputed claim read confirmed; 0.3 keeps 6 of the 16 Kyiv rows.
+stance_coverage = 0.4
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a `supports` passes the same fact-composition check as a
+# `contradicts` (stance_coverage / stance_coverage_short over the passage plus its context window, 2-stem floor,
+# full-stem fallback, date rule; untrusted.off_fact), and its supporting span must share 2 composition stems
+# whatever its length (untrusted.SUPPORT_SPAN_STEMS_MIN); downgrades are counted as "N supports off-fact".
+# The keys were stance_contradiction_coverage(_short) until this change. Why: D5 of snapshot v5 (first canonical run
+# under the span rules): about 8 of 14 "Confirmed" roundup labels rested on passages that do not support the claim.
+# Owner's decision (Yelysei, 2026-10-25, symmetric to contradictions).
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): coverage is measured over the passage plus its context window
+# (two sentences each side, what the model sees), and a short number/date/negation span (2-4 words) needs only
+# stance_coverage_short; the 2-stem floor applies to both. Why: on passage-only coverage 15 of 20
+# number contradictions and 102 of 115 negation ones fell below 0.4 — a short honest contradiction ("killed 5")
+# sits in a sentence covering few of a long claim's stems, while its neighbours name the actors and the act.
+# Owner's decision (Yelysei, 2026-10-25); not measurable offline (the journals carry no document text).
+# Short claims are the strictest: with a 2-stem composition both stems must be covered (the floor), whatever the
+# share; the share takes over from 5 stems up (0.4 of 5 = 2). A claim that would keep fewer than 2 stems after the
+# topic-frequent exclusion keeps its full stem set (text.fact_composition).
+stance_coverage_short = 0.25
+
+[clustering]
+# Superseded 2026-10-24 (kept for the record): similarity_threshold = 0.5 and borderline_band = 0.25 drove
+# the titles-only cosine. Clustering now groups by per-document event keys (nodes/cluster.py; decision in
+# reasoning/README.md › Decisions): near-identical keys merge in code, no shared entity or action stays
+# apart in code, the model answers only the in-between.
+key_merge_overlap = 0.75     # stemmed key-token overlap coefficient at/above which two documents merge with no model call
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): 160, up from 80. Why: the first real corpus (43 documents)
+# exhausted 80 pair questions in the first pass and left 32 of 34 events as singletons — the fail-safe "no merge"
+# direction makes cross-outlet confirmation unreachable when the budget runs out before the singleton pass.
+merge_questions_max = 160    # model merge questions (pair, singleton, chain) per run; past it the fail-safe direction applies
+
+[writing]
+reading_minutes_max = 4
+forbidden_words = [
+  "alarming", "shocking", "stunning", "historic", "unprecedented", "devastating", "crucial",
+  "controversial", "massive", "huge", "major blow", "landmark", "sweeping", "dramatic",
+  "clearly", "obviously", "undoubtedly", "arguably", "will likely", "could lead to", "may lead to",
+  "why it matters", "this matters", "experts say", "critics say", "some say",
+]
+attribution_verbs = ["says", "said", "states", "stated", "claims", "claimed", "according to", "announced", "told"]
+
+[models]
+# One hotspot (Meterless Nightshift: MODEL_BASE_URL / MODEL_API_KEY), two lanes by env: NEMOTRON_MODEL for every
+# task, NEMOTRON_MODEL_FACT_CHECKER for the blind second check (falls back to NEMOTRON_MODEL when unset). Through
+# Nightshift 1.2.3 the fact-checker lane is pinned with the explicit id nvidia/nemotron-3-ultra-550b-a55b (honoured
+# in every observed request, 2026-10-23); dispositions (fast/deep/judge) all rank onto Lightning. The answering
+# model is read from each response (provenance.answered_by, ledger `served`/`receipt_id`), never assumed.
+default = "env:NEMOTRON_MODEL"
+fact_checker = "env:NEMOTRON_MODEL_FACT_CHECKER"
+temperature = 0.1
+# DECISION(2026-10-23, Yelysei Shkirpan/Claude Code): reasoning mode off for every task, switched through the
+# request body (`chat_template_kwargs.enable_thinking = false`, NVIDIA's documented control for hosted
+# Nemotron 3.5 / Nemotron 3 Nano endpoints). Why: on the first live run Lightning 30B generated ~700 hidden
+# thinking tokens per 20-token JSON answer (7-70 s per call) and the biggest payload ended in a 500; our tasks
+# are judgments on quoted text, not multi-step problems. A system-prompt "/no_think" was tried first and did
+# nothing: that switch belongs to Qwen3, not Nemotron (superseded the same day).
+reasoning = "off"                 # off | on
+reasoning_budget = 0              # when reasoning = "on": cap on thinking tokens, NVIDIA's `reasoning_budget` (0 = provider default)
+max_tokens = 1500                 # ceiling per reply; every task answers in far fewer
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): 1600 ms between live calls by default (37 requests/min,
+# under the direct NVIDIA route's documented 40-requests/min trial cap), overridable per run with
+# QUORUM_MIN_INTERVAL_MS (0 through Nightshift, where the hotspot paces upstream; 3500 if the direct route
+# still answers 429). Why: with no spacing the first live fixture run hit HTTP 429 after 61 calls and finished
+# only at 3500 ms (Vadim, NVIDIA-FIRST-01); the one explicit retry in llm.py honours Retry-After, so the
+# documented cap is the starting point and the observed 3500 ms the fallback. Verified only by the first live
+# run on this branch: until then this value is IMPLEMENTED, not TESTED. (superseded 2026-10-24, next entry)
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): base pace of the default (Lightning) lane raised to 2400 ms
+# (25 requests/min); llm.py doubles a route's interval on every 429 and pauses it after two in a row (decisions
+# there). Why: the journals of two live runs showed a 429 whenever a 60 s window held 31 or more requests (about
+# one per 33 calls at 1600 ms) and none below that; the 429 carries no Retry-After, and staying at the limit for
+# ~30-35 min pushed the provider into a stricter state that refused even ~8 requests/min for minutes.
+# (superseded 2026-10-24, next entry)
+# DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): base pace 6000 ms on the default (Lightning) lane (~10
+# requests/min) and 10000 ms on the fact-checker and reviewer (Ultra) lanes (~6 requests/min); llm.py backs a refused
+# route off to twice its base and stops the run on the second refused call within 10 min (decisions there). Why:
+# three runs' journals and NVIDIA user reports show a per-model bucket (Lightning ~700-900 requests, Ultra ~250) with
+# a slow refill (~2-4 requests/min, 3.5-7 h to full), no rate headers and no Retry-After; a slower base spends the
+# bucket more evenly over a run, and a drained bucket is refused at any pace above the refill.
+min_interval_ms = 6000            # base pause between live calls; env QUORUM_MIN_INTERVAL_MS overrides
+# Per-lane pause, measured per model route (llm.min_interval_ms; decision there; values: decision above). Env QUORUM_MIN_INTERVAL_MS_FACT_CHECKER /
+# QUORUM_MIN_INTERVAL_MS_REVIEWER override. Through Nightshift QUORUM_MIN_INTERVAL_MS=0 alone turns these lanes off
+# too (an explicit shared 0 wins over the values below unless a lane's own env is set; decision in llm.min_interval_ms).
+min_interval_ms_fact_checker = 10000
+min_interval_ms_reviewer = 10000

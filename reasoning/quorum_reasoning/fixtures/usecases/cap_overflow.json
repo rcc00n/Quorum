@@ -1,0 +1,103 @@
+{
+  "_note": "Fictional use-case day (workstream D): twelve events cross the bar. The cap keeps ten, ordered by rubric total then confirmation; the two lowest-scored events that still cross the bar go to the roundup (DECISIONS.md > Selecting major news: up to ten a day).",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-11-08",
+  "documents": [
+    {
+      "id": 9801, "source_id": "congress-gov", "source_name": "Congress.gov", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.congress.gov/fiction/bill/9801",
+      "title": "Congress adopts fisheries subsidy act", "lead": "",
+      "published_at": "2026-11-07T10:01:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "law",
+      "text": "The act establishes a subsidy program for coastal fisheries fleets."
+    },
+    {
+      "id": 9802, "source_id": "congress-gov", "source_name": "Congress.gov", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.congress.gov/fiction/vote/9802",
+      "title": "Senate approves pipeline permit resolution", "lead": "",
+      "published_at": "2026-11-07T10:02:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "vote",
+      "text": "The resolution grants a permit for the northern pipeline segment."
+    },
+    {
+      "id": 9803, "source_id": "congress-gov", "source_name": "Congress.gov", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.congress.gov/fiction/bill/9803",
+      "title": "Parliament amends grain export tariff code", "lead": "",
+      "published_at": "2026-11-07T10:03:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "law",
+      "text": "The amended code sets a tariff schedule for grain exports."
+    },
+    {
+      "id": 9804, "source_id": "federal-register", "source_name": "Federal Register", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.federalregister.gov/fiction/9804",
+      "title": "Federal court ruling voids timber lease auctions", "lead": "",
+      "published_at": "2026-11-07T10:04:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "ruling",
+      "text": "The ruling voids three timber lease auctions held last spring."
+    },
+    {
+      "id": 9805, "source_id": "federal-register", "source_name": "Federal Register", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.federalregister.gov/fiction/9805",
+      "title": "Nationwide steel import quota imposed by decree", "lead": "",
+      "published_at": "2026-11-07T10:05:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "order",
+      "text": "The decree sets a quota for steel imports from next quarter."
+    },
+    {
+      "id": 9806, "source_id": "federal-register", "source_name": "Federal Register", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.federalregister.gov/fiction/9806",
+      "title": "President signed aviation security order Tuesday", "lead": "",
+      "published_at": "2026-11-07T10:06:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "order",
+      "text": "The order directs screening upgrades at twelve airports."
+    },
+    {
+      "id": 9807, "source_id": "federal-register", "source_name": "Federal Register", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.federalregister.gov/fiction/9807",
+      "title": "New sanctions completed on shipping registries", "lead": "",
+      "published_at": "2026-11-07T10:07:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "order",
+      "text": "The order adds shipping registries to the sanctions list."
+    },
+    {
+      "id": 9808, "source_id": "congress-gov", "source_name": "Congress.gov", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.congress.gov/fiction/bill/9808",
+      "title": "Law establishing housing trust takes effect", "lead": "",
+      "published_at": "2026-11-07T10:08:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "law",
+      "text": "The law creates a housing trust funded by bond sales."
+    },
+    {
+      "id": 9809, "source_id": "congress-gov", "source_name": "Congress.gov", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.congress.gov/fiction/vote/9809",
+      "title": "Senate passes telecom spectrum measure", "lead": "",
+      "published_at": "2026-11-07T10:09:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "vote",
+      "text": "The measure reallocates telecom spectrum for rural carriers."
+    },
+    {
+      "id": 9810, "source_id": "congress-gov", "source_name": "Congress.gov", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.congress.gov/fiction/vote/9810",
+      "title": "Congress approves border crossing modernization bill", "lead": "",
+      "published_at": "2026-11-07T10:10:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "vote",
+      "text": "The bill funds modernization of border crossings over four years."
+    },
+    {
+      "id": 9811, "source_id": "congress-gov", "source_name": "Congress.gov", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.congress.gov/fiction/bill/9811",
+      "title": "Parliament adopts port dredging levy", "lead": "",
+      "published_at": "2026-11-07T10:11:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "law",
+      "text": "The levy applies to port dredging contracts from January."
+    },
+    {
+      "id": 9812, "source_id": "federal-register", "source_name": "Federal Register", "independence_group": "us-gov", "kind": "official",
+      "flank": null, "tier": null, "url": "https://www.federalregister.gov/fiction/9812",
+      "title": "Federal energy permit exchange completed under order", "lead": "",
+      "published_at": "2026-11-07T10:12:00Z", "access_level": 1, "wire_origin": null,
+      "official": true, "doc_type": "order",
+      "text": "The order finalizes the exchange of energy permits between agencies."
+    }
+  ]
+}

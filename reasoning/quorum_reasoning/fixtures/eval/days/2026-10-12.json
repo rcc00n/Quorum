@@ -1,0 +1,23 @@
+{
+  "_note": "Eval day: real coverage, see fixtures/eval/README.md for provenance and limits.",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-12",
+  "expected_above_bar": 1,
+  "expected_above_bar_reason": "Energy ceasefire announcement: legal_force 1 (presidential announcement, no adopted document), reach 3 (two warring countries and the US), irreversibility 0 (an announcement), confirmation 2 (two independence groups for the announcement itself) = 6, at the threshold.",
+  "documents": [
+    {
+      "id": 91201, "source_id": "fox-news", "source_name": "Fox News", "independence_group": "fox-news", "kind": "outlet",
+      "flank": "right", "tier": "major", "url": "https://noticias.foxnews.com/politics/trump-announces-immediate-energy-ceasefire-between-russia-ukraine",
+      "title": "Trump announces Russia-Ukraine energy ceasefire, both sides agree",
+      "lead": "President Trump announced an immediate energy ceasefire between Russia and Ukraine. Trump said both sides agreed to stop attacks on each other's energy facilities.",
+      "published_at": "2026-10-11T21:00:00Z", "access_level": 1, "wire_origin": null
+    },
+    {
+      "id": 91202, "source_id": "npr", "source_name": "NPR", "independence_group": "npr", "kind": "outlet",
+      "flank": "left", "tier": "major", "url": "https://www.npr.org/2026/10/12/nx-s1-5998808/trump-announced-a-partial-russia-ukraine-ceasefire-did-either-country-know-about-it",
+      "title": "Trump announced a partial Russia-Ukraine ceasefire. Did either country know about it?",
+      "lead": "President Trump announced an energy ceasefire between Russia and Ukraine on Sunday. Neither Moscow nor Kyiv confirmed the agreement, and a White House official said the initial focus was oil refineries, with power plants possibly added later.",
+      "published_at": "2026-10-12T09:00:00Z", "access_level": 1, "wire_origin": null
+    }
+  ]
+}

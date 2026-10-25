@@ -1,0 +1,338 @@
+{
+  "schema_version": "1.0",
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-22",
+  "run_id": "2026-10-22-russia-ukraine-war-1",
+  "version": 1,
+  "status": "empty",
+  "generated_at": "2026-10-25T19:42:08Z",
+  "published_at": null,
+  "expires_at": "2026-10-23T12:00:00Z",
+  "edition_timezone": "America/New_York",
+  "window": {
+    "start": "2026-10-21T09:30:00Z",
+    "end": "2026-10-22T09:30:00Z"
+  },
+  "provenance": {
+    "corpus": "fixture:usecases/quiet_day",
+    "model": "stand-ins",
+    "fact_checker_model": "stand-ins",
+    "fictional": true,
+    "model_calls": 0,
+    "answered_by": {},
+    "model_errors": 0
+  },
+  "bar": {
+    "threshold": 6,
+    "confirmation_min": 1
+  },
+  "summary": "No story crossed the bar today out of 3 events. The roundup carries all of them.",
+  "summary_source": "model",
+  "sources_missing": [],
+  "stories": [],
+  "roundup": {
+    "empty_day": true,
+    "count": 3,
+    "groups": [
+      {
+        "name": "Confirmed",
+        "items": [
+          {
+            "event_id": "b913ab53ff63",
+            "line": "Grain corridor talks open in Vienna; delegations meet in Vienna for talks on the grain corridor.",
+            "line_source": "model",
+            "status": "confirmed",
+            "needs_review": false,
+            "sources": [
+              {
+                "title": "The Guardian",
+                "url": "https://www.theguardian.com/fiction/2026/nov/01/grain-corridor-talks-vienna"
+              },
+              {
+                "title": "Reuters",
+                "url": "https://www.reuters.com/fiction/grain-corridor-talks-open-2026-11-01/"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Single source",
+        "items": [
+          {
+            "event_id": "8ec9e4f49dc1",
+            "line": "Museum reopens in Lviv after winter repairs.",
+            "line_source": "model",
+            "status": "single source",
+            "needs_review": false,
+            "sources": [
+              {
+                "title": "NPR",
+                "url": "https://www.npr.org/fiction/2026/11/01/museum-reopens-lviv"
+              }
+            ]
+          },
+          {
+            "event_id": "c83a993b6c7f",
+            "line": "Wheat futures eased in Tuesday trading.",
+            "line_source": "model",
+            "status": "single source",
+            "needs_review": false,
+            "sources": [
+              {
+                "title": "Reuters",
+                "url": "https://www.reuters.com/fiction/wheat-futures-eased-2026-11-01/"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "errors": [],
+  "trace": [
+    {
+      "node": "plan",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "4 documents from 3 sources, 0 official; research budget 2 rounds per event",
+      "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "cluster",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
+      "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "score_importance",
+      "iteration": 1,
+      "event_id": "b913ab53ff63",
+      "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "score_importance",
+      "iteration": 1,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "score_importance",
+      "iteration": 1,
+      "event_id": "c83a993b6c7f",
+      "decision": "legal_force 0, reach 1, irreversibility 0 (confirmation pending)",
+      "reason": "legal_force: none: no official document; reach: scope not stated; regional assumed; irreversibility: announced_or_threatened: announcement or talks",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "extract_claims",
+      "iteration": 1,
+      "event_id": "b913ab53ff63",
+      "decision": "2 claims extracted",
+      "reason": "from 2 documents; level-2 sources contribute leads only, level-3 nothing",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "extract_claims",
+      "iteration": 1,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "1 claims extracted",
+      "reason": "from 1 documents; level-2 sources contribute leads only, level-3 nothing",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "extract_claims",
+      "iteration": 1,
+      "event_id": "c83a993b6c7f",
+      "decision": "1 claims extracted",
+      "reason": "from 1 documents; level-2 sources contribute leads only, level-3 nothing",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "research",
+      "iteration": 1,
+      "event_id": "b913ab53ff63",
+      "decision": "round 1: 2 passages with a stance for 2 claims",
+      "reason": "event documents only; topic-frequent exclusion off (4 documents)",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "research",
+      "iteration": 1,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "round 1: 0 passages with a stance for 1 claims",
+      "reason": "event documents only; topic-frequent exclusion off (4 documents)",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "research",
+      "iteration": 1,
+      "event_id": "c83a993b6c7f",
+      "decision": "round 1: 0 passages with a stance for 1 claims",
+      "reason": "event documents only; topic-frequent exclusion off (4 documents)",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "verify",
+      "iteration": 1,
+      "event_id": "b913ab53ff63",
+      "decision": "2 confirmed, 0 disputed, 0 unverified; 0 thin",
+      "reason": "every claim has a document or two independent groups: on to the fact-checker",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "verify",
+      "iteration": 1,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "0 confirmed, 0 disputed, 1 unverified; 1 thin",
+      "reason": "thin claims and 1 research round(s) left: back to research",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "verify",
+      "iteration": 1,
+      "event_id": "c83a993b6c7f",
+      "decision": "0 confirmed, 0 disputed, 1 unverified; 1 thin",
+      "reason": "thin claims and 1 research round(s) left: back to research",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "research",
+      "iteration": 2,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "round 2: 0 passages with a stance for 1 claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims; topic-frequent exclusion off (4 documents)",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "research",
+      "iteration": 2,
+      "event_id": "c83a993b6c7f",
+      "decision": "round 2: 0 passages with a stance for 1 claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims; topic-frequent exclusion off (4 documents)",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "verify",
+      "iteration": 2,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "0 confirmed, 0 disputed, 1 unverified; 1 thin",
+      "reason": "thin claims but the research budget is spent: on to the fact-checker",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "verify",
+      "iteration": 2,
+      "event_id": "c83a993b6c7f",
+      "decision": "0 confirmed, 0 disputed, 1 unverified; 1 thin",
+      "reason": "thin claims but the research budget is spent: on to the fact-checker",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "fact_check",
+      "iteration": 1,
+      "event_id": "b913ab53ff63",
+      "decision": "skipped: event cannot reach the impact bar; 2 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "fact_check",
+      "iteration": 1,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "skipped: event cannot reach the impact bar; 1 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "fact_check",
+      "iteration": 1,
+      "event_id": "c83a993b6c7f",
+      "decision": "skipped: event cannot reach the impact bar; 1 claims not double-checked",
+      "reason": "judged points plus the maximum confirmation score fall short of the threshold (1 + 2 < 6)",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "adjudicate",
+      "iteration": 1,
+      "event_id": "b913ab53ff63",
+      "decision": "2 confirmed, 0 disputed, 0 unverified; 0 disagreement(s); rubric total 3 (confirmation 2)",
+      "reason": "below the bar",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "adjudicate",
+      "iteration": 1,
+      "event_id": "8ec9e4f49dc1",
+      "decision": "0 confirmed, 0 disputed, 1 unverified; 0 disagreement(s); rubric total 1 (confirmation 0)",
+      "reason": "below the bar",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "adjudicate",
+      "iteration": 1,
+      "event_id": "c83a993b6c7f",
+      "decision": "0 confirmed, 0 disputed, 1 unverified; 0 disagreement(s); rubric total 1 (confirmation 0)",
+      "reason": "below the bar",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "adjudicate",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "0 of 3 events above the bar; 0 flagged for review",
+      "reason": "bar and cap from config/reasoning.toml (see docs/DECISIONS.md › Selecting major news)",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "roundup",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "3 events in 2 group(s); empty day: True",
+      "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "publish",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "snapshot empty: 0 stories, roundup of 3",
+      "reason": "built from state; the store versions it",
+      "model": "stand-ins",
+      "duration_ms": 0
+    }
+  ]
+}
