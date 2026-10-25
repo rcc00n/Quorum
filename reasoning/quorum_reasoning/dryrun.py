@@ -274,3 +274,12 @@ def summary(p: dict[str, Any]) -> dict[str, Any]:
     if isinstance(missing, list) and missing:
         s += f" Sources missing today: {', '.join(missing)}."
     return {"summary": s}
+
+
+def topic_terms(p: dict[str, Any]) -> dict[str, Any]:
+    """Twin of the free-text topic → terms call: the phrase's own words, their runs and naive plurals
+    (`topics.derive`, the same deterministic row the fallback uses), in the model's answer shape."""
+    from .topics import derive  # imported here: topics imports llm, which imports this module
+
+    row = derive(str(p.get("phrase") or ""))
+    return {"slug": row["slug"], "name": row["name"], "terms": row["terms"], "notes": "dry run: " + row["notes"]}
