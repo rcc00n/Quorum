@@ -1,0 +1,45 @@
+diff --git a/web/components/reasoning-evidence.tsx b/web/components/reasoning-evidence.tsx
+index 2ac8c23..d1960a9 100644
+--- a/web/components/reasoning-evidence.tsx
++++ b/web/components/reasoning-evidence.tsx
+@@ -181,7 +181,10 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
+         </div>
+         {c.resolved_by && <aside className="r-disagreement">
+           <strong>Resolution: {c.resolved_by}</strong>
+-          <p>Third reviewer: {c.reviewer_status ?? "No accepted verdict supplied"}</p>
++          {/* DECISION(2026-10-25, rcc00n/Codex): distinguish a reviewer proposal from the accepted final verdict.
++              Why: genuine v4 includes proposals rejected by producer code despite a confirmed reviewer response. */}
++          <p>Third reviewer proposal: {c.reviewer_status ?? "No verdict supplied"}</p>
++          {c.reviewer_status && c.resolved_by !== "reviewer" && <p className="r-review-proposal-rejected">Proposal not adopted; the final claim status above remains authoritative.</p>}
+           {c.reviewer_reason && <p>{c.reviewer_reason}</p>}
+           {c.reviewer_quote && <blockquote>{c.reviewer_quote}</blockquote>}
+           <p>Recorded producer decision; not an independent portal review.</p>
+diff --git a/web/components/reasoning-preview.tsx b/web/components/reasoning-preview.tsx
+index e60b003..c8676a6 100644
+--- a/web/components/reasoning-preview.tsx
++++ b/web/components/reasoning-preview.tsx
+@@ -326,7 +326,7 @@ export function ReasoningPreviewPage({
+               These declarations do not establish a genuine sponsor run or
+               publication.
+             </p>
+-            {data.preview.warnings.filter((warning) => warning.startsWith("IMPACT REVIEW PENDING:")).map((warning) => (
++            {data.preview.warnings.filter((warning) => warning.startsWith("IMPACT REVIEW PENDING:") || warning.startsWith("Ledger scope:")).map((warning) => (
+               <p className="r-preview-limits" role="alert" key={warning}>{warning}</p>
+             ))}
+             {data.preview.provisional && !data.preview.corpus_binding && (
+diff --git a/web/tests/reasoning-snapshot-checks.cjs b/web/tests/reasoning-snapshot-checks.cjs
+index dc1af70..785b3e3 100644
+--- a/web/tests/reasoning-snapshot-checks.cjs
++++ b/web/tests/reasoning-snapshot-checks.cjs
+@@ -149,9 +149,10 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
+       if (claim.resolved_by) {
+         const review = row.locator('aside.r-disagreement');
+         assert.equal(await review.locator('strong').textContent(), `Resolution: ${claim.resolved_by}`);
+-        assert.ok((await review.textContent()).includes(claim.reviewer_status ?? 'No accepted verdict supplied'));
++        assert.ok((await review.textContent()).includes(claim.reviewer_status ?? 'No verdict supplied'));
+         if (claim.reviewer_reason) assert.ok((await review.locator('p').allTextContents()).includes(claim.reviewer_reason));
+         if (claim.reviewer_quote) assert.equal(await review.locator('blockquote').textContent(), claim.reviewer_quote);
++        assert.equal(await review.locator('.r-review-proposal-rejected').count(), claim.reviewer_status && claim.resolved_by !== 'reviewer' ? 1 : 0);
+       }
+       for (const [i, verdict, evidence] of [
+         [0, claim.verifier, claim.evidence.filter((e) => ["researcher", "verifier"].includes(e.found_by))],
