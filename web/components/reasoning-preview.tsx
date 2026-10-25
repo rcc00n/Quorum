@@ -326,7 +326,7 @@ export function ReasoningPreviewPage({
               These declarations do not establish a genuine sponsor run or
               publication.
             </p>
-            {data.preview.warnings.filter((warning) => warning.startsWith("IMPACT REVIEW PENDING:")).map((warning) => (
+            {data.preview.warnings.filter((warning) => warning.startsWith("IMPACT REVIEW PENDING:") || warning.startsWith("Ledger scope:")).map((warning) => (
               <p className="r-preview-limits" role="alert" key={warning}>{warning}</p>
             ))}
             {data.preview.provisional && !data.preview.corpus_binding && (

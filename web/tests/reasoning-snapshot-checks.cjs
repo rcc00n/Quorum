@@ -149,9 +149,10 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
       if (claim.resolved_by) {
         const review = row.locator('aside.r-disagreement');
         assert.equal(await review.locator('strong').textContent(), `Resolution: ${claim.resolved_by}`);
-        assert.ok((await review.textContent()).includes(claim.reviewer_status ?? 'No accepted verdict supplied'));
+        assert.ok((await review.textContent()).includes(claim.reviewer_status ?? 'No verdict supplied'));
         if (claim.reviewer_reason) assert.ok((await review.locator('p').allTextContents()).includes(claim.reviewer_reason));
         if (claim.reviewer_quote) assert.equal(await review.locator('blockquote').textContent(), claim.reviewer_quote);
+        assert.equal(await review.locator('.r-review-proposal-rejected').count(), claim.reviewer_status && claim.resolved_by !== 'reviewer' ? 1 : 0);
       }
       for (const [i, verdict, evidence] of [
         [0, claim.verifier, claim.evidence.filter((e) => ["researcher", "verifier"].includes(e.found_by))],

@@ -181,7 +181,10 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
         </div>
         {c.resolved_by && <aside className="r-disagreement">
           <strong>Resolution: {c.resolved_by}</strong>
-          <p>Third reviewer: {c.reviewer_status ?? "No accepted verdict supplied"}</p>
+          {/* DECISION(2026-10-25, rcc00n/Codex): distinguish a reviewer proposal from the accepted final verdict.
+              Why: genuine v4 includes proposals rejected by producer code despite a confirmed reviewer response. */}
+          <p>Third reviewer proposal: {c.reviewer_status ?? "No verdict supplied"}</p>
+          {c.reviewer_status && c.resolved_by !== "reviewer" && <p className="r-review-proposal-rejected">Proposal not adopted; the final claim status above remains authoritative.</p>}
           {c.reviewer_reason && <p>{c.reviewer_reason}</p>}
           {c.reviewer_quote && <blockquote>{c.reviewer_quote}</blockquote>}
           <p>Recorded producer decision; not an independent portal review.</p>
