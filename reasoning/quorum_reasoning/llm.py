@@ -200,6 +200,11 @@ def route_problem() -> str | None:
 
 
 def _client():
+    # DECISION(2026-10-25, rcc00n/Codex): enforce credential-family checks at the SDK boundary.
+    # Why: diagnostic entrypoints bypass the live-run guard and must never send a token to the wrong service.
+    problem = route_problem()
+    if problem:
+        raise ValueError(problem)
     from openai import OpenAI  # imported lazily: not needed in dry run
 
     base, key, _ = _route()

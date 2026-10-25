@@ -289,3 +289,22 @@ def test_held_lane_is_not_unverified(live):
     live(_completion(LIGHTNING, _met(LIGHTNING, LIGHTNING, LIGHTNING)))
     llm.json_task("stance", {"claim": "c"}, dry_run=False)
     assert "lane_unverified" not in llm.calls[-1] and llm.lane_unverified_count() == 0
+
+
+@pytest.mark.parametrize("entrypoint", ["_client", "list_models", "probe", "test_connection"])
+@pytest.mark.parametrize("setup", [
+    {"MODEL_BASE_URL": "https://integrate.api.nvidia.com/v1", "METERLESS_TOKEN": "TEST-runtime-token"},
+    {"MODEL_BASE_URL": "https://integrate.api.nvidia.com/v1", "METERLESS_RUNTIME_TOKEN": "TEST-runtime-token"},
+    {"METERLESS_BASE_URL": "http://127.0.0.1:8088/v1", "MODEL_API_KEY": "TEST-model-key"},
+])
+def test_mixed_route_diagnostics_never_construct_sdk_client(env, monkeypatch, setup, entrypoint):
+    import openai
+    for name, value in setup.items():
+        env.setenv(name, value)
+    def forbidden(**kwargs):
+        raise AssertionError("mixed route reached the SDK constructor")
+    monkeypatch.setattr(openai, "OpenAI", forbidden)
+    with pytest.raises(ValueError, match="mixed model route") as failure:
+        getattr(llm, entrypoint)()
+    assert "TEST-runtime-token" not in str(failure.value)
+    assert "TEST-model-key" not in str(failure.value)
