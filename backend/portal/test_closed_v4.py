@@ -81,3 +81,25 @@ class LaterClosedEditionTests(SimpleTestCase):
         for (p, s), (raw, sidecar) in zip(pairs, originals):
             self.assertEqual(p.read_bytes(), raw)
             self.assertEqual(s.read_bytes(), sidecar)
+
+
+    @skipUnless(os.getenv('QUORUM_TEST_CLOSED_HANDOFF_DIR'), 'private closed-edition originals not supplied')
+    def test_original_later_editions_pass_native_metadata_only_checks(self):
+        import io
+        import subprocess
+        from django.core.management import call_command
+        root = Path(os.environ['QUORUM_TEST_CLOSED_HANDOFF_DIR'])
+        for version in (5, 6):
+            snapshot = root / f'2026-10-24-closed-v{version}.snapshot.json'
+            sidecar = root / f'2026-10-24-closed-v{version}.sidecar.json'
+            prefix = json.loads(sidecar.read_bytes())['producer']['commit_of_the_publishing_process']
+            commit = subprocess.check_output(['git', 'rev-parse', prefix], text=True).strip()
+            output = io.StringIO()
+            call_command('reasoning_snapshot', file=str(snapshot), sha256=hashlib.sha256(snapshot.read_bytes()).hexdigest(),
+                         sidecar=str(sidecar), sidecar_sha256=hashlib.sha256(sidecar.read_bytes()).hexdigest(),
+                         producer_commit=commit, stdout=output)
+            report = json.loads(output.getvalue())
+            self.assertTrue(report['compatible'])
+            self.assertTrue(report['metadata_valid'])
+            for field in ('execution_verified', 'source_text_verified', 'published'):
+                self.assertFalse(report[field])
