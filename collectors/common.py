@@ -113,13 +113,37 @@ def load_sources_csv(conn: psycopg.Connection, path: Path = HERE / "sources.csv"
 
 
 def ensure_topic(conn: psycopg.Connection, topic_id: str, name: str, query_terms: list[str]) -> None:
+    """Seed a topic if it does not exist. DECISION(2026-10-25, Anastasia/Claude Code): ON CONFLICT DO NOTHING, not
+    UPDATE. Why: the topics table is the source of truth (the web app writes it); a seed in code must not overwrite a
+    user's or reasoning's terms on every pass. Changing a seeded topic's terms is an UPDATE on the table."""
     with conn.cursor() as cur:
         cur.execute(
-            """INSERT INTO topics (id, name, query_terms) VALUES (%s, %s, %s)
-               ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, query_terms = EXCLUDED.query_terms""",
+            "INSERT INTO topics (id, name, query_terms) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
             (topic_id, name, query_terms),
         )
     conn.commit()
+
+
+_TOPIC_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")  # reasoning's --topic rule (tools/corpus.py)
+
+
+def load_topics(conn: psycopg.Connection) -> list[dict]:
+    """Active topics in collection order (created_at, id): the first topic that matches a document keeps it.
+
+    A row with a bad slug or no terms is skipped with a warning rather than aborting the pass: the web app may have
+    written it a moment ago and can still fix it; nothing is collected under it until then.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, name, query_terms FROM topics WHERE active ORDER BY created_at, id")
+        rows = cur.fetchall()
+    topics: list[dict] = []
+    for r in rows:
+        terms = [t.strip() for t in (r["query_terms"] or []) if t and t.strip()]
+        if not _TOPIC_SLUG.match(r["id"]) or not terms:
+            log.warning("topic %r skipped: %s", r["id"], "bad slug" if not _TOPIC_SLUG.match(r["id"]) else "no query_terms")
+            continue
+        topics.append({"id": r["id"], "name": r["name"], "query_terms": terms})
+    return topics
 
 # ------------------------------------------------------------- topics ----
 
