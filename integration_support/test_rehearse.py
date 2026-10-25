@@ -29,7 +29,7 @@ class RehearsalTests(unittest.TestCase):
     def test_web_owned_profile_excludes_pending_owner_code(self):
         directory=Path(__file__).with_name('patches')
         selected=module.selected_patches(directory,profile='web-owned')
-        self.assertEqual(len(selected),5)
+        self.assertEqual(len(selected),6)
         for path in selected:
             text=path.read_text()
             self.assertNotIn('diff --git a/reasoning/',text)

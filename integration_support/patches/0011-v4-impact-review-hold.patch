@@ -1,0 +1,118 @@
+diff --git a/backend/README.md b/backend/README.md
+index f390caf..9419cb4 100644
+--- a/backend/README.md
++++ b/backend/README.md
+@@ -83,3 +83,11 @@ python backend/manage.py reasoning_snapshot --file <private-original.json> --sha
+ ```
+ 
+ The JSON report separates `compatible` from `metadata_valid`. A config discrepancy exits nonzero; even matching metadata keeps `execution_verified`, `source_text_verified` and `published` false. It never rewrites inputs. Optional local tests take `QUORUM_TEST_GENUINE_SNAPSHOT`; CI skips those two private-original tests and uses synthetic negative cases instead.
++
++### Historical v4 editorial hold
++
++The exact original closed-v4 hash has a preview advisory and acceptance hold for
++its owner-disclosed impact contradiction. Producer score and claims are unchanged;
++the advisory does not bypass JSON, provenance or publisher validation. The raw
++artifact and independent D5/ledger verification remain necessary. The existing
++warning array carries this local editorial disclosure; no producer contract changes.
+diff --git a/backend/portal/management/commands/reasoning_snapshot.py b/backend/portal/management/commands/reasoning_snapshot.py
+index 5f6cc75..ba0adbd 100644
+--- a/backend/portal/management/commands/reasoning_snapshot.py
++++ b/backend/portal/management/commands/reasoning_snapshot.py
+@@ -5,7 +5,7 @@ import re
+ import subprocess
+ from pathlib import Path
+ from django.core.management.base import BaseCommand, CommandError
+-from portal.reasoning_preview import bind_preview_sidecar, parse_preview_json, present_reasoning
++from portal.reasoning_preview import artifact_review_issues, bind_preview_sidecar, parse_preview_json, present_reasoning
+ from portal.snapshot_store import read_bounded
+ from portal.snapshot_validation import SnapshotError
+ 
+@@ -62,6 +62,7 @@ class Command(BaseCommand):
+             report.update(producer_commit=commit, declared_config_sha256=declared, git_config_sha256=actual)
+             require(actual == declared, 'producer_config_mismatch')
+             report['metadata_valid'] = True
++            report['issues'].extend(artifact_review_issues(options['sha256']))
+         except SnapshotError as exc:
+             report['issues'].append(str(exc))
+         except (OSError, ValueError, TypeError, KeyError):
+diff --git a/backend/portal/reasoning_preview.py b/backend/portal/reasoning_preview.py
+index 6e2edbb..4a94014 100644
+--- a/backend/portal/reasoning_preview.py
++++ b/backend/portal/reasoning_preview.py
+@@ -20,6 +20,28 @@ from .snapshot_store import read_bounded
+ 
+ SAMPLE = Path(__file__).parent / "fixtures/reasoning-demo/snapshot.sample.json"
+ HISTORICAL_V3_SHA256 = "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
++GENUINE_V4_SHA256 = "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79"
++
++
++def artifact_review_issues(sha256):
++    # DECISION(2026-10-25, rcc00n/Codex): pin an editorial hold to the owner-disclosed v4 bytes.
++    # Why: conditional/reversible rationale conflicts with irreversibility 1; do not rescore producer output.
++    return ["impact_score_review_required"] if sha256 == GENUINE_V4_SHA256 else []
++
++
++def artifact_review_notices(sha256):
++    if not artifact_review_issues(sha256):
++        return []
++    return [
++        "IMPACT REVIEW PENDING: producer score 6 is preserved. The owner reports a conditional and "
++        "reversible irreversibility rationale; assigning 0 instead of 1 would yield 5, below the story "
++        "threshold of 6. This story has not passed independent impact review. Publication is blocked.",
++        "Ledger scope: the owner reports 1674 recorded calls include replayed and unused rows from "
++        "earlier attempts, including 6 errors. These are not current-attempt spending or failure totals. "
++        "Original execution receipts and the D5 source-verification report require separate acceptance.",
++    ]
++
++
+ SAMPLE_REVISION = "6ea82434d0f06cefb51f5536732ceac68e9780ef"
+ MISSING = [
+     "original document/source IDs",
+@@ -682,7 +704,7 @@ def present_reasoning(raw, *, now=None, catalog=None):
+             # Why: missing metadata must not erase a known corpus limitation.
+             provisional=True if hashlib.sha256(raw).hexdigest() == HISTORICAL_V3_SHA256 else None,
+             missing_provenance=missing_provenance,
+-            warnings=[
++            warnings=artifact_review_notices(hashlib.sha256(raw).hexdigest()) + [
+                 (
+                     "FICTIONAL data; links and quotations are illustrative, not verified news."
+                     if p["provenance"]["fictional"]
+diff --git a/backend/portal/test_reasoning_acceptance.py b/backend/portal/test_reasoning_acceptance.py
+index 088401e..92fa9da 100644
+--- a/backend/portal/test_reasoning_acceptance.py
++++ b/backend/portal/test_reasoning_acceptance.py
+@@ -53,3 +53,20 @@ class ReasoningAcceptanceTests(SimpleTestCase):
+         for options in (dict(sha256='0'*64),dict(sidecar_sha256='1'*64),dict(sha256='short'),
+                         dict(producer_commit='not-a-commit'),dict(producer_commit='b'*40),dict(file='/missing/TEST-private-path')):
+             with self.subTest(options=list(options)):self.run_report(blocked=True,**options)
++
++    def test_editorial_hold_blocks_acceptance_even_with_matching_metadata(self):
++        with patch('portal.management.commands.reasoning_snapshot.artifact_review_issues',
++                   return_value=['impact_score_review_required']):
++            report = self.run_report(blocked=True)
++        self.assertTrue(report['metadata_valid'])
++        self.assertEqual(report['issues'], ['impact_score_review_required'])
++
++    def test_v4_hold_is_exact_hash_only_and_never_changes_parser_rules(self):
++        from .reasoning_preview import GENUINE_V4_SHA256, HISTORICAL_V3_SHA256, artifact_review_issues, artifact_review_notices
++        self.assertEqual(artifact_review_issues(GENUINE_V4_SHA256), ['impact_score_review_required'])
++        for sha in (HISTORICAL_V3_SHA256, '0' * 64, GENUINE_V4_SHA256[:-1] + '0'):
++            self.assertEqual(artifact_review_issues(sha), [])
++            self.assertEqual(artifact_review_notices(sha), [])
++        notices = ' '.join(artifact_review_notices(GENUINE_V4_SHA256))
++        self.assertIn('producer score 6 is preserved', notices)
++        self.assertIn('has not passed independent impact review', notices)
+diff --git a/web/components/reasoning-preview.tsx b/web/components/reasoning-preview.tsx
+index ecbbe80..a776fcd 100644
+--- a/web/components/reasoning-preview.tsx
++++ b/web/components/reasoning-preview.tsx
+@@ -326,6 +326,9 @@ export function ReasoningPreviewPage({
+               These declarations do not establish a genuine sponsor run or
+               publication.
+             </p>
++            {data.preview.warnings.filter((warning) => warning.startsWith("IMPACT REVIEW PENDING:")).map((warning) => (
++              <p className="r-preview-limits" role="alert" key={warning}>{warning}</p>
++            ))}
+             {data.preview.provisional && !data.preview.corpus_binding && (
+               <p className="r-preview-limits r-corpus-binding">
+                 PROVISIONAL CORPUS · Capture metadata unavailable; no sidecar is bound to this preview.
