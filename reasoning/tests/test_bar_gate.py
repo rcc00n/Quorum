@@ -142,3 +142,22 @@ def test_roundup_label_follows_the_verifier_verdict(run_through):
     assert roundup.status_label(e, claims, docs) == "Confirmed"
     only_disputed = [c for c in claims if c["id"] == "g2"]
     assert roundup.status_label(e, only_disputed, docs) == "Disputed"
+
+
+def test_reviewer_run_never_reviews_a_gated_claim(monkeypatch):
+    """Regression: attempt 3 reviewed gated claims because run() re-derived the selection without the marker."""
+    from quorum_reasoning import llm
+    from quorum_reasoning.nodes import review_disputed
+
+    st = initial_state("t", "russia-ukraine-war", "2026-10-24", dry_run=True)
+    st["documents"] = []
+    gated = Claim(id="g1", event_id="ev1", text="x", kind="fact", origin_document_id=1, evidence=[], verifier_status="disputed", verifier_reason="",
+                  fact_checker_status="unverified", fact_checker_reason="skipped: event cannot reach the impact bar (2 + 2 < 6); not double-checked",
+                  final_status="disputed", adjudication="fact-check skipped")
+    gated["fact_check_skipped"] = True
+    st["claims"] = {"g1": gated}
+    calls = []
+    monkeypatch.setattr(llm, "json_task", lambda *a, **k: calls.append(a) or {"verdict": "disputed", "decisive_chain": "verifier", "decisive_index": 0, "decisive_quote": "q", "reason": "r"})
+    out = review_disputed.run(st)
+    assert calls == [] and "review_passes" not in out["claims"]["g1"] and out["claims"]["g1"].get("resolved_by") is None
+    assert all(s["node"] != "review_disputed" for s in out["steps"])

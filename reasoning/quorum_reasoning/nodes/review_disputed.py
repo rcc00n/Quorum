@@ -110,8 +110,13 @@ def run(state: RunState) -> dict:
     by_id = {d["id"]: d for d in state["documents"]}
     steps, errors = [], []
     reviewed = 0
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): the node reviews exactly the claims `pending()` names, the
+    # same predicate the router uses, so a claim excluded there (the bar gate's `fact_check_skipped`) is never reviewed
+    # here. Why: attempt 3 of 2026-10-24 reviewed 41 gated claims on the large model because this loop re-derived the
+    # selection without the marker; one predicate, one place.
+    to_review = {c["id"] for c in pending(state)}
     for cid, c in claims.items():
-        if not is_disagreement(c) or c.get("review_passes", 0) >= int(config.get("loops", "review_disputed_max", 1)):
+        if cid not in to_review:
             continue
         c["review_passes"] = c.get("review_passes", 0) + 1
         reviewed += 1

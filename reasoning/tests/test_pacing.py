@@ -456,3 +456,26 @@ def test_zero_or_negative_retry_after_floors_the_first_wait_at_1_s(live, clock, 
     live([_rate_limited({"retry-after": value}), _completion()])
     llm.json_task("stance", {}, dry_run=False)
     assert clock.sleeps[0] == 1.0  # the raised lane interval (4.8 s) may add a throttle wait after it
+
+
+def test_seed_journal_loads_replay_without_a_checkpoint(tmp_path, monkeypatch):
+    """--seed-journal: a fresh run (no checkpoint) restores its journal's rows and replay queues before starting."""
+    import json
+    from quorum_reasoning import graph, run as run_cli
+
+    rid = "2026-10-24-russia-ukraine-war-7"
+    jdir = tmp_path / "_journal"; jdir.mkdir()
+    row = {"task": "stance", "lane": "default", "route": "m", "served": "m", "attempts": 1, "ms": 1, "tokens_in": 1, "tokens_out": 1,
+           "request_key": "k" * 64, "reply": "{\"stance\": \"supports\"}", "run_id": rid, "payload": {}}
+    (jdir / f"{rid}.jsonl").write_text(json.dumps(row) + chr(10), encoding="utf-8")
+    seen = {}
+
+    def fake_run_local(*a, **kw):
+        seen["calls"] = len(llm.calls); seen["replay"] = sum(len(q) for q in llm.replay.values()); seen["resume"] = kw.get("resume")
+        raise llm.RateLimitAbort("m", 2)  # leave main() through the path it already handles (exit 3); the assertions are on `seen`
+
+    monkeypatch.setattr(graph, "run_local", fake_run_local)
+    monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None, raising=False)
+    monkeypatch.setenv("QUORUM_DRY_RUN", "0")
+    rc = run_cli.main(["--topic", "russia-ukraine-war", "--date", "2026-10-24", "--model", "live", "--attempt", "7", "--seed-journal", "--quiet", "--out", str(tmp_path)])
+    assert rc == 3 and seen == {"calls": 1, "replay": 1, "resume": False}, (rc, seen)

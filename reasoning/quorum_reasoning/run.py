@@ -94,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--version", type=int, default=None, help="with --show: the version to print (default: newest)")
     ap.add_argument("--checkpoint", action="store_true", help="checkpoint every node into <out>/_checkpoints/<run_id>.sqlite (always on with --model live)")
     ap.add_argument("--resume", action="store_true", help="continue the run <date>-<topic>-<attempt> from its last completed node (needs the checkpoint file)")
+    ap.add_argument("--seed-journal", action="store_true", help="start the run fresh (no checkpoint) but load this run id's journal first, so identical requests are answered from it (replay) and its rows count in the ledger; for a new attempt seeded from an earlier attempt's journal")
     ap.add_argument("--attempt", type=int, default=1, help="attempt number in the run id (default 1); a fresh live run of the same day after a finished one needs 2, 3, …")
     ap.add_argument("--mermaid", action="store_true", help="print the graph as Mermaid and exit")
     ap.add_argument("--models", action="store_true", help="list the routes the configured hotspot offers (GET /v1/models) and exit")
@@ -164,10 +165,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if not model_dry:
         llm.journal_path = Path(args.out) / "_journal" / f"{rid}.jsonl"  # private: full request payloads and receipts
-        if args.resume:
+        if args.resume or args.seed_journal:
+            # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): --seed-journal loads the run id's journal for replay
+            # without a checkpoint, so a fresh attempt can be seeded from an earlier attempt's journal (copied under the
+            # new run id, with the rows to be redone removed) when the earlier checkpoint holds state that must not be
+            # resumed. Why: attempt 3 of 2026-10-24 completed a reviewer pass over gated claims (a bug fixed the same
+            # night); resuming it would publish those verdicts, restarting without replay would repay ~1500 calls.
             llm.reset_calls()
             loaded = llm.load_journal(llm.journal_path)
-            print(f"resuming {rid}: {loaded} journalled calls restored into the ledger", file=sys.stderr)
+            print(f"{'resuming' if args.resume else 'seeding'} {rid}: {loaded} journalled calls restored into the ledger", file=sys.stderr)
     try:
         state = graph.run_local(args.topic, args.date, dry_run=model_dry, corpus=corpus, attempt=args.attempt, on_step=on_step, checkpoint_path=checkpoint, resume=args.resume)
     except llm.RateLimitAbort as exc:  # decision at llm.RATE_LIMIT_ABORT_WINDOW_S
