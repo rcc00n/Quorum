@@ -192,6 +192,16 @@ Four things are deferred. For the first of them, data accumulates from day one.
 - **Comparison of US and Chinese news.**
 - **Subscription** — everything is free at first.
 
+## Daily editions for users: topics, delivery time, where runs execute
+
+Decided 2026-10-25 (Yelysei; asked for by Vadim before any scheduling is built; collection side agreed in Issue #2 6394199167):
+
+- **Topics are free text.** The user types a topic; the web app writes a `topics` row (slug, name, query terms) that the collector reads at the start of every pass (no rebuild). Reasoning turns the user's words into whole-word query terms (`python -m quorum_reasoning.topics --suggest`), with a deterministic fallback so a topic can always be created. A new topic's first edition is thin until feeds accumulate; the UI says so instead of hiding it.
+- **Edition cut** stays 05:30 America/New_York per date (09:30Z until the end of daylight saving on 2026-11-01, 10:30Z after), converted per date in code.
+- **Delivery time** is a local time of day the user chooses; at that time the already published version of the day's edition is shown. It is not the time a run starts.
+- **Where runs execute and who starts them.** The reasoning run for a date starts after the cut on the owner's machine (manual command or a local scheduler), one run per topic; a public VPS runs neither reasoning nor collection; model credentials live only in the owner's local `.env`. The web application never calls the models itself: it reads published versions from the store and writes nothing paid. Paid runs follow the per-account budget rules in reasoning/README.
+- Why: the per-request cost and the per-account model limits make an unattended trigger from the web a budget and key-exposure risk; the owner-started run keeps credentials and spend under one person's control while users still get their editions at their chosen time.
+
 ## Still to clarify
 
 Seven questions the team has not closed yet.
@@ -236,6 +246,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-25 | Yelysei / Claude Code | Daily editions for users: topics are free text (web writes `topics`, collector reads it, reasoning derives the terms); edition cut 05:30 New York per date; the user's delivery time is when the published version is shown; runs start after the cut on the owner's machine only (manual or local scheduler), credentials only in the owner's local `.env`, the web app never calls models or triggers paid work (new section "Daily editions for users"). | Asked by Vadim before scheduling work; keeps spend and keys under the owner's control while users get editions at their chosen time. |
 | 2026-10-22 | rcc00n / Codex, explicit human reasoning-1.0 authorization | Consume canonical upstream §8 in an isolated fictional development preview; keep strict production publication unchanged. | Build against the actual sample without fabricating missing provenance, competing with reasoning ownership or publishing demo news. |
 | 2026-10-22 | rcc00n / Codex, explicit human reconciliation authorization | Merge approved team product decisions into feature/web-portals, preserving portal/auth/security history; hold conflicting visual-identity changes for clarification. | Adopt impact-bar/article/roundup direction without silently replacing either owner’s decisions or approving a live bridge. |
 | 2026-10-25 | Yelysei / Claude Code | Supports need a verbatim quote from the passage sharing a fact-composition stem with the claim (no length or coverage bar); short contradiction quotes may pass on two shared composition stems instead of a number/date/negation; boilerplate lines (photo captions, "View image in fullscreen", "Read more") are never passages. | A live probe of the new prompts (22 calls) showed an unrelated passage labelled a support, and a real three-word contradiction lost to the marker rule; Guardian captions without newlines contradicted each other through boilerplate words. |
