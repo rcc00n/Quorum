@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        patch-profile: [all-provisional, web-owned]
+        patch-profile: [privacy-review, web-owned]
     name: offline-rehearsal (${{ matrix.patch-profile }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -34,10 +34,7 @@ jobs:
           git config user.email 'ci@users.noreply.github.com'
           node integration_support/test_demo.cjs
           python -m unittest discover -s integration_support -p 'test_*.py'
-          patch_args=(--with-proposed-patches)
-          if [[ '${{ matrix.patch-profile }}' == 'web-owned' ]]; then
-            patch_args=(--patch-profile web-owned --require-current)
-          fi
+          patch_args=(--patch-profile '${{ matrix.patch-profile }}' --require-current)
           python integration_support/rehearse.py --repo "$GITHUB_WORKSPACE" --destination "$RUNNER_TEMP/quorum-rehearsal" "${patch_args[@]}"
           python integration_support/check_tree.py --root "$RUNNER_TEMP/quorum-rehearsal"
           git -C "$RUNNER_TEMP/quorum-rehearsal" diff --check f59e75840c9aee67ca35a8f44bf5dd42747af75f HEAD
@@ -48,6 +45,9 @@ jobs:
       - name: Test combined Python components with sockets blocked
         env:
           QUORUM_DRY_RUN: '1'
+          # Synthetic route only: the seed-journal test stubs graph execution; sockets stay blocked.
+          MODEL_BASE_URL: 'http://127.0.0.1:1'
+          MODEL_API_KEY: 'TEST-offline-only'
           DJANGO_DEBUG: '1'
           QUORUM_PORTAL_DATA: ${{ runner.temp }}/quorum-test-auth
         run: |

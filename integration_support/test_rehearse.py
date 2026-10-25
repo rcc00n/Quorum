@@ -54,3 +54,12 @@ class RehearsalTests(unittest.TestCase):
             self.assertTrue(any('public-failure' in p.name for p in selected))
             self.assertFalse(any(p.name in module.HMEM_REVIEW_ONLY for p in selected))
         self.assertTrue(any(p.name in module.HMEM_REVIEW_ONLY for p in module.selected_patches(directory,profile='hmem-review')))
+
+
+class WorkflowSafetyTests(unittest.TestCase):
+    def test_normal_ci_does_not_adopt_owner_rejected_memory(self):
+        workflow=(Path(__file__).parents[1]/'.github/workflows/integration-support.yml').read_text()
+        self.assertIn('patch-profile: [privacy-review, web-owned]', workflow)
+        self.assertNotIn('patch-profile: [all-provisional', workflow)
+        self.assertIn('integration_support/offline:', workflow)
+        self.assertIn("MODEL_BASE_URL: 'http://127.0.0.1:1'", workflow)
