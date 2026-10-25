@@ -25,6 +25,8 @@ Local merge sequence retained all owner decision-log rows verbatim and unioned a
 
 ## Decisions
 
+2026-10-25 UTC · rcc00n / Codex · Build the private final cut from reviewed genuine footage plus authenticated UI still holds, with frame-indexed captions and an explicit no-audio fallback script. Why: exact runtime and readable four-mode scenes must not depend on drifting capture timestamps; no UI data or producer evidence is edited.
+
 2026-10-25 UTC · rcc00n / Codex · `demo_tour.cjs --scenes` captures authenticated original-evidence stills without a timed movie. Why: final offline edits need deterministic, auditable rating/provenance frames while preserving all existing original-hash, catalog and publication guards.
 
 2026-10-24 · rcc00n / Codex · `--patch-profile web-owned --require-current` applies only independent web/deployment/diagnostic patches and refuses stale fetched owner pins before worktree creation. Why: unapproved reasoning/privacy/memory proposals must remain distinguishable from the candidate used for the genuine demo. This is a module decision; owner merge approvals are still required.
@@ -94,3 +96,6 @@ Release-candidate evidence and the timed private recording procedure are in [REL
 
 
 For private submission editing, `demo_tour.cjs --scenes` accepts the same five paths/environment as the timed recorder and writes actual UI screenshots plus an explicit authenticated-stills receipt. It does not alter the product DOM or original snapshot/sidecar. It remains local-only and does not claim a timed video or sponsor completion.
+
+
+Private submission tooling: `build_submission_video.py --raw <reviewed-genuine-movie> --scenes <authenticated-scene-directory> --output <NEW-external-package-directory> --ffmpeg <installed-encoder>` creates the 222-second WebM, burned/sidecar captions, exact recording script and edit manifest. Pillow and the installed official recorder encoder are used offline; no voice clone, model call or publication occurs. `prepare_submission_docs.py --repo <support> --candidate <local-RC> --root <package-directory> --scenes <scenes>` adds PDF/offline HTML slides, disclosures, setup/dependencies and a tracked-source archive. ReportLab is required only for document generation. Private originals and runtime auth/configuration are excluded; promotion/public upload still requires human review and genuine sponsor proof.
