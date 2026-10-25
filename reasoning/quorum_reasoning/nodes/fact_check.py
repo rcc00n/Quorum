@@ -7,21 +7,23 @@ vote or ruling; role fact_checker: look for reasons the claim could be wrong) an
 rule to its own evidence. Its evidence rows carry found_by="fact_checker" so the snapshot shows both chains side by side. Route "fact_checker" in
 config/reasoning.toml may point at a different provider when the rules allow. The model's stance answer is
 untrusted: only the four allowed stance words are accepted, anything else counts as neutral; the same two relevance
-guards as research apply (research.relevant before the call, untrusted.checked_stance after it).
+guards as research apply (research.relevant before the call, research.judged_stance after it).
 """
 
 from __future__ import annotations
 
 from collections import Counter
 
-from .. import llm, untrusted
+from .. import llm
 from ..rules.confirmation import origin_group, verdict
 from ..rules.impact_bar import POINT_RANGES, cannot_reach_bar, judged_points, threshold
 from ..state import RunState, StepError
-from ..text import best_passage
 from ..tools.fetch_text import fetch_result
 from ..trace import finish, step
-from .research import already_seen, evidence_from, rank_candidates, relevance_note, relevant, stance_question, stance_task
+from .research import (
+    already_seen, evidence_from, excluded_note, judged_stance, rank_candidates, relevance_note, relevant, stance_payload,
+    stance_question, stance_task, stance_window, topic_frequent,
+)
 
 
 def run(state: RunState) -> dict:
@@ -59,7 +61,9 @@ def run(state: RunState) -> dict:
             judged_calls = 0
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at research.stance_question)
             repeats = 0
-            irrelevant = ungrounded = 0  # the two relevance guards (decisions at research.relevant and untrusted.checked_stance)
+            irrelevant = ungrounded = off_fact = 0  # the relevance guards (decisions at research.relevant, untrusted.checked_stance, untrusted.off_fact)
+            frequent, n_docs = topic_frequent(state)
+            live = not llm.is_dry_run(state["dry_run"])
             for c in event_claims:
                 failed_before = len(failed)
                 judged_before = judged_calls
@@ -67,13 +71,13 @@ def run(state: RunState) -> dict:
                 # the fact-checker has the researcher's access to the whole corpus; the same code ranking bounds its calls
                 for d in rank_candidates(c["text"], pool, dry_run=state["dry_run"]):
                     fetched = fetch_result(d, dry_run=state["dry_run"])
-                    passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
+                    before, passage, after = stance_window(c["text"], fetched)
                     if not passage:
                         continue
                     if not relevant(c["text"], passage):  # not asked, so not judged
                         irrelevant += 1
                         continue
-                    question = stance_question("fact_checker", c["text"], passage, d)
+                    question = stance_question("fact_checker", c["text"], passage, d, (before, after))
                     if question in asked:
                         stance = asked[question]
                         repeats += 1
@@ -85,14 +89,7 @@ def run(state: RunState) -> dict:
                         try:
                             ans = llm.json_task(
                                 stance_task(d),  # decision at research.stance_task
-                                {
-                                    "claim": untrusted.clip(c["text"], untrusted.CAP_CLAIM),
-                                    "passage": untrusted.clip(passage, untrusted.CAP_PASSAGE),
-                                    "source": d["source_name"],
-                                    "source_kind": d["kind"],
-                                    "doc_type": d.get("doc_type"),
-                                    "role": "fact_checker",
-                                },
+                                stance_payload(c["text"], before, passage, after, d, "fact_checker"),
                                 dry_run=state["dry_run"],
                                 which="fact_checker",
                             )
@@ -100,8 +97,9 @@ def run(state: RunState) -> dict:
                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
                             continue  # a failed question is not remembered: a repeat of it is asked again
                         judged_calls += 1
-                        stance, downgraded = untrusted.checked_stance(ans, passage, c["text"], require_span=not llm.is_dry_run(state["dry_run"]))
-                        ungrounded += downgraded
+                        stance, why = judged_stance(ans, c["text"], passage, frequent, live=live, context=(before, after))
+                        ungrounded += why == "ungrounded"
+                        off_fact += why == "off-fact"
                         asked[question] = stance
                     if stance == "neutral":
                         continue
@@ -115,8 +113,8 @@ def run(state: RunState) -> dict:
                 c["fact_checker_reason"] = reason + (f" ({lost} stance call(s) failed for this claim)" if lost else "")
                 c["fact_checker_judged"] = judged  # 0 with failures = unavailable, not a verdict (adjudicate reads it)
                 counts[status] += 1
-            s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded)
-            s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + (f"; failures: {failed[0]}" if failed else "")
+            s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact)
+            s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + excluded_note(frequent, n_docs, [c["text"] for c in event_claims]) + (f"; failures: {failed[0]}" if failed else "")
             if failed:
                 errors.append(StepError(node="fact_check", event_id=e["id"], message=f"{len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
         steps.append(finish(state, s))

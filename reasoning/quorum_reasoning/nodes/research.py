@@ -13,7 +13,7 @@ from __future__ import annotations
 from .. import config, llm, untrusted
 from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin, origin_group
 from ..state import Claim, DocRef, Evidence, RunState, StepError
-from ..text import best_passage, clip_sentences, containment, tokens
+from ..text import best_passage, clip_sentences, containment, frequent_stems, keeps_full_stems, passage_window, tokens
 from ..tools.corpus import OFFICIAL_ID_OFFSET
 from ..tools.fetch_text import FetchResult, fetch_result, find_quote
 from ..trace import finish, step
@@ -46,7 +46,7 @@ def relevant(claim_text: str, passage: str) -> bool:
     return containment(claim_text, passage) >= float(config.get("research", "stance_min_overlap", 0.0) or 0.0)
 
 
-def stance_question(role: str, claim_text: str, passage: str, doc: DocRef) -> tuple[str, str, str, str, str | None, bool]:
+def stance_question(role: str, claim_text: str, passage: str, doc: DocRef, context: tuple[str, str] = ("", "")) -> tuple:
     """The identity of one stance question within a node run: who asks, about which claim, which passage, from which
     source. doc_type and the official flag are part of it because they pick the prompt (stance_task) and the payload."""
     # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): within one node run for one event, a stance question already
@@ -55,7 +55,8 @@ def stance_question(role: str, claim_text: str, passage: str, doc: DocRef) -> tu
     # document. Why: ~1.7% of stance calls on two live runs were exact
     # repeats (two documents yielding the same passage, or two claims with identical text); verdicts count independence
     # groups, not rows, so the second row of the same source never counts twice.
-    return (role, claim_text, passage, doc["source_id"], doc.get("doc_type"), bool(doc.get("official")))
+    # the context window and the title are in the payload, so they are part of the question (decision at STANCE_CONTEXT_SENTENCES)
+    return (role, claim_text, passage, doc["source_id"], doc.get("doc_type"), bool(doc.get("official")), context, doc.get("title") or "")
 
 
 def bind_quote(ev: Evidence, doc: DocRef, fetched: FetchResult | None) -> Evidence:
@@ -75,9 +76,97 @@ def bind_quote(ev: Evidence, doc: DocRef, fetched: FetchResult | None) -> Eviden
     return ev
 
 
-def relevance_note(irrelevant: int, ungrounded: int) -> str:
-    """The step-decision suffix counting the two relevance guards; empty when neither fired."""
-    parts = ([f"{irrelevant} passages below relevance"] if irrelevant else []) + ([f"{ungrounded} contradictions ungrounded"] if ungrounded else [])
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): the stance payload carries the document title and
+# STANCE_CONTEXT_SENTENCES sentences before and after the passage (context_before, context_after; each side clipped to
+# CAP_PASSAGE, empty at the edges), only so the model can tell whether the passage is about the same event as the
+# claim; the span must still come from the passage. Why: D5 (2026-10-24 canonical run): a lone sentence hides which
+# of an article's several events it belongs to. Owner's decision (Yelysei, 2026-10-25), two sentences per side.
+# Token cost estimate in reasoning/README.md › Decisions.
+STANCE_CONTEXT_SENTENCES = 2
+
+
+def stance_window(claim_text: str, fetched: FetchResult | None) -> tuple[str, str, str]:
+    """(before, passage, after) for a stance call: text.passage_window over the fetched text."""
+    return passage_window(claim_text, (fetched.text if fetched else None) or "", STANCE_CONTEXT_SENTENCES)
+
+
+def clipped_context(before: str, after: str) -> tuple[str, str]:
+    """The context window as the payload carries it: `before` keeps its end (the sentence next to the passage),
+    `after` its start; each side at most CAP_PASSAGE characters. off_fact measures coverage over exactly these."""
+    return untrusted.clip_end(before, untrusted.CAP_PASSAGE), untrusted.clip(after, untrusted.CAP_PASSAGE)
+
+
+def stance_payload(claim_text: str, before: str, passage: str, after: str, doc: DocRef, role: str) -> dict:
+    """The payload of one stance call; research and fact_check send the same shape."""
+    before, after = clipped_context(before, after)
+    return {
+        "claim": untrusted.clip(claim_text, untrusted.CAP_CLAIM),
+        "passage": untrusted.clip(passage, untrusted.CAP_PASSAGE),
+        "context_before": before,
+        "context_after": after,
+        "title": untrusted.clip(doc.get("title") or "", untrusted.CAP_TITLE),
+        "source": doc["source_name"],
+        "source_kind": doc["kind"],
+        "doc_type": doc.get("doc_type"),
+        "role": role,
+    }
+
+
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): topic-frequent stems are excluded from fact compositions only
+# when the run has at least STANCE_FREQUENT_MIN_DOCS documents; below that nothing is excluded and the step reason
+# says so. Why: on the fixture days (6-10 documents) the "most frequent" stems were the main story's own words
+# ("aid, bill, law, sign"), so a real contradiction of that story would have read as off-fact. Owner's decision
+# (Yelysei, 2026-10-25).
+STANCE_FREQUENT_MIN_DOCS = 30
+
+
+def topic_frequent(state: RunState) -> tuple[set[str], int]:
+    """(stems, document count): the run's most common stems (text.frequent_stems over every document's title and
+    lead), excluded from a claim's fact composition (untrusted.off_fact); empty below STANCE_FREQUENT_MIN_DOCS."""
+    texts = [f"{d.get('title') or ''} {d.get('lead') or ''}" for d in state["documents"]]
+    return (frequent_stems(texts) if len(texts) >= STANCE_FREQUENT_MIN_DOCS else set()), len(texts)
+
+
+def contradiction_coverage(span: object) -> float:
+    """The fact-composition share a `contradicts` needs: research.stance_contradiction_coverage for a clause,
+    research.stance_contradiction_coverage_short for a short number/date/negation span (untrusted.is_short_span)."""
+    key = "stance_contradiction_coverage_short" if untrusted.is_short_span(span) else "stance_contradiction_coverage"
+    return float(config.get("research", key, 0.0) or 0.0)
+
+
+def judged_stance(ans: object, claim_text: str, passage: str, frequent: set[str], *, live: bool, context: tuple[str, str] = ("", "")) -> tuple[str, str | None]:
+    """The stance after the post-call guards and, when downgraded, why: "ungrounded" (untrusted.checked_stance) or
+    "off-fact" (untrusted.off_fact over the passage and its context window: the fact composition is not covered, or
+    another stated day). `live` is False when the dry-run stand-in answered (llm.is_dry_run): it writes no span, and
+    its contradictions stay."""
+    stance, downgraded = untrusted.checked_stance(ans, passage, claim_text, require_span=live)
+    if downgraded:
+        return "neutral", "ungrounded"
+    if stance == "contradicts" and live:
+        span = ans.get("contradicted_span") if isinstance(ans, dict) else None
+        if untrusted.off_fact(claim_text, passage, span, frequent, contradiction_coverage(span), " ".join(clipped_context(*context))):
+            return "neutral", "off-fact"
+    return stance, None
+
+
+def excluded_note(frequent: set[str], n_docs: int, claim_texts: list[str] | tuple = ()) -> str:
+    """The step-reason suffix naming the stems excluded from fact compositions, or saying the exclusion is off, and
+    how many of the event's claims kept their full stem set (text.keeps_full_stems)."""
+    if n_docs < STANCE_FREQUENT_MIN_DOCS:
+        return f"; topic-frequent exclusion off ({n_docs} documents)"
+    if not frequent:
+        return ""
+    kept = sum(1 for t in claim_texts if keeps_full_stems(t, frequent))
+    return f"; topic-frequent stems excluded from fact compositions: {', '.join(sorted(frequent))}" + (f"; {kept} claims kept their full stem set" if kept else "")
+
+
+def relevance_note(irrelevant: int, ungrounded: int, off_fact: int = 0) -> str:
+    """The step-decision suffix counting the relevance guards; empty when none fired."""
+    parts = (
+        ([f"{irrelevant} passages below relevance"] if irrelevant else [])
+        + ([f"{ungrounded} contradictions ungrounded"] if ungrounded else [])
+        + ([f"{off_fact} contradictions off-fact"] if off_fact else [])
+    )
     return f"; {', '.join(parts)}" if parts else ""
 
 
@@ -165,20 +254,22 @@ def run(state: RunState) -> dict:
             failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at stance_question)
             repeats = 0
-            irrelevant = ungrounded = 0  # the two relevance guards (decisions at relevant and untrusted.checked_stance)
+            irrelevant = ungrounded = off_fact = 0  # the relevance guards (decisions at relevant, untrusted.checked_stance, untrusted.off_fact)
+            frequent, n_docs = topic_frequent(state)
+            live = not llm.is_dry_run(state["dry_run"])  # the stand-in answers whenever llm.is_dry_run
             for c in targets:
                 pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
                 # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
                 candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"])
                 for d in candidates:
                     fetched = fetch_result(d, dry_run=state["dry_run"])
-                    passage = best_passage(c["text"], (fetched.text if fetched else None) or "")
+                    before, passage, after = stance_window(c["text"], fetched)
                     if not passage:
                         continue
                     if not relevant(c["text"], passage):
                         irrelevant += 1
                         continue
-                    question = stance_question("researcher", c["text"], passage, d)
+                    question = stance_question("researcher", c["text"], passage, d, (before, after))
                     if question in asked:
                         stance = asked[question]
                         repeats += 1
@@ -186,29 +277,23 @@ def run(state: RunState) -> dict:
                         try:
                             ans = llm.json_task(
                                 stance_task(d),
-                                {
-                                    "claim": untrusted.clip(c["text"], untrusted.CAP_CLAIM),
-                                    "passage": untrusted.clip(passage, untrusted.CAP_PASSAGE),
-                                    "source": d["source_name"],
-                                    "source_kind": d["kind"],
-                                    "doc_type": d.get("doc_type"),
-                                    "role": "researcher",
-                                },
+                                stance_payload(c["text"], before, passage, after, d, "researcher"),
                                 dry_run=state["dry_run"],
                             )
                         except Exception as exc:  # noqa: BLE001
                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
                             continue  # a failed question is not remembered: a repeat of it is asked again
-                        stance, downgraded = untrusted.checked_stance(ans, passage, c["text"], require_span=not llm.is_dry_run(state["dry_run"]))  # the stand-in answers whenever llm.is_dry_run
-                        ungrounded += downgraded
+                        stance, why = judged_stance(ans, c["text"], passage, frequent, live=live, context=(before, after))
+                        ungrounded += why == "ungrounded"
+                        off_fact += why == "off-fact"
                         asked[question] = stance
                     if stance == "neutral":
                         continue
                     c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
                     found += 1
-            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded)
+            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact)
             earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
-            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + (f"; failures: {failed[0]}" if failed else "")
+            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + excluded_note(frequent, n_docs, [c["text"] for c in targets]) + (f"; failures: {failed[0]}" if failed else "")
             if failed:
                 errors.append(StepError(node="research", event_id=e["id"], message=f"round {round_no}: {len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
             rounds[e["id"]] = round_no

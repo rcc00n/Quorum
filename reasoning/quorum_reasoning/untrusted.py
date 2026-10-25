@@ -17,7 +17,7 @@ import json
 import re
 from typing import Any
 
-from .text import containment, sentences, stems, tokens
+from .text import composition_coverage, containment, different_day, sentences, stated_dates, stems, tokens
 
 # Prefixed to every live model payload (llm.json_task). The prompts carry the same rule.
 DATA_NOTE = (
@@ -56,6 +56,15 @@ def clip(text: Any, limit: int) -> str:
     if len(s) <= limit:
         return s
     return s[: max(0, limit - 2)] + " …"
+
+
+def clip_end(text: Any, limit: int) -> str:
+    """The string, cut to its last `limit` characters (the cut marked at the start): for text that precedes a passage,
+    whose end is the part next to it."""
+    s = str(text) if text is not None else ""
+    if len(s) <= limit:
+        return s
+    return "… " + s[len(s) - max(0, limit - 2) :]
 
 
 def valid_stance(value: Any) -> str:
@@ -151,6 +160,46 @@ def checked_stance(answer: Any, passage: str, claim_text: str, *, require_span: 
     if span_in(span, passage) and span_contradicts_claim(span, claim_text):
         return stance, False
     return "neutral", True
+
+
+COMPOSITION_STEMS_MIN = 2
+
+
+def is_short_span(span: Any) -> bool:
+    """True for a span under SPAN_MIN_WORDS words: the short number/date/negation kind (span_contradicts_claim)."""
+    return isinstance(span, str) and len(_words(span)) < SPAN_MIN_WORDS
+
+
+def off_fact(claim_text: str, passage: str, span: Any, frequent: set[str], min_coverage: float, context: str = "") -> str | None:
+    """Why a grounded `contradicts` is not about the claim's fact, or None when it is.
+
+    "off-fact": the passage together with its context window (`context`: the clipped sentences exactly as the model
+    received them) covers less than `min_coverage` of the claim's fact composition (text.fact_composition: the
+    claim's stems minus the topic's most frequent ones, or all of them when fewer than two would remain) or fewer
+    than COMPOSITION_STEMS_MIN of its stems.
+    "different day": claim and passage (the passage alone) both state a date of the same kind, the dates differ and
+    none matches (text.different_day), unless the span is short (is_short_span) and itself carries a stated date —
+    then the contradiction is about the date.
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): coverage is computed over the passage plus its context window,
+    not the passage alone. Why: a short honest contradiction ("killed 5") sits in a sentence that covers few of a
+    long claim's stems, but its neighbours in the same article name the actors and the act; a caption or an
+    unrelated paragraph in another article does not. Owner's decision (Yelysei, 2026-10-25).
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a shared entity ("Trump") does not tie a contradiction to the
+    same fact; the passage must carry the claim's fact composition (threshold research.stance_contradiction_coverage,
+    numbers in config/reasoning.toml) and must not be about another stated day. Why: one article holds several
+    events of the same actors (D5, 2026-10-24 canonical run). Exception (owner's decision, Yelysei, 2026-10-25): a
+    SHORT span (2-4 words) that states a date is a date contradiction ("on Monday", not Tuesday) and is kept; a clause
+    of 5+ words stating another day ("a strike on Monday killed 7 in Kharkiv") is another day's event: downgraded.
+    """
+    share, hits = composition_coverage(claim_text, f"{context} {passage}", frequent)
+    if hits < COMPOSITION_STEMS_MIN or share < min_coverage:
+        return "off-fact"
+    span_dates = stated_dates(span) if is_short_span(span) else {}
+    if different_day(claim_text, passage) and not any(span_dates.values()):
+        return "different day"
+    return None
 
 
 _NUMBER = re.compile(r"\d[\d.,]*")

@@ -35,6 +35,28 @@ candidates_per_claim = 8
 # mostly survived it (captions 0.21-0.64, Kyiv passages 0.20-0.56); 0.15 loses 8 of 222 supports (3.6%), removes
 # 24 contradicts and saves 110 calls (4%).
 stance_min_overlap = 0.15    # 0 disables
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a `contradicts` counts only when the passage covers at least
+# stance_contradiction_coverage of the claim's fact composition (its stems minus the run's 5 most frequent stems and
+# any stem in > 30% of the documents' titles+leads) and at least 2 of those stems (untrusted.off_fact). Why: a shared
+# entity ("Trump") does not tie a contradiction to the same fact (D5). Offline on the 2026-10-24 run-3/5 journals
+# (passage only; corpus frequency approximated from the journal's 599 unique claims+passages, which excluded trump,
+# ukraine, president, his, russia): median coverage is 0.36 for supports and 0.17 for contradicts. Kept contradicts
+# vs supports clearing the same bar: 0.3 → 163/714 vs 136/222; 0.4 → 78/714 vs 94/222; 0.5 → 45/714 vs 70/222.
+# D5 noise at 0.4: Ramaswamy 0/2 and Pope/Kremlin 0/9 kept (max 0.17 / 0.21), Kyiv 2/16 (0.64), captions 14/37
+# (measured on glued caption+sentence passages, which the newline split now separates). 0.4 rather than 0.5: the
+# supports show that a same-fact single sentence covers >= 0.4 in 42% of cases but >= 0.5 in only 32%, and a lost
+# true contradiction lets a disputed claim read confirmed; 0.3 keeps 6 of the 16 Kyiv rows.
+stance_contradiction_coverage = 0.4
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): coverage is measured over the passage plus its context window
+# (two sentences each side, what the model sees), and a short number/date/negation span (2-4 words) needs only
+# stance_contradiction_coverage_short; the 2-stem floor applies to both. Why: on passage-only coverage 15 of 20
+# number contradictions and 102 of 115 negation ones fell below 0.4 — a short honest contradiction ("killed 5")
+# sits in a sentence covering few of a long claim's stems, while its neighbours name the actors and the act.
+# Owner's decision (Yelysei, 2026-10-25); not measurable offline (the journals carry no document text).
+# Short claims are the strictest: with a 2-stem composition both stems must be covered (the floor), whatever the
+# share; the share takes over from 5 stems up (0.4 of 5 = 2). A claim that would keep fewer than 2 stems after the
+# topic-frequent exclusion keeps its full stem set (text.fact_composition).
+stance_contradiction_coverage_short = 0.25
 
 [clustering]
 # Superseded 2026-10-24 (kept for the record): similarity_threshold = 0.5 and borderline_band = 0.25 drove

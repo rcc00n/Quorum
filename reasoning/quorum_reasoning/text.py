@@ -110,12 +110,87 @@ def overlap_coefficient(a: set[str], b: set[str]) -> float:
     return len(a & b) / min(len(a), len(b))
 
 
-def best_passage(claim_text: str, text: str) -> str:
-    """The sentence of `text` that shares the most words with the claim; empty when nothing is shared."""
+def passage_window(claim_text: str, text: str, n: int) -> tuple[str, str, str]:
+    """(before, passage, after): the sentence of `text` sharing the most words with the claim (the first on a tie;
+    empty when nothing is shared) and up to `n` sentences on each side, joined by a space; empty at the edges."""
+    sents = sentences(text)
     cw = tokens(claim_text)
-    best, best_score = "", 0
-    for sent in sentences(text):
+    best, best_score = -1, 0
+    for i, sent in enumerate(sents):
         score = len(cw & tokens(sent))
         if score > best_score:
-            best, best_score = sent, score
-    return best
+            best, best_score = i, score
+    if best < 0:
+        return "", "", ""
+    return " ".join(sents[max(0, best - n) : best]), sents[best], " ".join(sents[best + 1 : best + 1 + n])
+
+
+def best_passage(claim_text: str, text: str) -> str:
+    """The sentence of `text` that shares the most words with the claim; empty when nothing is shared."""
+    return passage_window(claim_text, text, 0)[1]
+
+
+def frequent_stems(texts: list[str], k: int = 5, share: float = 0.3) -> set[str]:
+    """The topic's most common stems: the top `k` by document frequency over `texts` (ties broken alphabetically)
+    plus every stem found in more than `share` of them. Deterministic for the same texts."""
+    from collections import Counter
+
+    df = Counter(s for t in texts for s in stems(t))
+    top = {s for s, _ in sorted(df.items(), key=lambda kv: (-kv[1], kv[0]))[:k]}
+    return top | {s for s, c in df.items() if texts and c / len(texts) > share}
+
+
+COMPOSITION_MIN = 2  # the composition floor (untrusted.COMPOSITION_STEMS_MIN is the same number of covered stems)
+
+
+def keeps_full_stems(claim_text: str, frequent: set[str]) -> bool:
+    """True when excluding the topic's frequent stems would leave the claim fewer than COMPOSITION_MIN stems while
+    excluding something; such a claim keeps its full stem set (fact_composition)."""
+    full = stems(claim_text)
+    return bool(full & frequent) and len(full - frequent) < COMPOSITION_MIN
+
+
+def fact_composition(claim_text: str, frequent: set[str]) -> set[str]:
+    """The claim's significant stems minus the topic's most common ones: what makes this fact this fact. When fewer
+    than COMPOSITION_MIN stems would remain, the full stem set (keeps_full_stems).
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a claim made of frequent names ("Trump met Zelensky") keeps
+    its full stem set instead of an empty composition. Why: such a claim must still be contradictable; with the
+    exclusion it could never reach the 2-stem floor. Owner's decision (Yelysei, 2026-10-25).
+    """
+    full = stems(claim_text)
+    return full if keeps_full_stems(claim_text, frequent) else full - frequent
+
+
+def composition_coverage(claim_text: str, passage: str, frequent: set[str]) -> tuple[float, int]:
+    """(share, count) of the claim's fact composition found among the passage's stems; (0.0, 0) for an empty composition."""
+    comp = fact_composition(claim_text, frequent)
+    if not comp:
+        return 0.0, 0
+    hit = len(comp & stems(passage))
+    return hit / len(comp), hit
+
+
+_MONTH_NUM = {m: i + 1 for i, m in enumerate("jan feb mar apr may jun jul aug sep oct nov dec".split())}
+_MONTH = r"(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\.?"
+_DAY = r"(\d{1,2})(?:st|nd|rd|th)?"
+_MONTH_DAY = re.compile(rf"\b{_MONTH}\s+{_DAY}\b|\b{_DAY}\s+(?:of\s+)?{_MONTH}(?![a-z])", re.IGNORECASE)
+_WEEKDAY = re.compile(r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.IGNORECASE)
+
+
+def stated_dates(text: str) -> dict[str, set[str]]:
+    """Explicit dates in `text` by kind: "day" ("10-22" for October 22 / 22 Oct) and "weekday" ("tuesday").
+    A month alone or a bare number is not a date here."""
+    days = set()
+    for m in _MONTH_DAY.finditer(text or ""):
+        month, day = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        if 1 <= int(day) <= 31:
+            days.add(f"{_MONTH_NUM[month.lower()[:3]]}-{int(day)}")
+    return {"day": days, "weekday": {w.lower() for w in _WEEKDAY.findall(text or "")}}
+
+
+def different_day(claim_text: str, passage: str) -> bool:
+    """True when both sides state a date of the same kind, those dates differ, and no stated date of any kind matches."""
+    a, b = stated_dates(claim_text), stated_dates(passage)
+    both = [k for k in a if a[k] and b[k]]
+    return bool(both) and not any(a[k] & b[k] for k in both)

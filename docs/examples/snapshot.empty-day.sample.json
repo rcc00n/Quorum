@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-25T01:51:27Z",
+  "generated_at": "2026-10-25T03:19:25Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -98,7 +98,7 @@
       "decision": "4 documents from 3 sources, 0 official; research budget 2 rounds per event",
       "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
-      "duration_ms": 0
+      "duration_ms": 3
     },
     {
       "node": "cluster",
@@ -107,7 +107,7 @@
       "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 3
+      "duration_ms": 9
     },
     {
       "node": "score_importance",
@@ -168,16 +168,16 @@
       "iteration": 1,
       "event_id": "b913ab53ff63",
       "decision": "round 1: 2 passages with a stance for 2 claims",
-      "reason": "event documents only",
+      "reason": "event documents only; topic-frequent exclusion off (4 documents)",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 0
     },
     {
       "node": "research",
       "iteration": 1,
       "event_id": "8ec9e4f49dc1",
       "decision": "round 1: 0 passages with a stance for 1 claims",
-      "reason": "event documents only",
+      "reason": "event documents only; topic-frequent exclusion off (4 documents)",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -186,7 +186,7 @@
       "iteration": 1,
       "event_id": "c83a993b6c7f",
       "decision": "round 1: 0 passages with a stance for 1 claims",
-      "reason": "event documents only",
+      "reason": "event documents only; topic-frequent exclusion off (4 documents)",
       "model": "stand-ins",
       "duration_ms": 0
     },
@@ -222,18 +222,18 @@
       "iteration": 2,
       "event_id": "8ec9e4f49dc1",
       "decision": "round 2: 0 passages with a stance for 1 claims",
-      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims; topic-frequent exclusion off (4 documents)",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "research",
       "iteration": 2,
       "event_id": "c83a993b6c7f",
       "decision": "round 2: 0 passages with a stance for 1 claims",
-      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims; topic-frequent exclusion off (4 documents)",
       "model": "stand-ins",
-      "duration_ms": 0
+      "duration_ms": 1
     },
     {
       "node": "verify",
@@ -323,7 +323,7 @@
       "decision": "3 events in 2 group(s); empty day: True",
       "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "publish",
@@ -332,7 +332,7 @@
       "decision": "snapshot empty: 0 stories, roundup of 3",
       "reason": "built from state; the store versions it",
       "model": "stand-ins",
-      "duration_ms": 2
+      "duration_ms": 0
     }
   ]
 }
