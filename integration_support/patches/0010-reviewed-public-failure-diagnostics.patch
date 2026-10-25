@@ -1,0 +1,254 @@
+diff --git a/reasoning/README.md b/reasoning/README.md
+index c0992d2..4ff3cbc 100644
+--- a/reasoning/README.md
++++ b/reasoning/README.md
+@@ -123,3 +123,12 @@ Module-level decisions (AGENTS.md § 2). Project-level ones are in `docs/DECISIO
+ | 2026-10-23 | Yelysei / Claude Code | The model axis (`dry_run`) and the corpus axis (`corpus`) are separate switches; a document that carries `text` is read from it in any mode. | A live model on the fixture corpus is how prompts and JSON parsing are tried before collection has data, without waiting on Zetaris; a live corpus with stand-ins checks the SQL without credits. |
+ | 2026-10-23 | Yelysei / Claude Code | `langgraph.json` names the graph by module path (`quorum_reasoning.graph:graph`), not by file path. | `langgraph dev` loads a file path as a top-level module, so the package's relative imports fail (`attempted relative import with no known parent package`); the module path works because `dependencies: ["."]` installs the package. |
+ | 2026-10-22 | Yelysei / Claude Code | *Superseded 2026-10-24 by the file store (`store.py`, row above); kept for the record.* Storage is not in this version: `publish` builds the snapshot, `run.py` writes it to `snapshots/`; the `analysis` schema and the snapshot endpoint come next. | A snapshot file is enough for the portal adapter to start against; the Postgres store is additive. |
++
++### Public failure projection (owner-review amendment)
++
++Public trace and adjudication failures retain a bounded exception type and a structured
++HTTP status when available. Exception text, provider bodies, paths and request URLs
++are omitted. The lowercase wording also fits within adjudication sentences.
++**The snapshot file still contains raw `errors[].message` diagnostics.** Only the
++portal's `public_error` projection hides those messages. Original snapshot files
++must remain private; this patch does not make them safe for public distribution.
+diff --git a/reasoning/quorum_reasoning/nodes/extract.py b/reasoning/quorum_reasoning/nodes/extract.py
+index ea9bc3a..048d25a 100644
+--- a/reasoning/quorum_reasoning/nodes/extract.py
++++ b/reasoning/quorum_reasoning/nodes/extract.py
+@@ -83,6 +83,6 @@ def run(state: RunState) -> dict:
+             except Exception as exc:  # noqa: BLE001 — one event's extraction must not kill the run; the trace shows it
+                 errors.append(StepError(node="extract_claims", event_id=e["id"], message=str(exc)[:300]))
+                 s.decision = f"failed after {n} claims"
+-                s.reason = untrusted.PUBLIC_FAILURE
++                s.reason = untrusted.public_failure(exc)
+         steps.append(finish(state, s))
+     return {"claims": claims, "steps": steps, "errors": errors}
+diff --git a/reasoning/quorum_reasoning/nodes/fact_check.py b/reasoning/quorum_reasoning/nodes/fact_check.py
+index d9f50a7..3610761 100644
+--- a/reasoning/quorum_reasoning/nodes/fact_check.py
++++ b/reasoning/quorum_reasoning/nodes/fact_check.py
+@@ -49,6 +49,7 @@ def run(state: RunState) -> dict:
+         with step(state, "fact_check", event_id=e["id"], model=llm.model_name("fact_checker")) as s:
+             counts: Counter[str] = Counter()
+             found = 0
++            failed_public: list[str] = []
+             failed: list[str] = []
+             # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a failed stance call skips that one passage and the
+             # loop goes on; the claim's verdict comes from the passages that were judged, and the event's trace row and
+@@ -93,6 +94,7 @@ def run(state: RunState) -> dict:
+                             )
+                         except Exception as exc:  # noqa: BLE001 — one passage lost, the claim and the event go on
+                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
++                            failed_public.append(untrusted.public_failure(exc))
+                             continue  # a failed question is not remembered: a repeat of it is asked again
+                         judged_calls += 1
+                         stance = asked[question] = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
+@@ -109,7 +111,7 @@ def run(state: RunState) -> dict:
+                 c["fact_checker_judged"] = judged  # 0 with failures = unavailable, not a verdict (adjudicate reads it)
+                 counts[status] += 1
+             s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "")
+-            s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + ("; " + untrusted.PUBLIC_FAILURE if failed else "")
++            s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + ("; " + failed_public[0] if failed else "")
+             if failed:
+                 errors.append(StepError(node="fact_check", event_id=e["id"], message=f"{len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
+         steps.append(finish(state, s))
+diff --git a/reasoning/quorum_reasoning/nodes/frame.py b/reasoning/quorum_reasoning/nodes/frame.py
+index be488f2..e701358 100644
+--- a/reasoning/quorum_reasoning/nodes/frame.py
++++ b/reasoning/quorum_reasoning/nodes/frame.py
+@@ -70,7 +70,7 @@ def run(state: RunState) -> dict:
+                             dry_run=state["dry_run"],
+                         )
+                     except Exception as exc:  # noqa: BLE001 — one outlet unlabelled, the others keep their labels
+-                        failed.append(f"{d['source_name']}: {type(exc).__name__}")
++                        failed.append(untrusted.public_failure(exc))
+                         continue
+                     if not isinstance(ans, dict):
+                         failed.append(f"{d['source_name']}: no object")
+@@ -117,6 +117,6 @@ def run(state: RunState) -> dict:
+                 errors.append(StepError(node="frame", event_id=e["id"], message=str(exc)[:300]))
+                 e["framing"] = {"rating_mode": "average", "coverage": coverage(state["documents"], e["document_ids"]), "interpretations": [], "outlets": outlets}
+                 s.decision = "failed; coverage counts only"
+-                s.reason = untrusted.PUBLIC_FAILURE
++                s.reason = untrusted.public_failure(exc)
+         steps.append(finish(state, s))
+     return {"events": events, "steps": steps, "errors": errors}
+diff --git a/reasoning/quorum_reasoning/nodes/publish.py b/reasoning/quorum_reasoning/nodes/publish.py
+index 0590f30..7d5af3b 100644
+--- a/reasoning/quorum_reasoning/nodes/publish.py
++++ b/reasoning/quorum_reasoning/nodes/publish.py
+@@ -195,7 +195,7 @@ def run(state: RunState) -> dict:
+                 summary, summary_source = fallback_summary(len(state["events"]), len(stories), n_review), "fallback"
+         except Exception as exc:  # noqa: BLE001
+             summary_errors.append(StepError(node="publish", event_id=None, message=f"summary model call failed: {str(exc)[:200]}; fallback text used"))
+-            s.reason = untrusted.PUBLIC_FAILURE + " Summary fallback used."
++            s.reason = untrusted.public_failure(exc) + " Summary fallback used."
+             summary, summary_source = fallback_summary(len(state["events"]), len(stories), n_review), "fallback"
+         errors = list(state.get("errors", [])) + summary_errors
+         status = "partial" if errors else ("empty" if not stories else "ok")
+diff --git a/reasoning/quorum_reasoning/nodes/research.py b/reasoning/quorum_reasoning/nodes/research.py
+index 6d62699..1d5efc5 100644
+--- a/reasoning/quorum_reasoning/nodes/research.py
++++ b/reasoning/quorum_reasoning/nodes/research.py
+@@ -143,6 +143,7 @@ def run(state: RunState) -> dict:
+         targets = event_claims if round_no == 1 else [c for c in event_claims if is_thin(c["evidence"], origin_group(c, by_id))]
+         with step(state, "research", event_id=e["id"], model=llm.model_name()) as s:
+             found = 0
++            failed_public: list[str] = []
+             failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
+             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at stance_question)
+             repeats = 0
+@@ -175,6 +176,7 @@ def run(state: RunState) -> dict:
+                             )
+                         except Exception as exc:  # noqa: BLE001
+                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
++                            failed_public.append(untrusted.public_failure(exc))
+                             continue  # a failed question is not remembered: a repeat of it is asked again
+                         stance = asked[question] = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
+                     if stance == "neutral":
+@@ -183,7 +185,7 @@ def run(state: RunState) -> dict:
+                     found += 1
+             s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "")
+             earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
+-            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + ("; " + untrusted.PUBLIC_FAILURE if failed else "")
++            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + ("; " + failed_public[0] if failed else "")
+             if failed:
+                 errors.append(StepError(node="research", event_id=e["id"], message=f"round {round_no}: {len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
+             rounds[e["id"]] = round_no
+diff --git a/reasoning/quorum_reasoning/nodes/review_disputed.py b/reasoning/quorum_reasoning/nodes/review_disputed.py
+index 25756a2..6de8c99 100644
+--- a/reasoning/quorum_reasoning/nodes/review_disputed.py
++++ b/reasoning/quorum_reasoning/nodes/review_disputed.py
+@@ -126,7 +126,7 @@ def run(state: RunState) -> dict:
+                 accepted, reason, quote, why_invalid = validate(c, ans, origin_group(c, by_id))
+             except Exception as exc:  # noqa: BLE001 — a failed pass keeps the dispute; the trace shows it
+                 errors.append(StepError(node="review_disputed", event_id=c["event_id"], message=str(exc)[:300]))
+-                accepted, reason, quote, why_invalid = None, "", "", untrusted.PUBLIC_FAILURE
++                accepted, reason, quote, why_invalid = None, "", "", untrusted.public_failure(exc)
+             c["reviewer_reason"] = reason
+             c["reviewer_quote"] = quote
+             if accepted is None:
+diff --git a/reasoning/quorum_reasoning/nodes/score.py b/reasoning/quorum_reasoning/nodes/score.py
+index 3c30d1a..5342d76 100644
+--- a/reasoning/quorum_reasoning/nodes/score.py
++++ b/reasoning/quorum_reasoning/nodes/score.py
+@@ -68,6 +68,6 @@ def run(state: RunState) -> dict:
+                 errors.append(StepError(node="score_importance", event_id=e["id"], message=str(exc)[:300]))
+                 e["rubric"] = build_rubric(0, 0, 0, 0, {})
+                 s.decision = "failed; scored 0 on all judged points"
+-                s.reason = untrusted.PUBLIC_FAILURE
++                s.reason = untrusted.public_failure(exc)
+         steps.append(finish(state, s))
+     return {"events": events, "steps": steps, "errors": errors}
+diff --git a/reasoning/quorum_reasoning/nodes/write.py b/reasoning/quorum_reasoning/nodes/write.py
+index d468a6a..53b2421 100644
+--- a/reasoning/quorum_reasoning/nodes/write.py
++++ b/reasoning/quorum_reasoning/nodes/write.py
+@@ -112,6 +112,6 @@ def run(state: RunState) -> dict:
+                 e["drafts"] += 1
+                 e["critic_status"] = None
+                 s.decision = f"draft {e['drafts']} failed"
+-                s.reason = untrusted.PUBLIC_FAILURE
++                s.reason = untrusted.public_failure(exc)
+         steps.append(finish(state, s))
+     return {"events": events, "steps": steps, "errors": errors}
+diff --git a/reasoning/quorum_reasoning/untrusted.py b/reasoning/quorum_reasoning/untrusted.py
+index b5c76eb..4f5d459 100644
+--- a/reasoning/quorum_reasoning/untrusted.py
++++ b/reasoning/quorum_reasoning/untrusted.py
+@@ -28,7 +28,28 @@ DATA_NOTE = (
+ 
+ # DECISION(2026-10-24, rcc00n/Codex): public trace/adjudication failure reasons omit exception contents.
+ # Why: provider errors can include private endpoints or parameters; original StepError diagnostics stay private.
+-PUBLIC_FAILURE = "Upstream operation failed; internal details withheld."
++PUBLIC_FAILURE = "upstream operation failed; internal details withheld"
++
++
++def public_failure(exc: Exception) -> str:
++    """Bounded diagnostics from structured attributes only; never inspect exception text."""
++    # DECISION(2026-10-25, rcc00n/Codex): retain a safe type and structured HTTP status.
++    # Why: owner review requires useful public diagnostics without provider bodies or URLs.
++    name = type(exc).__name__
++    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,79}", name):
++        name = "Exception"
++    status = None
++    try:
++        status = getattr(exc, "status_code", None)
++        if type(status) is not int or not 100 <= status <= 599:
++            status = getattr(getattr(exc, "response", None), "status_code", None)
++    except Exception:
++        status = None
++    detail = name
++    if type(status) is int and 100 <= status <= 599:
++        detail += f", HTTP {status}"
++    return f"{PUBLIC_FAILURE} ({detail})"
++
+ 
+ STANCES = {"supports", "contradicts", "neutral", "statement"}
+ 
+diff --git a/reasoning/tests/test_public_failures.py b/reasoning/tests/test_public_failures.py
+index 73c86e2..3e5faec 100644
+--- a/reasoning/tests/test_public_failures.py
++++ b/reasoning/tests/test_public_failures.py
+@@ -15,7 +15,7 @@ def test_failed_node_does_not_export_exception_in_public_trace(node):
+     with patch('quorum_reasoning.llm.json_task',side_effect=RuntimeError(PRIVATE)):
+         result=node.run(state)
+     assert PRIVATE not in json.dumps(result['steps'])
+-    assert result['steps'][0]['reason']==untrusted.PUBLIC_FAILURE
++    assert result['steps'][0]['reason']==untrusted.public_failure(RuntimeError(PRIVATE))
+     assert PRIVATE in result['errors'][0]['message']  # restricted diagnostic remains available
+ 
+ 
+@@ -40,14 +40,47 @@ def test_remaining_failure_paths_preserve_status_without_public_exception(name):
+     if name=='review_disputed':
+         state=state_with([claim('TEST-claim','ev1','confirmed','unverified',[SUPPORT_A,SUPPORT_B])])
+     node=locals()[name]
+-    with patch.object(llm,'is_dry_run',return_value=False), patch.object(llm,'json_task',side_effect=RuntimeError(PRIVATE)):
++    exc = RuntimeError(PRIVATE)
++    exc.status_code = 429
++    with patch.object(llm,'is_dry_run',return_value=False), patch.object(llm,'json_task',side_effect=exc):
+         result=node.run(state)
+     assert result['errors'] and result['steps']
+     public={key:value for key,value in result.items() if key!='errors'}
+     assert PRIVATE not in json.dumps(public)
++    assert 'RuntimeError, HTTP 429' in json.dumps(public)
+     if name!='frame':  # Frame deliberately records only exception type even in its error summary.
+         assert PRIVATE in json.dumps(result['errors'])
+     if name=='review_disputed':
+         assert result['claims']['TEST-claim']['final_status']=='disputed'
+     if name=='fact_check':
+         assert all(c['fact_checker_status']=='unverified' for c in result['claims'].values())
++
++
++@pytest.mark.parametrize("status", [429, 500, 401])
++def test_structured_http_status_survives_without_response_body(status):
++    import httpx
++    request = httpx.Request("POST", "https://private.invalid/secret")
++    response = httpx.Response(status, request=request)
++    exc = httpx.HTTPStatusError(PRIVATE, request=request, response=response)
++    assert untrusted.public_failure(exc) == f"{untrusted.PUBLIC_FAILURE} (HTTPStatusError, HTTP {status})"
++    assert PRIVATE not in untrusted.public_failure(exc)
++
++
++@pytest.mark.parametrize("status", [True, 429.0, "429", 99, 600, None])
++def test_untrusted_status_values_and_message_are_not_parsed(status):
++    exc = RuntimeError("HTTP 429 " + PRIVATE)
++    exc.status_code = status
++    assert untrusted.public_failure(exc) == f"{untrusted.PUBLIC_FAILURE} (RuntimeError)"
++
++
++def test_hostile_exception_attributes_and_names_are_safe():
++    class Hostile(Exception):
++        @property
++        def status_code(self):
++            raise RuntimeError(PRIVATE)
++        def __str__(self):
++            raise AssertionError("must not stringify")
++    assert untrusted.public_failure(Hostile()) == f"{untrusted.PUBLIC_FAILURE} (Hostile)"
++    malformed = type("private/url", (Exception,), {})
++    assert untrusted.public_failure(malformed()) == f"{untrusted.PUBLIC_FAILURE} (Exception)"
++    assert untrusted.PUBLIC_FAILURE[0].islower()
