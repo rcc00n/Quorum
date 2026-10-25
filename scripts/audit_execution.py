@@ -3,6 +3,7 @@ import argparse
 from collections import Counter
 import hashlib
 import json
+import math
 from pathlib import Path, PurePosixPath
 import re
 
@@ -32,8 +33,12 @@ def strict_json(raw):
         return result
     def nonfinite(value):
         raise AuditError('nonfinite_json')
+    def finite_float(value):
+        number = float(value)
+        require(math.isfinite(number), 'nonfinite_json')
+        return number
     try:
-        return json.loads(raw, object_pairs_hook=pairs, parse_constant=nonfinite)
+        return json.loads(raw, object_pairs_hook=pairs, parse_constant=nonfinite, parse_float=finite_float)
     except (ValueError, UnicodeError, RecursionError) as exc:
         if isinstance(exc, AuditError):
             raise
@@ -191,6 +196,7 @@ def audit_bundle(root, manifest):
     for version, attempt in ((4, 5), (6, 7)):
         ledger = strict_json(file(f'v{version}.ledger.json'))
         snapshot = strict_json(file(f'2026-10-24-closed-v{version}.snapshot.json'))
+        require(isinstance(ledger, dict), 'invalid_ledger')
         require(ledger.get('version') == version, 'unexpected_ledger_version')
         versions[str(version)] = ledger_matches(ledger, journals[attempt], snapshot)
         versions[str(version)]['sessions'] = session_matches(journals[attempt], file(f'live_2026-10-24_attempt{attempt}.log'), snapshot['run_id'])

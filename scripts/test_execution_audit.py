@@ -38,7 +38,7 @@ def log(restored=1, replay_count=1, call='stance default TEST/model 1 ms 2>3'):
 
 class ExecutionAuditTests(unittest.TestCase):
     def test_duplicate_keys_and_nonfinite_are_rejected(self):
-        for raw in (b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":Infinity}'):
+        for raw in (b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":Infinity}', b'{"a":1e999}', b'{"a":-1e999}'):
             with self.subTest(raw=raw), self.assertRaises(audit.AuditError): audit.strict_json(raw)
 
     def test_truncated_or_corrupt_journal_cannot_pass(self):
@@ -65,6 +65,8 @@ class ExecutionAuditTests(unittest.TestCase):
 
     def test_ledger_rejects_model_counts_and_boolean_identity(self):
         rows=[row()]
+        for bad in ([], None, 'TEST private'):
+            with self.assertRaises(audit.AuditError): audit.ledger_matches(bad, rows, snapshot(rows))
         for value in (snapshot(rows) | {'version':True}, snapshot(rows) | {'provenance':dict(model_calls=1,model_errors=False,answered_by={'TEST/model':1})}):
             with self.assertRaises(audit.AuditError): audit.ledger_matches(ledger(rows),rows,value)
 
@@ -127,6 +129,13 @@ class ExecutionAuditTests(unittest.TestCase):
             for flag in ('per_key_replay_consumption_verified','process_config_at_launch_verified',
                          'provider_execution_verified','source_text_verified','published'):
                 self.assertFalse(report[flag])
+            ledger_path = root/'v4.ledger.json'
+            original_ledger = ledger_path.read_bytes()
+            for wrong_root in ('null', '[]', '"TEST private"'):
+                ledger_path.write_text(wrong_root)
+                with self.assertRaisesRegex(audit.AuditError, 'invalid_ledger'):
+                    audit.audit_bundle(root, receipts())
+            ledger_path.write_bytes(original_ledger)
             # Re-hashing a modified artifact cannot make inconsistent seed lineage pass.
             rows[7][0]=row(reply='TEST modified seed',run_id='2026-10-24-russia-ukraine-war-3')
             (root/'2026-10-24-russia-ukraine-war-7.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows[7]))
