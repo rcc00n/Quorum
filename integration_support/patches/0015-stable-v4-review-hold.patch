@@ -1,0 +1,89 @@
+diff --git a/backend/portal/management/commands/reasoning_snapshot.py b/backend/portal/management/commands/reasoning_snapshot.py
+index c8dd8c7..dee2a8b 100644
+--- a/backend/portal/management/commands/reasoning_snapshot.py
++++ b/backend/portal/management/commands/reasoning_snapshot.py
+@@ -57,7 +57,7 @@ class Command(BaseCommand):
+                 report.update(producer_commit=commit, git_config_sha256=hashlib.sha256(config).hexdigest(),
+                               git_config_crlf_sha256=hashlib.sha256(config.replace(b'\n', b'\r\n')).hexdigest())
+                 # Prefixes plus a reproduction command are not a full original config attestation.
+-                report['issues'].extend(['producer_config_hash_incomplete'] + artifact_review_issues(options['sha256']))
++                report['issues'].extend(['producer_config_hash_incomplete'] + artifact_review_issues(options['sha256'], p['run_id']))
+                 self.stdout.write(json.dumps(report, sort_keys=True))
+                 raise CommandError('Reasoning acceptance blocked; inspect safe report codes', returncode=1)
+             prefix = re.match(r'^([0-9a-f]{7,40})(?:\s|$)', producer['commit'])
+@@ -75,7 +75,7 @@ class Command(BaseCommand):
+             report.update(producer_commit=commit, declared_config_sha256=declared, git_config_sha256=actual)
+             require(actual == declared, 'producer_config_mismatch')
+             report['metadata_valid'] = True
+-            report['issues'].extend(artifact_review_issues(options['sha256']))
++            report['issues'].extend(artifact_review_issues(options['sha256'], p['run_id']))
+         except SnapshotError as exc:
+             report['issues'].append(str(exc))
+         except (OSError, ValueError, TypeError, KeyError):
+diff --git a/backend/portal/reasoning_preview.py b/backend/portal/reasoning_preview.py
+index 4f6cb38..44e2b41 100644
+--- a/backend/portal/reasoning_preview.py
++++ b/backend/portal/reasoning_preview.py
+@@ -24,14 +24,14 @@ GENUINE_V4_SIDECAR_SHA256 = "f55c3304afd92b9f763ddb04357f3ec0c7a8860e9ee3ddcf63b
+ GENUINE_V4_SHA256 = "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79"
+ 
+ 
+-def artifact_review_issues(sha256):
+-    # DECISION(2026-10-25, rcc00n/Codex): pin an editorial hold to the owner-disclosed v4 bytes.
++def artifact_review_issues(sha256, run_id=None):
++    # DECISION(2026-10-25, rcc00n/Codex): retain an editorial hold for the original v4 hash or its known run identity.
+     # Why: conditional/reversible rationale conflicts with irreversibility 1; do not rescore producer output.
+-    return ["impact_score_review_required"] if sha256 == GENUINE_V4_SHA256 else []
++    return ["impact_score_review_required"] if sha256 == GENUINE_V4_SHA256 or run_id == "2026-10-24-russia-ukraine-war-5" else []
+ 
+ 
+-def artifact_review_notices(sha256):
+-    if not artifact_review_issues(sha256):
++def artifact_review_notices(sha256, run_id=None):
++    if not artifact_review_issues(sha256, run_id):
+         return []
+     return [
+         "IMPACT REVIEW PENDING: producer score 6 is preserved. The owner reports a conditional and "
+@@ -705,7 +705,7 @@ def present_reasoning(raw, *, now=None, catalog=None):
+             # Why: missing metadata must not erase a known corpus limitation.
+             provisional=True if hashlib.sha256(raw).hexdigest() == HISTORICAL_V3_SHA256 else None,
+             missing_provenance=missing_provenance,
+-            warnings=artifact_review_notices(hashlib.sha256(raw).hexdigest()) + [
++            warnings=artifact_review_notices(hashlib.sha256(raw).hexdigest(), p["run_id"]) + [
+                 (
+                     "FICTIONAL data; links and quotations are illustrative, not verified news."
+                     if p["provenance"]["fictional"]
+diff --git a/backend/portal/test_closed_v4.py b/backend/portal/test_closed_v4.py
+index 10458c4..72e0c3c 100644
+--- a/backend/portal/test_closed_v4.py
++++ b/backend/portal/test_closed_v4.py
+@@ -38,6 +38,10 @@ class ClosedV4Tests(SimpleTestCase):
+         self.assertTrue(result['preview']['corpus_binding']['closed_edition'])
+         self.assertFalse(result['preview']['published'])
+         self.assertNotIn('api_keys', json.dumps(result['preview']))
++        # Formatting cannot erase the editorial hold; it still cannot bind the historical sidecar.
++        reencoded = json.dumps(p).encode()
++        self.assertIn('has not passed independent impact review', ' '.join(present_reasoning(reencoded)['preview']['warnings']))
++        with self.assertRaises(SnapshotError):bind_preview_sidecar(sidecar, reencoded, present_reasoning(reencoded))
+         for altered in (sidecar+b'\n', sidecar.replace(b'false', b'true', 1)):
+             with self.assertRaises(SnapshotError):bind_preview_sidecar(altered, raw, present_reasoning(raw))
+         with self.assertRaises(SnapshotError):bind_preview_sidecar(sidecar, SAMPLE.read_bytes(), present_reasoning(SAMPLE.read_bytes()))
+diff --git a/backend/portal/test_reasoning_acceptance.py b/backend/portal/test_reasoning_acceptance.py
+index 92fa9da..982639d 100644
+--- a/backend/portal/test_reasoning_acceptance.py
++++ b/backend/portal/test_reasoning_acceptance.py
+@@ -70,3 +70,14 @@ class ReasoningAcceptanceTests(SimpleTestCase):
+         notices = ' '.join(artifact_review_notices(GENUINE_V4_SHA256))
+         self.assertIn('producer score 6 is preserved', notices)
+         self.assertIn('has not passed independent impact review', notices)
++
++    def test_known_run_hold_survives_reencoding_without_extending_parser_exceptions(self):
++        from .reasoning_preview import artifact_review_issues, artifact_review_notices
++        self.assertEqual(artifact_review_issues('0' * 64, '2026-10-24-russia-ukraine-war-5'),
++                         ['impact_score_review_required'])
++        self.assertTrue(artifact_review_notices('0' * 64, '2026-10-24-russia-ukraine-war-5'))
++        self.assertEqual(artifact_review_issues('0' * 64, 'TEST-other-run'), [])
++        with patch('portal.management.commands.reasoning_snapshot.artifact_review_issues',
++                   return_value=['impact_score_review_required']) as review:
++            self.run_report(blocked=True)
++        review.assert_called_once_with(self.options['sha256'], json.loads(self.raw)['run_id'])
