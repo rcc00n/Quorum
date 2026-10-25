@@ -58,8 +58,11 @@ def live_mode_problem() -> str | None:
     llm._env()  # .env may set QUORUM_DRY_RUN; read it before judging (review finding, 2026-10-24)
     if os.getenv("QUORUM_DRY_RUN") == "1":
         return "--model live together with QUORUM_DRY_RUN=1 (shell or .env); unset the variable or drop --model live"
+    problem = llm.route_problem()
+    if problem:
+        return f"--model live with a {problem}"
     if not llm.route_configured():
-        return "--model live but no model route is configured (MODEL_BASE_URL and MODEL_API_KEY, or METERLESS_BASE_URL and METERLESS_RUNTIME_TOKEN, in .env)"
+        return "--model live but no model route is configured (MODEL_BASE_URL and MODEL_API_KEY, or METERLESS_RUNTIME_TOKEN / its alias METERLESS_TOKEN with METERLESS_BASE_URL, which defaults to http://127.0.0.1:8088/v1 when blank, in .env)"
     return None
 
 
@@ -202,7 +205,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"corpus: {state['corpus']}; model: {'stand-ins' if llm.is_dry_run(state['dry_run']) else llm.model_name()}; fact-checker: {prov['fact_checker_model']}")
         if prov["model_calls"]:
             answered = ", ".join(f"{m} ×{n}" for m, n in prov["answered_by"].items())
-            print(f"model calls: {prov['model_calls']} ({prov['model_errors']} failed); answered by: {answered}")
+            extra = "".join(
+                f", {n} {label}" for n, label in ((llm.substitution_count(), "lane substituted"), (llm.lane_unverified_count(), "lane unverified")) if n
+            )
+            print(f"model calls: {prov['model_calls']} ({prov['model_errors']} failed{extra}); answered by: {answered}")
         print(f"status: {snapshot['status']}; stories: {len(snapshot['stories'])}; roundup: {snapshot['roundup']['count']}; errors: {len(snapshot['errors'])}")
         print(f"summary ({snapshot['summary_source']}): {snapshot['summary']}")
         print(f"snapshot: {out} (version {version}, published_at {snapshot['published_at']}, sha256 {store.sha256_of(out)})")

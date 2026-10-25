@@ -209,3 +209,83 @@ def test_test_connection_prints_provider_model_and_receipt_per_lane(live, monkey
     assert f"provider_model {LIGHTNING}" in out and "receipt_id rcpt_test_1" in out and "lane held" in out
     assert f"SUBSTITUTED by {LIGHTNING}" in out  # the fact-checker lane answered from Lightning
     assert all(k["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False for k in client.kwargs)
+
+
+# review round (2026-10-25) ------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("setup,needle", [
+    ({"MODEL_BASE_URL": "https://integrate.api.nvidia.com/v1", "METERLESS_TOKEN": "t"}, "NVIDIA base URL with a Meterless token"),
+    ({"METERLESS_BASE_URL": "https://integrate.api.nvidia.com/v1", "METERLESS_RUNTIME_TOKEN": "t"}, "NVIDIA base URL with a Meterless token"),
+    ({"METERLESS_BASE_URL": "http://127.0.0.1:8088/v1", "MODEL_API_KEY": "k"}, "METERLESS_BASE_URL with MODEL_API_KEY"),
+])
+def test_mixed_pairs_are_not_a_route_and_live_mode_names_them(env, setup, needle):
+    for name, value in setup.items():
+        env.setenv(name, value)
+    assert not llm.route_configured() and needle in (llm.route_problem() or "")
+    assert needle in (run.live_mode_problem() or "")
+
+
+@pytest.mark.parametrize("setup", [
+    {"MODEL_BASE_URL": "http://127.0.0.1:8088/v1", "MODEL_API_KEY": "k"},  # Nightshift through the MODEL_* pair (.env.example)
+    {"MODEL_BASE_URL": "http://127.0.0.1:8088/v1", "METERLESS_TOKEN": "t"},
+    {"MODEL_BASE_URL": "https://integrate.api.nvidia.com/v1", "MODEL_API_KEY": "k"},
+    {"METERLESS_TOKEN": "t"},
+])
+def test_single_family_pairs_are_routes(env, setup):
+    for name, value in setup.items():
+        env.setenv(name, value)
+    assert llm.route_configured() and llm.route_problem() is None and run.live_mode_problem() is None
+
+
+def test_live_mode_message_mentions_the_alias(env):
+    assert "METERLESS_TOKEN" in run.live_mode_problem()
+
+
+def test_direct_route_request_key_golden(env):
+    import hashlib
+    import json
+
+    env.setenv("MODEL_BASE_URL", "https://integrate.api.nvidia.com/v1")
+    env.setenv("MODEL_API_KEY", "k")
+    messages = [{"role": "system", "content": "s"}, {"role": "user", "content": "u"}]
+    args = dict(task="stance", which="default", model=LIGHTNING, messages=messages, temperature=0.1, payload={"a": 1})
+    prompt = "system:s\nuser:u"
+    material = {"task": "stance", "lane": "default", "route": LIGHTNING,
+                "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(), "temperature": 0.1,
+                "extras": llm._request_extras(), "payload": {"a": 1}}
+    canonical = json.dumps(material, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
+    assert llm._request_key(**args) == hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@pytest.mark.parametrize("met,expected", [
+    ({"receipt": {"hmem": 4}}, 4),
+    ({"receipt": {"hmem": {"injected": "2"}}}, None),
+    ({"receipt": {"hmem": {"injected": True}}}, None),
+    ({"receipt": {"hmem": "lots"}}, None),
+    ({"receipt": {"hmem": {"strategy": "minimal"}}}, None),
+])
+def test_hmem_unparsable_is_none_and_plain_int_accepted(met, expected):
+    assert llm._hmem_injected(met) == expected
+
+
+def test_from_cache_string_is_not_coerced(live):
+    met = _met(LIGHTNING, LIGHTNING, LIGHTNING)
+    met["from_cache"] = "false"
+    live(_completion(LIGHTNING, met))
+    llm.json_task("stance", {"claim": "c"}, dry_run=False)
+    assert "receipt_from_cache" not in llm.calls[-1]
+
+
+@pytest.mark.parametrize("met", [None, {"receipt_id": "r"}, {"receipt_id": "r", "provider_model": "", "routed_model": ""}])
+def test_pinned_meterless_lane_without_evidence_is_unverified_not_error(live, met):
+    live(_completion(LIGHTNING, met))
+    llm.json_task("stance", {"claim": "c"}, dry_run=False)
+    row = llm.calls[-1]
+    assert row["lane_unverified"] is True and row["served"] == LIGHTNING and not row.get("error")
+    assert llm.lane_unverified_count() == 1 and llm.substitution_count() == 0
+
+
+def test_held_lane_is_not_unverified(live):
+    live(_completion(LIGHTNING, _met(LIGHTNING, LIGHTNING, LIGHTNING)))
+    llm.json_task("stance", {"claim": "c"}, dry_run=False)
+    assert "lane_unverified" not in llm.calls[-1] and llm.lane_unverified_count() == 0
