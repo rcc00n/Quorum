@@ -70,7 +70,7 @@ def run(state: RunState) -> dict:
                             dry_run=state["dry_run"],
                         )
                     except Exception as exc:  # noqa: BLE001 — one outlet unlabelled, the others keep their labels
-                        failed.append(untrusted.public_failure(exc))
+                        failed.append(f"{d['source_name']}: {untrusted.public_failure(exc)}")
                         continue
                     if not isinstance(ans, dict):
                         failed.append(f"{d['source_name']}: no object")

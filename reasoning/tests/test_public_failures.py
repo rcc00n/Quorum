@@ -84,3 +84,20 @@ def test_hostile_exception_attributes_and_names_are_safe():
     malformed = type("private/url", (Exception,), {})
     assert untrusted.public_failure(malformed()) == f"{untrusted.PUBLIC_FAILURE} (Exception)"
     assert untrusted.PUBLIC_FAILURE[0].islower()
+
+
+def test_frame_failure_keeps_source_identity_without_exception_body():
+    from quorum_reasoning import llm
+    from quorum_reasoning.nodes import frame
+    from test_per_call_failures import _state
+    state = _state()
+    state['events'][0]['above_bar'] = True
+    exc = RuntimeError(PRIVATE)
+    exc.status_code = 503
+    with patch.object(llm, 'is_dry_run', return_value=False), patch.object(llm, 'json_task', side_effect=exc):
+        result = frame.run(state)
+    public = json.dumps(result['steps'])
+    assert PRIVATE not in public
+    names = {d['source_name'] for d in state['documents'] if d['id'] in state['events'][0]['document_ids']}
+    assert any(f"{name}: {untrusted.public_failure(exc)}" in public for name in names)
+    assert any(name in json.dumps(result['errors']) for name in names)
