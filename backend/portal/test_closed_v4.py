@@ -53,3 +53,30 @@ class ClosedV4Tests(SimpleTestCase):
         with self.assertRaises(SnapshotError):parse_snapshot(raw)
         self.assertEqual(Path(os.environ['QUORUM_TEST_GENUINE_V4_SNAPSHOT']).read_bytes(), raw)
         self.assertEqual(Path(os.environ['QUORUM_TEST_GENUINE_V4_SIDECAR']).read_bytes(), sidecar)
+
+
+class LaterClosedEditionTests(SimpleTestCase):
+    @skipUnless(os.getenv('QUORUM_TEST_CLOSED_HANDOFF_DIR'), 'private closed-edition originals not supplied')
+    def test_v5_v6_exact_pairs_do_not_bind_cross_versions_or_modified_inputs(self):
+        root = Path(os.environ['QUORUM_TEST_CLOSED_HANDOFF_DIR'])
+        pairs = [(root / f'2026-10-24-closed-v{v}.snapshot.json',
+                  root / f'2026-10-24-closed-v{v}.sidecar.json') for v in (5, 6)]
+        originals = [(p.read_bytes(), s.read_bytes()) for p, s in pairs]
+        for raw, sidecar in originals:
+            result = bind_preview_sidecar(sidecar, raw, present_reasoning(raw))
+            self.assertEqual((len(result['reasoning']['stories']), result['reasoning']['roundup']['count'],
+                              len(result['reasoning']['trace'])), (0, 27, 219))
+            self.assertTrue(result['preview']['corpus_binding']['closed_edition'])
+            self.assertFalse(result['preview']['published'])
+            self.assertNotIn('api_keys', json.dumps(result['preview']))
+            self.assertNotIn('corpus_as_of_utc', result['preview']['corpus_binding'])
+            for bad_sidecar in (sidecar + b'\n', sidecar.replace(b'false', b'true', 1)):
+                with self.assertRaises(SnapshotError):
+                    bind_preview_sidecar(bad_sidecar, raw, present_reasoning(raw))
+            with self.assertRaises(SnapshotError):
+                bind_preview_sidecar(sidecar, raw + b'\n', present_reasoning(raw + b'\n'))
+        with self.assertRaises(SnapshotError):
+            bind_preview_sidecar(originals[0][1], originals[1][0], present_reasoning(originals[1][0]))
+        for (p, s), (raw, sidecar) in zip(pairs, originals):
+            self.assertEqual(p.read_bytes(), raw)
+            self.assertEqual(s.read_bytes(), sidecar)
