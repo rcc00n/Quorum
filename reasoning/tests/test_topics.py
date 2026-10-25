@@ -14,7 +14,7 @@ PHRASE = "climate policy and carbon tax"
 
 @pytest.fixture
 def no_route(monkeypatch):
-    for var in ("MODEL_BASE_URL", "MODEL_API_KEY", "METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN"):
+    for var in ("MODEL_BASE_URL", "MODEL_API_KEY", "METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN", "METERLESS_TOKEN"):  # alias since f175c44
         monkeypatch.setenv(var, "")
     monkeypatch.delenv("QUORUM_DRY_RUN", raising=False)
 
@@ -53,13 +53,14 @@ def test_valid_slugs(slug):
 
 
 @pytest.mark.parametrize("slug", ["climate", "Climate-Policy-x", "a-b-c-d-e", "climate_policy", "climate--policy", "-x-y", "", "клімат-політика"])
-def test_invalid_slugs_are_rejected(slug):
+def test_invalid_slugs_are_rebuilt_by_code(slug):
+    """A bad slug never discards the model's terms: the slug is rebuilt from the name (decision in validate)."""
     row, why = topics.validate(_reply(slug=slug))
-    # "Climate-Policy-x" lowercases to a valid slug; every other one is invalid
+    assert row is not None and why == "" and topics.SLUG_RE.match(row["slug"]) and row["terms"]
     if slug == "Climate-Policy-x":
-        assert row is not None and row["slug"] == "climate-policy-x"
+        assert row["slug"] == "climate-policy-x" and "rebuilt" not in row["notes"]  # lowercases to a valid slug, kept as given
     else:
-        assert row is None and "slug" in why
+        assert "slug rebuilt by code" in row["notes"]
 
 
 def test_term_filtering_rules():
@@ -143,7 +144,6 @@ def test_fallback_on_raising_json_task(monkeypatch, exc):
     [
         (None, "not a JSON object"),
         (["x"], "not a JSON object"),
-        (_reply(slug="Climate Policy"), "slug"),
         (_reply(name="  "), "name"),
         (_reply(terms=["the", "tax", "US"]), "no usable terms"),
         (_reply(terms="carbon tax"), "no usable terms"),
@@ -219,3 +219,13 @@ def test_prompt_carries_injection_paragraph():
     last = lambda name: (prompts / name).read_text(encoding="utf-8").strip().splitlines()[-1]  # noqa: E731
     assert last("topic_terms.md") == last("stance.md")
     assert "EPA" in (prompts / "topic_terms.md").read_text(encoding="utf-8")
+
+
+def test_a_bad_model_slug_keeps_the_terms_and_rebuilds_the_slug():
+    from quorum_reasoning import topics
+
+    row, why = topics.validate({"slug": "federal-budget-government-shutdown-appropriations", "name": "Federal Budget and Shutdown",
+                                "terms": ["government shutdown", "appropriations", "continuing resolution", "debt ceiling"], "notes": "n"})
+    assert why == "" and row is not None
+    assert topics.SLUG_RE.match(row["slug"]) and row["slug"].startswith("federal-budget")
+    assert "government shutdown" in row["terms"] and "slug rebuilt by code" in row["notes"]

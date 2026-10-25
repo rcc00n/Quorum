@@ -58,8 +58,11 @@ def live_mode_problem() -> str | None:
     llm._env()  # .env may set QUORUM_DRY_RUN; read it before judging (review finding, 2026-10-24)
     if os.getenv("QUORUM_DRY_RUN") == "1":
         return "--model live together with QUORUM_DRY_RUN=1 (shell or .env); unset the variable or drop --model live"
+    problem = llm.route_problem()
+    if problem:
+        return f"--model live with a {problem}"
     if not llm.route_configured():
-        return "--model live but no model route is configured (MODEL_BASE_URL and MODEL_API_KEY, or METERLESS_BASE_URL and METERLESS_RUNTIME_TOKEN, in .env)"
+        return "--model live but no model route is configured (MODEL_BASE_URL and MODEL_API_KEY, or METERLESS_RUNTIME_TOKEN / its alias METERLESS_TOKEN with METERLESS_BASE_URL, which defaults to http://127.0.0.1:8088/v1 when blank, in .env)"
     return None
 
 
@@ -133,6 +136,9 @@ def main(argv: list[str] | None = None) -> int:
                 for lane in ("default", "fact_checker"):
                     r = llm.test_connection(lane)
                     print(f"{r['lane']:<13} route {r['route']}  answered by {r['answered_by'] or '?'}  reply: {r['reply']!r}")
+                    if "receipt_id" in r:  # the Meterless route: the pin the runtime accepted and the receipt to check it by
+                        verdict = f"SUBSTITUTED by {r['substituted']}" if r.get("substituted") else "lane held"
+                        print(f"{'':<13} provider_model {r['provider_model'] or '?'}  routed_model {r['routed_model'] or '?'}  receipt_id {r['receipt_id'] or '?'}  hmem injected {r['hmem_injected']}  {verdict}")
         except Exception as exc:  # noqa: BLE001 — a CLI check reports, it does not trace
             print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
             return 2
@@ -199,7 +205,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"corpus: {state['corpus']}; model: {'stand-ins' if llm.is_dry_run(state['dry_run']) else llm.model_name()}; fact-checker: {prov['fact_checker_model']}")
         if prov["model_calls"]:
             answered = ", ".join(f"{m} ×{n}" for m, n in prov["answered_by"].items())
-            print(f"model calls: {prov['model_calls']} ({prov['model_errors']} failed); answered by: {answered}")
+            extra = "".join(
+                f", {n} {label}" for n, label in ((llm.substitution_count(), "lane substituted"), (llm.lane_unverified_count(), "lane unverified")) if n
+            )
+            print(f"model calls: {prov['model_calls']} ({prov['model_errors']} failed{extra}); answered by: {answered}")
         print(f"status: {snapshot['status']}; stories: {len(snapshot['stories'])}; roundup: {snapshot['roundup']['count']}; errors: {len(snapshot['errors'])}")
         print(f"summary ({snapshot['summary_source']}): {snapshot['summary']}")
         print(f"snapshot: {out} (version {version}, published_at {snapshot['published_at']}, sha256 {store.sha256_of(out)})")
