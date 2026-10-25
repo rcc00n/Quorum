@@ -21,15 +21,24 @@ def status_label(e: Event, claims: list[Claim], docs: list[DocRef]) -> str:
     single source (plus "reported, not confirmed" for escalated events). Review 2026-10-23 (D1, D2):
     a disputed claim must show as disputed, and an event covered by one independence group is a
     single source even when no claim gathered evidence (a scoop's own text is not evidence). A wire
-    reprint counts in the wire's group here too (same rule as research.evidence_from)."""
+    reprint counts in the wire's group here too (same rule as research.evidence_from).
+
+    Order: needs_review → "Statements only" (every claim is a statement) → "Disputed" (any disputed
+    claim, statements included) → "Confirmed" (any confirmed non-statement claim) → "Single source" → "Unverified".
+    An event with a disputed claim therefore shows "Disputed" even when another of its claims is confirmed."""
     if e["needs_review"]:
         return "Reported, not confirmed"
     if claims and all(c["kind"] == "statement" for c in claims):
         return "Statements only"  # confirmed that the words were said is still only statements (review finding, 2026-10-24)
-    if any(c["final_status"] == "confirmed" and c["kind"] != "statement" for c in claims):
-        return "Confirmed"
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): "Disputed" is tested before "Confirmed". Why: the docstring
+    # (review 2026-10-23, D1) says a disputed claim must show as disputed, but "Confirmed" came first, so on snapshot
+    # v5 (D5 check, 2026-10-25) events d2b63868e7ce and b039413e13cd read "Confirmed" while holding disputed claims.
+    # A disputed statement counts too (DECISIONS: "unverified" means no confirmed or disputed claim); an event made only
+    # of statements is still "Statements only" above.
     if any(c["final_status"] == "disputed" for c in claims):
         return "Disputed"
+    if any(c["final_status"] == "confirmed" and c["kind"] != "statement" for c in claims):
+        return "Confirmed"
     groups = {(d.get("wire_origin") or "").strip().lower() or d["independence_group"] for d in docs}
     if len(groups) == 1 or any(len(independent_support(c["evidence"])) == 1 for c in claims):
         return "Single source"

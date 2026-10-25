@@ -49,12 +49,16 @@ def _event(eid: str) -> Event:
                  article=[], drafts=0, versions=[], critic_status=None, critic_notes="", framing={}, review_reason="")
 
 
-def _score(monkeypatch, answer):
+def _run(monkeypatch, answer):
     monkeypatch.setattr(llm, "json_task", lambda task, payload, **kw: answer)
     st = initial_state("t", TOPIC, DAY, dry_run=True)
     st["documents"] = [_doc(1)]
     st["events"] = [_event("e1")]
-    out = score.run(st)
+    return score.run(st)
+
+
+def _score(monkeypatch, answer):
+    out = _run(monkeypatch, answer)
     assert not out["errors"]
     return out["events"][0]["rubric"], out["steps"][0]
 
@@ -74,13 +78,17 @@ def test_new_shape(monkeypatch):
 
 
 def test_old_numeric_shape_is_ignored(monkeypatch):
-    r, _ = _score(monkeypatch, {
+    out = _run(monkeypatch, {
         "legal_force": 2, "reach": 2, "irreversibility": 2,
         "rationale": {"legal_force": "a law", "reach": "national", "irreversibility": "signed"},
     })
+    r = out["events"][0]["rubric"]
     assert (r["legal_force"], r["reach"], r["irreversibility"]) == (0, 2, 0)
     assert r["rationale"]["legal_force"] == "fact not reported: a law"
     assert r["rationale"]["irreversibility"] == "fact not reported: signed"
+    # neither fact field: the reply is unusable and recorded as an error (decision at score.unusable_reason)
+    assert [(e["node"], e["event_id"], e["message"]) for e in out["errors"]] == [
+        ("score_importance", "e1", "rubric reply unusable: no legal_status or act_state field")]
 
 
 def test_facts_win_over_numbers_sent_alongside(monkeypatch):
@@ -90,9 +98,54 @@ def test_facts_win_over_numbers_sent_alongside(monkeypatch):
 
 
 def test_missing_facts_score_zero(monkeypatch):
-    r, _ = _score(monkeypatch, {"reach": 2})
+    out = _run(monkeypatch, {"reach": 2})
+    r = out["events"][0]["rubric"]
     assert (r["legal_force"], r["reach"], r["irreversibility"]) == (0, 2, 0)
     assert r["rationale"] == {"legal_force": "fact not reported", "reach": "", "irreversibility": "fact not reported"}
+    assert [e["message"] for e in out["errors"]] == ["rubric reply unusable: no legal_status or act_state field"]
+
+
+# --- unusable rubric replies (D5 of snapshot v5, 2026-10-25: b80e3c63fb60 read "fact not reported", no error) ------
+
+@pytest.mark.parametrize("reply, reason", [
+    ({}, "no legal_status or act_state field"),
+    ({"legal_force": "No binding legal instrument"}, "no legal_status or act_state field"),  # what a broken reply's last object looks like
+    ("{\"legal_status\": \"none\", \"act_state\"", "not a JSON object (str)"),
+    (["none", "announced_or_threatened"], "not a JSON object (list)"),
+    (None, "not a JSON object (NoneType)"),
+], ids=["empty", "rationale-only", "string", "list", "none"])
+def test_an_unusable_reply_is_an_error_and_scores_zero(monkeypatch, reply, reason):
+    out = _run(monkeypatch, reply)
+    r = out["events"][0]["rubric"]
+    assert (r["legal_force"], r["reach"], r["irreversibility"], r["confirmation"]) == (0, 0, 0, 0)
+    assert [(e["node"], e["event_id"], e["message"]) for e in out["errors"]] == [("score_importance", "e1", f"rubric reply unusable: {reason}")]
+    assert out["steps"][0]["decision"].endswith(f"rubric reply unusable: {reason}")
+
+
+def test_an_unrecognised_fact_value_is_not_an_error(monkeypatch):
+    out = _run(monkeypatch, {"legal_status": "adopted", "act_state": "announced_or_threatened", "reach": 1})
+    assert not out["errors"]
+    r = out["events"][0]["rubric"]
+    assert (r["legal_force"], r["reach"], r["irreversibility"]) == (0, 1, 0)
+    assert r["rationale"]["legal_force"] == "fact not reported"
+
+
+def test_an_unusable_reply_makes_the_run_partial(monkeypatch):
+    from quorum_reasoning import graph
+
+    real = llm.json_task
+    seen: list[str] = []
+
+    def json_task(task, payload, **kw):
+        if task == "rubric" and not seen:
+            seen.append(payload["headline"])
+            return {"rationale": {"legal_force": "cut off"}}  # the last object of a truncated reply
+        return real(task, payload, **kw)
+
+    monkeypatch.setattr(llm, "json_task", json_task)
+    st = graph.run_local(TOPIC, DAY, dry_run=True)
+    assert seen and st["snapshot"]["status"] == "partial"
+    assert [e["message"] for e in st["snapshot"]["errors"]] == ["rubric reply unusable: no legal_status or act_state field"]
 
 
 def test_threatened_not_adopted_stays_below_the_bar_even_with_numeric_ones(monkeypatch):

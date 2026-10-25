@@ -6,7 +6,8 @@ applies the bar and the cap (rules/impact_bar.py). The three pre-evidence points
 what the model reported before any evidence was gathered. The model's answer is untrusted: a `reach` that is not
 an integer counts as 0 (build_rubric clamps the ranges), a missing or unknown fact counts as 0, numeric legal_force /
 irreversibility in an old-shape answer are ignored, and a failed call scores the event 0 and records the
-error — the fail-safe direction is below the bar, never above it.
+error — the fail-safe direction is below the bar, never above it. A reply that is not a JSON object, or carries
+neither fact field, is unusable: scored as before and recorded as an error (decision at unusable_reason).
 """
 
 from __future__ import annotations
@@ -49,6 +50,26 @@ def _fact(ans: dict[str, Any], field: str, allowed: dict[str, int], *why_keys: s
     return (allowed[fact] if fact else 0), (f"{head}: {why}" if why else head)
 
 
+FACT_FIELDS = ("legal_status", "act_state")
+
+
+def unusable_reason(ans: Any) -> str | None:
+    """Why a rubric reply cannot be scored at all, or None when it can (a reply with a fact field present but an
+    unrecognised value is usable: that fact scores 0 as "fact not reported", without an error).
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a reply that is not a JSON object, or has neither
+    `legal_status` nor `act_state`, is recorded as a StepError ("rubric reply unusable: <reason>") so the run reads
+    `partial`; the score is what it was before (0 for both facts). Why: on snapshot v5 (D5 check, 2026-10-25) event
+    b80e3c63fb60's rubric reply was malformed JSON and was recorded as "fact not reported", score 0, no error, and the
+    run stayed `ok`: a judged 0 and a lost answer looked the same. Owner's decision (Yelysei, 2026-10-25).
+    """
+    if not isinstance(ans, dict):
+        return f"not a JSON object ({type(ans).__name__})"
+    if not any(k in ans for k in FACT_FIELDS):
+        return "no legal_status or act_state field"
+    return None
+
+
 def _rubric(ans: dict[str, Any]) -> Rubric:
     # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): legal_force and irreversibility come from the reported facts
     # only; numeric legal_force / irreversibility in the answer are ignored. Why: a free point contradicted its own
@@ -84,14 +105,18 @@ def run(state: RunState) -> dict:
                     },
                     dry_run=state["dry_run"],
                 )
-                e["rubric"] = _rubric(ans)
+                unusable = unusable_reason(ans)
+                e["rubric"] = _rubric(ans) if isinstance(ans, dict) else build_rubric(0, 0, 0, 0, {})
                 r = e["rubric"]
                 s.decision = f"legal_force {r['legal_force']}, reach {r['reach']}, irreversibility {r['irreversibility']} (confirmation pending)"
                 s.reason = "; ".join(f"{k}: {v}" for k, v in r["rationale"].items())
+                if unusable:
+                    errors.append(StepError(node="score_importance", event_id=e["id"], message=f"rubric reply unusable: {unusable}"))
+                    s.decision += f"; rubric reply unusable: {unusable}"
             except Exception as exc:  # noqa: BLE001 — a failed score is 0 points, below the bar, never above it
                 errors.append(StepError(node="score_importance", event_id=e["id"], message=str(exc)[:300]))
                 e["rubric"] = build_rubric(0, 0, 0, 0, {})
                 s.decision = "failed; scored 0 on all judged points"
-                s.reason = str(exc)[:200]
+                s.reason = untrusted.public_failure(exc)
         steps.append(finish(state, s))
     return {"events": events, "steps": steps, "errors": errors}

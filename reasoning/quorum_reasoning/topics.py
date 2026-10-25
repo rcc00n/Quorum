@@ -171,16 +171,24 @@ def validate(reply: Any) -> tuple[dict[str, Any] | None, str]:
     """(row, "") for a usable model reply, (None, why) otherwise."""
     if not isinstance(reply, dict):
         return None, "reply is not a JSON object"
-    slug = _clean(reply.get("slug")).lower()
-    if not SLUG_RE.match(slug):
-        return None, f"invalid slug {slug[:60]!r}"
     name = _clean(reply.get("name"))[:NAME_MAX_CHARS]
     if not name:
         return None, "empty name"
+    slug = _clean(reply.get("slug")).lower()
+    slug_note = ""
+    if not SLUG_RE.match(slug):
+        # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a bad slug never discards the model's terms; the slug is
+        # rebuilt by code from the name (the same rule the fallback uses). Why: the first live use rejected three of
+        # four replies for five-word slugs and fell back to naive terms ("federals", "chinas") although the terms were good.
+        slug_note = f"slug rebuilt by code (model gave {slug[:60]!r})"
+        slug = slug_for(name) if SLUG_RE.match(slug_for(name)) else slug_for(_clean(reply.get("slug")) or name)
+        if not SLUG_RE.match(slug):
+            return None, f"invalid slug {slug[:60]!r}"
     terms, dropped = clean_terms(reply.get("terms"))
     if not terms:
         return None, "no usable terms"
-    row = {"slug": slug, "name": name, "terms": terms, "notes": _clean(reply.get("notes"))[:300]}
+    notes = _clean(reply.get("notes"))[:300]
+    row = {"slug": slug, "name": name, "terms": terms, "notes": (notes + ("; " if notes and slug_note else "") + slug_note)[:400]}
     if dropped:
         row["dropped"] = dropped
     return row, ""

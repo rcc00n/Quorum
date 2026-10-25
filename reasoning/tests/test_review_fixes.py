@@ -210,6 +210,19 @@ def test_roundup_statements_only_beats_confirmed():
     assert roundup.status_label(e, [claim("c1", "ev1", kind="statement", status="confirmed")], [doc(1, "cnn")]) == "Statements only"
 
 
+def test_roundup_disputed_statement_makes_the_event_disputed():
+    # 2026-10-25 (D5 of snapshot v5): Disputed is tested before Confirmed and counts a disputed statement too
+    e = event("ev1", [1, 2])
+    e["needs_review"] = False
+    claims = [claim("c1", "ev1", kind="statement", status="disputed"), claim("c2", "ev1", kind="fact", status="unverified")]
+    assert roundup.status_label(e, claims, [doc(1, "cnn"), doc(2, "bbc")]) == "Disputed"
+    claims.append(claim("c3", "ev1", kind="fact", status="confirmed"))
+    assert roundup.status_label(e, claims, [doc(1, "cnn"), doc(2, "bbc")]) == "Disputed"
+    # statements only still comes first, even when one of them is disputed
+    only = [claim("c1", "ev1", kind="statement", status="disputed")]
+    assert roundup.status_label(e, only, [doc(1, "cnn")]) == "Statements only"
+
+
 # unverified — hash_mismatch is unknowable when a level-1 page fell back to headline and lead
 def test_hash_mismatch_is_null_on_a_lead_fallback():
     from quorum_reasoning.tools.fetch_text import FetchResult

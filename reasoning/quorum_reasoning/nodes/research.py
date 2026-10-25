@@ -127,26 +127,28 @@ def topic_frequent(state: RunState) -> tuple[set[str], int]:
     return (frequent_stems(texts) if len(texts) >= STANCE_FREQUENT_MIN_DOCS else set()), len(texts)
 
 
-def contradiction_coverage(span: object) -> float:
-    """The fact-composition share a `contradicts` needs: research.stance_contradiction_coverage for a clause,
-    research.stance_contradiction_coverage_short for a short number/date/negation span (untrusted.is_short_span)."""
-    key = "stance_contradiction_coverage_short" if untrusted.is_short_span(span) else "stance_contradiction_coverage"
+def stance_coverage(span: object) -> float:
+    """The fact-composition share a `contradicts` or `supports` needs: research.stance_coverage for a clause,
+    research.stance_coverage_short for a short span (untrusted.is_short_span; a short span reaching here already
+    carries a number, date or negation or shares 2 composition stems: untrusted.span_contradicts_claim,
+    untrusted.span_supports_claim)."""
+    key = "stance_coverage_short" if untrusted.is_short_span(span) else "stance_coverage"
     return float(config.get("research", key, 0.0) or 0.0)
 
 
 def judged_stance(ans: object, claim_text: str, passage: str, frequent: set[str], *, live: bool, context: tuple[str, str] = ("", "")) -> tuple[str, str | None]:
-    """The stance after the post-call guards and, when downgraded, why: "ungrounded" or "support ungrounded" (untrusted.checked_stance) or
-    "off-fact" (untrusted.off_fact over the passage and its context window: the fact composition is not covered, or
-    another stated day). `live` is False when the dry-run stand-in answered (llm.is_dry_run): it writes no span, and
-    its contradictions stay."""
+    """The stance after the post-call guards and, when downgraded, why: "ungrounded" or "support ungrounded"
+    (untrusted.checked_stance), or "off-fact" / "support off-fact" (untrusted.off_fact over the passage and its
+    context window: the fact composition is not covered, or another stated day). `live` is False when the dry-run
+    stand-in answered (llm.is_dry_run): it writes no span, and its contradictions and supports stay."""
     asked_stance = untrusted.valid_stance(ans.get("stance") if isinstance(ans, dict) else None)
     stance, downgraded = untrusted.checked_stance(ans, passage, claim_text, require_span=live, frequent=frequent)
     if downgraded:
         return "neutral", ("support ungrounded" if asked_stance == "supports" else "ungrounded")
-    if stance == "contradicts" and live:
-        span = ans.get("contradicted_span") if isinstance(ans, dict) else None
-        if untrusted.off_fact(claim_text, passage, span, frequent, contradiction_coverage(span), " ".join(clipped_context(*context))):
-            return "neutral", "off-fact"
+    if stance in ("contradicts", "supports") and live:
+        span = ans.get("contradicted_span" if stance == "contradicts" else "supporting_span") if isinstance(ans, dict) else None
+        if untrusted.off_fact(claim_text, passage, span, frequent, stance_coverage(span), " ".join(clipped_context(*context)), stance=stance):
+            return "neutral", ("off-fact" if stance == "contradicts" else "support off-fact")
     return stance, None
 
 
@@ -161,13 +163,14 @@ def excluded_note(frequent: set[str], n_docs: int, claim_texts: list[str] | tupl
     return f"; topic-frequent stems excluded from fact compositions: {', '.join(sorted(frequent))}" + (f"; {kept} claims kept their full stem set" if kept else "")
 
 
-def relevance_note(irrelevant: int, ungrounded: int, off_fact: int = 0, supports_ungrounded: int = 0) -> str:
+def relevance_note(irrelevant: int, ungrounded: int, off_fact: int = 0, supports_ungrounded: int = 0, supports_off_fact: int = 0) -> str:
     """The step-decision suffix counting the relevance guards; empty when none fired."""
     parts = (
         ([f"{irrelevant} passages below relevance"] if irrelevant else [])
         + ([f"{ungrounded} contradictions ungrounded"] if ungrounded else [])
         + ([f"{off_fact} contradictions off-fact"] if off_fact else [])
         + ([f"{supports_ungrounded} supports ungrounded"] if supports_ungrounded else [])
+        + ([f"{supports_off_fact} supports off-fact"] if supports_off_fact else [])
     )
     return f"; {', '.join(parts)}" if parts else ""
 
@@ -253,10 +256,11 @@ def run(state: RunState) -> dict:
         targets = event_claims if round_no == 1 else [c for c in event_claims if is_thin(c["evidence"], origin_group(c, by_id))]
         with step(state, "research", event_id=e["id"], model=llm.model_name()) as s:
             found = 0
+            failed_public: list[str] = []
             failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at stance_question)
             repeats = 0
-            irrelevant = ungrounded = off_fact = supports_ungrounded = 0  # the relevance guards (decisions at relevant, untrusted.checked_stance, untrusted.off_fact)
+            irrelevant = ungrounded = off_fact = supports_ungrounded = supports_off_fact = 0  # the relevance guards (decisions at relevant, untrusted.checked_stance, untrusted.off_fact)
             frequent, n_docs = topic_frequent(state)
             live = not llm.is_dry_run(state["dry_run"])  # the stand-in answers whenever llm.is_dry_run
             for c in targets:
@@ -284,19 +288,21 @@ def run(state: RunState) -> dict:
                             )
                         except Exception as exc:  # noqa: BLE001
                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
+                            failed_public.append(untrusted.public_failure(exc))
                             continue  # a failed question is not remembered: a repeat of it is asked again
                         stance, why = judged_stance(ans, c["text"], passage, frequent, live=live, context=(before, after))
                         ungrounded += why == "ungrounded"
                         off_fact += why == "off-fact"
                         supports_ungrounded += why == "support ungrounded"
+                        supports_off_fact += why == "support off-fact"
                         asked[question] = stance
                     if stance == "neutral":
                         continue
                     c["evidence"] = c["evidence"] + [evidence_from(d, passage, stance, "researcher", fetched)]
                     found += 1
-            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact, supports_ungrounded)
+            s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact, supports_ungrounded, supports_off_fact)
             earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
-            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + excluded_note(frequent, n_docs, [c["text"] for c in targets]) + (f"; failures: {failed[0]}" if failed else "")
+            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + excluded_note(frequent, n_docs, [c["text"] for c in targets]) + ("; " + failed_public[0] if failed else "")
             if failed:
                 errors.append(StepError(node="research", event_id=e["id"], message=f"round {round_no}: {len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
             rounds[e["id"]] = round_no

@@ -139,7 +139,9 @@ def test_roundup_label_follows_the_verifier_verdict(run_through):
     assert not e["above_bar"]
     claims = [c for c in st["claims"].values() if c["event_id"] == "gated"]
     docs = [d for d in st["documents"] if d["id"] in e["document_ids"]]
-    assert roundup.status_label(e, claims, docs) == "Confirmed"
+    # a disputed claim shows "Disputed" even next to a confirmed one (order fixed 2026-10-25, D5 of snapshot v5)
+    assert roundup.status_label(e, claims, docs) == "Disputed"
+    assert roundup.status_label(e, [c for c in claims if c["id"] != "g2"], docs) == "Confirmed"
     only_disputed = [c for c in claims if c["id"] == "g2"]
     assert roundup.status_label(e, only_disputed, docs) == "Disputed"
 

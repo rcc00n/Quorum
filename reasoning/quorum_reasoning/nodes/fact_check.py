@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from .. import llm
+from .. import llm, untrusted
 from ..rules.confirmation import origin_group, verdict
 from ..rules.impact_bar import POINT_RANGES, cannot_reach_bar, judged_points, threshold
 from ..state import RunState, StepError
@@ -52,6 +52,7 @@ def run(state: RunState) -> dict:
         with step(state, "fact_check", event_id=e["id"], model=llm.model_name("fact_checker")) as s:
             counts: Counter[str] = Counter()
             found = 0
+            failed_public: list[str] = []
             failed: list[str] = []
             # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): a failed stance call skips that one passage and the
             # loop goes on; the claim's verdict comes from the passages that were judged, and the event's trace row and
@@ -61,7 +62,7 @@ def run(state: RunState) -> dict:
             judged_calls = 0
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at research.stance_question)
             repeats = 0
-            irrelevant = ungrounded = off_fact = supports_ungrounded = 0  # the relevance guards (decisions at research.relevant, untrusted.checked_stance, untrusted.off_fact)
+            irrelevant = ungrounded = off_fact = supports_ungrounded = supports_off_fact = 0  # the relevance guards (decisions at research.relevant, untrusted.checked_stance, untrusted.off_fact)
             frequent, n_docs = topic_frequent(state)
             live = not llm.is_dry_run(state["dry_run"])
             for c in event_claims:
@@ -95,12 +96,14 @@ def run(state: RunState) -> dict:
                             )
                         except Exception as exc:  # noqa: BLE001 — one passage lost, the claim and the event go on
                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
+                            failed_public.append(untrusted.public_failure(exc))
                             continue  # a failed question is not remembered: a repeat of it is asked again
                         judged_calls += 1
                         stance, why = judged_stance(ans, c["text"], passage, frequent, live=live, context=(before, after))
                         ungrounded += why == "ungrounded"
                         off_fact += why == "off-fact"
                         supports_ungrounded += why == "support ungrounded"
+                        supports_off_fact += why == "support off-fact"
                         asked[question] = stance
                     if stance == "neutral":
                         continue
@@ -114,8 +117,8 @@ def run(state: RunState) -> dict:
                 c["fact_checker_reason"] = reason + (f" ({lost} stance call(s) failed for this claim)" if lost else "")
                 c["fact_checker_judged"] = judged  # 0 with failures = unavailable, not a verdict (adjudicate reads it)
                 counts[status] += 1
-            s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact, supports_ungrounded)
-            s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + excluded_note(frequent, n_docs, [c["text"] for c in event_claims]) + (f"; failures: {failed[0]}" if failed else "")
+            s.decision = f"{counts['confirmed']} confirmed, {counts['disputed']} disputed, {counts['unverified']} unverified from {found} own passages" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact, supports_ungrounded, supports_off_fact)
+            s.reason = "blind: own passages and own stance calls, nothing from the researcher or the verifier" + excluded_note(frequent, n_docs, [c["text"] for c in event_claims]) + ("; " + failed_public[0] if failed else "")
             if failed:
                 errors.append(StepError(node="fact_check", event_id=e["id"], message=f"{len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
         steps.append(finish(state, s))

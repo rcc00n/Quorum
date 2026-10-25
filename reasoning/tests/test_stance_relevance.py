@@ -349,7 +349,7 @@ def test_an_off_fact_contradiction_becomes_neutral_and_is_counted(live_path, mon
     passage = "The Kyiv mayor said the night bus service did not resume."
     json_task, _ = stub({"stance": "contradicts", "reason": "x", "contradicted_span": "the night bus service did not resume"})
     monkeypatch.setattr(llm, "json_task", json_task)
-    monkeypatch.setattr(config, "get", lambda section, key, default=None: {"stance_min_overlap": 0.0, "stance_contradiction_coverage": 0.4}.get(key, default) if section == "research" else default)
+    monkeypatch.setattr(config, "get", lambda section, key, default=None: {"stance_min_overlap": 0.0, "stance_coverage": 0.4}.get(key, default) if section == "research" else default)
     out = node.run(_state([doc(1, "origin", ON_TOPIC), doc(2, "reuters", passage)]))
     assert out["claims"]["c1"]["evidence"] == []
     assert "; 1 contradictions off-fact" in out["steps"][0]["decision"]
@@ -357,7 +357,7 @@ def test_an_off_fact_contradiction_becomes_neutral_and_is_counted(live_path, mon
 
 
 def test_coverage_threshold_is_configured():
-    assert config.get("research", "stance_contradiction_coverage") == 0.4
+    assert config.get("research", "stance_coverage") == 0.4
 
 
 def test_excluded_stems_are_named_in_the_reason(live_path, monkeypatch):
@@ -416,9 +416,9 @@ def test_coverage_uses_the_context_window():
 
 
 def test_short_and_clause_thresholds(monkeypatch):
-    assert config.get("research", "stance_contradiction_coverage_short") == 0.25
-    assert research.contradiction_coverage("5 were killed") == 0.25
-    assert research.contradiction_coverage("officials said that five people were killed") == 0.4
+    assert config.get("research", "stance_coverage_short") == 0.25
+    assert research.stance_coverage("5 were killed") == 0.25
+    assert research.stance_coverage("officials said that five people were killed") == 0.4
     assert untrusted.is_short_span("did not sign") and not untrusted.is_short_span("the minister did not sign it")
 
 
@@ -524,7 +524,7 @@ def test_full_stem_note_in_the_step_reason(live_path, monkeypatch):
 
 @pytest.mark.parametrize("span, kept", [
     ("Russian drones struck the Kyiv power station", True),
-    ("struck", True),  # no length minimum for supports
+    ("struck", False),  # one composition stem (2026-10-25: 2 composition stems whatever the length)
     ("Russian  DRONES struck", True),
     (None, False),
     ("", False),
@@ -582,3 +582,123 @@ def test_bare_longer_is_not_a_negation_marker():
     from quorum_reasoning import untrusted
 
     assert "longer" not in untrusted.SPAN_NEGATIONS and "no" in untrusted.SPAN_NEGATIONS
+
+
+# --- supports under the fact-composition rule (D5 of snapshot v5, owner's decision 2026-10-25) ---------------------
+
+@pytest.mark.parametrize("span, claim, kept", [
+    ("drones struck", CLAIM, True),  # 2 composition stems, short
+    ("struck", CLAIM, False),  # 1 stem, short
+    ("officials said the station was hit", CLAIM, False),  # a 5+ word clause sharing 1 stem no longer passes (2026-10-25)
+    ("officials said it was hit", CLAIM, False),  # 5+ words, no composition stem
+    ("the station", CLAIM, False),  # short, 1 stem
+    ("officials said Russian drones hit the station", CLAIM, True),  # clause, 3 stems
+], ids=["short-two-stems", "short-one-stem", "clause-one-stem", "clause-no-stem", "short-one-stem-2", "clause-three-stems"])
+def test_supporting_span_needs_two_stems(span, claim, kept):
+    assert untrusted.span_supports_claim(span, claim) is kept
+
+
+def test_support_threshold_is_named():
+    assert untrusted.SUPPORT_SPAN_STEMS_MIN == 2
+
+
+def test_a_support_off_the_fact_becomes_neutral():
+    # the span is grounded and shares 2 composition stems (kyiv, station), but passage + context cover 2 of 8 (< 0.4)
+    passage = "The Kyiv station manager said tickets would be refunded next week."
+    ans = {"stance": "supports", "supporting_span": "The Kyiv station manager said tickets would be refunded"}
+    assert untrusted.checked_stance(ans, passage, CLAIM) == ("supports", False)
+    assert research.judged_stance(ans, CLAIM, passage, set(), live=True) == ("neutral", "support off-fact")
+    # the same span with a context window that names the drones, the strike and the power station stays
+    ctx = ("Russian drones struck a power station overnight.", "The strike came on Tuesday night.")
+    assert research.judged_stance(ans, CLAIM, passage, set(), live=True, context=ctx) == ("supports", None)
+
+
+def test_support_uses_the_short_bar_for_a_short_span(monkeypatch):
+    # 9 composition stems; passage + context cover 3 (kharkiv, market, kill): 0.33, between 0.25 and 0.4
+    claim = "Russian drones killed 31 civilians in the Kharkiv market strike on Tuesday night"
+    passage = "In Kharkiv, people were killed at the market, said officials, who gave no other details at all."
+    ctx = ("Officials gave a briefing.", "More details later.")
+    short = {"stance": "supports", "supporting_span": "killed at the market"}  # 4 words, 2 stems
+    clause = {"stance": "supports", "supporting_span": "people were killed at the market"}
+    assert research.judged_stance(short, claim, passage, set(), live=True, context=ctx) == ("supports", None)
+    assert research.judged_stance(clause, claim, passage, set(), live=True, context=ctx) == ("neutral", "support off-fact")
+
+
+def test_support_two_stem_floor_and_full_stem_fallback():
+    claim = "Trump met Zelensky"
+    frequent = {"trump", "zelensky"}
+    assert text.fact_composition(claim, frequent) == text.stems(claim)  # fallback: full stem set
+    ans = {"stance": "supports", "supporting_span": "Trump met Zelensky"}
+    assert research.judged_stance(ans, claim, "Trump met Zelensky in Kyiv.", frequent, live=True) == ("supports", None)
+    # one of three stems in a short span: the span rule already rejects it
+    assert research.judged_stance({"stance": "supports", "supporting_span": "Trump"}, claim, "Trump spoke.", frequent, live=True) == ("neutral", "support ungrounded")
+
+
+def test_support_date_rule_has_no_short_span_exception():
+    claim = "The Kharkiv market strike on Tuesday killed 5"
+    passage = "Officials said the Kharkiv market strike on Monday killed 5."
+    sup = {"stance": "supports", "supporting_span": "market strike on Monday"}  # short, 2 composition stems, a date
+    con = {"stance": "contradicts", "contradicted_span": "market strike on Monday"}
+    assert research.judged_stance(con, claim, passage, set(), live=True) == ("contradicts", None)  # the date is the contradiction
+    assert research.judged_stance(sup, claim, passage, set(), live=True) == ("neutral", "support off-fact")
+    assert untrusted.off_fact(claim, passage, "market strike on Monday", set(), 0.25, stance="supports") == "different day"
+    assert untrusted.off_fact(claim, passage, "market strike on Monday", set(), 0.25) is None
+
+
+def test_dry_run_stand_in_support_is_exempt_from_the_fact_check():
+    off = "The Kyiv station manager said tickets would be refunded next week."
+    assert research.judged_stance({"stance": "supports"}, CLAIM, off, set(), live=False) == ("supports", None)
+
+
+@pytest.mark.parametrize("node", NODES)
+def test_an_off_fact_support_is_counted_separately(live_path, monkeypatch, node):
+    passage = "The Kyiv station manager said tickets would be refunded next week."
+    json_task, _ = stub({"stance": "supports", "reason": "x", "supporting_span": "The Kyiv station manager said tickets would be refunded"})
+    monkeypatch.setattr(llm, "json_task", json_task)
+    monkeypatch.setattr(research, "relevant", lambda claim, passage: True)
+    out = node.run(_state([doc(1, "origin", ON_TOPIC), doc(2, "reuters", passage)]))
+    assert out["claims"]["c1"]["evidence"] == []
+    decision = out["steps"][0]["decision"]
+    assert "; 1 supports off-fact" in decision
+    assert "supports ungrounded" not in decision and "contradictions off-fact" not in decision
+
+
+def test_relevance_note_names_supports_off_fact():
+    assert research.relevance_note(0, 0, 0, 1, 2) == "; 1 supports ungrounded, 2 supports off-fact"
+
+
+@pytest.mark.parametrize("claim, passage, span, ctx", [
+    # synthetic analogues of the D5 noise on snapshot v5 (2026-10-25); none may confirm its claim
+    ("Tucker Carlson has broken with Donald Trump largely over the war in Iran",
+     "Trump has been upset with Zelensky over Ukraine's attacks on Russian refineries.",
+     "Trump has been upset with Zelensky over Ukraine's attacks on Russian refineries", ("", "")),
+    ("French police reported looting of shops in Paris after the riots",
+     "Looters took goods from shops in Kyiv after the strike, residents said.",
+     "Looters took goods from shops in Kyiv", ("Russian missiles hit the city centre overnight.", "")),
+    ("AfD's 2025 election programme calls for lifting sanctions on Russia",
+     "Trump suspended sanctions against Russia and allowed it to sell more oil.",
+     "suspended sanctions against Russia and allowed it to sell more oil", ("", "")),
+    ("The color revolutions that destabilized nations abroad are now being organised at home",
+     "The president asked Musk, whose company operates Starshield, to restore the service.",
+     "The president asked Musk, whose company operates Starshield", ("", "")),
+], ids=["carlson-refinery", "looting-kyiv", "afd-trump", "color-revolutions-starshield"])
+def test_d5_style_noise_no_longer_supports(claim, passage, span, ctx):
+    ans = {"stance": "supports", "supporting_span": span}
+    stance, why = research.judged_stance(ans, claim, passage, {"trump", "russia", "ukraine", "president"}, live=True, context=ctx)
+    assert stance == "neutral" and why in ("support ungrounded", "support off-fact")
+
+
+def test_weak_words_are_not_stems():
+    for w in "just come came day days also new like make made take took get got way time year years week weeks month months today yesterday tomorrow back still people says said say told".split():
+        assert text.stems(w) == set(), w
+    assert "still" in untrusted.SPAN_NEGATIONS  # still a short-span marker for contradictions
+
+
+def test_midterms_shape_weak_stem_overlap_is_not_support():
+    # synthetic analogue of the attempt-6 row: the passage shares only weak words and "midterms" with the claim
+    claim = "The charges come just 10 days before the midterms."
+    passage = ("These include allowing Russia to export diesel to global markets, just days before the midterms, "
+               "a move critics called a gift to Moscow.")
+    ans = {"stance": "supports", "supporting_span": "allowing Russia to export diesel to global markets, just days before the midterms"}
+    assert text.fact_composition(claim, set()) == {"charg", "midterm"}
+    assert research.judged_stance(ans, claim, passage, set(), live=True) == ("neutral", "support ungrounded")
