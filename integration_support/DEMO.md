@@ -49,3 +49,17 @@ The current private master is a frame-indexed **222.0-second (3:42)** cut, not t
 No reliable natural offline voice was available. The captioned silent master and exact 441-word recording script are the permitted fallback; no audio-synchronization pass is claimed. Final human publication/rights/workspace review and genuine sponsor/execution evidence remain open. Originals, media and private packages remain outside Git; tooling/documentation commits remain local under the current no-publication instruction.
 
 Current official organizer rule 5.1 independently confirms Cursor is optional. Zetaris and Meterless remain required, as recorded canonically in `docs/RULES_CHECK.md`. The public event does not establish accepted workspace file formats/sizes. No source/media upload, merge, deployment or submission is performed by this workflow.
+
+
+## V4 handoff gate — 2026-10-25 UTC
+
+Do not replace the existing 3:42 master or adapt the v3-only recorder by loosening
+its original-hash checks. Closed-v4 originals, sidecar, D5 and corrective v3
+attestation have not arrived locally. Actual v4 story/claim/evidence/browser
+acceptance is BLOCKED. If the originals pass future strict acceptance, record a
+new private candidate in a new directory and retain the impact-review warning:
+producer 6 is unchanged; conditional/reversible irreversibility may imply total 5.
+A featured story is producer-selected, not independently impact-approved. The
+1674-call ledger is historical/replay-inclusive, not a new-attempt spend metric.
+Until then the recommended truthful demonstration remains the existing explicitly
+partial/provisional v3 workflow. No H-MEM owner-graph or Nightshift completion claim.

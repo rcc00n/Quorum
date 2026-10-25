@@ -89,7 +89,7 @@ python3 integration_support/rehearse.py --repo <checkout> \
   --destination <NEW-external-RC-path> --patch-profile web-owned --require-current
 ```
 
-Fetch first, then use this profile: it does not contact any service itself. Patches 0003/0006/0007/0008/0009 are applied; owner-dependent 0001/0002/0004/0005 remain provisional review artifacts. `--with-proposed-patches` retains the separately labelled all-provisional audit profile. Neither profile approves integration, production publishing, or sponsor completion.
+Fetch first, then use this profile: it does not contact any service itself. Patches 0003/0006/0007/0008/0009/0011 are applied; owner-dependent 0001/0002/0004/0005 remain provisional review artifacts. `--with-proposed-patches` now selects `privacy-review`; see the dated owner response below. Neither profile approves integration, production publishing, or sponsor completion.
 
 
 Release-candidate evidence and the timed private recording procedure are in [RELEASE_MATRIX.md](RELEASE_MATRIX.md) and [DEMO.md](DEMO.md). These supplement the canonical tracker/release checklist. The candidate applies five web-owned patches; full owner-patch tests and sponsor proposals remain separately labelled. Demo recordings, originals, captions, receipts and packaged releases remain outside Git.
