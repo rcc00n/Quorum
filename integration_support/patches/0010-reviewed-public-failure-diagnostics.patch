@@ -60,23 +60,16 @@ diff --git a/reasoning/quorum_reasoning/nodes/frame.py b/reasoning/quorum_reason
 index be488f2..e701358 100644
 --- a/reasoning/quorum_reasoning/nodes/frame.py
 +++ b/reasoning/quorum_reasoning/nodes/frame.py
-@@ -70,7 +70,7 @@ def run(state: RunState) -> dict:
-                             dry_run=state["dry_run"],
-                         )
+@@ -72,3 +72,3 @@ def run(state: RunState) -> dict:
                      except Exception as exc:  # noqa: BLE001 — one outlet unlabelled, the others keep their labels
 -                        failed.append(f"{d['source_name']}: {type(exc).__name__}")
 +                        failed.append(untrusted.public_failure(exc))
                          continue
-                     if not isinstance(ans, dict):
-                         failed.append(f"{d['source_name']}: no object")
-@@ -117,6 +117,6 @@ def run(state: RunState) -> dict:
-                 errors.append(StepError(node="frame", event_id=e["id"], message=str(exc)[:300]))
-                 e["framing"] = {"rating_mode": "average", "coverage": coverage(state["documents"], e["document_ids"]), "interpretations": [], "outlets": outlets}
+@@ -119,3 +119,3 @@ def run(state: RunState) -> dict:
                  s.decision = "failed; coverage counts only"
 -                s.reason = untrusted.PUBLIC_FAILURE
 +                s.reason = untrusted.public_failure(exc)
          steps.append(finish(state, s))
-     return {"events": events, "steps": steps, "errors": errors}
 diff --git a/reasoning/quorum_reasoning/nodes/publish.py b/reasoning/quorum_reasoning/nodes/publish.py
 index 0590f30..7d5af3b 100644
 --- a/reasoning/quorum_reasoning/nodes/publish.py

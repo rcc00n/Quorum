@@ -1,0 +1,93 @@
+diff --git a/reasoning/memory/README.md b/reasoning/memory/README.md
+index bbdd37c..761e8dc 100644
+--- a/reasoning/memory/README.md
++++ b/reasoning/memory/README.md
+@@ -15,3 +15,15 @@ Run `METERLESS_HOME=<existing-checkout> <reasoning-python> -m pytest reasoning/t
+ ## Decisions
+ 
+ 2026-10-24 · rcc00n / Codex · Propose local subprocess reference-memory hooks at frame/write and research-round2 retrieval; never import recalled evidence or change confirmation rules. Why: exercise the existing owner proposal with exact source provenance and bounded re-verification while preserving default-off/dry behavior and strict snapshot fields.
++
++### Owner objections — no adoption
++
++The default launcher proposal uses `node .../tsx/dist/cli.mjs` instead of the
++POSIX `.bin/tsx` shell shim. Linux reference tests and argv-with-spaces tests do
++not establish native Windows execution; Yelysei must verify that environment.
++The 20-second timeout still fails closed: inspect `quorum.lock`, `quorum.pending`
++and the reference ledger privately after a stopped child. Do not delete either
++marker or retry writes automatically. Recovery policy remains an owner decision.
++Recall relevance, whole-store promotion and the architecture's memory trace/error
++stage are unresolved; this patch does not approve a threshold or policy. The
++project-level adoption decision is deliberately absent and belongs to Yelysei.
+diff --git a/reasoning/quorum_reasoning/tools/memory.py b/reasoning/quorum_reasoning/tools/memory.py
+index e0ae746..8525cd0 100644
+--- a/reasoning/quorum_reasoning/tools/memory.py
++++ b/reasoning/quorum_reasoning/tools/memory.py
+@@ -4,6 +4,7 @@ import json
+ import os
+ import re
+ import subprocess
++import shutil
+ from datetime import datetime
+ from pathlib import Path
+ from .. import config, llm
+@@ -22,16 +23,29 @@ def identity(doc):
+                 **{k:doc.get(k) for k in ('source_id','url','published_at','content_hash','fetched_at','access_level','independence_group','wire_origin','kind','doc_type')})
+ 
+ 
++def _launcher(home):
++    # DECISION(2026-10-25, rcc00n/Codex): run TSX through Node, avoiding POSIX-only .bin shims.
++    # Why: subprocess argv works with spaces on Windows without shell interpretation.
++    override = os.getenv('QUORUM_HMEM_TSX')
++    if override:
++        return [override]  # existing explicit executable override; never invoke a shell
++    node = shutil.which('node')
++    cli = home / 'engines/hmem/reference/node_modules/tsx/dist/cli.mjs'
++    if not node or not cli.is_file():
++        raise ValueError('Installed Node and TSX CLI required')
++    return [node, str(cli)]
++
++
+ def _call(state, action, **payload):
+     repo=Path(__file__).resolve().parents[3]
+     directory=Path(os.environ['QUORUM_HMEM_DIR']).expanduser()
+     if not directory.is_absolute() or directory.resolve().is_relative_to(repo) or any((parent/'.git').exists() for parent in (directory.resolve(),*directory.resolve().parents)):
+         raise ValueError('Private memory must stay outside the repository')
+     home=Path(os.environ['METERLESS_HOME'])
+-    tsx=os.getenv('QUORUM_HMEM_TSX',str(home/'engines/hmem/reference/node_modules/.bin/tsx'))
++    launcher = _launcher(home)
+     data=json.dumps(dict(action=action,dry_run=state.get('dry_run',True),**payload))
+     if len(data.encode())>2*1024*1024:raise ValueError('Memory request too large')
+-    result=subprocess.run([tsx,str(repo/'reasoning/memory/sidecar.mjs')],input=data,text=True,capture_output=True,timeout=20,check=True)
++    result=subprocess.run(launcher + [str(repo/'reasoning/memory/sidecar.mjs')],input=data,text=True,capture_output=True,timeout=20,check=True)
+     if len(result.stdout.encode())>2*1024*1024:raise ValueError('Memory response too large')
+     return json.loads(result.stdout)
+ 
+diff --git a/reasoning/tests/test_memory_launcher.py b/reasoning/tests/test_memory_launcher.py
+new file mode 100644
+index 0000000..49042d0
+--- /dev/null
++++ b/reasoning/tests/test_memory_launcher.py
+@@ -0,0 +1,23 @@
++"""Launcher proposal only: no graph adoption or Windows execution claim."""
++from pathlib import Path
++from unittest.mock import patch
++import pytest
++from quorum_reasoning.tools import memory
++
++
++def test_default_launcher_preserves_paths_with_spaces_without_shell(tmp_path, monkeypatch):
++    monkeypatch.delenv('QUORUM_HMEM_TSX', raising=False)
++    home = tmp_path / 'reference checkout'
++    cli = home / 'engines/hmem/reference/node_modules/tsx/dist/cli.mjs'
++    cli.parent.mkdir(parents=True)
++    cli.touch()
++    with patch.object(memory.shutil, 'which', return_value='C:/Program Files/nodejs/node.exe'):
++        assert memory._launcher(home) == ['C:/Program Files/nodejs/node.exe', str(cli)]
++
++
++def test_missing_runtime_fails_closed_and_explicit_override_stays_one_argument(tmp_path, monkeypatch):
++    monkeypatch.delenv('QUORUM_HMEM_TSX', raising=False)
++    with patch.object(memory.shutil, 'which', return_value=None), pytest.raises(ValueError):
++        memory._launcher(tmp_path)
++    monkeypatch.setenv('QUORUM_HMEM_TSX', '/TEST custom executable/tsx')
++    assert memory._launcher(tmp_path) == ['/TEST custom executable/tsx']
