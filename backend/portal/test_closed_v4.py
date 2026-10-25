@@ -68,6 +68,7 @@ class LaterClosedEditionTests(SimpleTestCase):
                               len(result['reasoning']['trace'])), (0, 27, 219))
             self.assertTrue(result['preview']['corpus_binding']['closed_edition'])
             self.assertFalse(result['preview']['published'])
+            self.assertIn('not this attempt', ' '.join(result['preview']['warnings']))
             self.assertNotIn('api_keys', json.dumps(result['preview']))
             self.assertNotIn('corpus_as_of_utc', result['preview']['corpus_binding'])
             for bad_sidecar in (sidecar + b'\n', sidecar.replace(b'false', b'true', 1)):

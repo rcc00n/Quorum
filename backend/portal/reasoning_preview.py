@@ -41,6 +41,23 @@ def artifact_review_issues(sha256, run_id=None):
 
 
 def artifact_review_notices(sha256, run_id=None):
+    # DECISION(2026-10-25, rcc00n/Codex): inherited ledger rows are not current-attempt spend.
+    # Why: v5/v6 owner attestations explicitly include replayed, unused and earlier error rows.
+    later = {"2026-10-24-russia-ukraine-war-6": 5, "2026-10-24-russia-ukraine-war-7": 6}
+    version = later.get(run_id)
+    if version is None:
+        later_hashes = list(CLOSED_SIDECAR_PAIRS.values())[1:]
+        version = 5 + later_hashes.index(sha256) if sha256 in later_hashes else None
+    if version is not None:
+        return [
+            "Ledger scope: recorded calls include seeded, replayed and unused rows from earlier attempts. "
+            "Reported model/error totals are not this attempt's spending or failure totals. "
+            "Execution, replay consumption and source-text verification remain separate checks.",
+            ("Historical v5 is superseded by the owner's v6 handover; preserve these original bytes."
+             if version == 5 else
+             "Current owner v6 handover. The owner D5 report discloses unresolved roundup-label, "
+             "claim/event relevance and rubric-repair limitations; producer labels are not independent acceptance."),
+        ]
     if not artifact_review_issues(sha256, run_id):
         return []
     return [
