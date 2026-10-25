@@ -150,13 +150,33 @@ def test_span_typography_variants_match(span, passage):
     assert untrusted.span_in(span, passage)
 
 
-def test_span_must_have_two_words_and_touch_the_claim():
-    assert _c("did not strike the Kyiv power station") == ("contradicts", False)
-    assert _c("drones did not strike") == ("contradicts", False)  # shares the stem drone
-    assert _c("night") == ("neutral", True), "one word, even a claim word"
-    assert _c("More follows") == ("neutral", True), "grounded, two words, nothing of the claim"
-    assert _c("Getty Images", "Andrew Harnik/Getty Images") == ("neutral", True)
-    assert _c("killed 31", "Officials said 5 were killed 31 wounded.", "The strike killed 31 people") == ("contradicts", False), "short words count"
+TROOPS = "Russia withdrew troops from Kherson on Monday"
+TROOPS_DENIAL = "Officials said Russia did not withdraw troops from Kherson, a procedural step only, the ministry added."
+
+
+@pytest.mark.parametrize("span, passage, claim, kept", [
+    ("killed 31", "Officials said 5 were killed 31 wounded.", "The strike killed 31 people", True),
+    ("did not withdraw troops", TROOPS_DENIAL, TROOPS, True),
+    ("didn't withdraw troops", "Russia didn't withdraw troops.", TROOPS, True),
+    ("troops left on Sunday", "The troops left on Sunday, officials said.", TROOPS, True),
+    ("Trump said Tuesday", "Trump said Tuesday that talks go on.", "Zelensky met Macron in Paris", False),
+    ("a procedural step only", TROOPS_DENIAL, TROOPS, False),
+    ("Russia did withdraw some troops", "Russia did withdraw some troops, not all.", TROOPS, True),
+    ("the talks ended in Geneva today", "Officials said the talks ended in Geneva today.", TROOPS, False),
+    ("Getty Images", "Andrew Harnik/Getty Images", CLAIM, False),
+    ("No", "No, the troops stayed.", TROOPS, False),
+    ("night", DENIAL, CLAIM, False),
+    ("More follows", DENIAL, CLAIM, False),
+], ids=["number-2w", "negation-4w", "contraction", "weekday", "date-no-shared-stem", "4w-no-marker", "5w-clause",
+        "6w-no-shared-stem", "caption", "one-word-no", "one-word-claim-word", "2w-off-claim"])
+def test_span_length_rule(span, passage, claim, kept):
+    assert untrusted.span_in(span, passage), "every case is grounded: only the length and claim rules decide"
+    assert _c(span, passage, claim) == (("contradicts", False) if kept else ("neutral", True))
+
+
+def test_span_thresholds_are_named():
+    assert (untrusted.SPAN_MIN_WORDS, untrusted.SPAN_SHORT_MIN_WORDS) == (5, 2)
+    assert {"not", "never", "denied"} <= untrusted.SPAN_NEGATIONS and {"tuesday", "october"} <= untrusted.SPAN_DATE_WORDS
 
 
 # --- the dry-run stand-in -----------------------------------------------------------------------------------------
@@ -218,3 +238,15 @@ def test_quote_after_the_split_is_found_at_its_offsets(live_path, monkeypatch, n
     (ev,) = out["claims"]["c1"]["evidence"]
     assert ev["quote"] == "Meanwhile, Russian drones struck the Kyiv power station on Tuesday night."
     assert CAPTION_TEXT[ev["char_start"]:ev["char_end"]] == ev["quote"]
+
+
+def test_may_and_march_are_not_date_markers():
+    """'troops may withdraw' is a 3-word span with no number, date or negation: neutral; 'on March 3' still passes on the digit."""
+    from quorum_reasoning import untrusted
+
+    assert "may" not in untrusted.SPAN_DATE_WORDS and "march" not in untrusted.SPAN_DATE_WORDS
+    passage = "Officials said troops may withdraw from Kursk on March 3 after talks."
+    claim = "Troops will withdraw from Kursk on March 5."
+    short = untrusted.checked_stance({"stance": "contradicts", "contradicted_span": "troops may withdraw"}, passage, claim)
+    dated = untrusted.checked_stance({"stance": "contradicts", "contradicted_span": "on March 3"}, passage, claim)
+    assert short[0] == "neutral" and dated[0] == "contradicts"

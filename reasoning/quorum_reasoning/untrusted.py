@@ -82,24 +82,55 @@ def span_in(span: Any, passage: str) -> bool:
     return bool(s) and f" {' '.join(s)} " in f" {' '.join(_words(passage))} "
 
 
-SPAN_WORDS_MIN = 2
+# DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a contradicting span passes with SPAN_MIN_WORDS words or more;
+# a span of SPAN_SHORT_MIN_WORDS to SPAN_MIN_WORDS - 1 words passes only when it carries a number, a month or
+# weekday name, or a negation; shorter spans never pass; every span must also share a stem with the claim. Why: a
+# two-word run is too easy to rip out of context; the shortest legitimate contradictions are numbers, dates and
+# negations about the same fact ("killed 5", "did not sign", "on Tuesday"), everything else must quote a
+# near-sentence. Owner's decision (Yelysei, 2026-10-25). Supersedes the plain ">= 2 words" minimum of the same day.
+SPAN_MIN_WORDS = 5
+SPAN_SHORT_MIN_WORDS = 2
+SPAN_NEGATIONS = frozenset({"not", "no", "never", "denied", "denies", "deny", "without", "nor", "cannot"})
+SPAN_DATE_WORDS = frozenset(  # "may" and "march" (and "mar") left out: ordinary verb/noun; dates with a digit pass on the digit
+    "january february april june july august september october november december "
+    "jan feb apr jun jul aug sep sept oct nov dec "
+    "monday tuesday wednesday thursday friday saturday sunday".split()
+)
+_DIGIT = re.compile(r"\d")
+_CONTRACTED_NOT = re.compile(r"n't\b")
+
+
+def _short_span_marker(span: str, words: list[str]) -> bool:
+    """True when a short span carries what a short contradiction may rest on: a number, a date word or a negation."""
+    return (
+        any(_DIGIT.search(w) for w in words)
+        or any(w in SPAN_DATE_WORDS or w in SPAN_NEGATIONS for w in words)
+        or bool(_CONTRACTED_NOT.search(span.translate(_TYPOGRAPHY).lower()))
+    )
 
 
 def span_contradicts_claim(span: str, claim_text: str) -> bool:
-    """True when the span has at least SPAN_WORDS_MIN words and shares a significant stem with the claim (text.stems:
-    function words dropped, suffixes stripped)."""
-    return len(_words(span)) >= SPAN_WORDS_MIN and bool(stems(span) & stems(claim_text))
+    """True when the span is long enough for its kind (SPAN_MIN_WORDS, or SPAN_SHORT_MIN_WORDS with a number, date
+    word or negation) and shares a significant stem with the claim (text.stems: function words dropped, suffixes
+    stripped). Words are counted as written, not as text.tokens: "killed 31" is two words."""
+    words = _words(span)
+    if len(words) < SPAN_SHORT_MIN_WORDS:
+        return False
+    if len(words) < SPAN_MIN_WORDS and not _short_span_marker(span, words):
+        return False
+    return bool(stems(span) & stems(claim_text))
 
 
 def checked_stance(answer: Any, passage: str, claim_text: str, *, require_span: bool = True) -> tuple[str, bool]:
     """The stance of a stance reply after the post-call relevance guard, and whether a contradiction was downgraded.
 
     `supports`, `statement` and `neutral` pass through valid_stance unchanged. A `contradicts` stays only when its
-    `contradicted_span` is found as a word run in the passage the model was shown (span_in), has at least two words
-    and shares a significant stem with the claim (span_contradicts_claim); otherwise it becomes `neutral` and the
-    second value is True, so the caller counts it.
+    `contradicted_span` is found as a word run in the passage the model was shown (span_in), is long enough for its
+    kind and shares a significant stem with the claim (span_contradicts_claim, decision at SPAN_MIN_WORDS); otherwise
+    it becomes `neutral` and the second value is True, so the caller counts it.
 
-    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): the span must have >= 2 words and share a stem with the claim.
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code; the ">= 2 words" part superseded 2026-10-25 by the decision at
+    SPAN_MIN_WORDS, the shared stem stays): the span must have >= 2 words and share a stem with the claim.
     Why: a grounding-only check lets any run of the passage pass ("Getty Images", "Tuesday"); requiring overlap with
     the claim ties the span to the fact being contradicted. Words, not text.tokens, count toward the two: tokens
     drops words under three characters, and "killed 31" is a two-word span. Owner's decision (Yelysei, 2026-10-25).
