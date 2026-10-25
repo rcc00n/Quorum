@@ -55,11 +55,21 @@ Current official organizer rule 5.1 independently confirms Cursor is optional. Z
 
 Do not replace the existing 3:42 master or adapt the v3-only recorder by loosening
 its original-hash checks. Closed-v4 originals, sidecar, D5 and corrective v3
-attestation have not arrived locally. Actual v4 story/claim/evidence/browser
-acceptance is BLOCKED. If the originals pass future strict acceptance, record a
+attestation subsequently arrived. Strict parsing and the actual authenticated
+v4 story/claim/evidence/browser journey PASS. Full provenance and impact
+acceptance remain BLOCKED. If the originals pass future strict acceptance, record a
 new private candidate in a new directory and retain the impact-review warning:
 producer 6 is unchanged; conditional/reversible irreversibility may imply total 5.
 A featured story is producer-selected, not independently impact-approved. The
 1674-call ledger is historical/replay-inclusive, not a new-attempt spend metric.
 Until then the recommended truthful demonstration remains the existing explicitly
 partial/provisional v3 workflow. No H-MEM owner-graph or Nightshift completion claim.
+
+
+The private v4 review candidate has 1 story / 26 roundup / 235 trace rows and
+12 claims (4 confirmed, 4 disputed, 4 unverified). The sidecar's config hashes
+are truncated, so native acceptance remains blocked alongside impact review.
+Original v4 screenshots and the offline dump/DocRef/level-2 quote audit remain
+outside Git. Use these for a limited technical review; keep the existing v3
+movie until the owner resolves both gates. Rejected third-reviewer proposals
+are now explicitly distinguished from the final claim verdict.
