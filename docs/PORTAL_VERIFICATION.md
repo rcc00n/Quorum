@@ -368,7 +368,10 @@ were preserved; no squash, force-push, inference, production deployment or publi
 - Actual clean package: 2663 entries, no links/credentials/private originals/runtime
   database; SHA `6cb9a27d0ef52c721422258d9a53e9b9af295c7b506fa246c41dfbfa8ec591e0`.
   Actual temporary SQLite backup and independent restore preserve integrity and the
-  TEST account. This local package is not a production release.
+  TEST account. The actual packaged Django and standalone Next also start on fresh
+  loopback ports; after restoring the disposable auth database, CSRF login succeeds
+  and the authenticated feed correctly stays pending with publication disabled.
+  This local package is not a production release.
 - Routine diagnostics: doctor 15 PASS / 0 FAIL / 1 BLOCKED / 1 NOT_TESTED; verify
   31 PASS / 0 FAIL / 2 BLOCKED / 1 NOT_TESTED. Real Zetaris SQL `SELECT 1`, bundled
   dataset rows and the official bundle verifier PASS. Startup headroom and missing
