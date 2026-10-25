@@ -92,6 +92,6 @@ def run(state: RunState) -> dict:
                 errors.append(StepError(node="score_importance", event_id=e["id"], message=str(exc)[:300]))
                 e["rubric"] = build_rubric(0, 0, 0, 0, {})
                 s.decision = "failed; scored 0 on all judged points"
-                s.reason = str(exc)[:200]
+                s.reason = untrusted.public_failure(exc)
         steps.append(finish(state, s))
     return {"events": events, "steps": steps, "errors": errors}
