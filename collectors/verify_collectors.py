@@ -171,19 +171,27 @@ def check_invariants(cur) -> None:
     else:
         cur.execute("SELECT topic_match, count(*) FROM documents WHERE topic_id IS NOT NULL GROUP BY 1 ORDER BY 1")
         emit("PASS", "topic_match", "set on all topic-tagged documents: " + ", ".join(f"{k}={v}" for k, v in cur.fetchall()))
-    # Invariant 3: exactly one topic id across documents and official_docs, and it is the one run.py collects.
-    cur.execute("SELECT DISTINCT topic_id FROM documents UNION SELECT DISTINCT topic_id FROM official_docs")
-    topics = {row[0] for row in cur.fetchall()}
+    # Invariant 3: every topic id in the data is one run.py collects (N topics allowed since 2026-10-25; a topic just
+    # added may have no rows yet). DECISION(2026-10-25, Anastasia/Claude Code): the check is "data ⊆ run.py's TOPICS and
+    # at least one topic has rows", not "exactly one topic". Why: the demo adds topics as dictionary entries (Issue #2,
+    # Yelysei 2026-10-25); an unknown id in the data would still mean a rename went wrong on one side.
+    cur.execute(
+        "SELECT topic_id, count(*) FROM (SELECT topic_id FROM documents UNION ALL SELECT topic_id FROM official_docs) t "
+        "WHERE topic_id IS NOT NULL GROUP BY topic_id ORDER BY topic_id"
+    )
+    counts = {row[0]: row[1] for row in cur.fetchall()}
     try:
         from collectors.run import TOPICS  # type: ignore
         expected = set(TOPICS)
     except Exception:
         expected = None
-    if len(topics) != 1 or (expected is not None and topics != expected):
-        emit("FAIL", "topic id", f"topic ids in data {sorted(map(str, topics))}; run.py collects {sorted(expected) if expected else '?'}")
+    unknown = sorted(set(counts) - expected) if expected is not None else []
+    if not counts or unknown:
+        emit("FAIL", "topic ids", f"rows per topic {counts}; run.py collects {sorted(expected) if expected else '?'}; unknown in data: {unknown}")
     else:
-        emit("PASS", "topic id", f"single topic id {next(iter(topics))} in documents and official_docs")
-
+        empty = sorted(expected - set(counts)) if expected is not None else []
+        emit("PASS", "topic ids", "rows per topic " + ", ".join(f"{k}={v}" for k, v in counts.items())
+             + (f"; no rows yet for {empty}" if empty else ""))
 
 def main() -> int:
     load_env()
