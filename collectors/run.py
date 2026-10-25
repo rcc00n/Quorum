@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one collection pass for every topic in collectors/topics.yaml-free config below.
+"""Run one collection pass over every active topic in the `topics` table, oldest first (README › Topics).
 
 Usage:
     python3 -m collectors.run                # all collectors, all topics
@@ -73,13 +73,18 @@ def run_once(only: str | None = None) -> dict:
         ensure_topic(conn, topic_id, spec["name"], spec["query_terms"])
     topics = load_topics(conn)
     log.info("topics: %s", ", ".join(f"{t['id']} ({len(t['query_terms'])} terms)" for t in topics) or "none active")
-    for topic in topics:
-        t = topic["id"]  # report keys carry the topic so N topics do not overwrite each other's counters
-        if only in (None, "rss"):
+    if only in (None, "rss"):
+        # Feeds are walked once per pass for all topics (first_topic_match in common.py; decision: README › Decisions,
+        # 2026-10-25); the per-source stats carry `by_topic`, so these keys need no topic prefix.
+        if not topics:
+            log.info("no active topics: RSS and official feeds skipped, nothing to match")
+        else:
             for source in rss_sources:
-                step(f"{t}/rss/{source['id']}", rss.collect_source, conn, fetcher, source, topic)
+                step(f"rss/{source['id']}", rss.collect_source, conn, fetcher, source, topics)
             for source in official_feeds:
-                step(f"{t}/official/{source['id']}", rss.collect_official_feed, conn, fetcher, source, topic)
+                step(f"official/{source['id']}", rss.collect_official_feed, conn, fetcher, source, topics)
+    for topic in topics:
+        t = topic["id"]  # API collectors query per topic; the key carries it so N topics do not overwrite each other
         if only in (None, "guardian"):
             step(f"{t}/guardian", guardian.collect, conn, fetcher, topic)
         if only in (None, "federal_register"):
