@@ -1,0 +1,204 @@
+diff --git a/backend/README.md b/backend/README.md
+index 9419cb4..842eab7 100644
+--- a/backend/README.md
++++ b/backend/README.md
+@@ -91,3 +91,10 @@ its owner-disclosed impact contradiction. Producer score and claims are unchange
+ the advisory does not bypass JSON, provenance or publisher validation. The raw
+ artifact and independent D5/ledger verification remain necessary. The existing
+ warning array carries this local editorial disclosure; no producer contract changes.
++
++The original closed-v4 sidecar uses a different historical format. Its exact
++SHA-pinned bytes can bind only the exact original snapshot for a private preview;
++unknown/mutated closed-format sidecars fail. Edition end is shown as a boundary,
++never invented as a corpus capture timestamp. Its config hashes are truncated:
++local Git hashes are reported independently, and full metadata acceptance remains
++blocked along with impact review. The production publisher is unchanged.
+diff --git a/backend/portal/management/commands/reasoning_snapshot.py b/backend/portal/management/commands/reasoning_snapshot.py
+index ba0adbd..c8dd8c7 100644
+--- a/backend/portal/management/commands/reasoning_snapshot.py
++++ b/backend/portal/management/commands/reasoning_snapshot.py
+@@ -47,6 +47,19 @@ class Command(BaseCommand):
+                           provisional=result['preview']['provisional'])
+             sidecar = parse_preview_json(sidecar_raw)
+             producer = sidecar['producer']
++            if 'commit_of_the_publishing_process' in producer:
++                require(commit.startswith(producer['commit_of_the_publishing_process']), 'producer_commit_mismatch')
++                try:
++                    config = subprocess.check_output(['git', 'show', f'{commit}:reasoning/config/reasoning.toml'],
++                        cwd=Path(__file__).resolve().parents[4], stderr=subprocess.DEVNULL)
++                except subprocess.CalledProcessError:
++                    raise SnapshotError('producer_config_unavailable') from None
++                report.update(producer_commit=commit, git_config_sha256=hashlib.sha256(config).hexdigest(),
++                              git_config_crlf_sha256=hashlib.sha256(config.replace(b'\n', b'\r\n')).hexdigest())
++                # Prefixes plus a reproduction command are not a full original config attestation.
++                report['issues'].extend(['producer_config_hash_incomplete'] + artifact_review_issues(options['sha256']))
++                self.stdout.write(json.dumps(report, sort_keys=True))
++                raise CommandError('Reasoning acceptance blocked; inspect safe report codes', returncode=1)
+             prefix = re.match(r'^([0-9a-f]{7,40})(?:\s|$)', producer['commit'])
+             require(prefix is not None and commit.startswith(prefix[1]), 'producer_commit_mismatch')
+             declared = producer['config_sha256']
+diff --git a/backend/portal/reasoning_preview.py b/backend/portal/reasoning_preview.py
+index 4a94014..4f6cb38 100644
+--- a/backend/portal/reasoning_preview.py
++++ b/backend/portal/reasoning_preview.py
+@@ -20,6 +20,7 @@ from .snapshot_store import read_bounded
+ 
+ SAMPLE = Path(__file__).parent / "fixtures/reasoning-demo/snapshot.sample.json"
+ HISTORICAL_V3_SHA256 = "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
++GENUINE_V4_SIDECAR_SHA256 = "f55c3304afd92b9f763ddb04357f3ec0c7a8860e9ee3ddcf63b69a4bcff7c6d0"
+ GENUINE_V4_SHA256 = "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79"
+ 
+ 
+@@ -735,10 +736,33 @@ def load_preview(path=None):
+     return result
+ 
+ 
++def bind_closed_v4_sidecar(raw, snapshot_raw, result, sidecar):
++    # DECISION(2026-10-25, rcc00n/Codex): support only the pinned historical closed-v4 sidecar bytes.
++    # Why: this producer format omits full config hashes; display binding must not imply full acceptance.
++    fail(hashlib.sha256(raw).hexdigest() == GENUINE_V4_SIDECAR_SHA256, "unsupported_closed_sidecar")
++    fail(hashlib.sha256(snapshot_raw).hexdigest() == GENUINE_V4_SHA256, "sidecar_snapshot_mismatch")
++    binding, run, p = sidecar['snapshot'], sidecar['run'], result['reasoning']
++    fail(binding['sha256_file_bytes'] == result['preview']['sha256'], 'sidecar_snapshot_mismatch')
++    fail(type(binding['size_bytes']) is int and binding['size_bytes'] == len(snapshot_raw), 'sidecar_size_mismatch')
++    for key, expected in dict(status=p['status'], stories=len(p['stories']), roundup=p['roundup']['count'],
++                              errors=len(p.get('errors', [])), published_at=p['published_at']).items():
++        fail(type(binding[key]) is type(expected) and binding[key] == expected, 'sidecar_snapshot_mismatch')
++    fail(sidecar['provisional'] is False and run['run_id'] == p['run_id'], 'sidecar_snapshot_mismatch')
++    fail(sidecar['corpus']['edition_window_utc'] == [p['window'][k] for k in ('start', 'end')], 'sidecar_window_mismatch')
++    for key in ('model_calls', 'model_errors', 'answered_by'):
++        fail(run[key] == p['provenance'][key], 'sidecar_snapshot_mismatch')
++    result['preview']['provisional'] = False
++    result['preview']['corpus_binding'] = dict(provisional=False, closed_edition=True,
++        edition_window_end_utc=p['window']['end'], sidecar_sha256=hashlib.sha256(raw).hexdigest())
++    return result
++
++
+ def bind_preview_sidecar(raw, snapshot_raw, result):
+     try:
+         sidecar = parse_preview_json(raw)
+         fail(isinstance(sidecar, dict), "invalid_sidecar")
++        if isinstance(sidecar.get('snapshot'), dict) and 'sha256_file_bytes' in sidecar['snapshot']:
++            return bind_closed_v4_sidecar(raw, snapshot_raw, result, sidecar)
+         binding = sidecar["snapshot"]
+         fail(isinstance(binding, dict), "invalid_sidecar")
+         fail(binding["sha256"] == result["preview"]["sha256"], "sidecar_snapshot_mismatch")
+diff --git a/backend/portal/test_closed_v4.py b/backend/portal/test_closed_v4.py
+new file mode 100644
+index 0000000..10458c4
+--- /dev/null
++++ b/backend/portal/test_closed_v4.py
+@@ -0,0 +1,51 @@
++"""Private historical originals are opt-in; never substitute a synthetic v4 artifact."""
++import copy
++import hashlib
++import json
++import os
++from pathlib import Path
++from unittest import skipUnless
++from django.test import SimpleTestCase
++from .reasoning_preview import (SAMPLE, GENUINE_V4_SHA256, GENUINE_V4_SIDECAR_SHA256,
++    bind_preview_sidecar, parse_reasoning, present_reasoning)
++from .snapshot_validation import SnapshotError, parse_snapshot
++
++class ClosedV4Tests(SimpleTestCase):
++    def test_unpinned_closed_format_cannot_bind_arbitrary_snapshot(self):
++        raw = SAMPLE.read_bytes()
++        for binding in ({'sha256_file_bytes': hashlib.sha256(raw).hexdigest()}, {}, None):
++            sidecar = json.dumps({'snapshot': binding, 'provisional': False}).encode()
++            with self.subTest(binding=binding), self.assertRaises(SnapshotError):
++                bind_preview_sidecar(sidecar, raw, present_reasoning(raw))
++
++    @skipUnless(os.getenv('QUORUM_TEST_GENUINE_V4_SNAPSHOT') and os.getenv('QUORUM_TEST_GENUINE_V4_SIDECAR'),
++                'original private v4 pair not supplied')
++    def test_original_v4_binding_counts_claims_and_editorial_hold(self):
++        raw = Path(os.environ['QUORUM_TEST_GENUINE_V4_SNAPSHOT']).read_bytes()
++        sidecar = Path(os.environ['QUORUM_TEST_GENUINE_V4_SIDECAR']).read_bytes()
++        self.assertEqual(hashlib.sha256(raw).hexdigest(), GENUINE_V4_SHA256)
++        self.assertEqual(hashlib.sha256(sidecar).hexdigest(), GENUINE_V4_SIDECAR_SHA256)
++        result = bind_preview_sidecar(sidecar, raw, present_reasoning(raw))
++        p = result['reasoning']
++        self.assertEqual((len(p['stories']), p['roundup']['count'], len(p['trace']), len(p['errors'])), (1,26,235,0))
++        claims = p['stories'][0]['claims']
++        self.assertEqual(len(claims), 12)
++        for status in ('confirmed', 'disputed', 'unverified'):
++            self.assertEqual(sum(c['status'] == status for c in claims), 4)
++        self.assertEqual(p['stories'][0]['rubric']['total'], 6)
++        self.assertIn('has not passed independent impact review', ' '.join(result['preview']['warnings']))
++        self.assertNotIn('corpus_as_of_utc', result['preview']['corpus_binding'])
++        self.assertTrue(result['preview']['corpus_binding']['closed_edition'])
++        self.assertFalse(result['preview']['published'])
++        self.assertNotIn('api_keys', json.dumps(result['preview']))
++        for altered in (sidecar+b'\n', sidecar.replace(b'false', b'true', 1)):
++            with self.assertRaises(SnapshotError):bind_preview_sidecar(altered, raw, present_reasoning(raw))
++        with self.assertRaises(SnapshotError):bind_preview_sidecar(sidecar, SAMPLE.read_bytes(), present_reasoning(SAMPLE.read_bytes()))
++        for mutate in (lambda x:x.update(TEST_unknown=True),
++                       lambda x:x['provenance'].update(model_calls=1675),
++                       lambda x:x['stories'][0]['claims'][0]['evidence'][0].update(url='javascript:TEST')):
++            bad=copy.deepcopy(p);mutate(bad)
++            with self.assertRaises(SnapshotError):parse_reasoning(json.dumps(bad).encode())
++        with self.assertRaises(SnapshotError):parse_snapshot(raw)
++        self.assertEqual(Path(os.environ['QUORUM_TEST_GENUINE_V4_SNAPSHOT']).read_bytes(), raw)
++        self.assertEqual(Path(os.environ['QUORUM_TEST_GENUINE_V4_SIDECAR']).read_bytes(), sidecar)
+diff --git a/web/components/reasoning-preview.tsx b/web/components/reasoning-preview.tsx
+index a776fcd..e60b003 100644
+--- a/web/components/reasoning-preview.tsx
++++ b/web/components/reasoning-preview.tsx
+@@ -336,8 +336,8 @@ export function ReasoningPreviewPage({
+             )}
+             {data.preview.corpus_binding && (
+               <p className="r-preview-limits r-corpus-binding">
+-                {data.preview.corpus_binding.provisional ? "PROVISIONAL CORPUS" : "Producer corpus capture"}
+-                {" · "}As of {data.preview.corpus_binding.corpus_as_of_utc}.
++                {data.preview.corpus_binding.closed_edition ? "CLOSED EDITION (producer-declared)" : data.preview.corpus_binding.provisional ? "PROVISIONAL CORPUS" : "Producer corpus capture"}
++                {" · "}{data.preview.corpus_binding.closed_edition ? `Edition ends ${data.preview.corpus_binding.edition_window_end_utc}` : `As of ${data.preview.corpus_binding.corpus_as_of_utc}`}.
+                 {" "}Sidecar bound to these snapshot bytes; execution and corpus manifests remain producer declarations.
+               </p>
+             )}
+diff --git a/web/lib/reasoning.ts b/web/lib/reasoning.ts
+index 4cd17f3..792b891 100644
+--- a/web/lib/reasoning.ts
++++ b/web/lib/reasoning.ts
+@@ -176,7 +176,7 @@ export type ReasoningPreview = {
+   expiry_hint: "expired" | "within_hint";
+   sha256: string;
+   provisional?: boolean | null;
+-  corpus_binding?: { provisional: boolean; corpus_as_of_utc: string; sidecar_sha256: string };
++  corpus_binding?: { provisional: boolean; corpus_as_of_utc?: string; closed_edition?: boolean; edition_window_end_utc?: string; sidecar_sha256: string };
+   missing_provenance: string[];
+   warnings: string[];
+ };
+diff --git a/web/tests/reasoning-snapshot-checks.cjs b/web/tests/reasoning-snapshot-checks.cjs
+index f42d8c2..dc1af70 100644
+--- a/web/tests/reasoning-snapshot-checks.cjs
++++ b/web/tests/reasoning-snapshot-checks.cjs
+@@ -113,7 +113,14 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
+     const binding = JSON.parse(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_SIDECAR));
+     assert.equal(result.preview.corpus_binding.provisional, binding.provisional);
+     assert.equal(result.preview.corpus_binding.sidecar_sha256, digest(fs.readFileSync(env.QUORUM_REASONING_PREVIEW_SIDECAR)));
+-    await page.getByText(/PROVISIONAL CORPUS/).waitFor();
++    if (binding.snapshot.sha256_file_bytes) {
++      await page.getByText(/CLOSED EDITION \(producer-declared\)/).waitFor();
++      await page.getByRole('alert').filter({hasText:'IMPACT REVIEW PENDING:'}).waitFor();
++      assert.equal(result.preview.corpus_binding.closed_edition, true);
++      assert.ok(result.preview.warnings.some(w => w.includes('has not passed independent impact review')));
++    } else {
++      await page.getByText(/PROVISIONAL CORPUS/).waitFor();
++    }
+   }
+   assert.equal(await page.locator(".r-roundup-row .r-check-notice").count(), roundup.length);
+   for (const story of sample.stories) {
+@@ -139,6 +146,13 @@ module.exports = async function ({ browser, root, env, password, temp, sourceFil
+       assert.equal(await row.locator(".r-final strong").textContent(), claim.status);
+       assert.equal(await row.locator(".r-final p").textContent(), claim.reason || "No final rationale supplied.");
+       assert.ok((await row.locator(".r-agreement").textContent()).includes(claim.verifier === claim.fact_checker ? "Reviewers agree" : "Reviewers disagree"));
++      if (claim.resolved_by) {
++        const review = row.locator('aside.r-disagreement');
++        assert.equal(await review.locator('strong').textContent(), `Resolution: ${claim.resolved_by}`);
++        assert.ok((await review.textContent()).includes(claim.reviewer_status ?? 'No accepted verdict supplied'));
++        if (claim.reviewer_reason) assert.ok((await review.locator('p').allTextContents()).includes(claim.reviewer_reason));
++        if (claim.reviewer_quote) assert.equal(await review.locator('blockquote').textContent(), claim.reviewer_quote);
++      }
+       for (const [i, verdict, evidence] of [
+         [0, claim.verifier, claim.evidence.filter((e) => ["researcher", "verifier"].includes(e.found_by))],
+         [1, claim.fact_checker, claim.evidence.filter((e) => e.found_by === "fact_checker")],

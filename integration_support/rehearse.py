@@ -20,6 +20,7 @@ WEB_OWNED_PATCHES = (
     '0008-keyboard-investigation-flow.patch',
     '0009-final-readiness-checklist.patch',
     '0011-v4-impact-review-hold.patch',
+    '0013-original-closed-v4-sidecar.patch',
 )
 HMEM_REVIEW_ONLY = {'0002-source-memory-hooks.patch','0004-memory-storage-safety.patch','0012-hmem-portability-inspection.patch'}
 REMOTE_BRANCHES = dict(integration='integration', reasoning='yelysei/agents',
