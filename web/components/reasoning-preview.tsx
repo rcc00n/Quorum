@@ -15,6 +15,13 @@ import { Spectrum } from "./spectrum";
 import { ReasoningSpectrum } from "./reasoning-spectrum";
 import { ReasoningTimeline, previewHref } from "./reasoning-timeline";
 import { roundupCheckNotice } from "@/lib/reasoning-trace";
+function focusReadingTarget(target: HTMLElement) {
+  // DECISION(2026-10-24, rcc00n/Codex): section navigation transfers keyboard focus after async loading.
+  // Why: scrolling alone leaves keyboard and screen-reader users at the previous link.
+  target.tabIndex = -1;
+  target.focus({ preventScroll: true });
+}
+
 function ReadingNavigation({
   run,
   story,
@@ -53,7 +60,10 @@ function ReadingNavigation({
     targets.forEach((e) => observer.observe(e));
     // A date/event navigation may render its anchor after the recorded edition loads.
     const target = document.getElementById(location.hash.slice(1));
-    if (target) target.scrollIntoView({ behavior: "instant" });
+    if (target && targets.includes(target)) {
+      focusReadingTarget(target);
+      target.scrollIntoView({ behavior: "instant" });
+    }
     return () => observer.disconnect();
   }, [ids, eventId]);
   return (
@@ -63,7 +73,11 @@ function ReadingNavigation({
           key={id}
           href={"#" + id}
           aria-current={active === id ? "location" : undefined}
-          onClick={() => setActive(id)}
+          onClick={() => {
+            setActive(id);
+            const target = document.getElementById(id);
+            if (target) focusReadingTarget(target);
+          }}
         >
           {title}
         </a>
@@ -262,7 +276,7 @@ export function ReasoningPreviewPage({
           <ReadingNavigation run={run} story={!!story} eventId={eventId} />
         )}
       </div>
-      <main id="main" className="r-main">
+      <main id="main" tabIndex={-1} className="r-main">
         {loading ? (
           <section className="r-preview-loading" role="status" aria-busy="true">
             <p>Loading the recorded reasoning sample…</p>

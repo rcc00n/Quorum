@@ -66,9 +66,9 @@ export function ReasoningTimeline({
     setEvent(id);
   }
   return (
-    <section id="reasoning-timeline" className="r-section">
+    <section id="reasoning-timeline" tabIndex={-1} aria-labelledby="reasoning-timeline-title" className="r-section">
       <p className="eyebrow">RECORDED EXECUTION · NOT LIVE INFERENCE</p>
-      <h2>Investigation Timeline</h2>
+      <h2 id="reasoning-timeline-title">Investigation Timeline</h2>
       <p>
         Research can return for more evidence. A rejected draft can return for
         revision. Explore what this recorded run actually did.
