@@ -1,0 +1,21 @@
+[Unit]
+Description=Quorum Django web API
+After=network.target
+[Service]
+User=quorum
+Group=quorum
+WorkingDirectory=/opt/quorum/current/backend
+EnvironmentFile=/etc/quorum/portal.env
+ExecStart=/opt/quorum/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8017 --workers 1 --threads 2 --timeout 30 --access-logfile -
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/quorum
+MemoryMax=192M
+CPUQuota=50%
+[Install]
+WantedBy=multi-user.target

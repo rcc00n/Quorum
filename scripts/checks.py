@@ -108,11 +108,8 @@ def doctor():
     rc, out = run(['docker', 'info', '--format', '{{.OperatingSystem}}'])
     emit('PASS' if rc == 0 and 'Docker Desktop' in out else 'NOT_TESTED', 'Docker Desktop WSL2 integration',
          'Desktop backend identified' if rc == 0 and 'Docker Desktop' in out else 'Current backend is Linux Engine; Desktop integration not demonstrated or required')
-    ps = r'''$p=$env:QUORUM_CURSOR_EXE; if(!$p){$p="$env:LOCALAPPDATA\Programs\cursor\Cursor.exe"}; if(Test-Path -LiteralPath $p){Write-Output (Get-Item -LiteralPath $p).VersionInfo.ProductVersion; exit 0}; exit 2'''
-    env = dict(os.environ, QUORUM_CURSOR_EXE=val('CURSOR_EXE'))
-    rc, out = run(['powershell.exe', '-NoProfile', '-Command', ps], env=env)
-    emit('PASS' if rc == 0 else 'BLOCKED', 'Cursor installation', 'Windows executable '+out if rc == 0 else 'Windows executable unavailable')
-    cursor_acceptance()
+    # DECISION(2026-10-22, rcc00n/Codex): Codex workflow; legacy Cursor
+    # acceptance runs only in cursor-history mode, never routine readiness.
     rc, out = run(['df', '-Pk', str(ROOT)])
     if rc == 0:
         fields = out.splitlines()[-1].split()
@@ -181,6 +178,15 @@ def meterless():
         emit('BLOCKED', 'Meterless smoke tests', 'Official reference dependencies missing')
 
 
+def cursor_history():
+    """Optional historical diagnostics; excluded from doctor/verify summaries."""
+    ps = r'''$p=$env:QUORUM_CURSOR_EXE; if(!$p){$p="$env:LOCALAPPDATA\Programs\cursor\Cursor.exe"}; if(Test-Path -LiteralPath $p){Write-Output (Get-Item -LiteralPath $p).VersionInfo.ProductVersion; exit 0}; exit 2'''
+    env = dict(os.environ, QUORUM_CURSOR_EXE=val('CURSOR_EXE'))
+    rc, out = run(['powershell.exe', '-NoProfile', '-Command', ps], env=env)
+    emit('PASS' if rc == 0 else 'BLOCKED', 'Cursor installation', 'Windows executable '+out if rc == 0 else 'Windows executable unavailable')
+    cursor_acceptance()
+
+
 def cursor_acceptance():
     path = val('CURSOR_ACCEPTANCE_FILE')
     if not path:
@@ -242,10 +248,10 @@ def zetaris():
         emit('PASS' if isinstance(config, dict) else 'NOT_TESTED', 'Zetaris GUI /api/config', 'Actual UI config response; not SQL verification')
     except Exception as exc:
         failure('Zetaris GUI /api/config', exc)
-    # The bundle's API healthcheck uses HTTP /, while REST routes live under /api/v1.0.
+    # The bundle probes HTTP / without curl --fail; SQL is verified separately below.
     try:
-        probe_api_http(api+'/')
-        emit('PASS', 'Zetaris REST API process', 'HTTP health response at the bundled API healthcheck URL; SQL tested separately')
+        status = probe_api_http(api+'/')
+        emit('PASS', 'Zetaris REST API process', f'HTTP {status} at the bundled root probe; SQL tested separately')
     except Exception as exc:
         failure('Zetaris REST API process', exc)
     try:
@@ -280,9 +286,17 @@ def zetaris():
 
 
 def probe_api_http(url):
-    with urllib.request.build_opener(NoRedirect).open(url, timeout=15) as response:
-        if response.status != 200:
-            raise ValueError('API healthcheck did not return HTTP 200')
+    # DECISION(2026-10-23, rcc00n/Codex): accept the bundled API's unrouted root (404) as
+    # process reachability. Why: authenticated SQL works there; root 200 is not its contract.
+    try:
+        with urllib.request.build_opener(NoRedirect).open(url, timeout=15) as response:
+            if response.status != 200:
+                raise ValueError('Unexpected API root response')
+            return response.status
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return exc.code
+        raise
 
 
 def nemotron(allow_inference=False):
@@ -308,19 +322,40 @@ def nemotron(allow_inference=False):
         failure('Nemotron through Meterless', exc)
 
 
+def offline_doctor():
+    # DECISION(2026-10-24, rcc00n/Codex): offline mode reads no private configuration and contacts no service.
+    # Why: combined fixture acceptance must not spend credits or probe active sponsor runtimes.
+    for name, args in [('Git', ['git', '--version']), ('Node.js', ['node', '--version']),
+                       ('npm', ['npm', '--version']), ('Python', ['python3', '--version'])]:
+        rc, out = run(args)
+        emit('PASS' if rc == 0 else 'BLOCKED', name, out if rc == 0 else 'Tool unavailable')
+    rc, _ = run(['git', 'diff', '--check'])
+    emit('PASS' if rc == 0 else 'FAIL', 'working diff whitespace', 'Local Git check; no remote operation')
+    emit('BLOCKED', 'live integration evidence', 'Offline mode: no private config, GitHub API, Zetaris, Nightshift or inference requests')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['doctor', 'verify'])
+    parser.add_argument('mode', choices=['doctor', 'verify', 'cursor-history'])
     parser.add_argument('--inference', action='store_true', help='Explicitly send one capped Meterless request when real credentials are supplied')
+    parser.add_argument('--offline', action='store_true', help='Local tools and diff only; no private config or service requests')
     args = parser.parse_args()
+    if args.offline and (args.inference or args.mode == 'cursor-history'):
+        parser.error('--offline cannot enable inference or historical interactive checks')
     if args.inference and args.mode != 'verify':
         parser.error('--inference requires verify')
-    load_config()
+    if not args.offline:
+        load_config()
     if 'FAIL' in RESULTS:
         print('FAIL | diagnostics | Correct private configuration before running checks')
         return 1
-    doctor()
-    if args.mode == 'verify':
+    if args.offline:
+        offline_doctor()
+    elif args.mode == 'cursor-history':
+        cursor_history()
+    else:
+        doctor()
+    if args.mode == 'verify' and not args.offline:
         meterless()
         zetaris()
         nemotron(args.inference)

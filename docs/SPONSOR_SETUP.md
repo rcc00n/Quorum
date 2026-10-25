@@ -32,8 +32,8 @@ The authenticated SQL Editor proxy route and payload come from the **bundled ver
 
 The bundle includes the matching official JDBC JAR and driver class, so no driver download or guessed class is needed. The existing Java helper is preserved; current integration diagnostics follow the bundle's UI proxy verification route instead.
 
-## Cursor and Meterless → Nemotron
+## Codex workflow and Meterless → Nemotron
 
-Preserve the installed/authenticated Cursor. No reinstall, logout, credits purchase or model-settings changes were made. Composer/Grok Agent acceptance still needs actual user observation; the read-only smoke remains in MANUAL_ACTIONS.md.
+The team uses Codex. Routine checks exclude Cursor installation and Composer/Grok acceptance; optional historical diagnostics preserve existing installations/settings. The claimed organizer change is human-reported, not independently verified; see [current rules evidence](RULES_CHECK.md). Required Zetaris/Meterless integration and the chosen Nemotron route are unchanged.
 
 Hosted inference reads `MODEL_BASE_URL`, `MODEL_API_KEY` and `NEMOTRON_MODEL` from one route: the local Nightshift Console, or a direct NVIDIA route with that route's own three values. `METERLESS_BASE_URL`, `METERLESS_RUNTIME_TOKEN` and `METERLESS_MODEL` are accepted when the `MODEL_*` entries are empty. Keep Meterless keys out of Cursor settings. Routine diagnostics never send inference; `--inference` explicitly allows one capped request after real values are supplied. Existing H-MEM and persistence passes are reference-component results, not inference readiness.
