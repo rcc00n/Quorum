@@ -112,6 +112,6 @@ def run(state: RunState) -> dict:
                 e["drafts"] += 1
                 e["critic_status"] = None
                 s.decision = f"draft {e['drafts']} failed"
-                s.reason = str(exc)[:200]
+                s.reason = untrusted.public_failure(exc)
         steps.append(finish(state, s))
     return {"events": events, "steps": steps, "errors": errors}

@@ -126,7 +126,7 @@ def run(state: RunState) -> dict:
                 accepted, reason, quote, why_invalid = validate(c, ans, origin_group(c, by_id))
             except Exception as exc:  # noqa: BLE001 — a failed pass keeps the dispute; the trace shows it
                 errors.append(StepError(node="review_disputed", event_id=c["event_id"], message=str(exc)[:300]))
-                accepted, reason, quote, why_invalid = None, "", "", f"third pass failed: {str(exc)[:120]}"
+                accepted, reason, quote, why_invalid = None, "", "", untrusted.public_failure(exc)
             c["reviewer_reason"] = reason
             c["reviewer_quote"] = quote
             if accepted is None:

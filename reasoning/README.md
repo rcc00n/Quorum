@@ -132,3 +132,12 @@ Module-level decisions (AGENTS.md § 2). Project-level ones are in `docs/DECISIO
 | 2026-10-23 | Yelysei / Claude Code | The model axis (`dry_run`) and the corpus axis (`corpus`) are separate switches; a document that carries `text` is read from it in any mode. | A live model on the fixture corpus is how prompts and JSON parsing are tried before collection has data, without waiting on Zetaris; a live corpus with stand-ins checks the SQL without credits. |
 | 2026-10-23 | Yelysei / Claude Code | `langgraph.json` names the graph by module path (`quorum_reasoning.graph:graph`), not by file path. | `langgraph dev` loads a file path as a top-level module, so the package's relative imports fail (`attempted relative import with no known parent package`); the module path works because `dependencies: ["."]` installs the package. |
 | 2026-10-22 | Yelysei / Claude Code | *Superseded 2026-10-24 by the file store (`store.py`, row above); kept for the record.* Storage is not in this version: `publish` builds the snapshot, `run.py` writes it to `snapshots/`; the `analysis` schema and the snapshot endpoint come next. | A snapshot file is enough for the portal adapter to start against; the Postgres store is additive. |
+
+### Public failure projection (owner-review amendment)
+
+Public trace and adjudication failures retain a bounded exception type and a structured
+HTTP status when available. Exception text, provider bodies, paths and request URLs
+are omitted. The lowercase wording also fits within adjudication sentences.
+**The snapshot file still contains raw `errors[].message` diagnostics.** Only the
+portal's `public_error` projection hides those messages. Original snapshot files
+must remain private; this patch does not make them safe for public distribution.

@@ -256,6 +256,7 @@ def run(state: RunState) -> dict:
         targets = event_claims if round_no == 1 else [c for c in event_claims if is_thin(c["evidence"], origin_group(c, by_id))]
         with step(state, "research", event_id=e["id"], model=llm.model_name()) as s:
             found = 0
+            failed_public: list[str] = []
             failed: list[str] = []  # one failed stance call skips one passage, never the event (decision in nodes/fact_check.py)
             asked: dict[tuple, str] = {}  # this event's stance answers by question (decision at stance_question)
             repeats = 0
@@ -287,6 +288,7 @@ def run(state: RunState) -> dict:
                             )
                         except Exception as exc:  # noqa: BLE001
                             failed.append(f"{type(exc).__name__}: {str(exc)[:80]}")
+                            failed_public.append(untrusted.public_failure(exc))
                             continue  # a failed question is not remembered: a repeat of it is asked again
                         stance, why = judged_stance(ans, c["text"], passage, frequent, live=live, context=(before, after))
                         ungrounded += why == "ungrounded"
@@ -300,7 +302,7 @@ def run(state: RunState) -> dict:
                     found += 1
             s.decision = f"round {round_no}: {found} passages with a stance for {len(targets)} claims" + (f"; {len(failed)} stance calls failed" if failed else "") + (f" ({repeats} repeated questions skipped)" if repeats else "") + relevance_note(irrelevant, ungrounded, off_fact, supports_ungrounded, supports_off_fact)
             earlier = sum(1 for d in _candidates(state, e["document_ids"], round_no) if d.get("from_previous_day"))
-            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + excluded_note(frequent, n_docs, [c["text"] for c in targets]) + (f"; failures: {failed[0]}" if failed else "")
+            s.reason = ("event documents only" if round_no == 1 else f"widened to the rest of the day, official documents and {earlier} earlier-day documents for thin claims") + excluded_note(frequent, n_docs, [c["text"] for c in targets]) + ("; " + failed_public[0] if failed else "")
             if failed:
                 errors.append(StepError(node="research", event_id=e["id"], message=f"round {round_no}: {len(failed)} stance call(s) failed, passages skipped: {failed[0]}"))
             rounds[e["id"]] = round_no
