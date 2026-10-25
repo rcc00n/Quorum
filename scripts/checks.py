@@ -322,22 +322,40 @@ def nemotron(allow_inference=False):
         failure('Nemotron through Meterless', exc)
 
 
+def offline_doctor():
+    # DECISION(2026-10-24, rcc00n/Codex): offline mode reads no private configuration and contacts no service.
+    # Why: combined fixture acceptance must not spend credits or probe active sponsor runtimes.
+    for name, args in [('Git', ['git', '--version']), ('Node.js', ['node', '--version']),
+                       ('npm', ['npm', '--version']), ('Python', ['python3', '--version'])]:
+        rc, out = run(args)
+        emit('PASS' if rc == 0 else 'BLOCKED', name, out if rc == 0 else 'Tool unavailable')
+    rc, _ = run(['git', 'diff', '--check'])
+    emit('PASS' if rc == 0 else 'FAIL', 'working diff whitespace', 'Local Git check; no remote operation')
+    emit('BLOCKED', 'live integration evidence', 'Offline mode: no private config, GitHub API, Zetaris, Nightshift or inference requests')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('mode', choices=['doctor', 'verify', 'cursor-history'])
     parser.add_argument('--inference', action='store_true', help='Explicitly send one capped Meterless request when real credentials are supplied')
+    parser.add_argument('--offline', action='store_true', help='Local tools and diff only; no private config or service requests')
     args = parser.parse_args()
+    if args.offline and (args.inference or args.mode == 'cursor-history'):
+        parser.error('--offline cannot enable inference or historical interactive checks')
     if args.inference and args.mode != 'verify':
         parser.error('--inference requires verify')
-    load_config()
+    if not args.offline:
+        load_config()
     if 'FAIL' in RESULTS:
         print('FAIL | diagnostics | Correct private configuration before running checks')
         return 1
-    if args.mode == 'cursor-history':
+    if args.offline:
+        offline_doctor()
+    elif args.mode == 'cursor-history':
         cursor_history()
     else:
         doctor()
-    if args.mode == 'verify':
+    if args.mode == 'verify' and not args.offline:
         meterless()
         zetaris()
         nemotron(args.inference)
