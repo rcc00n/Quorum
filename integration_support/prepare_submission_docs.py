@@ -56,8 +56,9 @@ def contains_secret(data):
     # Why: existing validators contain marker words; those are not private key material.
     begin=b'-----BEGIN '
     label=b'PRIVATE KEY-----'
-    pem=re.escape(begin)+rb'(?:RSA |EC |DSA |OPENSSH )?'+re.escape(label)
-    return bool(re.search(pem,data) or re.search(rb'(?:gh[pousr]_|nvapi-)[A-Za-z0-9_-]{20,}|Bearer [A-Za-z0-9_.-]{20,}',data))
+    pem=re.escape(begin)+rb'(?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?'+re.escape(label)
+    pgp=re.escape(begin)+re.escape(b'PGP PRIVATE KEY BLOCK-----')
+    return bool(re.search(pem,data) or re.search(pgp,data) or re.search(rb'(?:gh[pousr]_|nvapi-)[A-Za-z0-9_-]{20,}|Bearer [A-Za-z0-9_.-]{20,}',data))
 
 
 def write(path,text):path.parent.mkdir(parents=True,exist_ok=True);path.write_text(text)

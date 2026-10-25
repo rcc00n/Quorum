@@ -10,7 +10,8 @@ class PackagePrivacyTests(unittest.TestCase):
         self.assertFalse(module.contains_secret(text))
     def test_complete_headers_and_tokens_are_rejected(self):
         begin=b'-----BEGIN '
-        for kind in (b'',b'RSA ',b'EC ',b'OPENSSH '):
+        for kind in (b'',b'RSA ',b'EC ',b'OPENSSH ',b'ENCRYPTED '):
             self.assertTrue(module.contains_secret(b'{"config":"'+begin+kind+b'PRIVATE KEY'+b'-----"}'))
+        self.assertTrue(module.contains_secret(begin+b'PGP PRIVATE KEY BLOCK'+b'-----'))
         self.assertTrue(module.contains_secret(b'nvapi-'+b'TEST'*6))
         self.assertTrue(module.contains_secret(b'Bearer '+b'TEST'*6))
