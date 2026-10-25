@@ -99,3 +99,12 @@ For private submission editing, `demo_tour.cjs --scenes` accepts the same five p
 
 
 Private submission tooling: `build_submission_video.py --raw <reviewed-genuine-movie> --scenes <authenticated-scene-directory> --output <NEW-external-package-directory> --ffmpeg <installed-encoder>` creates the 222-second WebM, burned/sidecar captions, exact recording script and edit manifest. Pillow and the installed official recorder encoder are used offline; no voice clone, model call or publication occurs. `prepare_submission_docs.py --repo <support> --candidate <local-RC> --root <package-directory> --scenes <scenes>` adds PDF/offline HTML slides, disclosures, setup/dependencies and a tracked-source archive. ReportLab is required only for document generation. Private originals and runtime auth/configuration are excluded; promotion/public upload still requires human review and genuine sponsor proof.
+
+
+## V4 owner review — 2026-10-25 UTC
+
+Canonical owner response: [Issue #2 comment 6391691017](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6391691017), read in full. Reasoning pin advanced to `25e3745`; the producer of genuine v4 is `88e3dcf`. Ordinary `--with-proposed-patches` now means `privacy-review` and excludes H-MEM. `--patch-profile hmem-review` is an explicit disposable proposal audit only; never adoption. Web-owned is unchanged except later web-owned safety amendments. The owner rejected memory hook adoption and requires three privacy amendments before acceptance.
+
+The unadopted `docs/DECISIONS.md` hunk was removed from 0002 at Yelysei's explicit request: it depended on rehearsal-only context and preempted his go/no-go. Its history remains in previous support commits. Only Yelysei records the project adoption row if he accepts the feature. All actual owner decision history remains untouched.
+
+H-MEM blockers: Windows TSX shell-launch incompatibility; timeout/process/store recovery policy; unapproved whole-store recall relevance/promotion; missing architecture definition of the memory trace/error stage. None is waived by reference conformance or prior TEST-state hook evidence. Default off, and no H-MEM hooks are applied to the primary candidate or ordinary CI profiles.

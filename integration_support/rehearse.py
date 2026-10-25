@@ -9,7 +9,7 @@ import subprocess
 
 PINS = {
     'integration':'c3cc5ac4a65855769ab48e36a1d59d5cc1ae261d',
-    'reasoning':'3d894488835b19b22281784cf8bf1e2ad5fa2be3',
+    'reasoning':'25e3745ebe7b68ace6b9e62e5d1f98b6e8c8a6a1',
     'collection':'8f126c57a9ef9af798543bf23a0a60737b0ce5dc',
     'web':'f59e75840c9aee67ca35a8f44bf5dd42747af75f',
 }
@@ -20,6 +20,7 @@ WEB_OWNED_PATCHES = (
     '0008-keyboard-investigation-flow.patch',
     '0009-final-readiness-checklist.patch',
 )
+HMEM_REVIEW_ONLY = {'0002-source-memory-hooks.patch','0004-memory-storage-safety.patch','0012-hmem-portability-inspection.patch'}
 REMOTE_BRANCHES = dict(integration='integration', reasoning='yelysei/agents',
                        collection='data-collection', web='feature/web-genuine-integration')
 
@@ -63,14 +64,16 @@ def assignments(text):
 def selected_patches(directory, with_patches=False, profile=None):
     # DECISION(2026-10-24, rcc00n/Codex): web-owned candidates exclude pending owner-dependent patches.
     # Why: a passing provisional rehearsal must not imply approval of reasoning/privacy/memory changes.
-    if profile not in (None,'web-owned') or (with_patches and profile):
+    if profile not in (None,'web-owned','privacy-review','hmem-review') or (with_patches and profile):
         raise ValueError('Choose one explicit patch profile')
     paths=sorted(Path(directory).glob('*.patch'))
     if profile=='web-owned':
         selected=[Path(directory)/name for name in WEB_OWNED_PATCHES]
         if any(not p.is_file() for p in selected):raise ValueError('Required web-owned patch missing')
         return selected
-    return paths if with_patches else []
+    if profile=='hmem-review':return paths
+    # Owner review rejects H-MEM adoption; ordinary rehearsals must not apply those hooks.
+    return [p for p in paths if p.name not in HMEM_REVIEW_ONLY] if with_patches or profile=='privacy-review' else []
 
 
 def require_current_pins(repo):
@@ -87,7 +90,7 @@ def rehearse(repo,destination,with_patches=False,profile=None,require_current=Fa
     for sha in PINS.values():git(repo,'cat-file','-e',sha+'^{commit}')
     git(repo,'worktree','add','--detach',str(destination),PINS['integration'])
     report=dict(inputs=PINS,merges=[],owner_approved=False,production_published=False,
-                patch_profile=profile or ('all-provisional' if with_patches else 'none'),
+                patch_profile=profile or ('privacy-review' if with_patches else 'none'),
                 release_approved=False)
     for owner in ('reasoning','collection','web'):
         result=git(destination,'merge','--no-ff','--no-edit',PINS[owner],check=False)
@@ -130,7 +133,7 @@ if __name__=='__main__':
     parser.add_argument('--repo',required=True)
     parser.add_argument('--destination',required=True)
     parser.add_argument('--with-proposed-patches',action='store_true')
-    parser.add_argument('--patch-profile',choices=['web-owned'])
+    parser.add_argument('--patch-profile',choices=['web-owned','privacy-review','hmem-review'])
     parser.add_argument('--require-current',action='store_true',help='Compare pins to already-fetched origin refs; performs no fetch')
     args=parser.parse_args()
     try:print(json.dumps(rehearse(args.repo,args.destination,args.with_proposed_patches,args.patch_profile,args.require_current),indent=2))

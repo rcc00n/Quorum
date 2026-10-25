@@ -1,24 +1,3 @@
-diff --git a/docs/DECISIONS.md b/docs/DECISIONS.md
-index c331806..a9a47f4 100644
---- a/docs/DECISIONS.md
-+++ b/docs/DECISIONS.md
-@@ -192,6 +192,8 @@ Four things are deferred. For the first of them, data accumulates from day one.
- 
- ## Still to clarify
- 
-+**Owner-review support proposal (2026-10-24, rcc00n / Codex):** an optional reference H-MEM sidecar can persist source-attributed framing and confirmed-evidence candidates from internal `frame` state, and prioritize exact authorized DocRefs in research round 2. Default off; forced/requested dry mode performs no memory I/O; fresh fetch/stance/quote/independence checks and the existing candidate cap remain mandatory. No snapshot fields or confirmation rules change. Offline TEST-state hook tests and unchanged-reference conformance establish preparation only; Yelysei must approve/adopt and provide genuine feature evidence before claiming sponsor completion. Anastasia reviews namespace/hash/access provenance. This is a proposed patch, not a change to the owner's go/no-go decision.
-+
- Seven questions the team has not closed yet.
- 
- - [ ] Whether the model's own rating is needed as a fifth mode already in the MVP. Default: no.
-@@ -234,6 +236,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in
- 
- | Date | Who (human / tool) | What was decided | Why |
- | --- | --- | --- | --- |
-+| 2026-10-24 | rcc00n / Codex, explicit cross-team support authorization | Prepare owner-review-only H-MEM frame/research hooks, default off with zero dry writes, exact DocRef identity and fresh verification; no production/sponsor completion claim. | Make the existing owner proposal executable and testable offline without changing unreviewed owner branches or the strict snapshot contract. |
- | 2026-10-24 | rcc00n / Codex, explicit local rehearsal authorization | Local rehearsal retains all owner decision rows, additive environment/ignore entries and both development-contract and production-bridge gates; integration workflow approval is Issue #2 comment 6390138653. No product threshold, strict contract or publication authority changed. | Exercise reasoning → collection → web together without overwriting owner history or pushing rehearsal merges. |
- | 2026-10-24 | Yelysei / Claude Code (Yelysei's choice between keeping the full chain, this, and skipping research round 2 as well) | The impact bar gates the expensive checks: events that cannot reach the threshold even with full confirmation keep both research rounds on the fast lane but skip the blind fact-checker and the reviewer; their claims export `fact_checker: unverified` (reason "skipped…"), status = verifier's verdict, no `resolved_by`, adjudication "not double-checked" (Selecting major news). | 77% of the first genuine runs' calls, all of the large-model calls, went to events that could not become stories; roundup labels are not published facts. Alternative rejected: skipping research round 2 too would have left roundup labels on the event's own documents only. |
- | 2026-10-24 | Anastasia / Claude Code (proposal, Issue #2 6385696755); agreed by Yelysei / Claude Code; Vadim pending | `integration` branch cut from master; blocks merge there first through owner PRs in the order yelysei/agents → data-collection → feature/web-portals (merge commits); small compatibility fixes allowed there with a DECISION record; CI and the release checklist run against it; master stays the demo fallback until it is green (see Shared development coordination). | Compatibility problems are found and fixed in one place while master remains the last state that demonstrably worked. |
 diff --git a/reasoning/config/reasoning.toml b/reasoning/config/reasoning.toml
 index 78b1b11..b996886 100644
 --- a/reasoning/config/reasoning.toml

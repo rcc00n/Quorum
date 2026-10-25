@@ -45,3 +45,12 @@ class RehearsalTests(unittest.TestCase):
             with self.assertRaises(ValueError):module.rehearse(d,Path(d)/'new',profile='web-owned',require_current=True)
             self.assertFalse((Path(d)/'new').exists())
             self.assertFalse(any('worktree' in call.args for call in git.call_args_list))
+
+
+    def test_ordinary_profiles_exclude_rejected_memory_hooks(self):
+        directory=Path(__file__).with_name('patches')
+        for kwargs in ({'with_patches':True},{'profile':'privacy-review'}):
+            selected=module.selected_patches(directory,**kwargs)
+            self.assertTrue(any('public-failure' in p.name for p in selected))
+            self.assertFalse(any(p.name in module.HMEM_REVIEW_ONLY for p in selected))
+        self.assertTrue(any(p.name in module.HMEM_REVIEW_ONLY for p in module.selected_patches(directory,profile='hmem-review')))
