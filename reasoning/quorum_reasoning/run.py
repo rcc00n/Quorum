@@ -133,6 +133,9 @@ def main(argv: list[str] | None = None) -> int:
                 for lane in ("default", "fact_checker"):
                     r = llm.test_connection(lane)
                     print(f"{r['lane']:<13} route {r['route']}  answered by {r['answered_by'] or '?'}  reply: {r['reply']!r}")
+                    if "receipt_id" in r:  # the Meterless route: the pin the runtime accepted and the receipt to check it by
+                        verdict = f"SUBSTITUTED by {r['substituted']}" if r.get("substituted") else "lane held"
+                        print(f"{'':<13} provider_model {r['provider_model'] or '?'}  routed_model {r['routed_model'] or '?'}  receipt_id {r['receipt_id'] or '?'}  hmem injected {r['hmem_injected']}  {verdict}")
         except Exception as exc:  # noqa: BLE001 — a CLI check reports, it does not trace
             print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
             return 2
