@@ -323,3 +323,69 @@ Owner Vadim / Codex; branch `feature/web-genuine-integration`, based on clean `1
 **WEB-RELEASE-INTEGRITY — TESTED locally:** a successful source-bound build receipt is required before packaging; stale/incomplete builds and changed sources are rejected. Packaging exports tracked portal/deploy files only and rejects private runtime paths. Existing upgrade backup/rollback tests pass. No production package was deployed, no service changed and no publication was enabled. **WEB-INTEGRATION-CI — IMPLEMENTED:** feature-web/integration/PR triggers now run isolated Chromium auth/reasoning/skipped-check tests; hosted results must be verified separately after push.
 
 Routine diagnostics: doctor 15 PASS / 0 FAIL / 1 BLOCKED / 1 NOT_TESTED; verify 31 PASS / 0 FAIL / 2 BLOCKED / 1 NOT_TESTED. Actual bundled sample SQL passed this session; startup headroom and missing Meterless model configuration remain blockers. No inference requested. Read-only merge-tree conflicts remain `.env.example` + `docs/DECISIONS.md` for reasoning/collection, `.gitignore` + `docs/DECISIONS.md` for reasoning/web; no owner application paths overlap. Integration remains reasoning → collection → web, followed by combined verification/review. Config attestation, sponsor execution/H-MEM, secure production bridge, genuine exported claim evidence/story and final release gates remain open.
+
+## Combined web integration — code checkpoint 9421cc8
+
+Owner: Vadim / Codex. WEB-INTEGRATION-03 is INTEGRATED for the combined code and
+local snapshot handoff; production publishing and full sponsor acceptance remain BLOCKED.
+PR #5 merged with two-parent commit `9421cc831d4a72e3dc8c08d5351e0e7c9dc19f7e`.
+Its tree equals tested web HEAD `1d72e451a706c4475c34e641c703e2661994ecb8` exactly.
+The web branch merged reasoning+collection `b1d9ee9` through `b86e672`; all decision
+rows, environment blocks and owner ancestry survived. Master and existing worktrees
+were preserved; no squash, force-push, inference, production deployment or publisher activation.
+
+### Verification and limits
+
+- Reasoning: 402 PASS with Python socket connections blocked. The existing journal
+  test requires a synthetic route (`http://127.0.0.1:1`, TEST key), even though it stubs
+  graph execution. PR #9 removes that credential dependency and adapts the requested
+  public-failure privacy amendments to current reasoning; its 420 tests pass without
+  model credentials. Owner review remains required; H-MEM hooks are excluded.
+- Django: 75 PASS with all three private-original tests enabled (v3 and v4).
+  System check and migration-drift checks pass. Hosted CI skips private originals.
+- Deployment: 12 PASS; tooling: 8 PASS. Temporary filesystem rollback tests stub
+  service commands; they do not establish target-host restore/rollback acceptance.
+- Next production build, TypeScript, ratings/null/threshold/link checks, editorial
+  guards, trace isolation/skipped-check logic and projected API TypeScript contracts PASS.
+- Current collection CSV/provenance/wire/outlet contracts PASS. All three canonical
+  `docs/examples` snapshots and a newly generated fictional graph snapshot pass the
+  actual portal parser. Stand-ins do not establish real inference integration.
+- Actual isolated HTTP/Chromium suites PASS: existing auth/CSRF/roles/routes and
+  snapshot correction/rollback; canonical fictional main/empty/partial/retry/XSS;
+  skipped-check attribution and keyboard focus; unchanged genuine v3 and genuine v4.
+  Desktop/tablet/mobile widths 1440/768/390; v4 screenshots inspected.
+- Genuine v4: exact original SHA `ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79`,
+  1 story, 26 roundup, 235 traces, 12 claims. Historical score 6 is retained with an
+  explicit impact hold; rejected reviewer proposals are distinguished from final verdicts.
+  Native acceptance returns compatible true, metadata/execution/source-text verification
+  and publication false; issues `producer_config_hash_incomplete` and
+  `impact_score_review_required`. Original evidence is unchanged.
+- Fresh read-only extraction of the hash-matching closed corpus dump: 61/61 DocRef
+  identities/URLs, 12/12 level-2 Unicode quote/hash bindings, no superseded evidence;
+  86 rows = 48 active + 38 folded; current 49/18/1 official, earlier 76+1.
+  Document 141 remains the known collector/quote hash difference. The 49 level-1
+  evidence rows were not independently re-fetched. No ledger/journal execution proof.
+- Actual clean package: 2663 entries, no links/credentials/private originals/runtime
+  database; SHA `6cb9a27d0ef52c721422258d9a53e9b9af295c7b506fa246c41dfbfa8ec591e0`.
+  Actual temporary SQLite backup and independent restore preserve integrity and the
+  TEST account. The actual packaged Django and standalone Next also start on fresh
+  loopback ports; after restoring the disposable auth database, CSRF login succeeds
+  and the authenticated feed correctly stays pending with publication disabled.
+  This local package is not a production release.
+- Routine diagnostics: doctor 15 PASS / 0 FAIL / 1 BLOCKED / 1 NOT_TESTED; verify
+  31 PASS / 0 FAIL / 2 BLOCKED / 1 NOT_TESTED. Real Zetaris SQL `SELECT 1`, bundled
+  dataset rows and the official bundle verifier PASS. Startup headroom and missing
+  Meterless model route remain blocked. Official reference H-MEM smoke (10 tests)
+  and persistence/state smoke pass; owner-graph adoption/conformance remains blocked.
+- Hosted code-head checks: [push 40166062182](https://github.com/rcc00n/Quorum/actions/runs/40166062182)
+  and [PR 40166064848](https://github.com/rcc00n/Quorum/actions/runs/40166064848)
+  SUCCESS, both portal/Chromium and combined-python jobs. The combined job uses
+  Python 3.11 with sockets blocked; portal retains production-compatible Python 3.10.
+
+Private logs, reports, database rehearsals and screenshots remain outside Git under
+`~/.local/share/quorum/experiments/web-final-integration/`. Pending gates: reasoning
+owner review of PR #9, genuine execution/config/ledger/journal reconciliation,
+historical impact disposition, Meterless → Nemotron proof, owner H-MEM decisions,
+approved production bridge and target-host release/security/restore acceptance.
+The next canonical paid run belongs to the reasoning owner and needs separate spend
+agreement. Existing collection work and provenance review are not requested again.

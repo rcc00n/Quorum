@@ -4,6 +4,21 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. Production remains `20261023-web-portals-09f5325`; this milestone is local-only.
 
+## Combined integration checkpoint
+
+Supersedes local-only/merge-pending descriptions below for this checkpoint; historical
+milestones and production evidence remain retained. Owner Vadim, web branch
+`feature/web-genuine-integration`, merged PR #5, integration `9421cc8`.
+Exact checks and remaining evidence limits: [combined verification](PORTAL_VERIFICATION.md#combined-web-integration--code-checkpoint-9421cc8).
+
+| Feature ID | Status | Evidence | Remaining dependency |
+| --- | --- | --- | --- |
+| WEB-INTEGRATION-03 | INTEGRATED, local snapshot/code boundary | Reasoning + collection + web merged preserving history; fresh fictional graph handoff and unchanged genuine v3/v4 authenticated browser acceptance | Production bridge/release and full execution/sponsor proof remain BLOCKED |
+| WEB-GENUINE-V4 | TESTED, unpublished | 1 story / 26 roundup / 235 traces / 12 claims; exact-byte private originals, visible impact hold | Full config/ledger/journal provenance and owner impact disposition |
+| WEB-INTEGRATION-CI | TESTED hosted | Both portal/Chromium and socket-blocked combined-python jobs passed for PR #5 | Recheck each new integration SHA |
+| WEB-RELEASE-INTEGRITY | TESTED locally | Compiled-output receipt, actual package startup, disposable auth backup/restore/login; temporary-filesystem rollback | Target-host release/security/rollback acceptance |
+| REASONING-PUBLIC-FAILURE-01 | TESTED; owner review pending | PR #9, 420 socket-blocked tests; requested type/status/lowercase/raw-error disclosures | Yelysei review; no H-MEM adoption |
+
 | Feature ID | Feature / implementation | Status | Test evidence / deployment | Dependencies |
 | --- | --- | --- | --- | --- |
 | WEB-CATALOG-RATINGS | Provenance-preserving export, exact preview source join, real registry four modes and attributed audience | TESTED locally; not DEPLOYED | 58 Django tests, exporter/upgrade tests, build/TS and authenticated real-catalog browser acceptance at three widths | Final genuine model snapshot; production bridge/release approval |
