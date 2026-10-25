@@ -135,7 +135,7 @@ async function main(args) {
       if(i===3){await hold(162);const detail=page.locator('.rating-provenance').first();await detail.locator('summary').click();}
       await hold(125+i*15);
       assert.equal(await page.getByLabel('Rating mode',{exact:true}).inputValue(),mode);
-      console.log('PASS: sustained recorded rating mode '+mode);
+      console.log('PASS: '+(scenesOnly?'captured authenticated rating mode ':'sustained recorded rating mode ')+mode);
     }
     await page.locator('.r-corpus-binding').scrollIntoViewIfNeeded();await hold(185);
     await page.locator('.r-upstream-errors > summary').click();await hold(195);

@@ -40,3 +40,12 @@ Human pass: check the first and final frames, captions, voice timing, source att
 A full genuine-data rehearsal completed at 229.8 seconds (silent WebM), with VTT narration captions, immutable-original receipt and a separate artifact hash manifest outside Git. Chromium decoded the file for visual inspection. Review caught the spectrum section centering on its long source list; the recorder now asserts that the real rating selector stays in view during each mode switch, then opens source attribution separately. The original-hash, 40-source authenticated catalog binding, four modes and final limitation matrix are mandatory checks, not optional fixture fallbacks.
 
 Native original-file acceptance was also rerun: presentation-compatible, `producer_config_mismatch`, no execution/source-text verification and no publication. These limits stay in the speaking script. The video is a private rehearsal artifact; narration audio, human privacy/content review, final export/slides and submission remain unfinished.
+
+
+## Final submission edit — 2026-10-25 UTC
+
+The current private master is a frame-indexed **222.0-second (3:42)** cut, not the older timed capture described above. `build_submission_video.py` combines reviewed genuine footage with explicit authenticated UI still holds, burns synchronized captions and writes VTT/SRT plus an exact script for Vadim. It does not change producer data or fabricate interface states. The 44 transition-neighbor frames and all four encoded native rating labels pass independent checks; the seven-slide PDF/offline HTML deck is separately prepared by `prepare_submission_docs.py`.
+
+No reliable natural offline voice was available. The captioned silent master and exact 441-word recording script are the permitted fallback; no audio-synchronization pass is claimed. Final human publication/rights/workspace review and genuine sponsor/execution evidence remain open. Originals, media and private packages remain outside Git; tooling/documentation commits remain local under the current no-publication instruction.
+
+Current official organizer rule 5.1 independently confirms Cursor is optional. Zetaris and Meterless remain required, as recorded canonically in `docs/RULES_CHECK.md`. The public event does not establish accepted workspace file formats/sizes. No source/media upload, merge, deployment or submission is performed by this workflow.
