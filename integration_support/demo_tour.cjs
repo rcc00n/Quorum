@@ -12,6 +12,11 @@ function verifyEvidence(snapshot,sidecar) {
   assert.equal(p.stories.length,0);assert.equal(p.roundup.count,28);
   return p;
 }
+function verifyCatalog(catalog) {
+  assert.equal(catalog.revision,'8f126c57a9ef9af798543bf23a0a60737b0ce5dc','Pinned genuine source catalog required');
+  assert.equal(catalog.sources.length,40,'All 40 source definitions required');
+  assert.equal(new Set(catalog.sources.map(s=>s.id)).size,40,'Unique source identities required');
+}
 function externalNewOutput(output) {
   assert.ok(path.isAbsolute(output));assert.ok(!fs.existsSync(output),'Output must be new');
   for(let dir=path.dirname(output);;dir=path.dirname(dir)) {
@@ -56,11 +61,16 @@ async function main(args) {
   assert.equal(execFileSync('git',['status','--porcelain'],{cwd:candidate,encoding:'utf8'}).trim(),'');
   const build=process.env.QUORUM_WEB_BUILD,python=process.env.QUORUM_PYTHON;
   assert.ok(build&&python,'Explicit isolated build and Python required');
+  // DECISION(2026-10-24, rcc00n/Codex): require and forward the genuine source registry before recording.
+  // Why: a preview without its catalog omits ratings; a successful partial tour must not conceal that gap.
+  const catalog=process.env.QUORUM_TEST_CATALOG_FILE;
+  assert.ok(catalog,'Export the pinned collection catalog and set QUORUM_TEST_CATALOG_FILE');
+  verifyCatalog(JSON.parse(fs.readFileSync(catalog,'utf8')));
   execFileSync(python,['-c','from deploy.build_integrity import validate_build; import sys; validate_build(".",sys.argv[1])',build],{cwd:candidate,stdio:'pipe'});
   assert.ok(fs.statSync(matrix).isFile());fs.mkdirSync(output,{recursive:true,mode:0o700});
   fs.copyFileSync(matrix,path.join(output,'release-matrix.html'));
   fs.writeFileSync(path.join(output,'narration.vtt'),captions(),{mode:0o600});
-  const env={PATH:process.env.PATH,HOME:process.env.HOME,LANG:'C.UTF-8',QUORUM_DRY_RUN:'1',NEXT_TELEMETRY_DISABLED:'1',QUORUM_WEB_BUILD:build,QUORUM_PYTHON:python,QUORUM_TEST_REASONING_SIDECAR:sidecar};
+  const env={PATH:process.env.PATH,HOME:process.env.HOME,LANG:'C.UTF-8',QUORUM_DRY_RUN:'1',NEXT_TELEMETRY_DISABLED:'1',QUORUM_WEB_BUILD:build,QUORUM_PYTHON:python,QUORUM_TEST_REASONING_SIDECAR:sidecar,QUORUM_TEST_CATALOG_FILE:catalog};
   const child=spawn(process.execPath,[path.join(candidate,'web/tests/boundary.cjs'),'--reasoning','--reasoning-file',snapshot,'--serve'],{cwd:candidate,env,stdio:['ignore','pipe','ignore']});
   let browser,context;
   try {
@@ -83,6 +93,7 @@ async function main(args) {
     const session=await (await context.request.get(root+'/api/session/')).json();
     assert.equal((await context.request.post(root+'/api/login/',{headers:{'X-CSRFToken':session.csrfToken,Origin:root},data:{username:'DEMO-boundary-reader',password}})).status(),200);
     const payload=await (await context.request.get(root+'/api/preview/reasoning/')).json();
+    assert.equal(payload.catalog_revision,'8f126c57a9ef9af798543bf23a0a60737b0ce5dc');assert.equal(payload.sources.length,40);
     assert.equal(payload.preview.sha256,PINS.snapshot);assert.equal(payload.preview.published,false);
     assert.equal(payload.reasoning.roundup.count,28);assert.equal(payload.reasoning.stories.length,0);
     assert.equal((await (await context.request.get(root+'/api/feed/')).json()).status,'pending');
@@ -129,5 +140,5 @@ async function main(args) {
     await new Promise(resolve=>{if(child.exitCode!==null)return resolve();const timer=setTimeout(()=>{child.kill('SIGTERM');resolve();},5000);child.once('exit',()=>{clearTimeout(timer);resolve();});});
   }
 }
-module.exports={verifyEvidence,externalNewOutput,captions};
+module.exports={verifyEvidence,verifyCatalog,externalNewOutput,captions};
 if(require.main===module)main(process.argv.slice(2)).catch(error=>{const location=String(error.stack||'').match(/integration_support\/demo_tour\.cjs:\d+:\d+/);if(location)console.error('Check location: '+location[0]);console.error('FAIL: private demo rehearsal; inputs and local credentials withheld');process.exitCode=1;});

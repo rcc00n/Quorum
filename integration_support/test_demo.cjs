@@ -1,7 +1,9 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {verifyEvidence,externalNewOutput,captions}=require('./demo_tour.cjs');
+const {verifyEvidence,verifyCatalog,externalNewOutput,captions}=require('./demo_tour.cjs');
 assert.throws(()=>verifyEvidence(Buffer.from('{"fictional":false}'),Buffer.from('TEST')),/Original snapshot required/);
 assert.throws(()=>externalNewOutput('relative/TEST'));
+assert.throws(()=>verifyCatalog({revision:'TEST',sources:[]}));
+assert.throws(()=>verifyCatalog({revision:'8f126c57a9ef9af798543bf23a0a60737b0ce5dc',sources:Array.from({length:40},()=>({id:'TEST-duplicate'}))}),/Unique source/);
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'quorum-demo-test-'));
 try {
   assert.throws(()=>externalNewOutput(temp));

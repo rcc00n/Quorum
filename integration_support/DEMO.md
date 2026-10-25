@@ -14,17 +14,21 @@ RC-01 · Presenter: Vadim. Use the web-owned candidate and unchanged original v3
 
 ## Reproduce privately
 
-Build/typecheck the fresh web-owned candidate first using the existing external dependency installation. Run its complete browser checks. Export this matrix as a local HTML artifact for the final scene; it must contain the actual verified evidence and remaining blockers, not invented sponsor metrics. Then:
+Build/typecheck the fresh web-owned candidate first using the existing external dependency installation. Export definitions with `python3 <candidate>/deploy/export-catalog.py origin/data-collection <NEW-external-catalog.json>` and provide that file to both the browser boundary and recorder. This uses the genuine pinned source registry, not a substitute snapshot. The recorder requires the pinned revision and 40 unique sources, then checks the authenticated API actually binds that catalog before creating a page. Run its complete browser checks. Export this matrix as a local HTML artifact for the final scene; it must contain the actual verified evidence and remaining blockers, not invented sponsor metrics. Then:
 
 ```bash
 QUORUM_PYTHON=<existing-portal-python> \
+QUORUM_TEST_CATALOG_FILE=<exported-genuine-40-source-catalog> \
 QUORUM_WEB_BUILD=<external-matching-build> \
 PLAYWRIGHT_MODULE=<installed-playwright-module> \
+PLAYWRIGHT_BROWSERS_PATH=<cache-with-matching-recording-encoder> \
 CHROMIUM_PATH=<installed-chromium> \
 node integration_support/demo_tour.cjs \
   <web-owned-candidate> <original-v3-snapshot> <original-v3-sidecar> \
   <NEW-external-private-output> <local-matrix-html>
 ```
+
+The Playwright version must have its matching FFmpeg revision in the selected cache. The first local attempt stopped before opening a page because FFmpeg 1013 was absent; the official matching 2.2 MiB recording bundle was installed into an external experiment directory without modifying the existing browser caches or system tools. This is a recording dependency, not sponsor execution.
 
 The recorder checks exact original hashes, a clean candidate and matching compiled receipt before starting. It creates only its own disposable loopback services/accounts, blocks external browser requests, never follows publisher links and stops its children afterward. Recordings/captions/receipts stay outside Git. `narration.vtt` is a timed speaking/caption script; the captured WebM is silent and needs final human narration/edit/review. The receipt explicitly keeps publication, execution attestation, owner memory adoption and sponsor completion false. Never upload it automatically.
 
