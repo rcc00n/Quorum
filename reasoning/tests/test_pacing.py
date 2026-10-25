@@ -475,6 +475,9 @@ def test_seed_journal_loads_replay_without_a_checkpoint(tmp_path, monkeypatch):
         raise llm.RateLimitAbort("m", 2)  # leave main() through the path it already handles (exit 3); the assertions are on `seen`
 
     monkeypatch.setattr(graph, "run_local", fake_run_local)
+    monkeypatch.setattr(llm, "journal_loaded_for", None)  # main() sets it; restore so no later test keeps a stale ledger
+    monkeypatch.setattr(llm, "current_run_id", None)
+    monkeypatch.setattr(llm, "journal_path", None)
     monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None, raising=False)
     monkeypatch.setenv("QUORUM_DRY_RUN", "0")
     rc = run_cli.main(["--topic", "russia-ukraine-war", "--date", "2026-10-24", "--model", "live", "--attempt", "7", "--seed-journal", "--quiet", "--out", str(tmp_path)])
