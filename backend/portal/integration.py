@@ -114,7 +114,7 @@ class PublishedAdapter:
 
         # Installed reasoning 1.0 editions answer first when the login-only reader is switched on
         # (decision at the top of reasoning_editions.py); otherwise the published store as before.
-        installed = reasoning_editions.snapshot(day, topic, revision)
+        installed = reasoning_editions.feed(day, topic, revision)
         if installed is not None:
             return installed
         catalog = CatalogAdapter().snapshot()

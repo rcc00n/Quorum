@@ -60,6 +60,7 @@ def install(raw, sidecar_raw, p, options, report):
         snapshot_sha256=options['sha256'],
         sidecar_sha256=options['sidecar_sha256'],
         producer_commit=options['producer_commit'],
+        config_source='file' if options.get('producer_config') else 'git',
         topic_id=p['topic_id'],
         edition_date=p['edition_date'],
         version=p['version'],
@@ -98,6 +99,7 @@ class Command(BaseCommand):
         report = dict(report_version=1, compatible=False, metadata_valid=False,
                       execution_verified=False, source_text_verified=False, published=False, issues=[])
         raw = sidecar_raw = p = None
+        report['config_source'] = 'file' if options.get('producer_config') else 'git'
         try:
             for key in ('sha256', 'sidecar_sha256'):
                 require(re.fullmatch(r'[0-9a-f]{64}', options[key]), 'expected_full_sha256_required')
@@ -142,6 +144,8 @@ class Command(BaseCommand):
                 require(isinstance(declared, str) and re.fullmatch(r'[0-9a-f]{64}', declared), 'invalid_config_sha256')
                 # DECISION(2026-10-24, rcc00n/Codex): compare local Git bytes, never repair the sidecar or fetch a corpus.
                 # Why: metadata compatibility is separate from independently verified execution and publication.
+                # Amended 2026-10-26 (Anastasia/Claude Code, PR #31): the bytes may come from --producer-config on a
+                # release without .git; the report says which (`config_source`). The rule itself is unchanged.
                 config = producer_config(options, commit)
                 actual = hashlib.sha256(config).hexdigest()
                 report.update(producer_commit=commit, declared_config_sha256=declared, git_config_sha256=actual)

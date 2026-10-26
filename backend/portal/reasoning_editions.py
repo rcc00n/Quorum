@@ -128,6 +128,7 @@ def edition_of(p, result):
         "edition_window_utc": [p["window"]["start"], p["window"]["end"]],
         "closed_edition": bool(binding.get("closed_edition")),
         "warnings": list(preview.get("warnings") or []),
+        "missing_provenance": list(preview.get("missing_provenance") or []),
         "roundup": [
             {
                 "name": group["name"],
@@ -167,6 +168,7 @@ def snapshot(day, topic="", revision=None):
         catalog = None
     names = {t["id"]: t["name"] for t in (catalog["topics"] if catalog else [])}
     events, editions, digests, errors, sources, seen = [], [], [], [], {}, []
+    edition_of_event = {}
     fictional, partial, generated, expires, published, run_ids = False, [], [], [], [], []
     for name, (version, path) in sorted(index.items()):
         if topic and name != topic:
@@ -191,6 +193,8 @@ def snapshot(day, topic="", revision=None):
         digests.extend(result["digests"])
         errors.extend(p.get("errors", []))
         editions.append(edition_of(p, result))
+        for event_row in result["events"]:
+            edition_of_event[event_row["id"]] = editions[-1]
         generated.append(p["generated_at"])
         expires.append(p["expires_at"])
         run_ids.append(p["run_id"])
@@ -226,12 +230,27 @@ def snapshot(day, topic="", revision=None):
             "published_at": max(published) if published else None,
             "installed_at": max(published) if published else None,
             "provisional": any(e["provisional"] for e in editions),
+            # The earliest capture time among the provisional editions served; event() narrows it to the
+            # event's own edition (Yelysei's re-review of PR #31).
+            "corpus_as_of_utc": min(
+                (e["corpus_as_of_utc"] for e in editions if e["provisional"] and e["corpus_as_of_utc"]),
+                default=None,
+            ),
             "warnings": list(dict.fromkeys(w for e in editions for w in e["warnings"])),
             "fallback": False,
             "mode": "demo" if fictional else "live",
         },
         "errors": errors,
+        "_edition_of_event": edition_of_event,
     }
+
+
+def feed(day, topic="", revision=None):
+    """snapshot() for the feed: the per-event helper map is not part of the API."""
+    result = snapshot(day, topic, revision)
+    if result is not None:
+        result.pop("_edition_of_event", None)
+    return result
 
 
 def event(event_id, day="", revision=None):
@@ -250,5 +269,10 @@ def event(event_id, day="", revision=None):
                 break
     if result is None:
         return None
+    own = result.pop("_edition_of_event", {}).get(event_id)
+    if own:
+        result["publication"]["provisional"] = own["provisional"]
+        result["publication"]["corpus_as_of_utc"] = own["corpus_as_of_utc"]
+        result["publication"]["warnings"] = list(own["warnings"])
     result["events"] = [e for e in result["events"] if e["id"] == event_id]
     return result

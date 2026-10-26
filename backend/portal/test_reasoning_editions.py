@@ -197,7 +197,13 @@ class ReasoningEditionsTests(TestCase):
         self.assertFalse(edition["closed_edition"])
         self.assertTrue(any("not publication-approved" in w for w in edition["warnings"]))
         self.assertTrue(data["publication"]["provisional"])
+        self.assertEqual(data["publication"]["corpus_as_of_utc"], edition["corpus_as_of_utc"])
         self.assertEqual(data["publication"]["warnings"], edition["warnings"])
+        self.assertIn("missing_provenance", edition)
+        self.assertNotIn("_edition_of_event", data)
+        detail = self.client.get(f"/api/events/{story['stories'][0]['event_id']}/?date=2026-10-22").json()
+        self.assertEqual(detail["publication"]["corpus_as_of_utc"], edition["corpus_as_of_utc"])
+        self.assertNotIn("_edition_of_event", detail)
         self.assertEqual(data["publication"]["installed_at"], data["publication"]["published_at"])
 
     def test_roundup_vocabulary_maps_to_claim_statuses_and_keeps_the_labels(self):
@@ -227,6 +233,7 @@ class ReasoningEditionsTests(TestCase):
             call_command("reasoning_snapshot", stdout=out, **options, producer_config=str(config), install=True)
         report = json.loads(out.getvalue())
         self.assertTrue(report["metadata_valid"] and report["installed"])
+        self.assertEqual(report["config_source"], "file")
         config.write_bytes(b"TEST other config")
         out = io.StringIO()
         with patch(COMMAND, side_effect=AssertionError("git must not be called")), self.assertRaises(CommandError):
