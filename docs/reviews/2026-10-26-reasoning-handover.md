@@ -53,7 +53,13 @@ Do not write "Build rule met" before those.
    - REASON-ENGINE-01 status, using the wording above;
    - the `spectrum.readings` fields and the parser change for Anastasia;
    - "PR #29 ready to merge" for Anastasia, who merges into `integration`.
-3. **Reviews of Anastasia's PR #30** (README submission) and **PR #31** (login-only reader, `manage.py reasoning_snapshot … --install`). Scope: the reasoning facts and the contract. A review was started and its results may already sit in the session; otherwise redo it.
+3. **Reviews of Anastasia's PR #30** (README submission) and **PR #31** (login-only reader, `manage.py reasoning_snapshot … --install`) are posted (#30: 6429149662, #31: 6429149974). When she pushes fixes, re-check the blocking items.
+4. **Reasoning's own docs, in PR #29.** They contradict the code and the README:
+   - ARCHITECTURE § 7 says `meterless/auto`, but the code pins exact Nemotron ids;
+   - ARCHITECTURE § 10 still says "BLOCKED: the Nightshift route" and the Engine is "pending";
+   - `.env.example` defaults `NEMOTRON_MODEL=meterless/auto`.
+
+   Fix them to match `reasoning/README.md` › Decisions and the Build-rule wording above.
 
 ## 4. Tuesday 27 Oct (UTC / New York)
 
@@ -66,7 +72,7 @@ Do not write "Build rule met" before those.
   4. `ai-regulation-export-controls`.
 
   **Stop rule (Yelysei's):** stop at the first error. That means 403 or any 4xx/5xx, `route_substituted`, `lane_unverified`, injected H-MEM memories, a Traceback, or a non-zero exit. Find the cause before you go on.
-- **After each topic.** Write the sidecar with `corpus_as_of`. Hand the files to Yelysei to **email to Anastasia**: snapshot, sidecar, both `.sha256` files, and the producer commit.
+- **After each topic.** Write the sidecar with `corpus_as_of`. **Push the producer commit to `origin/yelysei/agents` first**: her installer resolves it in its own clone. Then hand the files to Yelysei to **email to Anastasia**: snapshot, sidecar, both `.sha256` files, and the producer commit.
 - **Deadline for the files.** All files reach her **by 14:00Z, and by 14:30Z at the latest**. She installs them with `manage.py reasoning_snapshot --file … --sha256 … --sidecar … --sidecar-sha256 … --producer-commit … --install` (PR #31).
 - **After she confirms an install.** Export with `export_public_edition.py` into `docs/examples/editions/2026-10-27/`. Then fill the README samples (PR #30).
 - **About 16:00–22:00Z.** Video with audio, showing Meterless working; slides; the HackOS form. Submit with margin before 23:45Z.
