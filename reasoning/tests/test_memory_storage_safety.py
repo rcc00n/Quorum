@@ -5,18 +5,26 @@ from test_source_memory import state, live_memory, TEXT
 from quorum_reasoning.tools import memory
 
 
+def symlink_or_skip(link, target, **kw):
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a symlink test skips when the OS refuses to create the link.
+    # Why: Windows creates symlinks only with Developer Mode or elevation (WinError 1314); the store check itself
+    # (sidecar.mjs inspectStore) is unchanged and still rejects links where they exist.
+    try:link.symlink_to(target,**kw)
+    except OSError as exc:pytest.skip(f'symlinks unavailable here ({type(exc).__name__})')
+
+
 def test_symlinked_state_is_rejected_without_reading_or_mutating_target(live_memory,tmp_path):
     s=state();memory.remember(s,[])
     original=(live_memory/'state.json').read_bytes()
     target=tmp_path/'TEST-protected.json';target.write_bytes(original)
-    (live_memory/'state.json').unlink();(live_memory/'state.json').symlink_to(target)
+    (live_memory/'state.json').unlink();symlink_or_skip(live_memory/'state.json',target)
     with pytest.raises(Exception):memory._call(s,'recall',query=TEXT)
     assert target.read_bytes()==original
 
 
 def test_symlinked_root_is_rejected(live_memory,tmp_path,monkeypatch):
     s=state();memory.remember(s,[])
-    link=tmp_path/'TEST-link';link.symlink_to(live_memory,target_is_directory=True)
+    link=tmp_path/'TEST-link';symlink_or_skip(link,live_memory,target_is_directory=True)
     monkeypatch.setenv('QUORUM_HMEM_DIR',str(link))
     with pytest.raises(Exception):memory._call(s,'recall',query=TEXT)
 

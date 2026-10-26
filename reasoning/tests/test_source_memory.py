@@ -31,7 +31,12 @@ def state():
 def live_memory(monkeypatch,tmp_path):
     import os
     home=Path(os.getenv('METERLESS_HOME','/nonexistent'))
-    if not (home/'engines/hmem/reference/node_modules/.bin/tsx').is_file():pytest.skip('installed reference/TSX not supplied')
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): skip exactly when memory._launcher cannot start the sidecar
+    # (Node and the checkout's tsx/dist/cli.mjs, or QUORUM_HMEM_TSX), not on the POSIX .bin/tsx shim. Why: patch 0012
+    # moved the launcher off that shim; the old check ran these tests where the launcher fails, and skipped them where
+    # only the shim is missing. The engine-free contract tests are tests/test_source_memory_contract.py.
+    try:memory._launcher(home)
+    except ValueError:pytest.skip('installed reference/TSX not supplied')
     monkeypatch.delenv('QUORUM_DRY_RUN',raising=False)
     directory=tmp_path/'private-memory'
     monkeypatch.setenv('QUORUM_HMEM_DIR',str(directory))

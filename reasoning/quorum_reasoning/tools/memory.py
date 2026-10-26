@@ -7,7 +7,7 @@ import subprocess
 import shutil
 from datetime import datetime
 from pathlib import Path
-from .. import config, llm
+from .. import config, llm, untrusted
 from ..trace import step, finish
 from .corpus import OFFICIAL_ID_OFFSET, _edition_window, _previous_window, previous_days
 
@@ -45,7 +45,10 @@ def _call(state, action, **payload):
     launcher = _launcher(home)
     data=json.dumps(dict(action=action,dry_run=state.get('dry_run',True),**payload))
     if len(data.encode())>2*1024*1024:raise ValueError('Memory request too large')
-    result=subprocess.run(launcher + [str(repo/'reasoning/memory/sidecar.mjs')],input=data,text=True,capture_output=True,timeout=20,check=True)
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the sidecar's stdin and stdout are UTF-8 explicitly, not
+    # the locale's code page. Why: on Windows text=True decodes with cp1252 outside `python -X utf8`, while Node writes
+    # UTF-8: a recalled record with a non-ASCII quote or label would be garbled or fail to decode.
+    result=subprocess.run(launcher + [str(repo/'reasoning/memory/sidecar.mjs')],input=data,encoding='utf-8',capture_output=True,timeout=20,check=True)
     if len(result.stdout.encode())>2*1024*1024:raise ValueError('Memory response too large')
     return json.loads(result.stdout)
 
@@ -80,8 +83,13 @@ def remember(state,events):
                     rows.append(dict(base,kind='framing',event_id=event['id'],docref=identity(matches[0]),interpretation_label=row['interpretation_label']))
         result=_call(state,'store',rows=rows) if rows else dict(count=0,ledger_entries=0)
         return [_trace(state,None,f"stored {result['count']} source memories",f"Reference H-MEM; candidate-only records; {result['ledger_entries']} ledger actions")],[]
-    except Exception:
-        return [_trace(state,None,'memory write unavailable','No memory success claimed; private details withheld')],[dict(node='memory',event_id=None,message='Source memory write unavailable')]
+    except Exception as exc:
+        # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a memory failure names its exception type through
+        # untrusted.public_failure, never its text, in the trace reason and the run error. Why: the operator needs
+        # to tell a missing METERLESS_HOME (KeyError) from a timeout or a fail-closed store (CalledProcessError)
+        # without the store path, stderr or a recalled quote reaching the snapshot.
+        failure=untrusted.public_failure(exc)
+        return [_trace(state,None,'memory write unavailable',f'No memory success claimed; {failure}')],[dict(node='memory',event_id=None,message=f'Source memory write unavailable: {failure}')]
 
 
 def prioritize(state,event_id,query,ordered):
@@ -104,5 +112,6 @@ def prioritize(state,event_id,query,ordered):
         rest=[doc for doc in ordered if doc not in candidates]
         trace=_trace(state,event_id,f'recalled {len(candidates)} authorized source candidates',f"Reference H-MEM; fresh verification required; {result['ledger_entries']} ledger actions")
         return candidates+rest,[trace],[]
-    except Exception:
-        return ordered,[_trace(state,event_id,'memory recall unavailable','Ordinary research ranking retained; private details withheld')],[dict(node='memory',event_id=event_id,message='Source memory recall unavailable')]
+    except Exception as exc:
+        failure=untrusted.public_failure(exc)  # decision in remember
+        return ordered,[_trace(state,event_id,'memory recall unavailable',f'Ordinary research ranking retained; {failure}')],[dict(node='memory',event_id=event_id,message=f'Source memory recall unavailable: {failure}')]
