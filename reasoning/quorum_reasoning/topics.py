@@ -297,7 +297,9 @@ def _readable(row: dict[str, Any]) -> str:
 # the overlap rule, input validation); module notes in reasoning/README.md › Decisions.
 
 REQUEST_MAX_CHARS = 80
-KEY_STOPWORDS = frozenset("a about an and at by for from in into of on or over s the to vs with news".split())
+# The web app's STOP list in web/lib/topic-search.mjs, word for word (Issue #2 6411408519 item 1: one list in both
+# codebases); `request_key` has the DECISION.
+KEY_STOPWORDS = frozenset("the a an of in on and or for to vs v at by with".split())
 INTAKE_STATUSES = ("existing", "new", "needs_review", "rejected")
 # mapping.json: one object per request entry, every field present (null when it does not apply), in this order.
 # match: name | slug | headline for existing, and for a needs_review that names an existing topic (a retired one, or
@@ -317,54 +319,44 @@ _COLLECTION_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")  # collectors/schema.s
 ID_BASE_MAX = 60  # a new id's base, so that a "-999" suffix still fits collection's 64 characters
 
 
-# The combining-diacritics blocks: Combining Diacritical Marks, … Extended, … Supplement, … for Symbols, Combining Half
-# Marks. Only these are folded by the key; the vowel signs of Indic and Thai scripts (also category M) are kept.
-_DIACRITICS = ((0x0300, 0x036F), (0x1AB0, 0x1AFF), (0x1DC0, 0x1DFF), (0x20D0, 0x20FF), (0xFE20, 0xFE2F))
-
-
-def _diacritic(c: str) -> bool:
-    return any(lo <= ord(c) <= hi for lo, hi in _DIACRITICS)
+def _utf16_units(s: str) -> int:
+    """JavaScript's `s.length`: an astral-plane character is two UTF-16 code units."""
+    return len(s) + sum(1 for c in s if ord(c) > 0xFFFF)
 
 
 def request_key(text: Any) -> str:
-    r"""The normalised request key: the contract shared with the web app (docs/DECISIONS.md › Daily editions for users).
+    """The normalised request key: the contract shared with the web app (docs/DECISIONS.md › Daily editions for users).
 
-    0. delete every format character (general category Cf: soft hyphen, zero-width space, bidi controls, BOM);
-    1. lowercase, Unicode NFKD, delete the combining diacritics (U+0300-036F, U+1AB0-1AFF, U+1DC0-1DFF, U+20D0-20FF,
-       U+FE20-FE2F), lowercase again;
-    2. delete a full stop that stands between two letters ("U.S." -> "us", "e.g." -> "eg");
-    3. tokens = maximal runs of letters, marks and digits (categories L, M and N); everything else separates tokens;
-    4. drop KEY_STOPWORDS; 5. the unique tokens, sorted by code point, joined by single spaces.
+    The shared definition is the web app's `words()` in web/lib/topic-search.mjs (PR #24); the key is
+    `[...new Set(words(text))].sort().join(" ")`, and this function gives the same string, byte for byte:
 
-    "war in Ukraine" and "Ukraine war" give "ukraine war"; "U.S. tariffs on China!" gives "china tariffs us"; "चीन"
-    (China) and "चना" (chickpea) keep their vowel signs and stay apart. The same in the web app (JavaScript):
+    1. lowercase (`toLowerCase`), then Unicode NFKD, then delete U+0300-036F (Combining Diacritical Marks);
+    2. every run of characters that are neither letters nor digits (categories L and N) becomes one space, so other
+       combining marks (Indic and Thai vowel signs), apostrophes, full stops and format characters separate words;
+    3. drop the tokens of one UTF-16 code unit ("s" of "Biden's", "u" and "s" of "U.S.") and KEY_STOPWORDS;
+    4. the unique tokens, sorted by UTF-16 code units (JavaScript's default `sort()`), joined by single spaces.
 
-        const STOP = new Set("a about an and at by for from in into of on or over s the to vs with news".split(" "));
-        const requestKey = t => [...new Set((String(t ?? "").replace(/\p{Cf}/gu, "").toLowerCase().normalize("NFKD")
-          .replace(/[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/gu, "").toLowerCase()
-          .replace(/(?<=\p{L})\.(?=\p{L})/gu, "").match(/[\p{L}\p{M}\p{N}]+/gu) || [])
-          .filter(w => !STOP.has(w)))].sort().join(" ");
+    "war in Ukraine" and "Ukraine war" give "ukraine war"; "U.S. tariffs on China!" gives "china tariffs". Shared test
+    vectors, for the web app too: reasoning/tests/data/topic_key_vectors.json.
 
-    (`sort()` compares UTF-16 units, which equals code-point order unless the text has astral-plane letters. The
-    docstring is a raw string so that the source shows the JavaScript exactly as it must be copied.)
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; agreed with the web side in Issue #2 6411408519 item 1, adopted
+    in 6411653104): the key is exactly the web app's rule (web/lib/topic-search.mjs; docs/DECISIONS.md › Daily editions
+    for users), including its order (lowercase before NFKD, so "𝐁𝐫𝐞𝐱𝐢𝐭" keys as "Brexit"), its one diacritic block and
+    its UTF-16 length and sort. Why: the web app matches a typed topic to the catalog and stores `requested:<key>` with
+    its own copy, so two copies that differ in one character give two keys for one request.
 
-    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): only the
-    combining diacritics are folded, not every combining mark, and marks count as word characters. Why: deleting all
-    of category M removed the vowel signs of Devanagari and Thai, so "चीन" (China) and "चना" (chickpea) shared a key
-    and were resolved as one request; Latin, Greek and Cyrillic accents are all in the folded blocks.
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei; superseded
+    2026-10-26 in closing round 4 by the DECISION above): only the combining diacritics are folded, not every combining
+    mark, and marks count as word characters. Why: deleting all of category M removed the vowel signs of Devanagari
+    and Thai, so "चीन" (China) and "चना" (chickpea) shared a key and were resolved as one request; Latin, Greek and
+    Cyrillic accents are all in the folded blocks. (Under the web's rule a vowel sign separates words: "चीन" leaves only
+    one-letter tokens, an empty key, and is rejected as "nothing left after normalising"; "चना" keys as "चन".)
     """
-    s = unicodedata.normalize("NFKD", _strip_format(str(text if text is not None else "")).lower())
-    s = "".join(c for c in s if not _diacritic(c)).lower()
-    s = "".join(c for i, c in enumerate(s) if not (c == "." and 0 < i < len(s) - 1 and s[i - 1].isalpha() and s[i + 1].isalpha()))
-    tokens: set[str] = set()
-    cur: list[str] = []
-    for c in s + " ":
-        if unicodedata.category(c)[0] in "LMN":
-            cur.append(c)
-        elif cur:
-            tokens.add("".join(cur))
-            cur = []
-    return " ".join(sorted(t for t in tokens if t not in KEY_STOPWORDS))
+    s = unicodedata.normalize("NFKD", str(text if text is not None else "").lower())
+    s = "".join(c for c in s if not 0x0300 <= ord(c) <= 0x036F)
+    tokens = "".join(c if unicodedata.category(c)[0] in "LN" else " " for c in s).split(" ")
+    words = {t for t in tokens if _utf16_units(t) > 1 and t not in KEY_STOPWORDS}
+    return " ".join(sorted(words, key=lambda w: w.encode("utf-16-be", "surrogatepass")))
 
 
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): any "@" is rejected and withheld (an e-mail address is any
@@ -388,8 +380,14 @@ _DOTS = {0x3002: ".", 0xFF0E: ".", 0xFF61: "."}  # ideographic, full-width and h
 _PHONE_RE = re.compile(
     r"\+\d[\d\s().-]{6,}\d"  # international: +44 20 7946 0958
     r"|(?<!\d)\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"  # North American: (555) 123-4567, 555.123.4567, 5551234567
-    r"|(?<![\d.-])\d{3}[.-]\d{4}(?![\d.-])"  # local: 555-1234 (not "2026-2027", not "100 2026")
+    r"|(?<!\d)\d{3}[.-]\d{4}(?!\d)"  # local: 555-1234 (not "2026-2027", not "100 2026")
 )
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 4, to confirm by Yelysei): a local number
+# is 3 and 4 digits joined by "-" or "." and not inside a longer run of digits; what stands next to it otherwise (a
+# word, a separator, the end of the text) does not matter. Why: the old guard refused any "-" or "." next to it, so
+# "jane-555-1234", "jane.555-1234", "jane/555-1234", "jane_555-1234" (both turned into "-" by `_phone_form`),
+# "555-1234-jane", "call 555-1234." and "call 1-555-1234" passed and became public topic names; dates ("2026-10-26"),
+# years, "H.R. 4521", "Section 301" and "Area 51" have no 3-and-4-digit pair and stay acceptable.
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): before the
 # phone patterns run, every dash-like character (category Pd, and U+2212 minus), "/" and "_" become "-", and a run of
 # digits and separators (space . - ( )) that holds 9 or more digits in 2 or more groups (this group condition superseded
@@ -481,7 +479,7 @@ def check_request(text: Any) -> tuple[str, bool]:
     if not any(c.isalpha() for c in cleaned):
         return "no letters", False
     if not request_key(cleaned):
-        return "nothing left after normalising (only stopwords and punctuation)", False
+        return "nothing left after normalising (only stopwords, one-letter words and punctuation)", False
     return "", False
 
 
@@ -988,9 +986,15 @@ def _entry(index: int, raw: Any) -> dict[str, Any]:
         count = 1
     web_key = entry.get("key") if isinstance(entry.get("key"), str) else None
     key = "" if why else request_key(_clean(text))
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 4, to confirm by Yelysei): the batch
+    # groups and matches by the key of the text with its format characters deleted (`_clean`), but checks the web
+    # app's key against the contract applied to the text as sent. Why: the contract (web/lib/topic-search.mjs) does not
+    # delete them: for "Ukr\u00adaine war" the web app sends "aine ukr war", and comparing that with the batch's
+    # "ukraine war" would report a key mismatch where the web app followed the contract.
+    contract = "" if why else request_key(text)
     base: dict[str, Any] = {"index": index, "key": _echo(web_key) if web_key is not None else key,
                             "text": _echo(_clean(text)) if isinstance(text, str) else None, "count": count}
-    if web_key is not None and web_key != key and _key_withheld(web_key):
+    if web_key is not None and web_key != contract and _key_withheld(web_key):
         base["key"] = WITHHELD
     if withheld:
         # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): text and key that may carry personal data are never echoed
@@ -998,8 +1002,8 @@ def _entry(index: int, raw: Any) -> dict[str, Any]:
         base.update(key=WITHHELD, text=WITHHELD)
     elif why and base["text"] and len(base["text"]) > REQUEST_MAX_CHARS:
         base["text"] = base["text"][:REQUEST_MAX_CHARS] + "…"
-    if not why and web_key is not None and web_key != key:
-        base["key_mismatch"] = key  # the web app's key differs from the contract: a bug on one side
+    if not why and web_key is not None and web_key != contract:
+        base["key_mismatch"] = contract  # the web app's key differs from the contract: a bug on one side
     return {**base, "_key": key, "_why": why}
 
 

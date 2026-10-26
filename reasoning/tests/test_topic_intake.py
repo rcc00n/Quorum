@@ -62,91 +62,103 @@ def resolve(texts, existing, **kw):
 
 # ---------------------------------------------------------------- request key ----
 
+# The contract's shared test vectors (docs/DECISIONS.md › Daily editions for users): [{"text", "key"}], the keys as the web
+# app's `words()` in web/lib/topic-search.mjs gives them; the web app can run its own copy over the same file.
+KEY_VECTORS_FILE = Path(__file__).parent / "data" / "topic_key_vectors.json"
+KEY_VECTORS = json.loads(KEY_VECTORS_FILE.read_text(encoding="utf-8"))
 
-KEY_VECTORS = [
-    ("war in Ukraine", "ukraine war"),
-    ("Ukraine war", "ukraine war"),
-    ("  UKRAINE   war!!! ", "ukraine war"),
-    ("Russia–Ukraine war", "russia ukraine war"),
-    ("russia-ukraine-war", "russia ukraine war"),
-    ("U.S. tariffs on China!", "china tariffs us"),
-    ("US tariffs on China", "china tariffs us"),
-    ("Biden's EU tariffs", "biden eu tariffs"),
-    ("Biden’s EU tariffs", "biden eu tariffs"),
-    ("Café  Économie", "cafe economie"),
-    ("Ｆｕｌｌｗｉｄｔｈ news", "fullwidth"),
-    ("İstanbul", "istanbul"),
-    ("war war WAR", "war"),
-    ("e.g. net-zero", "eg net zero"),
-    ("Fiscal year 2027", "2027 fiscal year"),
-    ("the of and", ""),
-    ("", ""),
-    (None, ""),
-    ("Війна в Україні", "в віина украіні"),
-    ("𝐁𝐫𝐞𝐱𝐢𝐭", "brexit"),  # mathematical bold: no lowercase until NFKD makes it ASCII, hence the second lowercase
-    ("ℍ", "h"),
-    ("Ukr\u00adaine war", "ukraine war"),  # soft hyphen (Cf) deleted, not a separator
-    ("Ukr\u200baine war", "ukraine war"),  # zero-width space
-    ("\u202eevil topic", "evil topic"),  # right-to-left override
-    ("\ufeffClimate", "climate"),  # BOM
-    # vowel signs of Indic and Thai scripts are marks but not diacritics: kept, and part of the word
-    ("\u091a\u0940\u0928", "\u091a\u0940\u0928"),  # China
-    ("\u091a\u0928\u093e", "\u091a\u0928\u093e"),  # chickpea: a different key from China
-    ("\u092d\u093e\u0930\u0924", "\u092d\u093e\u0930\u0924"),
-    ("\u091a\u0940\u0928 \u0914\u0930 \u092d\u093e\u0930\u0924", "\u0914\u0930 \u091a\u0940\u0928 \u092d\u093e\u0930\u0924"),
-    ("\u0e1b\u0e35\u0e43\u0e2b\u0e21\u0e48", "\u0e1b\u0e35\u0e43\u0e2b\u0e21\u0e48"),
-    ("\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e", "\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e"),
-    # every key stopword, so that both implementations are held to the whole list
-    ("a about an and at by for from in into of on or over s the to vs with news", ""),
-    ("Ukraine vs Russia with news about war", "russia ukraine war"),
-]
+# The key's stopwords exactly as docs/DECISIONS.md › Daily editions for users lists them: the web app's STOP list.
+DOCUMENTED_KEY_STOPWORDS = "the a an of in on and or for to vs v at by with"
 
-# The key's stopwords exactly as docs/DECISIONS.md › Daily editions for users lists them (the contract with the web app).
-DOCUMENTED_KEY_STOPWORDS = "a about an and at by for from in into of on or over s the to vs with news"
+# Where the web app's copy of the rule lives: the checked-out file once the web branch is merged, else PR #24's head
+# (fetched read-only: git fetch origin pull/24/head:refs/pr/24).
+WEB_KEY_FILE = "web/lib/topic-search.mjs"
+WEB_KEY_REF = "refs/pr/24"
 
 
-@pytest.mark.parametrize("text, key", KEY_VECTORS)
+def _web_key_source() -> str | None:
+    root = Path(topics.__file__).resolve().parents[2]
+    checked_out = root / WEB_KEY_FILE
+    if checked_out.is_file():
+        return checked_out.read_text(encoding="utf-8")
+    git = shutil.which("git")
+    if git is None:
+        return None
+    try:
+        done = subprocess.run([git, "-C", str(root), "show", f"{WEB_KEY_REF}:{WEB_KEY_FILE}"], capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout.decode("utf-8") if done.returncode == 0 and done.stdout else None
+
+
+def test_the_key_vectors_cover_the_contract():
+    texts = [v["text"] for v in KEY_VECTORS]
+    assert len(KEY_VECTORS) >= 25 and all(set(v) == {"text", "key"} for v in KEY_VECTORS) and len(set(texts)) == len(texts)
+    keys = [v["key"] for v in KEY_VECTORS]
+    assert any(not t.isascii() for t in texts) and any(not k.isascii() for k in keys)  # non-ASCII
+    assert any(any(not (c.isalnum() or c.isspace()) for c in t) for t in texts)  # punctuation
+    assert {w for t in texts for w in t.lower().split()} >= set(DOCUMENTED_KEY_STOPWORDS.split())  # every stopword
+    assert any(len(w) == 1 for t in texts for w in re.findall(r"\w+", t))  # one-letter tokens
+    assert any(re.search(r"\d", k) for k in keys)  # digits
+    assert any(k == "" for k in keys) and any(ord(c) > 0xFFFF for k in keys for c in k)  # empty keys, astral letters
+
+
+@pytest.mark.parametrize("text, key", [(v["text"], v["key"]) for v in KEY_VECTORS], ids=[str(i) for i in range(len(KEY_VECTORS))])
 def test_request_key_contract(text, key):
     assert topics.request_key(text) == key
 
 
-def _js_twin() -> str:
-    doc = topics.request_key.__doc__
-    start = doc.index("const STOP")
-    end = doc.index('.join(" ");', start) + len('.join(" ");')
-    return "\n".join(line.strip() for line in doc[start:end].splitlines())
+def test_request_key_of_nothing_is_empty():
+    assert topics.request_key(None) == "" == topics.request_key("")
 
 
-def test_js_twin_in_the_source_is_the_javascript_to_copy():
-    """The docstring is raw, so the source file shows `\\p{L}`, not `\\\\p{L}` (a regex SyntaxError in JavaScript)."""
-    src = Path(topics.__file__).read_text(encoding="utf-8")
-    twin = _js_twin()
-    flat = "\n".join(line.strip() for line in src.splitlines())
-    assert twin in flat and "\\\\" not in twin
-    for piece in (r"/\p{Cf}/gu", r"/[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/gu",
-                  r"/(?<=\p{L})\.(?=\p{L})/gu", r"/[\p{L}\p{M}\p{N}]+/gu"):
-        assert piece in twin
-    assert r"/\p{M}/gu" not in twin  # not every combining mark is deleted: Indic and Thai vowel signs stay
+def _fuzz_texts(n: int = 400) -> list[str]:
+    """Deterministic strings over the characters on which two copies of the rule would drift."""
+    import random
 
-
-def test_js_twin_folds_the_same_diacritic_blocks():
-    ranges = re.search(r"\.replace\(/\[((?:\\u[0-9a-f]{4}-\\u[0-9a-f]{4})+)\]/gu", _js_twin()).group(1)
-    pairs = re.findall(r"\\u([0-9a-f]{4})-\\u([0-9a-f]{4})", ranges)
-    assert tuple((int(a, 16), int(b, 16)) for a, b in pairs) == topics._DIACRITICS
+    pieces = ["a", "b", "Z", "x", "1", "22", " ", "-", ".", "'", "’", "–", "­", "​", "‮", "\t", " ",
+              "　", "é", "É", "ß", "İ", "Σ", "σ", "Й", "ї", "च", "ी",
+              "ุ", "中", "Ａ", "₂", "½", "㎒", "ℌ", "\U0001d401", "\U00020000", "﨎",
+              "\U0001f525", "the", "of", "v", "vs", "news", "with", "٢", "ệ", "ł", "Ⅰ", "ẞ"]
+    rnd = random.Random(20261026)
+    return ["".join(rnd.choice(pieces) for _ in range(rnd.randint(1, 12))) for _ in range(n)]
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
-def test_js_twin_matches_request_key(tmp_path):
-    texts = [t for t, _ in KEY_VECTORS] + ["Texas: measles outbreak", "U.S.-China trade", "A.I. regulation", "COVID-19 in 2026",
-                                           "\uff2d\uff49\uff58\uff45\uff44\u3000width", "na\u00efve caf\u00e9", "e.g.,x", "a.b.c", "\u1f48\u03b4\u03c5\u03c3\u03c3\u03b5\u03cd\u03c2"]
-    (tmp_path / "vectors.json").write_text(json.dumps(texts), encoding="utf-8")
-    script = tmp_path / "twin.js"
-    script.write_text(_js_twin() + "\nconst fs = require('fs');\n"
-                      "const texts = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));\n"
-                      "process.stdout.write(JSON.stringify(texts.map(requestKey)));\n", encoding="utf-8")
-    done = subprocess.run([shutil.which("node"), str(script), str(tmp_path / "vectors.json")], capture_output=True, timeout=60)
+def test_the_web_apps_words_give_the_same_keys(tmp_path):
+    """Runs the web app's own `words()` from a temporary copy of web/lib/topic-search.mjs over the shared vectors and a
+    deterministic fuzz set: the web's key, `[...new Set(words(text))].sort().join(" ")`, must equal `request_key`."""
+    source = _web_key_source()
+    if source is None:
+        pytest.skip(f"{WEB_KEY_FILE} is neither checked out nor readable at {WEB_KEY_REF}")
+    (tmp_path / "topic-search.mjs").write_text(source, encoding="utf-8")
+    (tmp_path / "keys.mjs").write_text(
+        'import { readFileSync } from "node:fs";\n'
+        'import { words } from "./topic-search.mjs";\n'
+        'const texts = JSON.parse(readFileSync(process.argv[2], "utf8"));\n'
+        'process.stdout.write(JSON.stringify(texts.map((t) => [...new Set(words(t))].sort().join(" "))));\n',
+        encoding="utf-8")
+    texts = [v["text"] for v in KEY_VECTORS] + _fuzz_texts()
+    (tmp_path / "texts.json").write_text(json.dumps(texts), encoding="utf-8")
+    done = subprocess.run([shutil.which("node"), str(tmp_path / "keys.mjs"), str(tmp_path / "texts.json")],
+                          capture_output=True, timeout=60)
     assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
-    assert json.loads(done.stdout.decode("utf-8")) == [topics.request_key(t) for t in texts]
+    web = json.loads(done.stdout.decode("utf-8"))
+    assert web[: len(KEY_VECTORS)] == [v["key"] for v in KEY_VECTORS]
+    assert [(t, w) for t, w in zip(texts, web) if topics.request_key(t) != w] == []
+
+
+def test_key_stopwords_are_the_documented_list_and_the_web_apps():
+    """Runs without node: the web app's STOP list is read from its source when it is available."""
+    assert topics.KEY_STOPWORDS == frozenset(DOCUMENTED_KEY_STOPWORDS.split())
+    decisions = Path(topics.__file__).resolve().parents[2] / "docs" / "DECISIONS.md"
+    if decisions.exists():  # the repository checkout; an installed package has no docs
+        assert f"drop the stopwords `{DOCUMENTED_KEY_STOPWORDS}`" in decisions.read_text(encoding="utf-8")
+    source = _web_key_source()
+    if source is None:
+        pytest.skip(f"{WEB_KEY_FILE} is neither checked out nor readable at {WEB_KEY_REF}")
+    web_stop = re.search(r"const STOP = new Set\(\[([^\]]*)\]\)", source).group(1)
+    assert re.findall(r'"([^"]*)"', web_stop) == DOCUMENTED_KEY_STOPWORDS.split()
 
 
 def test_request_key_is_idempotent_and_order_free():
@@ -159,25 +171,38 @@ def test_request_key_is_idempotent_and_order_free():
 
 def test_key_stopwords_are_small_and_keep_meaningful_words():
     assert len(topics.KEY_STOPWORDS) <= 25
-    for word in ("us", "war", "ai", "not", "no"):
+    for word in ("us", "war", "ai", "not", "no", "news"):
         assert word not in topics.KEY_STOPWORDS
 
 
-def test_key_stopwords_are_the_documented_list_in_python_and_in_the_js_twin():
-    """Runs without node: the JavaScript twin's STOP list is read from the docstring and compared."""
-    documented = frozenset(DOCUMENTED_KEY_STOPWORDS.split())
-    assert topics.KEY_STOPWORDS == documented
-    js_stop = re.search(r'const STOP = new Set\("([^"]*)"\.split\(" "\)\);', topics.request_key.__doc__).group(1)
-    assert js_stop.split(" ") == DOCUMENTED_KEY_STOPWORDS.split(" ")
-    decisions = Path(topics.__file__).resolve().parents[2] / "docs" / "DECISIONS.md"
-    if decisions.exists():  # the repository checkout; an installed package has no docs
-        assert f"drop the stopwords `{DOCUMENTED_KEY_STOPWORDS}`" in decisions.read_text(encoding="utf-8")
+def test_one_letter_tokens_are_dropped_by_utf16_length():
+    """JavaScript's `w.length > 1` counts UTF-16 code units: an astral-plane letter alone is a token, a BMP one is not."""
+    assert topics.request_key("U.S. x 中 \U00020000") == "\U00020000"
+    assert topics.request_key("﨎﨎 \U00020000") == "\U00020000 﨎﨎"  # UTF-16 order, not code points
 
 
-def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
+def test_words_that_a_vowel_sign_splits_into_single_letters_are_rejected(existing):
+    """Under the web app's rule a combining mark other than U+0300-036F separates words, so "चीन" (China) leaves only
+    one-letter tokens: an empty key, rejected; "चना" (chickpea) keeps "चन" before its final vowel sign (the
+    closing-round-4 DECISION at `request_key`)."""
+    assert (topics.request_key("चीन"), topics.request_key("चना")) == ("", "चन")
     china, chickpea = resolve([{"text": "चीन", "count": 2}, "चना"], existing)
-    assert china["key"] != chickpea["key"] and china["text"] == "चीन" and chickpea["text"] == "चना"
-    assert china["topic_id"] != chickpea["topic_id"]
+    assert china["status"] == "rejected" and china["text"] == "चीन"
+    assert china["reason"] == "nothing left after normalising (only stopwords, one-letter words and punctuation)"
+    assert chickpea["status"] != "rejected" and chickpea["key"] == "चन" and chickpea["text"] == "चना"
+
+
+def test_the_web_key_is_checked_against_the_contract_of_the_text_as_sent(existing):
+    """The batch keys the text after deleting format characters, the web app does not: its key for "Ukr\\u00adaine war"
+    is "aine ukr war", which is the contract and no mismatch; the batch still resolves the request as "ukraine war"."""
+    text = "Ukr­aine war"
+    assert topics.request_key(text) == "aine ukr war" and topics.request_key(topics._clean(text)) == "ukraine war"
+    follows, differs = topics.resolve_requests([{"key": "aine ukr war", "text": text, "count": 1},
+                                                {"key": "ukraine war", "text": text, "count": 1}], existing, propose=dry)
+    assert (follows["status"], follows["topic_id"], follows["key"], follows["key_mismatch"]) == (
+        "existing", "russia-ukraine-war", "aine ukr war", None)
+    assert (differs["status"], differs["topic_id"], differs["key"], differs["key_mismatch"]) == (
+        "existing", "russia-ukraine-war", "ukraine war", "aine ukr war")
 
 
 # ---------------------------------------------------------------- validation ----
@@ -207,7 +232,8 @@ def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
         ("x" * 81, "longer than 80 characters (81)", False),
         ("2026", "no letters", False),
         ("!!! ???", "no letters", False),
-        ("the and of", "nothing left after normalising (only stopwords and punctuation)", False),
+        ("the and of", "nothing left after normalising (only stopwords, one-letter words and punctuation)", False),
+        ("U.S. v. A", "nothing left after normalising (only stopwords, one-letter words and punctuation)", False),
         # any "@": an e-mail address needs no dotted domain, every other "@" is a handle
         ("contact jane.doe@gmail", "contains an e-mail address", True),
         ("john@localhost", "contains an e-mail address", True),
@@ -264,6 +290,23 @@ def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
         ("Jane 0170‐1234567", "contains a phone number", True),  # U+2010 hyphen
         ("call 030/123/456", "contains a phone number", True),
         ("Jane 0170−1234567", "contains a phone number", True),  # U+2212 minus sign
+        # closing round 4: a local number glued to a word by "-", ".", "/", "_" or a dash, or before a full stop
+        ("jane-555-1234", "contains a phone number", True),
+        ("jane.555-1234", "contains a phone number", True),
+        ("jane/555-1234", "contains a phone number", True),
+        ("jane_555-1234", "contains a phone number", True),
+        ("jane–555-1234", "contains a phone number", True),  # en dash
+        ("jane‑555‑1234", "contains a phone number", True),  # non-breaking hyphens
+        ("jane−555.1234", "contains a phone number", True),  # minus sign
+        ("call 555-1234.", "contains a phone number", True),
+        ("call 555.1234.", "contains a phone number", True),
+        ("call jane 555-1234。", "contains a phone number", True),  # ideographic full stop (a "." when scanned)
+        ("555-1234-jane", "contains a phone number", True),
+        ("555-1234.jane", "contains a phone number", True),
+        ("jane-555-1234.", "contains a phone number", True),
+        ("call 1-555-1234", "contains a phone number", True),  # another digit group joined by a separator
+        ("hotline 1.555.1234", "contains a phone number", True),
+        ("call 555-1234-5", "contains a phone number", True),  # a local number and an extension
     ],
 )
 def test_rejections(text, why, withheld):
@@ -279,7 +322,13 @@ def test_rejections(text, why, withheld):
      "2024-2025 season", "2024\u20132025 budget", "24/7 news", "9/11 anniversary", "1 000 000 dollars",
      "St. Louis floods", "\u6771\u4eac\u3002\u9078\u6319", "M\u00fcnchen Oktoberfest", "version 1.25 release",
      # closing round 2: 8 digits in a row stay acceptable (9 are a phone number, test_rejections)
-     "population 33000000"],
+     "population 33000000",
+     # closing round 4: the local-number pattern ends where the digit groups end; dates, years, bill and section numbers
+     # have no 3-and-4-digit group pair, also next to a full stop, a hyphen or a slash
+     "election 2026-10-26", "summit on 2026-10-26.", "26.10.2026 vote", "2026.10.26 summit", "2026/10/26 strike",
+     "1999-2000 recession", "fiscal year 2026-2027.", "elections in 2026.", "H.R. 4521", "H.R. 4521 vote.", "H.R.4521",
+     "Section 301 tariffs", "Section 301.", "Area 51", "Area 51 leak.", "Area-51 files", "Boeing 737-800.",
+     "COVID-19 2026.", "troop range 500-10000"],
 )
 def test_acceptable_requests(text):
     assert topics.check_request(text) == ("", False)
@@ -317,6 +366,17 @@ def test_phone_numbers_without_separators_never_become_a_row(existing):
     assert all(r["text"] == r["key"] == topics.WITHHELD and r["reason"] == "contains a phone number" for r in res)
     sql = topics.rows_sql(res)
     assert sql.count("INSERT") == 0 and not any(d in sql for d in ("07911123456", "01701234567", "123456789", "1234567", "123456"))
+
+
+def test_local_phone_numbers_glued_to_a_word_never_become_a_row(existing):
+    """Before closing round 4 these were `new` rows named "Jane-555-1234" or "Call Jane 555-1234." (the local-number
+    guard refused any "-" or "." next to the number, so a word joined by one, or a closing full stop, hid it)."""
+    texts = ["jane-555-1234", "Jane Doe/555-1234", "call jane 555-1234.", "Jane_555.1234 Mars", "555-1234-jane"]
+    res = resolve(texts, existing)
+    assert [r["status"] for r in res] == ["rejected"] * len(texts)
+    assert all(r["text"] == r["key"] == topics.WITHHELD and r["reason"] == "contains a phone number" for r in res)
+    out = json.dumps(res) + topics.rows_sql(res)
+    assert "INSERT" not in out and "1234" not in out and "jane" not in out.lower()
 
 
 @pytest.mark.parametrize(
@@ -755,9 +815,9 @@ def test_derived_sources_are_the_three_derive_paths():
 
 
 @pytest.mark.parametrize("source", DERIVED)
-@pytest.mark.parametrize("text", ["चीन", "ปีใหม่"])
+@pytest.mark.parametrize("text", ["भारत", "ปีใหม่"])
 def test_derived_terms_that_miss_the_typed_words_are_needs_review(existing, text, source):
-    """derive splits words at a vowel sign ("चीन" -> "च न"); such terms would collect nothing on the subject."""
+    """derive splits words at a vowel sign ("भारत" -> "भ रत"); such terms would collect nothing on the subject."""
     (r,) = resolve([text], existing, propose=lambda t: {**topics.derive(t), "source": source})
     assert (r["status"], r["source"]) == ("needs_review", source) and r["terms"]
     assert r["reason"].startswith("the derived terms would not match the typed words: none of ")
@@ -1123,7 +1183,7 @@ def test_cli_dry_environment_stand_in_for_a_phrase_derive_splits(tmp_path, monke
     path would need llm._route, which fails the test here (pytest.fail is not caught by suggest)."""
     monkeypatch.setenv("QUORUM_DRY_RUN", "1")
     monkeypatch.setattr(llm, "_route", lambda *a, **k: pytest.fail("a model route was resolved", pytrace=False))
-    code, (m,), sql, report = _batch(tmp_path, [{"text": "चीन", "count": 1}])
+    code, (m,), sql, report = _batch(tmp_path, [{"text": "भारत", "count": 1}])
     assert code == 0 and (m["status"], m["source"]) == ("needs_review", "dry-run stand-in") and m["terms"]
     assert m["reason"].startswith("the derived terms would not match the typed words: none of ")
     assert "INSERT" not in sql and f"mode:       {topics.MODE_DRY_ENV}" in report
@@ -1132,7 +1192,7 @@ def test_cli_dry_environment_stand_in_for_a_phrase_derive_splits(tmp_path, monke
 def test_cli_fallback_for_a_phrase_derive_splits(tmp_path, monkeypatch):
     calls = _recording_json_task(monkeypatch, RuntimeError("route down"))
     _route(monkeypatch, live=True)
-    code, (m,), sql, _ = _batch(tmp_path, [{"text": "चीन", "count": 1}])
+    code, (m,), sql, _ = _batch(tmp_path, [{"text": "भारत", "count": 1}])
     assert code == 0 and len(calls) == 1 and (m["status"], m["source"]) == ("needs_review", "fallback")
     assert m["reason"].startswith("the derived terms would not match the typed words: none of ") and "INSERT" not in sql
 
@@ -1210,7 +1270,9 @@ def test_cli_a_model_name_that_fails_the_checks_is_replaced_by_the_derived_name_
 
 
 @pytest.mark.parametrize("slug", ["call-jane-555-1234567", "jane-doe-5551234567", "jane-555-123-4567", "call-jane-5551234567",
-                                  "555-1234"])
+                                  "555-1234",
+                                  # closing round 4: a local number joined to the words by the slug's own hyphens
+                                  "call-jane-555-1234", "jane-doe-555-1234", "555-1234-jane"])
 def test_cli_a_model_slug_that_may_carry_personal_data_is_replaced_by_the_derived_id(tmp_path, monkeypatch, slug):
     """A valid model slug was used as the id unchecked before closing round 3; a hyphen counts as a phone separator."""
     _recording_json_task(monkeypatch, {**MARS_REPLY, "slug": slug})
