@@ -30,11 +30,16 @@ Without --keys one worker runs every topic on the route in .env as it is (no key
 or a single direct key. The route counts as one key under the same caps (behind Nightshift it is still one NVIDIA
 account), so --max-calls-per-key bounds what one invocation starts there.
 
-Status files: <status-dir>/<date>/<topic>.json, written atomically (temp file + os.replace), plus _summary.json at the
-end. They hold key variable names, never values, and file names relative to --log-dir, never paths. A run without
---live never changes a live outcome there: it writes its plan beside it (decision at Statuses.open). Logs: one per run
-in <log-dir>/ (<date>_<topic>_run<NN>_<key>.log, <date>_<topic>_dry.log, <date>_runner.log); every key and token value
-the runner knows is replaced by [redacted] before a byte reaches a log.
+Status files (the portal's contract, Issue #2 6411408519): <status-dir>/<topic>/<date>.json with exactly topic, date,
+state (queued | running | published | failed | waiting_for_key), run_id, started_at, updated_at, attempts and reason
+(a string or null), written atomically (temp file + os.replace) and each followed by <date>.json.sha256
+("<sha256>  <date>.json"), which the portal's install command checks. The runner's own record of each topic-date (what
+set the state, estimates, the plan, key names, runs, versions), _summary.json and the lock are in
+<status-dir>/_runner/<date>/, never installed (decision at Statuses). Both hold key variable names, never values, and
+file names relative to --log-dir, never paths. A run without --live never changes a live outcome there: it writes its
+plan beside it (decision at Statuses.open). Logs: one per run in <log-dir>/ (<date>_<topic>_run<NN>_<key>.log,
+<date>_<topic>_dry.log, <date>_runner.log); every key and token value the runner knows is replaced by [redacted] before
+a byte reaches a log.
 
 Exit code: 0 every topic published (or, without --live, every dry check passed and the plan finishes every topic in
 this invocation), 1 a topic failed (a listed id that is not a row, or a row whose id breaks the rule, counts), 3 a
@@ -46,6 +51,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
 import heapq
 import json
 import math
@@ -148,15 +154,28 @@ def edition_cut_utc(edition_date: str) -> datetime:
     return datetime(d.year, d.month, d.day, 5, 30, tzinfo=ZoneInfo("America/New_York")).astimezone(timezone.utc)
 
 
+def json_bytes(obj: Any) -> bytes:
+    """The bytes a JSON file of the runner holds (UTF-8, LF line ends on every system)."""
+    return (json.dumps(obj, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def sha256_line(name: str, data: bytes) -> bytes:
+    """A sha256sum line for a file named `name` holding `data`: "<64 hex>  <name>\\n"."""
+    return f"{hashlib.sha256(data).hexdigest()}  {name}\n".encode("utf-8")
+
+
 def write_json_atomic(path: Path, obj: Any) -> None:
+    write_bytes_atomic(path, json_bytes(obj))
+
+
+def write_bytes_atomic(path: Path, data: bytes) -> None:
     """Temp file in the same folder, fsync, then os.replace: a reader sees the old file or the new one, never part of
     one. os.replace is retried briefly on Windows, where a reader holding the file open makes it fail for a moment."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(obj, fh, ensure_ascii=False, indent=2)
-            fh.write("\n")
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
             fh.flush()
             os.fsync(fh.fileno())
         for attempt in range(10):
@@ -519,14 +538,39 @@ def holds_live_outcome(doc: dict[str, Any]) -> bool:
     return bool(doc.get("runs")) or state in LIVE_ONLY_STATES or (doc.get("state_mode") == "live" and state not in (None, "queued"))
 
 
-class Statuses:
-    """One JSON file per topic-date: <status-dir>/<date>/<topic>.json. Only the main thread writes them.
+RUNNER_DIR = "_runner"  # <status-dir>/_runner/<date>/: the runner's records, _summary.json, the lock (decision at Statuses)
+PUBLIC_FIELDS = ("topic", "date", "state", "run_id", "started_at", "updated_at", "attempts", "reason")
+STATES = ("queued", "running", "published", "failed", "waiting_for_key")
+PLAN_FIELDS = ("plan", "plan_outcome", "plan_reason")
 
-    `state_mode` in a document says what set its `state`: `live` (a live invocation, or a snapshot of the run id in the
+
+def runner_dir(status_dir: Path, edition_date: str) -> Path:
+    return status_dir / RUNNER_DIR / edition_date
+
+
+class Statuses:
+    """Per topic-date, the portal's status file <status-dir>/<topic>/<date>.json (+ <date>.json.sha256) and the runner's
+    own record <status-dir>/_runner/<date>/<topic>.json. Only the main thread writes them.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the status file holds exactly PUBLIC_FIELDS (`reason` null when
+    there is none) at <status-dir>/<topic>/<date>.json, and <date>.json.sha256 beside it holds the sha256sum line of its
+    bytes; both are written atomically, the hash after the file. Everything else the runner keeps (`state_mode`, the
+    estimates, the plan, key names, `runs`, versions, exit codes) is in its record under <status-dir>/_runner/<date>/,
+    with _summary.json and the lock; the record is what the runner reads back. Why: the contract agreed with the portal
+    in Issue #2 (6411408519, 6411653104): one folder per topic, the file named by the edition date, these eight fields
+    and the five STATES (save refuses any other state before writing), installed by a `reasoning_status --file
+    --sha256` command of the same shape as `reasoning_snapshot`; the portal does not ignore unknown fields. `_runner`
+    can never be a topic id (the shared rule starts with a letter or digit), while a date such as 2026-10-26 is one, so
+    no runner folder is named like a topic.
+    Between the two writes a reader can see the new file with the old hash: the install refuses it and is retried.
+    Supersedes (2026-10-26) the layout <status-dir>/<date>/<topic>.json with every field in one file.
+
+    `state_mode` in a record says what set its `state`: `live` (a live invocation, or a snapshot of the run id in the
     live store), or `dry` (a plan run)."""
 
     def __init__(self, status_dir: Path, edition_date: str, redactor: Redactor, mode: str = "live"):
-        self.dir = status_dir / edition_date
+        self.root = status_dir
+        self.dir = runner_dir(status_dir, edition_date)
         self.date = edition_date
         self.redactor = redactor
         self.mode = mode
@@ -534,11 +578,16 @@ class Statuses:
         self.kept: set[str] = set()  # dry mode: topics whose file keeps its live outcome (decision at open)
 
     def path(self, topic: str) -> Path:
+        """The portal's status file of `topic` on this date."""
+        return self.root / topic / f"{self.date}.json"
+
+    def record_path(self, topic: str) -> Path:
+        """The runner's own record of `topic` on this date."""
         return self.dir / f"{topic}.json"
 
     def load(self, topic: str) -> dict[str, Any] | None:
         try:
-            doc = json.loads(self.path(topic).read_text(encoding="utf-8"))
+            doc = json.loads(self.record_path(topic).read_text(encoding="utf-8"))
             return doc if isinstance(doc, dict) else None
         except (OSError, ValueError):
             return None
@@ -579,9 +628,18 @@ class Statuses:
         return self.save(topic, state=state, reason=reason, **more)
 
     def save(self, topic: str, **changes: Any) -> dict[str, Any]:
+        """Applies `changes` (None removes a field), then writes the record and the status file with its hash."""
         doc = self.docs[topic]
+        if (changes.get("state") or doc.get("state")) not in STATES:  # decision at Statuses: nothing else is written
+            raise ValueError(f"status state {changes.get('state') or doc.get('state')!r} is not one of {', '.join(STATES)}")
         if "state" in changes:
             changes.setdefault("state_mode", self.mode)
+            if changes["state"] == "published":
+                # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): `published` clears plan, plan_outcome and
+                # plan_reason. Why: they predict what an invocation would do; once the run id is published the
+                # prediction is void, and a stale `waiting_for_key` made the next plan run exit 3 for a published topic.
+                for name in PLAN_FIELDS:
+                    changes.setdefault(name, None)
         for name in ("reason", "plan_reason"):
             if name in changes:
                 changes[name] = clean_reason(changes[name], self.redactor)
@@ -593,7 +651,11 @@ class Statuses:
         doc["updated_at"] = now_iso()
         ordered = {k: doc[k] for k in ("topic", "date", "state", "state_mode", "run_id", "started_at", "updated_at", "attempts") if k in doc}
         ordered.update({k: v for k, v in doc.items() if k not in ordered})
-        write_json_atomic(self.path(topic), ordered)
+        write_json_atomic(self.record_path(topic), ordered)
+        data = json_bytes({k: ordered.get(k) for k in PUBLIC_FIELDS})  # decision at Statuses
+        path = self.path(topic)
+        write_bytes_atomic(path, data)
+        write_bytes_atomic(path.with_name(path.name + ".sha256"), sha256_line(path.name, data))
         return ordered
 
 
@@ -652,6 +714,40 @@ def _child_env(ctx: Ctx, key: Key | None) -> dict[str, str]:
     return env
 
 
+def _reap(proc: subprocess.Popen, wait_s: float = 30.0) -> None:
+    """Kills `proc` and waits (at most `wait_s`) until it has exited."""
+    try:
+        proc.kill()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=wait_s)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def stop_children(ctx: Ctx, grace_s: float = 10.0) -> None:
+    """Stops every running child and waits until each has exited (killed when it has not after `grace_s`).
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): `ctx.stopping` is set first and a child registered after the
+    listing kills itself (_pump), so no child starts behind the stop. Why: a worker may be between its thread start and
+    its Popen when the main thread fails; that child would run unsupervised after the runner has gone."""
+    ctx.stopping.set()
+    with ctx.lock:
+        procs = list(ctx.procs.values())
+    for p in procs:
+        try:
+            p.terminate()
+        except OSError:
+            pass
+    deadline = time.monotonic() + grace_s
+    for p in procs:
+        try:
+            p.wait(timeout=max(0.1, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            _reap(p, 5.0)
+
+
 def _pump(ctx: Ctx, argv: list[str], env: dict[str, str], log_path: Path, header: str,
           timeout_s: float | None = None) -> tuple[int | None, list[str], str | None]:
     """Runs one child, its stdout+stderr redacted into `log_path`. Returns (exit code or None, last lines, why it did
@@ -668,6 +764,9 @@ def _pump(ctx: Ctx, argv: list[str], env: dict[str, str], log_path: Path, header
             return None, [], f"could not start the run: {type(exc).__name__}"
         with ctx.lock:
             ctx.procs[proc.pid] = proc
+            late = ctx.stopping.is_set()
+        if late:  # the runner began stopping its children while this one started (decision at stop_children)
+            _reap(proc)
         timer = None
         timed_out = threading.Event()
         if timeout_s:
@@ -687,6 +786,12 @@ def _pump(ctx: Ctx, argv: list[str], env: dict[str, str], log_path: Path, header
                 if text:
                     tail.append(text)
             rc = proc.wait()
+        except BaseException:
+            # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a fault while pumping a child's output (a log write,
+            # the redaction) kills the child and waits for it before the error goes on. Why: the caller records the
+            # topic failed and frees its key; a child left alive went on spending on that key next to the next run.
+            _reap(proc)
+            raise
         finally:
             if timer:
                 timer.cancel()
@@ -985,26 +1090,19 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
               redactor=redactor, timeout_s=args.run_timeout_min * 60 if args.run_timeout_min > 0 else None,
               factor=args.estimate_factor)
 
-    lock = status_dir / args.date / ".runner.lock"
+    lock = runner_dir(status_dir, args.date) / ".runner.lock"
     try:
         lock.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         return refuse(f"another runner holds the lock for {args.date} in --status-dir (or a crashed one left it): "
-                      f"delete {args.date}/.runner.lock there once no runner is running")
+                      f"delete {RUNNER_DIR}/{args.date}/.runner.lock there once no runner is running")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump({"pid": os.getpid(), "started_at": now_iso(), "live": bool(args.live)}, fh)
     try:
         return _run(ctx, args, keys, topics, unusable)
     except KeyboardInterrupt:
-        ctx.stopping.set()
-        with ctx.lock:
-            procs = list(ctx.procs.values())
-        for p in procs:
-            try:
-                p.terminate()
-            except OSError:
-                pass
+        stop_children(ctx)
         print("interrupted: running children stopped; their checkpoints are kept (rerun the same command to resume)", file=sys.stderr)
         return 130
     finally:
@@ -1138,8 +1236,12 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
                 n = int(doc.get("attempts") or 0) + 1
                 resume = item.resume or checkpoint_has_thread(ctx.out, run_id(item.topic, ctx.date, ctx.attempt))
                 log_name = f"{ctx.date}_{item.topic}_run{n:02d}_{key.name}.log"
+                # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): `started_at` is the first live start of the run
+                # id; until then it is when its status was first written. Why: the portal shows `running` and
+                # `waiting_for_key` as "being prepared since started_at"; a plan run hours earlier must not date it.
+                first = {"started_at": now_iso()} if n == 1 and not doc.get("runs") else {}
                 statuses.save(item.topic, state="running", attempts=n, key=key.name, log=log_name, reason=None,
-                              reserved={"fast": res[0], "ultra": res[1]})
+                              reserved={"fast": res[0], "ultra": res[1]}, **first)
                 ctx.say(f"start {item.topic} on {key.name}{' (resume)' if resume else ''}, reserved {res[0]}/{res[1]}, log {log_name}")
                 threading.Thread(target=worker, args=(item, key, res, n), daemon=True).start()
                 running += 1
@@ -1154,16 +1256,12 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
                 continue
             running -= 1
             _record(ctx, statuses, planner, final, *got)
-    except KeyboardInterrupt:
-        # stop the children, then record what they left (their checkpoints stay; a rerun resumes them)
-        ctx.stopping.set()
-        with ctx.lock:
-            procs = list(ctx.procs.values())
-        for p in procs:
-            try:
-                p.terminate()
-            except OSError:
-                pass
+    except BaseException:
+        # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): every way out of this loop (Ctrl-C, a status write that
+        # fails, a bug) stops the live children and waits for them, then records what they left (their checkpoints
+        # stay; a rerun resumes them) and lets the error go on. Why: only Ctrl-C did; any other error left paid children
+        # running unsupervised, their status on `running` and the lock gone, so a rerun resumed the run id beside them.
+        stop_children(ctx)
         deadline = time.monotonic() + 30
         while running and time.monotonic() < deadline:
             try:
@@ -1171,7 +1269,10 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
             except queue.Empty:
                 continue
             running -= 1
-            _record(ctx, statuses, planner, final, *got, requeue=False)
+            try:
+                _record(ctx, statuses, planner, final, *got, requeue=False)
+            except Exception:  # noqa: BLE001 — the fault that ended the loop may fail this write too; the stop came first
+                pass
         raise
 
 
@@ -1230,7 +1331,7 @@ def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, top
                "keys": [{"name": k.name, "cap_fast": k.cap_fast, "cap_ultra": k.cap_ultra, "used_fast": k.used_fast,
                          "used_ultra": k.used_ultra, "drained": k.drained, "usable": (not k.inject) or k.name in ctx.key_values} for k in keys],
                "topics": rows}
-    write_json_atomic(ctx.status_dir / ctx.date / "_summary.json", summary)
+    write_json_atomic(runner_dir(ctx.status_dir, ctx.date) / "_summary.json", summary)
     ctx.say(f"summary ({mode}, {ctx.date}):")
     for r in rows:
         est = r["calls_estimate"] or {}
@@ -1250,7 +1351,7 @@ def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, top
 
 def ctx_status(ctx: Ctx, topic: str) -> dict[str, Any]:
     try:
-        doc = json.loads((ctx.status_dir / ctx.date / f"{topic}.json").read_text(encoding="utf-8"))
+        doc = json.loads((runner_dir(ctx.status_dir, ctx.date) / f"{topic}.json").read_text(encoding="utf-8"))
         return doc if isinstance(doc, dict) else {}
     except (OSError, ValueError):
         return {}

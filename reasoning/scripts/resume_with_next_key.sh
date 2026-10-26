@@ -6,7 +6,7 @@
 #   bash reasoning/scripts/resume_with_next_key.sh --topic climate-policy --date 2026-10-26 \
 #        [--attempt 1] [--out reasoning/snapshots/_private] [--log FILE] \
 #        [--keys MODEL_API_KEY,MODEL_API_KEY_2,MODEL_API_KEY_3] [--resume] \
-#        [--env-file .env] [--python PATH] [--workdir reasoning] [-- <extra run.py arguments, e.g. --quiet>]
+#        [--env-file .env] [--python PATH] [--workdir reasoning] [-- --quiet|--verbose|--checkpoint]
 #
 #   # a run started elsewhere on MODEL_API_KEY drained (exit 3): continue it on the next keys
 #   bash reasoning/scripts/resume_with_next_key.sh --topic russia-ukraine-war --date 2026-10-24 --attempt 7 \
@@ -16,7 +16,8 @@
 # repo-level .env (python-dotenv, as llm._env reads it). The child gets MODEL_API_KEY = that value and every other key
 # variable blank, so one process holds one key; nothing from .env is printed, and the child's output passes through a
 # filter that replaces the key value with [redacted] before it reaches the log. The script runs the child itself and
-# reads its exit code directly. Exit 0 when a run published, 3 when every listed key drained, the run's code otherwise.
+# reads its exit code directly. Exit 0 when a run published, 3 when every listed key drained, 2 a refusal (also when
+# MODEL_BASE_URL is not NVIDIA's direct route), the run's code otherwise.
 #
 # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): key rotation lives in an operator script, not in llm.py.
 # Why: the per-account daily budget is an operator concern (whose key, how many), the running process must not
@@ -28,6 +29,16 @@
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the run's subshell sets MODEL_API_KEY and the blanks with the
 # `export` builtin and then execs Python; no external `env` program is used. Why: /usr/bin/env took them as arguments
 # and, under Git Bash, stayed alive as the run's parent for hours with the key readable in its process command line.
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): after `--` only --quiet, --verbose and --checkpoint pass through,
+# spelled exactly; anything else is refused (exit 2). Why: run.py's parser takes unique prefixes (argparse allow_abbrev),
+# so refusing exact spellings let `--ou X`, `--corp fixture`, `--att 9` or `--res` override the managed arguments (the
+# last value wins), and the check modes replace the run and exit 0, which this script reports as a published run
+# (--test-connection and --probe even send paid completions on the injected key). Supersedes the list of refused names.
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): before any run the script refuses (exit 2) unless MODEL_BASE_URL,
+# exported or else from the env file (read like the keys), is NVIDIA's direct route by llm._is_direct_url. Why: it hands
+# each key to the run as MODEL_API_KEY, which only that route uses (the runner refuses the same in run_editions.main); on
+# the Meterless route the first exit 3 sent MODEL_API_KEY_2, an NVIDIA key, as the bearer to the Meterless daemon, and
+# Meterless drains per account, not per key, so rotating there gains nothing.
 set -u
 
 usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -62,10 +73,12 @@ if [[ "$TOPIC" =~ ^(con|prn|aux|nul|com[0-9]|lpt[0-9])$ ]]; then
 fi
 [[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "--date must be YYYY-MM-DD" >&2; exit 2; }
 [[ "$ATTEMPT" =~ ^[1-9][0-9]*$ ]] || { echo "--attempt must be a positive integer" >&2; exit 2; }
-for arg in ${EXTRA[@]+"${EXTRA[@]}"}; do
+for arg in ${EXTRA[@]+"${EXTRA[@]}"}; do  # decision at the top: exact spellings only
   case "$arg" in
-    --topic|--date|--attempt|--out|--model|--corpus|--resume|--seed-journal|--dry-run|--topic=*|--date=*|--attempt=*|--out=*|--model=*|--corpus=*)
-      echo "extra run.py argument $arg is managed by this script" >&2; exit 2 ;;
+    --quiet|--verbose|--checkpoint) ;;
+    *) shown="(not echoed)"; [[ "$arg" =~ ^--?[A-Za-z][A-Za-z0-9-]*$ ]] && shown="$arg"
+       echo "extra run.py argument $shown is not passed through: after -- only --quiet, --verbose and --checkpoint are allowed" \
+            "(the script manages topic, date, attempt, out, model, corpus and resume; check modes are no run)" >&2; exit 2 ;;
   esac
 done
 if [ -z "$PY" ]; then
@@ -98,6 +111,23 @@ sys.stdout.write((dotenv_values(sys.argv[1]).get(sys.argv[2]) or "").strip())' "
   fi
   printf '%s' "$v"
 }
+
+# the direct NVIDIA route only (decision at the top); the URL reaches Python through its environment
+QUORUM_CHECK_BASE_URL="$(key_value MODEL_BASE_URL)" "$PY" -c 'import os, sys
+sys.path.insert(0, sys.argv[1])
+from quorum_reasoning import llm
+base = os.environ.get("QUORUM_CHECK_BASE_URL", "").strip()
+sys.exit(0 if base and llm._is_direct_url(base) else 3)' "$REASONING" 2>/dev/null
+route=$?
+if [ "$route" != 0 ]; then
+  if [ "$route" = 3 ]; then
+    echo "refusing to run: MODEL_BASE_URL (exported or in the env file) is not NVIDIA's direct route (integrate.api.nvidia.com);" \
+         "this script hands each key to the run as MODEL_API_KEY, which only that route uses (on the Meterless route run run.py itself)" >&2
+  else
+    echo "refusing to run: could not check MODEL_BASE_URL (quorum_reasoning.llm did not import from $REASONING with $PY)" >&2
+  fi
+  exit 2
+fi
 
 # every key variable is blank in the child (one key per process): the listed names and any MODEL_API_KEY_* known here
 BLANK_NAMES=()

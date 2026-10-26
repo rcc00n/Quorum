@@ -6,6 +6,7 @@ mistake refuses (exit 2) instead of spending anything."""
 from __future__ import annotations
 
 import _thread
+import hashlib
 import importlib.util
 import json
 import os
@@ -36,6 +37,7 @@ def _load(name: str):
 re_mod = _load("run_editions")
 dc_mod = _load("dry_check")
 
+PUBLIC_FIELDS = ("topic", "date", "state", "run_id", "started_at", "updated_at", "attempts", "reason")  # the portal's contract
 DATE = "2026-10-20"  # its cut (2026-10-20 09:30Z) has passed, so --live needs no --allow-before-cut
 VALUE_A = "fake-key-value-AAAA-0001"
 VALUE_B = "fake-key-value-BBBB-0002"
@@ -67,7 +69,7 @@ seen = None
 sd = os.environ.get("FAKE_STATUS_DIR")
 if sd:
     try:
-        seen = json.loads((Path(sd) / date / f"{topic}.json").read_text())["state"]
+        seen = json.loads((Path(sd) / topic / f"{date}.json").read_text())["state"]  # the portal's status file
     except Exception:
         seen = "unreadable"
 rec = {"topic": topic, "argv": args, "resume": "--resume" in args, "key_name": sc["values"].get(key, "?" if key else ""),
@@ -214,11 +216,34 @@ class Env:
     def dry_runs(self) -> list[dict]:
         return [json.loads(p.read_text()) for p in self.dry_records.glob("*.json")] if self.dry_records.is_dir() else []
 
+    @property
+    def runner(self) -> Path:
+        """<status-dir>/_runner/<date>/: the runner's records, _summary.json and the lock."""
+        return self.status / "_runner" / DATE
+
     def status_of(self, topic: str) -> dict:
-        return json.loads((self.status / DATE / f"{topic}.json").read_text(encoding="utf-8"))
+        """The runner's record of the topic (every field it keeps)."""
+        return json.loads((self.runner / f"{topic}.json").read_text(encoding="utf-8"))
+
+    def public_of(self, topic: str) -> dict:
+        """The portal's status file <status-dir>/<topic>/<date>.json, checked against the contract (Issue #2
+        6411408519): exactly the eight fields, a known state, the sha256 file beside it matching its bytes, and the same
+        values as the runner's record."""
+        path = self.status / topic / f"{DATE}.json"
+        data = path.read_bytes()
+        doc = json.loads(data.decode("utf-8"))
+        assert list(doc) == list(PUBLIC_FIELDS), doc
+        assert doc["state"] in ("queued", "running", "published", "failed", "waiting_for_key"), doc
+        assert doc["topic"] == topic and doc["date"] == DATE and isinstance(doc["attempts"], int)
+        assert doc["reason"] is None or isinstance(doc["reason"], str)
+        sha = (path.parent / f"{DATE}.json.sha256").read_bytes()
+        assert sha == f"{hashlib.sha256(data).hexdigest()}  {DATE}.json\n".encode(), sha
+        record = self.status_of(topic)
+        assert doc == {k: record.get(k) for k in PUBLIC_FIELDS}, (doc, record)
+        return doc
 
     def summary(self) -> dict:
-        return json.loads((self.status / DATE / "_summary.json").read_text(encoding="utf-8"))
+        return json.loads((self.runner / "_summary.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture
@@ -453,8 +478,9 @@ def test_status_files_are_saved_through_the_atomic_write(tmp_path: Path, monkeyp
     statuses = re_mod.Statuses(tmp_path / "status", DATE, re_mod.Redactor([]))
     statuses.open("t1", f"{DATE}-t1-1")
     statuses.save("t1", state="queued")
-    path = statuses.path("t1")
-    before = path.read_text(encoding="utf-8")
+    paths = (statuses.path("t1"), statuses.path("t1").with_name(f"{DATE}.json.sha256"), statuses.record_path("t1"))
+    assert paths[0] == tmp_path / "status" / "t1" / f"{DATE}.json" and paths[2] == tmp_path / "status" / "_runner" / DATE / "t1.json"
+    before = [p.read_bytes() for p in paths]
 
     def broken_replace(src, dst):
         raise OSError("disk went away")
@@ -462,8 +488,19 @@ def test_status_files_are_saved_through_the_atomic_write(tmp_path: Path, monkeyp
     monkeypatch.setattr(re_mod.os, "replace", broken_replace)
     with pytest.raises(OSError):
         statuses.save("t1", state="running")
-    assert path.read_text(encoding="utf-8") == before and json.loads(before)["state"] == "queued"
-    assert [p.name for p in path.parent.iterdir()] == ["t1.json"]  # no temp file left behind
+    assert [p.read_bytes() for p in paths] == before and json.loads(before[0])["state"] == "queued"
+    assert sorted(p.name for p in paths[0].parent.iterdir()) == [f"{DATE}.json", f"{DATE}.json.sha256"]  # no temp file left
+    assert [p.name for p in paths[2].parent.iterdir()] == ["t1.json"]
+
+
+def test_status_save_refuses_a_state_outside_the_contract(tmp_path: Path):
+    statuses = re_mod.Statuses(tmp_path / "status", DATE, re_mod.Redactor([]))
+    statuses.open("t1", f"{DATE}-t1-1")
+    with pytest.raises(ValueError, match="'drained' is not one of queued, running, published, failed, waiting_for_key"):
+        statuses.save("t1", state="drained")
+    assert not (tmp_path / "status").exists()  # nothing was written
+    statuses.save("t1", state="waiting_for_key", reason="x")
+    assert json.loads(statuses.path("t1").read_text(encoding="utf-8"))["state"] == "waiting_for_key"
 
 
 def test_status_replace_retries_while_a_reader_holds_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -521,9 +558,13 @@ def test_failures_do_not_stop_the_rest_and_have_short_reasons(world: Env):
         "refused": [{"exit": 2, "publish": False, "say": "refusing to run: --model live with a mixed model route"}],
         "partial": [{"exit": 2, "publish": True, "status": "partial"}],
         "odd": [{"exit": 7, "publish": False, "say": "something odd"}],
+        "long": [{"exit": 1, "publish": False, "say": "ValueError: " + "a\tvery long line " * 125}],  # ~2 000 characters
     })
-    rc = world.main(world.argv("ok,crash,refused,partial,odd", keys="QTEST_KEY_A,QTEST_KEY_B,QTEST_KEY_C"))
+    rc = world.main(world.argv("ok,crash,refused,partial,odd,long", keys="QTEST_KEY_A,QTEST_KEY_B,QTEST_KEY_C"))
     assert rc == 1
+    long_reason = world.public_of("long")["reason"]  # what the portal shows under "Could not be prepared"
+    assert len(long_reason) <= re_mod.REASON_MAX and long_reason.endswith("…") and long_reason.startswith("exit 1: ValueError: a very long")
+    assert "\n" not in long_reason and "\t" not in long_reason and world.status_of("long")["reason"] == long_reason
     assert world.status_of("ok")["state"] == "published"
     crash = world.status_of("crash")
     assert crash["state"] == "failed" and "RuntimeError: boom in the fake run" in crash["reason"] and crash["exit_code"] == 1
@@ -532,7 +573,7 @@ def test_failures_do_not_stop_the_rest_and_have_short_reasons(world: Env):
     partial = world.status_of("partial")
     assert partial["state"] == "published" and partial["snapshot_status"] == "partial" and "partial" in partial["reason"]
     assert world.status_of("odd")["reason"] == "exit 7: something odd"
-    assert len(world.runs()) == 5
+    assert len(world.runs()) == 6
 
 
 def test_all_keys_drained_leaves_waiting_for_key(world: Env):
@@ -648,7 +689,7 @@ def test_no_key_value_reaches_a_log_or_a_status_file(world: Env):
         assert value not in text
     assert "MODEL_API_KEY=[redacted]" in (world.logs / f"{DATE}_t1_run01_QTEST_KEY_A.log").read_text(encoding="utf-8")
     assert "stderr sees [redacted]" in text
-    for p in (world.status / DATE).glob("*.json"):
+    for p in world.status.rglob("*.json"):
         doc = p.read_text(encoding="utf-8")
         assert str(world.tmp) not in doc and str(world.tmp).replace("\\", "\\\\") not in doc  # no absolute paths
 
@@ -716,7 +757,7 @@ def test_topics_all_plans_every_row_and_reports_a_row_it_cannot_run(world: Env):
     assert [r["topic"] for r in bad] == ["x/y", "Not A Slug"] and all(r["state"] == "failed" for r in bad)
     runner_log = (world.logs / f"{DATE}_runner.log").read_text(encoding="utf-8")
     assert "'Not A Slug'" in runner_log and "'x/y'" in runner_log
-    assert not (world.status / DATE / "x").exists()  # no status file for an id that is not safe as a name
+    assert sorted(p.name for p in world.status.iterdir()) == ["_runner", "ai--jobs", "alpha-topic", "covid-19-"]  # none for x/y
 
 
 def test_topics_all_with_live_is_refused_until_zetaris_shows_active_rows(world: Env):
@@ -776,8 +817,8 @@ def test_refusals(world: Env, monkeypatch: pytest.MonkeyPatch, case: str):
     elif case == "bad_topic_dot":
         argv[argv.index("--topics") + 1] = "a.b"
     elif case == "lock":
-        (world.status / DATE).mkdir(parents=True)
-        (world.status / DATE / ".runner.lock").write_text("{}")
+        world.runner.mkdir(parents=True)
+        (world.runner / ".runner.lock").write_text("{}")
     elif case == "listing_fails":
         world.scenario({}, db_error=True)
     assert world.main(argv) == 2
@@ -846,19 +887,21 @@ def test_a_listed_windows_device_name_is_refused(world: Env, monkeypatch: pytest
 
 
 def test_topics_all_skips_rows_named_after_a_windows_device(world: Env, monkeypatch: pytest.MonkeyPatch):
-    real_path = re_mod.Statuses.path
+    for name in ("path", "record_path"):
+        real = getattr(re_mod.Statuses, name)
 
-    def guarded(self, topic: str) -> Path:  # on Windows the real file name would block or fail: fail fast instead
-        assert not re_mod.WINDOWS_DEVICE.fullmatch(topic), f"{topic!r} reached a status file name"
-        return real_path(self, topic)
+        def guarded(self, topic: str, real=real) -> Path:  # on Windows the real name would block or fail: fail fast instead
+            assert not re_mod.WINDOWS_DEVICE.fullmatch(topic), f"{topic!r} reached a status file name"
+            return real(self, topic)
 
-    monkeypatch.setattr(re_mod.Statuses, "path", guarded)
+        monkeypatch.setattr(re_mod.Statuses, name, guarded)
     world.scenario({}, {}, db_topics=["alpha-topic", "con", "nul"])
     assert world.main(world.argv("all", live=False)) == 1  # the rows it cannot run count as failed
     assert [d["topic"] for d in world.dry_runs()] == ["alpha-topic"]
     bad = [r for r in world.summary()["topics"] if r.get("skipped_row")]
     assert [r["topic"] for r in bad] == ["con", "nul"] and all(r["state"] == "failed" and "device name" in r["reason"] for r in bad)
-    assert sorted(p.name for p in (world.status / DATE).glob("*.json")) == ["_summary.json", "alpha-topic.json"]
+    assert sorted(p.name for p in world.status.iterdir()) == ["_runner", "alpha-topic"]
+    assert sorted(p.name for p in world.runner.glob("*.json")) == ["_summary.json", "alpha-topic.json"]
     assert world.status_of("alpha-topic")["state"] == "queued"  # the other topics of the date went on
 
 
@@ -896,7 +939,168 @@ def test_ctrl_c_stops_the_children_keeps_their_checkpoints_and_releases_the_lock
     st = world.status_of("slow")
     assert st["state"] != "running" and "interrupted" in st["reason"] and st["runs"][0]["key"] == "QTEST_KEY_A"
     assert (world.out / "_checkpoints" / f"{rid}.sqlite").is_file()
-    assert not (world.status / DATE / ".runner.lock").exists()
+    assert not (world.runner / ".runner.lock").exists()
+
+
+def test_status_files_follow_the_portal_contract(world: Env):
+    """Issue #2 6411408519 / 6411653104: <status-dir>/<topic>/<date>.json with exactly the eight fields (public_of checks
+    them, the state, the sha256 file beside it and the match with the record), nothing else beside the topic folders
+    but the runner's own `_runner` folder, which keeps every other field."""
+    world.scenario({"t1": [{"exit": 3, "fast": 200}, {"exit": 0, "fast": 50}], "t2": [{"crash": True}]}, {"t1": {"fast": 300, "ultra": 30}})
+    assert world.main(world.argv("t1,t2")) == 1
+    t1, t2 = world.public_of("t1"), world.public_of("t2")
+    assert (t1["state"], t1["reason"], t1["attempts"], t1["run_id"]) == ("published", None, 2, f"{DATE}-t1-1")
+    assert t2["state"] == "failed" and "boom in the fake run" in t2["reason"]
+    assert sorted(p.name for p in world.status.iterdir()) == ["_runner", "t1", "t2"]
+    for topic in ("t1", "t2"):
+        assert sorted(p.name for p in (world.status / topic).iterdir()) == [f"{DATE}.json", f"{DATE}.json.sha256"]
+    assert sorted(p.name for p in world.runner.iterdir()) == ["_summary.json", "t1.json", "t2.json"]  # the lock is gone
+    record = world.status_of("t1")
+    assert record["runs"] and record["calls_estimate"] == 330 and record["state_mode"] == "live" and record["version"] == 1
+    world.scenario({}, {"t3": {"fast": 10, "ultra": 0}})
+    assert world.main(world.argv("t3", live=False)) == 0  # a plan run writes the same contract
+    assert world.public_of("t3")["state"] == "queued"
+
+
+def test_started_at_is_the_first_live_start(world: Env):
+    """The portal shows `running` and `waiting_for_key` as "being prepared since started_at": a plan run hours before
+    does not date it, and a rerun that resumes keeps it."""
+    world.scenario({"t1": [{"exit": 3, "fast": 100}, {"exit": 3, "fast": 100}, {"exit": 0}]}, {"t1": {"fast": 300, "ultra": 0}})
+    assert world.main(world.argv("t1", live=False)) == 0
+    record = world.status_of("t1")
+    record["started_at"] = "2026-10-20T06:00:00Z"  # the plan ran at 06:00
+    (world.runner / "t1.json").write_text(json.dumps(record), encoding="utf-8")
+    assert world.main(world.argv("t1")) == 3  # both keys drain
+    waiting = world.public_of("t1")
+    assert waiting["state"] == "waiting_for_key" and waiting["started_at"] > "2026-10-20T06:00:00Z"
+    assert world.main(world.argv("t1")) == 0  # the next window resumes it
+    done = world.public_of("t1")
+    assert done["state"] == "published" and done["started_at"] == waiting["started_at"] and done["attempts"] == 3
+
+
+def test_a_plan_run_after_a_publish_the_plan_predicted_to_wait_exits_0(world: Env):
+    """The x1.6 estimate often predicts a wait for a topic that then publishes: `published` clears the prediction."""
+    world.scenario({"t1": [{"exit": 0, "fast": 10}]}, {"t1": {"fast": 1000, "ultra": 0}})
+    assert world.main(world.argv("t1", keys="QTEST_KEY_A")) == 0  # 1 000 > 650: the plan said waiting_for_key
+    st = world.status_of("t1")
+    assert st["state"] == "published" and not set(re_mod.PLAN_FIELDS) & set(st)
+    assert world.main(world.argv("t1", keys="QTEST_KEY_A", live=False)) == 0
+    row, = world.summary()["topics"]
+    assert (row["state"], row["plan_outcome"]) == ("published", None)
+    assert world.public_of("t1")["state"] == "published"
+
+
+def test_attempt_reaches_run_py_and_names_the_run_id(world: Env):
+    """--attempt 2: run.py gets --attempt 2, the status names run <date>-t1-2, and attempt 1's snapshot in the store
+    does not count as this run id published."""
+    d = world.out / "t1" / DATE
+    d.mkdir(parents=True)
+    old = {"run_id": f"{DATE}-t1-1", "topic_id": "t1", "edition_date": DATE, "status": "ok", "version": 1}
+    (d / "v1.json").write_text(json.dumps(old))
+    (d / "latest.json").write_text(json.dumps(old))
+    world.scenario({"t1": [{"exit": 0, "fast": 10}]})
+    assert world.main(world.argv("t1", "--attempt", "2")) == 0
+    run, = world.runs()
+    assert run["argv"][run["argv"].index("--attempt") + 1] == "2"
+    st = world.public_of("t1")
+    assert (st["state"], st["run_id"], st["reason"]) == ("published", f"{DATE}-t1-2", None)
+    assert world.status_of("t1")["version"] == 2
+
+
+def _record_live_popen(monkeypatch: pytest.MonkeyPatch, world: Env, delay_s: float = 0.0, on_live_start=None) -> list[subprocess.Popen]:
+    """Every live child the runner starts (the fake run), in order; `on_live_start(started)` runs just before each
+    Popen, `delay_s` holds each worker before its Popen."""
+    live: list[subprocess.Popen] = []
+    real = subprocess.Popen
+
+    def recording(argv, *a, **k):
+        is_live = str(world.tmp / "fake_run.py") in [str(x) for x in argv]
+        if is_live:
+            if on_live_start:
+                on_live_start(list(live))
+            time.sleep(delay_s)
+        p = real(argv, *a, **k)
+        if is_live:
+            live.append(p)
+        return p
+
+    monkeypatch.setattr(re_mod.subprocess, "Popen", recording)
+    return live
+
+
+def _kill_alive(procs: list[subprocess.Popen]) -> None:
+    for p in procs:
+        if p.poll() is None:
+            p.kill()
+            p.wait(10)
+
+
+def _failing_save(monkeypatch: pytest.MonkeyPatch, topic: str, state: str) -> None:
+    real = re_mod.Statuses.save
+
+    def save(self, t: str, **changes):
+        if t == topic and changes.get("state") == state:
+            raise OSError("status disk went away")
+        return real(self, t, **changes)
+
+    monkeypatch.setattr(re_mod.Statuses, "save", save)
+
+
+def test_a_status_write_fault_stops_every_live_child_before_the_runner_ends(world: Env, monkeypatch: pytest.MonkeyPatch):
+    world.scenario({"quick": [{"exit": 0}], "slow": [{"exit": 0, "sleep": 20}]})
+    live = _record_live_popen(monkeypatch, world)
+    _failing_save(monkeypatch, "quick", "published")
+    t0 = time.monotonic()
+    try:
+        with pytest.raises(OSError, match="status disk went away"):
+            world.main(world.argv("quick,slow"))
+        assert len(live) == 2 and [p.poll() is not None for p in live] == [True, True]  # no child outlives the runner
+    finally:
+        _kill_alive(live)
+    assert time.monotonic() - t0 < 15
+    assert [r["topic"] for r in world.runs()] == ["quick"]  # slow was stopped in its sleep
+    slow = world.public_of("slow")
+    assert slow["state"] == "failed" and "interrupted" in slow["reason"]  # not left on `running`
+    assert not (world.runner / ".runner.lock").exists()
+
+
+def test_a_pump_fault_kills_the_child_before_its_key_takes_the_next_topic(world: Env, monkeypatch: pytest.MonkeyPatch):
+    world.scenario({"first": [{"exit": 0, "echo": "POISON line", "sleep": 6}], "second": [{"exit": 0}]})
+    alive_at_start: list[subprocess.Popen] = []
+    live = _record_live_popen(monkeypatch, world, on_live_start=lambda started: alive_at_start.extend(p for p in started if p.poll() is None))
+    real_raw = re_mod.Redactor.raw
+
+    def raw(self, b: bytes) -> bytes:
+        if b"POISON" in b:
+            raise OSError("log disk full")
+        return real_raw(self, b)
+
+    monkeypatch.setattr(re_mod.Redactor, "raw", raw)
+    try:
+        assert world.main(world.argv("first,second", keys="QTEST_KEY_A")) == 1
+    finally:
+        _kill_alive(live)
+    assert len(live) == 2 and alive_at_start == []  # one live process per key: the first had exited
+    first = world.public_of("first")
+    assert first["state"] == "failed" and "runner error: OSError: log disk full" in first["reason"]
+    assert world.public_of("second")["state"] == "published"
+    assert [r["topic"] for r in world.runs()] == ["second"]  # first was killed in its sleep
+
+
+def test_a_child_that_starts_while_the_runner_stops_is_killed_at_once(world: Env, monkeypatch: pytest.MonkeyPatch):
+    """t1's worker reaches its Popen after the main thread failed on t2's status write and began the stop."""
+    world.scenario({"t1": [{"exit": 0, "sleep": 8}], "t2": [{"exit": 0, "sleep": 8}]})
+    live = _record_live_popen(monkeypatch, world, delay_s=1.0)
+    _failing_save(monkeypatch, "t2", "running")
+    t0 = time.monotonic()
+    try:
+        with pytest.raises(OSError, match="status disk went away"):
+            world.main(world.argv("t1,t2"))
+        assert len(live) == 1 and live[0].poll() is not None
+    finally:
+        _kill_alive(live)
+    assert world.runs() == [] and time.monotonic() - t0 < 8  # killed before its sleep ended
+    assert world.status_of("t1")["state"] == "failed" and "interrupted" in world.status_of("t1")["reason"]
 
 
 @pytest.mark.parametrize("resume", [False, True])
@@ -985,6 +1189,55 @@ def test_dry_check_fails_loudly_when_a_seam_is_missing(tmp_path: Path, monkeypat
     monkeypatch.setattr(run, "main", lambda argv: pytest.fail("the graph ran without its refusal seams"))
     with pytest.raises(RuntimeError, match=r"llm\._client not found"):
         dc_mod.estimate("t", "2026-10-22", tmp_path / "dry", "fixture", None)
+
+
+def test_dry_check_fails_when_a_live_call_was_refused_during_the_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    llm, run = _guard_llm_seams(monkeypatch)
+    monkeypatch.setattr(llm, "json_task", lambda task, payload, *, dry_run, which="default": {})
+
+    def fake_main(argv: list[str]) -> int:  # a node whose dry switch broke: its broad except swallows the refusal
+        try:
+            llm._create("m", [], 0.0, {})
+        except Exception:  # noqa: BLE001
+            pass
+        llm.json_task("event_key", {}, dry_run=True)
+        return 0
+
+    monkeypatch.setattr(run, "main", fake_main)
+    rep = dc_mod.estimate("t", "2026-10-22", tmp_path / "dry", "fixture", None)
+    assert rep["refused_calls"] == 1 and "1 live model or control-plane call(s) attempted and refused" in rep["error"]
+    assert rep["calls"]["fast"] == 1 and rep["exit_code"] == 0  # the counts stay for diagnosis
+
+
+def test_dry_check_fails_when_the_graph_exits_other_than_0(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    llm, run = _guard_llm_seams(monkeypatch)
+    monkeypatch.setattr(run, "main", lambda argv: 2)  # a partial snapshot (or a refusal) of the dry run
+    rep = dc_mod.estimate("t", "2026-10-22", tmp_path / "dry", "fixture", None)
+    assert rep["exit_code"] == 2 and rep["error"] == "dry check: graph exit 2, snapshot not stored"
+
+
+def test_dry_check_cli_exits_1_on_a_report_with_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Counts with an `error` are no estimate: dry_check.py exits 1, so the runner fails the topic."""
+    monkeypatch.setattr(dc_mod, "_isolate", lambda env_file, blank: None)
+    monkeypatch.setattr(dc_mod, "estimate", lambda *a: {"topic": "t", "calls": {"total": 5, "fast": 5, "ultra": 0}, "snapshot_status": "partial",
+                                                       "error": "dry check: graph exit 2, snapshot partial"})
+    report = tmp_path / "r.json"
+    assert dc_mod.main(["--topic", "t", "--date", "2026-10-22", "--out", str(tmp_path / "dry"), "--report", str(report)]) == 1
+    assert json.loads(report.read_text(encoding="utf-8"))["error"].endswith("snapshot partial")
+
+
+def test_dry_check_counting_passes_further_keywords_through(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    llm, run = _guard_llm_seams(monkeypatch)
+    seen: dict[str, object] = {}
+
+    def original(task, payload, *, dry_run, which="default", **more):
+        seen.update(more, dry_run=dry_run, which=which)
+        return {}
+
+    monkeypatch.setattr(llm, "json_task", original)
+    monkeypatch.setattr(run, "main", lambda argv: (llm.json_task("stance", {}, dry_run=False, which="fact_checker", budget=3), 0)[1])
+    rep = dc_mod.estimate("t", "2026-10-22", tmp_path / "dry", "fixture", None)
+    assert seen == {"budget": 3, "dry_run": True, "which": "fact_checker"} and rep["calls"]["ultra"] == 1 and "error" not in rep
 
 
 def test_list_topics_reads_active_rows_in_collection_order_and_reports_bad_ids(monkeypatch: pytest.MonkeyPatch):
@@ -1100,15 +1353,21 @@ sys.exit(codes[min(n, len(codes) - 1)])
 '''
 
 
+DIRECT_URL = "https://integrate.api.nvidia.com/v1"
+
+
 def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str], scan: bool = False, topic: str = "climate-policy",
-                       flags: tuple[str, ...] = (), extra: tuple[str, ...] = ("--quiet",)) -> tuple[subprocess.CompletedProcess, list[dict], str]:
-    """`flags` go before `--`, `extra` after it (run.py arguments)."""
+                       flags: tuple[str, ...] = (), extra: tuple[str, ...] = ("--quiet",), file_base_url: str | None = DIRECT_URL,
+                       exported_base_url: str = "") -> tuple[subprocess.CompletedProcess, list[dict], str]:
+    """`flags` go before `--`, `extra` after it (run.py arguments); MODEL_BASE_URL is `file_base_url` in the env file
+    (None: not there) and `exported_base_url` in the environment (blank: the env file's counts)."""
     pkg = tmp_path / "work" / "quorum_reasoning"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text("")
     (pkg / "run.py").write_text(FAKE_PACKAGE_RUN)
     env_file = tmp_path / ".env"
-    env_file.write_text(f"QTEST_KEY_A={values[0]}\nQTEST_KEY_B={values[1]}\nMODEL_API_KEY_7=fake-env-file-key-7777\n")
+    env_file.write_text(f"QTEST_KEY_A={values[0]}\nQTEST_KEY_B={values[1]}\nMODEL_API_KEY_7=fake-env-file-key-7777\n"
+                        + (f"MODEL_BASE_URL={file_base_url}\n" if file_base_url is not None else ""))
     records = tmp_path / "records.jsonl"
     (tmp_path / "scenario.json").write_text(json.dumps({"records": str(records), "codes": codes, "env_file": str(env_file), "scan": scan,
                                                         "values": {values[0]: "QTEST_KEY_A", values[1]: "QTEST_KEY_B"}}))
@@ -1121,6 +1380,7 @@ def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str]
     env["QUORUM_DRY_RUN"] = "1"
     for name in ("METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN", "MODEL_BASE_URL"):
         env[name] = ""
+    env["MODEL_BASE_URL"] = exported_base_url
     proc = subprocess.run([_git_bash(), str(SCRIPTS / "resume_with_next_key.sh"), "--topic", topic, "--date", DATE,
                            "--attempt", "2", "--out", str(tmp_path / "store"), "--log", str(log), "--keys", "QTEST_KEY_A,QTEST_KEY_B",
                            "--env-file", str(env_file), "--python", sys.executable, "--workdir", str(tmp_path / "work"), *flags, "--", *extra],
@@ -1160,12 +1420,43 @@ def test_resume_with_next_key_takes_a_topic_by_the_shared_rule(tmp_path: Path):
 
 
 @pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
-@pytest.mark.parametrize("extra", [("--model", "dry"), ("--model=dry",), ("--out", "elsewhere"), ("--resume",)])
-def test_resume_with_next_key_refuses_managed_run_arguments_after_dashdash(tmp_path: Path, extra: tuple[str, ...]):
-    """argparse takes the last --model: `-- --model dry` would write a dry run into the live store."""
+@pytest.mark.parametrize("extra", [("--model", "dry"), ("--model=dry",), ("--out", "elsewhere"), ("--resume",),
+                                   # unique prefixes run.py's parser expands (allow_abbrev): the last value would win
+                                   ("--ou", "elsewhere"), ("--corp", "fixture"), ("--att", "9"), ("--res",), ("--seed",),
+                                   # modes that replace the run and exit 0 (the first two send paid completions)
+                                   ("--test-connection",), ("--test-c",), ("--probe",), ("--models",), ("--list",), ("--mermaid",),
+                                   ("--quiet", "--fixture", "x"), ("--quiet=1",)])
+def test_resume_with_next_key_refuses_run_arguments_it_does_not_pass_through(tmp_path: Path, extra: tuple[str, ...]):
+    """After `--` only --quiet, --verbose and --checkpoint, spelled exactly (decision in the script header)."""
     proc, rows, text = _run_resume_script(tmp_path, [0], (VALUE_A, VALUE_B), extra=extra)
     assert proc.returncode == 2 and rows == [], text
-    assert "managed by this script" in proc.stderr
+    assert "not passed through" in proc.stderr and "final exit" not in proc.stdout
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+def test_resume_with_next_key_passes_the_allowed_extras_through(tmp_path: Path):
+    proc, rows, text = _run_resume_script(tmp_path, [0], (VALUE_A, VALUE_B), extra=("--quiet", "--verbose", "--checkpoint"))
+    assert proc.returncode == 0, text
+    row, = rows
+    assert row["argv"][-3:] == ["--quiet", "--verbose", "--checkpoint"]
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+@pytest.mark.parametrize("file_url,exported_url", [("http://127.0.0.1:8088/v1", ""), (DIRECT_URL, "http://127.0.0.1:8088/v1"), (None, ""),
+                                                   ("https://integrate.api.nvidia.com.example.org/v1", "")])
+def test_resume_with_next_key_refuses_a_route_other_than_direct_nvidia(tmp_path: Path, file_url: str | None, exported_url: str):
+    """The Meterless route (the README's Nightshift URL in MODEL_BASE_URL), no URL, or a look-alike host: exit 2 before
+    any run, so no NVIDIA key is ever sent as the bearer to another service; an exported URL wins over the env file."""
+    proc, rows, text = _run_resume_script(tmp_path, [3, 0], (VALUE_A, VALUE_B), file_base_url=file_url, exported_base_url=exported_url)
+    assert proc.returncode == 2 and rows == [], text
+    assert "not NVIDIA's direct route" in proc.stderr and VALUE_A not in text and VALUE_B not in text
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+def test_resume_with_next_key_takes_an_exported_direct_url_over_the_env_file(tmp_path: Path):
+    proc, rows, text = _run_resume_script(tmp_path, [0], (VALUE_A, VALUE_B), file_base_url="http://127.0.0.1:8088/v1", exported_base_url=DIRECT_URL)
+    assert proc.returncode == 0, text
+    assert [r["key"] for r in rows] == ["QTEST_KEY_A"]
 
 
 @pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")

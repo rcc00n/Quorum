@@ -40,7 +40,11 @@ class LiveCallRefused(RuntimeError):
     pass
 
 
+REFUSED: list[int] = []  # one entry per refused call in this process; estimate() reads how many fired during its run
+
+
 def _refuse(*_a: Any, **_k: Any) -> Any:
+    REFUSED.append(1)
     raise LiveCallRefused("dry check: a live model or control-plane call was attempted and refused")
 
 
@@ -135,6 +139,14 @@ def list_topics() -> dict[str, Any]:
 
 
 def estimate(topic: str, date: str, out: Path, corpus: str, fixture: str | None) -> dict[str, Any]:
+    """The dry run's counts, with `error` set when they cannot stand as an estimate.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the report carries an `error` (dry_check.py exits 1, the runner
+    marks the topic failed) when a call to a refusal seam fired during the run or the graph exited other than 0 (exit 2:
+    a partial snapshot, a node recorded an error); the counts stay in the report for diagnosis. The counting wrapper
+    passes any further keyword of llm.json_task through. Why: the nodes' broad `except Exception` swallows a refusal,
+    so the seam fired invisibly (54 refusals on the fixture with the dry switch broken) and the estimate came out too
+    low while the plan said every dry check passed; a partial dry run is no estimate of a whole run either."""
     from quorum_reasoning import llm, run, store
 
     missing = [name for name in LLM_SEAMS if not callable(getattr(llm, name, None))]
@@ -146,16 +158,18 @@ def estimate(topic: str, date: str, out: Path, corpus: str, fixture: str | None)
     counts: Counter[tuple[str, str]] = Counter()
     original = llm.json_task
 
-    def counting(task: str, payload: dict[str, Any], *, dry_run: bool, which: str = "default") -> dict[str, Any]:
+    def counting(task: str, payload: dict[str, Any], *, dry_run: bool = True, which: str = "default", **more: Any) -> dict[str, Any]:
         counts[(task, which)] += 1
-        return original(task, payload, dry_run=True, which=which)
+        return original(task, payload, dry_run=True, which=which, **more)
 
     llm.json_task = counting  # type: ignore[assignment]  # every node calls llm.json_task by attribute
     before = store.versions(out, topic, date)
     argv = ["--topic", topic, "--date", date, "--model", "dry", "--corpus", corpus, "--out", str(out)]
     if fixture:
         argv += ["--fixture", fixture]
+    refused_before = len(REFUSED)
     rc = run.main(argv)
+    refused = len(REFUSED) - refused_before
     after = store.versions(out, topic, date)
     snap = store.load(out, topic, date) if after and after != before else None
     by_lane: Counter[str] = Counter()
@@ -165,7 +179,12 @@ def estimate(topic: str, date: str, out: Path, corpus: str, fixture: str | None)
         by_task[task] += n
     fast = sum(by_lane[lane] for lane in FAST_LANES)
     ultra = sum(by_lane[lane] for lane in ULTRA_LANES)
-    return {
+    problems = []
+    if refused:
+        problems.append(f"{refused} live model or control-plane call(s) attempted and refused during the run, so the counts miss them")
+    if rc != 0:
+        problems.append(f"graph exit {rc}, snapshot {(snap.get('status') if snap else None) or 'not stored'}")
+    report: dict[str, Any] = {
         "topic": topic,
         "date": date,
         "corpus": corpus,
@@ -176,7 +195,11 @@ def estimate(topic: str, date: str, out: Path, corpus: str, fixture: str | None)
         "roundup": (snap.get("roundup") or {}).get("count") if snap else None,
         "calls": {"total": fast + ultra + sum(n for lane, n in by_lane.items() if lane not in FAST_LANES + ULTRA_LANES),
                   "fast": fast, "ultra": ultra, "by_lane": dict(by_lane), "by_task": dict(sorted(by_task.items()))},
+        "refused_calls": refused,
     }
+    if problems:
+        report["error"] = "dry check: " + "; ".join(problems)
+    return report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -216,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.report:
         write_json_atomic(Path(args.report), report)
     calls = report.get("calls")
-    if calls:
+    if calls and not report.get("error"):  # decision at estimate
         print(f"dry check {args.topic} {args.date}: {calls['total']} model calls ({calls['fast']} fast lane, {calls['ultra']} Ultra), snapshot {report['snapshot_status']}", file=sys.stderr)
         return 0
     print(f"dry check {args.topic} {args.date} failed: {report.get('error')}", file=sys.stderr)
