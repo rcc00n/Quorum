@@ -158,8 +158,27 @@ def run(state: RunState) -> dict:
     # Events form only from the edition window's documents, and a supersede chain (one URL re-fetched with a changed
     # hash) is one publication represented by its newest row: superseded versions stay in the state for the trace but
     # are not clustered, counted or listed (DECISIONS.md log 2026-10-24, chain-once rule).
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; review round 1): an official document marked `evidence_only` by
+    # plan's seed rule (no term of the topic in its title or abstract) may join an event but starts none: it is keyed
+    # and clustered with the window's other documents, and a group with no seed member (an outlet document or a
+    # seed-eligible official one) is dropped before it becomes an event. No model question is spent where neither side
+    # holds a seed member (a pair of two such documents, a lone one offered to a group of them, a chain check inside
+    # one); code merges between them stay free. A window with no seed document clusters nothing. Why: the owner's rule
+    # (DECISIONS.md › Sources) says such a document "starts no event and never becomes a roundup item by itself", not
+    # that it joins none: an adopted rule or order whose title and summary lack the topic's terms must still be able to
+    # sit in the outlet event that reports it (research round 1, extract and the rubric's legal status read the event's
+    # own documents). Supersedes the first version of this rule (left out of clustering entirely, Claude Code's reading).
     docs = [d for d in state["documents"] if not d.get("from_previous_day") and not d.get("superseded")]
+    held = [d for d in docs if d.get("evidence_only")]
+    if len(held) == len(docs):
+        docs = []  # nothing can seed an event, so nothing is keyed or asked
     folded = sum(1 for d in state["documents"] if d.get("superseded") and not d.get("from_previous_day"))
+    seedless = {"pair": 0, "singleton": 0, "chain": 0}
+
+    def no_seed(idx: list[int]) -> bool:
+        """True when none of these documents may seed an event (all are evidence-only official documents)."""
+        return all(docs[i].get("evidence_only") for i in idx)
+
     merge_hi = float(config.get("clustering", "key_merge_overlap", 0.75))
     budget = int(config.get("clustering", "merge_questions_max", 80))
     errors: list[StepError] = []
@@ -221,6 +240,9 @@ def run(state: RunState) -> dict:
         for _, i, j in pending_pairs:
             if uf.find(i) == uf.find(j):
                 continue
+            if no_seed([i, j]):
+                seedless["pair"] += 1
+                continue
             if ask("pair", _side(docs[i], keys[docs[i]["id"]]), _side(docs[j], keys[docs[j]["id"]])) is True:
                 merged["pair"] += 1
                 uf.union(i, j)
@@ -234,6 +256,9 @@ def run(state: RunState) -> dict:
         for cl in [c for c in clusters if len(c) == 1]:
             lone = docs[cl[0]]
             candidates = [c for c in clusters if len(c) >= 2 and sig[lone["id"]] & set().union(*(sig[docs[m]["id"]] for m in c))]
+            if no_seed(cl):
+                seedless["singleton"] += sum(1 for c in candidates if no_seed(c))
+                candidates = [c for c in candidates if not no_seed(c)]
             candidates.sort(key=lambda c: (-len(sig[lone["id"]] & set().union(*(sig[docs[m]["id"]] for m in c))), docs[c[0]]["id"]))
             for cand in candidates:
                 members = [docs[m] for m in cand]
@@ -248,6 +273,9 @@ def run(state: RunState) -> dict:
         chain_notes: list[str] = []
         while worklist:
             cl = worklist.pop()
+            if no_seed(cl):
+                seedless["chain"] += 1  # dropped below with no seed member; a check would change nothing
+                continue
             pairs = [(m, n) for x, m in enumerate(cl) for n in cl[x + 1 :]]
             m, n = min(pairs, key=lambda p: (overlap_coefficient(full[docs[p[0]]["id"]], full[docs[p[1]]["id"]]), docs[p[0]]["id"], docs[p[1]]["id"]))
             verdict = ask("chain", _side(docs[m], keys[docs[m]["id"]]), _side(docs[n], keys[docs[n]["id"]]))
@@ -268,6 +296,9 @@ def run(state: RunState) -> dict:
                 unsure += 1
                 chain_notes.append(("not checked, budget spent: " if budget <= 0 else "kept together unconfirmed: ") + f"{sorted(docs[i]['id'] for i in cl)}")
 
+        unseeded = [cl for cl in clusters if no_seed(cl)]
+        clusters = [cl for cl in clusters if not no_seed(cl)]
+        joined = sum(1 for cl in clusters for i in cl if docs[i].get("evidence_only"))
         events: list[Event] = []
         for cl in clusters:
             members = sorted((docs[i] for i in cl), key=lambda d: d["published_at"])
@@ -291,15 +322,29 @@ def run(state: RunState) -> dict:
                 )
             )
         events.sort(key=lambda e: -len(e["document_ids"]))
-        previous = len(state["documents"]) - len(docs) - folded
+        previous = sum(1 for d in state["documents"] if d.get("from_previous_day"))
         s.decision = (
-            f"{len(events)} events from {len(docs)} documents"
+            f"{len(events)} events from {len(docs) - sum(len(cl) for cl in unseeded)} documents"
             + (f" ({previous} earlier-day documents held for evidence only)" if previous else "")
+            + (
+                f" ({len(held)} official documents evidence only by the seed rule, see plan: {joined} joined an event, "
+                f"{len(held) - joined} in no event"
+                + (f", {len(unseeded)} group(s) with no seed member dropped" if unseeded else "")
+                + ("; no seed document in the window, nothing clustered" if held and not docs else "")
+                + ")"
+                if held
+                else ""
+            )
             + (f" ({folded} superseded versions folded into their chains' newest rows)" if folded else "")
             + f"; {merged['auto']} key merges in code, "
             f"model: {asked['pair']} pair / {asked['singleton']} singleton / {asked['chain']} chain questions, "
             f"{merged['pair'] + merged['singleton']} merged, {splits} split, {unsure} kept unconfirmed"
             + (f"; budget spent before {sum(spent_out.values())} question(s) (pair {spent_out['pair']} / singleton {spent_out['singleton']} / chain {spent_out['chain']})" if any(spent_out.values()) else "")
+            + (
+                f"; {sum(seedless.values())} question(s) not asked, no seed member on either side (pair {seedless['pair']} / singleton {seedless['singleton']} / chain {seedless['chain']})"
+                if any(seedless.values())
+                else ""
+            )
         )
         s.reason = "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between" + (
             "; " + "; ".join(chain_notes) if chain_notes else ""
