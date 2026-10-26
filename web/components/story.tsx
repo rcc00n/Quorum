@@ -158,6 +158,16 @@ export function storyReadable(event: Event, sources: Source[]) {
   });
 }
 
+// Yelysei's rule (Issue #2 6418787032; ARCHITECTURE § 8): a story the producer flagged `needs_review` is shown
+// with this label wherever its title appears, never silently approved.
+export function ReviewLabel() {
+  return (
+    <p className="story-review" role="status">
+      Requires editorial review
+    </p>
+  );
+}
+
 export function StoryCrumb({ topic, date }: { topic: Topic | null; date?: string }) {
   const href = topic ? `/topics/${encodeURIComponent(topic.id)}${date ? `?date=${date}` : ""}` : "/dashboard";
   return (
@@ -426,6 +436,7 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
         <h1 className="story-headline">{event.title}</h1>
         <p className="story-standfirst">{event.summary}</p>
         {meta.length > 0 && <p className="story-meta">{meta.join(" · ")}</p>}
+        {event.reasoning?.needs_review && <ReviewLabel />}
         <p className="story-key">{KEY_LINE}</p>
         {article.paragraphs.map((p, i) => {
           let lead: string | null = null;

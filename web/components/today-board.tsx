@@ -43,6 +43,8 @@ function StoryCard({ event, topicName, day, lead }: { event: Event; topicName: s
     event.importance?.label ?? "Importance not supplied",
     `${event.sources.length} ${event.sources.length === 1 ? "source" : "sources"}`,
     typeof minutes === "number" ? `${minutes} min` : null,
+    // Yelysei's rule (Issue #2 6418787032): a story the producer flagged is never shown silently approved.
+    event.reasoning?.needs_review ? "Requires editorial review" : null,
   ].filter(Boolean);
   return (
     <li className={lead ? "tb-card tb-card-lead" : "tb-card"}>
@@ -136,13 +138,19 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
             ? "No story crossed the bar today"
             : own.length
               ? `${own.length} ${own.length === 1 ? "story" : "stories"} today`
-              : isPast
-                ? noEdition
-                  ? "No edition installed for this date"
-                  : "No edition for this topic on this date"
-                : passed
-                  ? "Waiting for the edition"
-                  : `Cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
+              : edition
+                // An installed edition that is neither quiet nor carrying a visible story says so; "no edition"
+                // and "waiting" are only for topics without an edition row (Yelysei's re-review of PR #27).
+                ? edition.completion === "partial"
+                  ? "Partial edition"
+                  : "No stories in this edition"
+                : isPast
+                  ? noEdition
+                    ? "No edition installed for this date"
+                    : "No edition for this topic on this date"
+                  : passed
+                    ? "Waiting for the edition"
+                    : `Cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
         return (
           <section key={t.id} className={`tb-section tb-tint-${(i % 4) + 1}`} aria-labelledby={`tb-${t.id}`}>
             <div className="tb-section-head">

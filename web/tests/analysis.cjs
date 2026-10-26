@@ -161,6 +161,14 @@ const assert = require("node:assert/strict");
       .getByText("Provisional corpus as of", { exact: false })
       .waitFor();
     response.publication.provisional = false;
+    // A story the producer flagged needs_review carries the label on the claims-only head.
+    response.events[0].reasoning = { needs_review: true };
+    await open();
+    await page
+      .getByText("Requires editorial review", { exact: true })
+      .first()
+      .waitFor();
+    delete response.events[0].reasoning;
     response.events[0].analysis.trace = [];
     await open();
     await page

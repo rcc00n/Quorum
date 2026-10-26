@@ -20,7 +20,7 @@ import type {
 } from "@/lib/analysis";
 import { displayTime } from "@/lib/analysis";
 import { Spectrum } from "./spectrum";
-import { Story, claimKey } from "./story";
+import { Story, claimKey, ReviewLabel } from "./story";
 import { readableArticle } from "@/lib/editorial";
 
 const statusNames = {
@@ -117,12 +117,9 @@ export function PublicationNotice({
       </span>
       {p.provisional && (
         <span>
-          Provisional corpus
           {p.corpus_as_of_utc
-            ? ` as of ${displayTime(p.corpus_as_of_utc)}`
-            : ""}
-          : the producer&apos;s capture metadata, not an independent
-          verification.
+            ? `Provisional corpus as of ${displayTime(p.corpus_as_of_utc)}: the producer's capture metadata, not an independent verification.`
+            : "Provisional corpus: capture metadata unavailable, no sidecar is bound."}
         </span>
       )}
       {p.expires_at && (
@@ -492,6 +489,7 @@ export function AnalysisWorkspace({
           <>
             <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
             <h1>{event.title}</h1>
+            {event.reasoning?.needs_review && <ReviewLabel />}
             <p className="lede">{event.summary}</p>
             {event.importance && (
               <aside className="notice">

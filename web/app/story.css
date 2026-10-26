@@ -577,3 +577,16 @@
     transition: none;
   }
 }
+
+/* The producer's needs_review flag, beside the meta line and on the claims-only head. */
+.story-review {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 2px 8px;
+  border: 1px solid var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
