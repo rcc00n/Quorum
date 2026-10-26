@@ -115,6 +115,16 @@ export function PublicationNotice({
         Generated {displayTime(p.generated_at)} · Revision{" "}
         {p.revision || "unavailable"}
       </span>
+      {p.provisional && (
+        <span>
+          Provisional corpus
+          {p.corpus_as_of_utc
+            ? ` as of ${displayTime(p.corpus_as_of_utc)}`
+            : ""}
+          : the producer&apos;s capture metadata, not an independent
+          verification.
+        </span>
+      )}
       {p.expires_at && (
         <span>
           Freshness deadline {displayTime(p.expires_at)}. Publication status
