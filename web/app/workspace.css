@@ -67,55 +67,51 @@ summary:focus-visible {
   color: var(--umber);
 }
 
-/* Shell: the sidebar becomes a top bar (DECISION 2026-10-26, Anastasia/Claude Code: the menu moves to the top,
-   Today · History · My topics, the account and sign-out at the right; the sidebar's topic list is retired in
-   favour of the board's sections and "My topics". The markup in components/portal.tsx is unchanged.) */
+/* Shell: the sidebar becomes the site header (DECISION 2026-10-26, Anastasia/Claude Code: the menu moves to the
+   top, Today · History · My topics, the account and sign-out at the right; the sidebar's topic list is retired in
+   favour of the board's sections and "My topics". Revised the same day on Anastasia's review: the bar takes the
+   landing masthead's layout and colours, 72 px, wordmark left, menu centred, actions right, ink on the page, no
+   rule; its surface, clear at rest and frosted paper once the page scrolls under it, is app/header.css. The
+   markup in components/portal.tsx is unchanged.) */
 .app-layout {
   display: flex;
   flex-direction: column;
 }
 .sidebar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   height: auto;
-  flex-direction: row;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 28px;
-  min-height: 64px;
-  padding: 0 40px;
-  /* DECISION(2026-10-26, Anastasia/Claude Code): the bar is black at 60 % over the page, blurred (the page shows
-     through), with no rule under it; type on it is paper (5:1 on the blended grey). Why: Anastasia asked for a bar that
-     stands out from the paper without a hard edge. */
-  background: rgba(20, 20, 20, 0.6);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
-  backdrop-filter: blur(16px) saturate(120%);
-  color: var(--paper);
+  gap: 32px;
+  padding: 0 6%;
+  color: var(--ink);
   border-right: 0;
-  border-bottom: 0;
 }
 .sidebar .brand {
   font-size: 24px;
-  color: var(--paper);
+  color: var(--ink);
 }
 .sidebar .brand-dot {
-  color: rgba(255, 255, 255, 0.72);
+  display: none; /* the wordmark reads "Quorum", as on the landing */
 }
 .nav-label,
 .sidebar-topics,
-.sidebar nav svg {
+.sidebar nav svg,
+.sidebar .text-button svg {
   display: none;
 }
 .sidebar nav {
   display: flex;
-  gap: 24px;
+  justify-content: center;
+  gap: 28px;
 }
 .sidebar nav a {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
   border-radius: 0;
   font-size: 15px;
   font-weight: 500;
-  padding: 20px 0 18px;
+  padding: 0 0 2px;
   margin-left: 0;
   border-bottom: 2px solid transparent;
 }
@@ -123,39 +119,43 @@ summary:focus-visible {
 .sidebar nav a.active {
   background: none;
   box-shadow: none;
-  color: var(--paper);
-  border-bottom-color: var(--paper);
+  color: var(--ink);
+  border-bottom-color: var(--ink);
 }
 .sidebar-bottom {
-  margin: 0 0 0 auto;
+  margin: 0;
   padding: 0;
   display: flex;
   align-items: center;
-  gap: 20px;
-  font-size: 14px;
+  gap: 24px;
+  font-size: 15px;
+  justify-self: end;
 }
 .sidebar-bottom > a {
-  color: var(--paper);
-  font-size: 14px;
+  color: var(--ink);
+  font-size: 15px;
   margin: 0;
 }
 .account-name {
-  color: var(--paper);
+  color: var(--ink);
   border: 0;
-  padding: 0;
+  border-bottom: 2px solid transparent; /* the same baseline as the sign-out link */
+  padding: 0 0 2px;
   font-weight: 500;
   margin: 0;
 }
 .text-button {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 14px;
-  padding: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 0 2px;
+  border-bottom: 2px solid transparent;
 }
 .text-button:hover {
-  color: var(--paper);
+  border-bottom-color: var(--ink);
 }
 .sidebar :is(a, button):focus-visible {
-  outline-color: var(--paper);
+  outline-color: var(--ink);
 }
 .workspace-header {
   display: none;
@@ -391,23 +391,22 @@ label {
   border-top: 1px solid var(--rule);
 }
 
-@media (max-width: 1100px) {
-  .sidebar {
-    padding: 0 24px;
-    gap: 20px;
-  }
-}
 @media (max-width: 700px) {
   .sidebar {
-    flex-wrap: wrap;
+    grid-template-columns: auto 1fr;
     padding: 12px 16px 0;
-    gap: 8px 16px;
+    gap: 4px 16px;
   }
   .sidebar nav {
-    order: 3;
-    width: 100%;
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
     gap: 18px;
     overflow-x: auto;
+  }
+  .sidebar-bottom {
+    grid-row: 1;
+    grid-column: 2;
   }
   .sidebar nav a {
     padding: 8px 0 10px;

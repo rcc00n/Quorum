@@ -124,13 +124,8 @@
   max-width: 76ch;
 }
 
-/* Masthead */
+/* Masthead: its surface (sticky, clear at rest, frosted paper once scrolled) is app/header.css. */
 .lp-head {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--paper);
-  border-bottom: 3px double var(--ink);
   min-height: 72px;
   padding: 0 6%;
   display: grid;

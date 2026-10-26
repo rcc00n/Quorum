@@ -165,7 +165,7 @@
   /* DECISION(2026-10-26, Anastasia/Claude Code): black at 60 % over the page, blurred, so the paper shows
      through and white type keeps 5:1. Anastasia asked for about 20 %; at 20 % the card is #d1d1d1 and white
      type reads at 1.4:1, so 60 % is the most transparent legible value; she confirmed 60 % for the cards
-     and the bar the same day. */
+     the same day; the bar became the site header later that day (app/header.css). */
   background: rgba(20, 20, 20, 0.6);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
