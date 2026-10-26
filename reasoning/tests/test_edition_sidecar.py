@@ -10,13 +10,16 @@ every check `reasoning_snapshot` makes: when the portal changes, they fail and n
 from __future__ import annotations
 
 import ast
+import builtins
 import copy
 import hashlib
 import importlib.util
 import json
 import os
 import re
+import stat
 import subprocess
+import symtable
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -74,6 +77,51 @@ def base_snapshot() -> dict:
                    "model": None, "duration_ms": 0}],
         "errors": [],
     }
+
+
+def story() -> dict:
+    """A synthetic story the portal accepts: a confirmed fact, a sourced context block, framing on both flanks."""
+    return {
+        "event_id": "ev-story-1", "rank": 1, "headline": "Synthetic headline", "standfirst": "Synthetic standfirst.",
+        "reading_minutes": 2,
+        "rubric": {"legal_force": 1, "reach": 2, "irreversibility": 1, "confirmation": 2, "total": 6,
+                   "rationale": {"reach": "Synthetic rationale."}},
+        "photo": None,
+        "article": [
+            {"kind": "fact", "text": "A synthetic fact.", "claim_ids": ["c-1"], "sources": []},
+            {"kind": "context", "text": "Synthetic context.", "claim_ids": [],
+             "sources": [{"title": "Example source", "url": "https://example.com/context"}]},
+        ],
+        "claims": [
+            {"id": "c-1", "text": "A synthetic confirmed claim.", "status": "confirmed", "verifier": "confirmed",
+             "fact_checker": "confirmed", "reason": "Synthetic reason.", "evidence": [
+                 {"stance": "supports", "quote": "A synthetic quote.", "title": "Example source",
+                  "url": "https://example.com/evidence", "independence_group": "example.com",
+                  "source_id": "src-example", "document_id": 1, "official_doc_id": None}]},
+            {"id": "c-2", "text": "A synthetic unverified claim.", "status": "unverified", "verifier": "unverified",
+             "fact_checker": "unverified", "reason": "Synthetic reason.", "evidence": []},
+        ],
+        "spectrum": {"rating_mode": "average", "coverage": {"center": [1, 2]}, "interpretations": [],
+                     "left": {"highlights": "h", "omits": "o", "wording": "w", "example_url": ""},
+                     "right": {"highlights": "h", "omits": "o", "wording": "w",
+                               "example_url": "https://example.com/right"},
+                     "note": "Synthetic framing note."},
+        "needs_review": False,
+        "trace_ref": "trace-1",
+    }
+
+
+def story_snapshot() -> dict:
+    snap = base_snapshot()
+    snap["stories"] = [story()]
+    return snap
+
+
+def pre_cut_snapshot() -> dict:
+    """A run that finished before the window end: generated_at, not window.end, bounds the capture time."""
+    snap = base_snapshot()
+    snap.update(generated_at="2026-10-26T08:00:00Z", published_at="2026-10-26T08:00:01Z")
+    return snap
 
 
 def snapshot_bytes(snap: dict) -> bytes:
@@ -322,6 +370,15 @@ def test_refuses_a_symlinked_snapshot(edition, producer, capsys):
     refused(capsys, cli(link, producer), "unsafe_snapshot_file", path)
 
 
+def test_refuses_a_snapshot_that_lstat_reports_as_a_symlink(edition, producer, capsys, monkeypatch):
+    """Runs where symlinks cannot be created too: the rule is that the snapshot's own entry (lstat) is a file."""
+    path = edition()
+    real = es.os.lstat
+    link = os.stat_result((stat.S_IFLNK | 0o644, 0, 0, 1, 0, 0, path.stat().st_size, 0, 0, 0))
+    monkeypatch.setattr(es.os, "lstat", lambda p, *a, **k: link if Path(p) == path else real(p, *a, **k))
+    refused(capsys, cli(path, producer), "unsafe_snapshot_file", path)
+
+
 def test_refuses_a_snapshot_over_the_portal_size_limit(edition, producer, capsys):
     path = edition(raw=b" " * (es.MAX_BYTES + 1))
     refused(capsys, cli(path, producer), "payload_too_large", path)
@@ -348,6 +405,27 @@ def test_refuses_an_out_path_that_would_overwrite_the_snapshot_or_its_hash(editi
     refused(capsys, cli(path, producer, "2026-10-26T10:30Z", None, "--out", str(path.with_name(target))),
             "out_path_conflict", path)
     assert path.read_bytes() == raw
+
+
+@pytest.mark.parametrize("target", ["V1.JSON", "V1.JSON.SHA256", "v1.JSON.sha256"])
+def test_refuses_an_out_path_that_differs_from_the_snapshot_or_its_hash_only_in_case(edition, producer, capsys,
+                                                                                      target):
+    """On a case-insensitive file system (NTFS, APFS) V1.JSON is the snapshot itself; refused on every system."""
+    path = edition()
+    raw = path.read_bytes()
+    refused(capsys, cli(path, producer, "2026-10-26T10:30Z", None, "--out", str(path.with_name(target))),
+            "out_path_conflict", path)
+    assert path.read_bytes() == raw
+    if path.with_name("V1.JSON").exists():  # case-insensitive here: the variant really was the snapshot
+        assert path.with_name("V1.JSON").read_bytes() == raw
+
+
+def test_case_variants_are_the_same_path_where_normcase_keeps_case(monkeypatch):
+    """As on macOS, where os.path.normcase returns the path unchanged but APFS ignores case."""
+    monkeypatch.setattr(es.os.path, "normcase", lambda value: value)
+    assert es._same(Path("edition") / "v1.json", Path("edition") / "V1.JSON")
+    assert es._same(Path("edition") / "v1.json", Path("edition") / "x" / ".." / "v1.json")
+    assert not es._same(Path("edition") / "v1.json", Path("edition") / "v2.json")
 
 
 def test_refuses_an_out_directory_that_does_not_exist(edition, producer, capsys, tmp_path):
@@ -385,6 +463,56 @@ def test_a_failed_write_leaves_no_file_and_no_temporary(edition, producer, capsy
     assert files_in(path) == ["v1.json"]
 
 
+def test_refuses_a_snapshot_that_changes_after_validation(edition, producer, capsys, monkeypatch):
+    path = edition()
+    real = es.read_snapshot_file
+    calls = []
+
+    def third_read_differs(snapshot):
+        calls.append(snapshot)
+        raw = real(snapshot)
+        return raw + b" " if len(calls) == 3 else raw  # make, validate_sidecar, then the re-read before writing
+
+    monkeypatch.setattr(es, "read_snapshot_file", third_read_differs)
+    refused(capsys, cli(path, producer), "snapshot_changed", path)
+    assert len(calls) == 3
+
+
+def _tamper_sidecar_on_replace(monkeypatch):
+    real = es.os.replace
+
+    def replace(src, dst):
+        real(src, dst)
+        if str(dst).endswith(".sidecar.json"):
+            Path(dst).write_bytes(b"{}\n")
+
+    monkeypatch.setattr(es.os, "replace", replace)
+
+
+def test_a_sidecar_that_differs_on_disk_after_the_write_is_refused_and_removed(edition, producer, capsys,
+                                                                                monkeypatch):
+    path = edition()
+    _tamper_sidecar_on_replace(monkeypatch)
+    rc, out, err = run_main(capsys, *cli(path, producer))
+    assert rc == 2, (out, err)
+    assert "refused (write_failed)" in err and "differs from the validated bytes" in err
+    assert "the files it wrote were removed" in err and "nothing written" not in err
+    assert files_in(path) == ["v1.json"]
+
+
+def test_a_sidecar_that_differs_on_disk_and_cannot_be_removed_is_named(edition, producer, capsys, monkeypatch):
+    path = edition()
+    _tamper_sidecar_on_replace(monkeypatch)
+    monkeypatch.setattr(es, "_remove", lambda _: False)
+    rc, out, err = run_main(capsys, *cli(path, producer))
+    assert rc == 2, (out, err)
+    assert "refused (write_failed)" in err and "nothing written" not in err
+    left = err.split("delete ", 1)[1]
+    for name in ("v1.json.sidecar.json", "v1.json.sidecar.json.sha256", "v1.json.sha256"):
+        assert str(path.with_name(name)) in left
+    assert "before any hand-over" in left
+
+
 # ---------------------------------------------------------------- validate_sidecar: one check each
 
 
@@ -406,7 +534,7 @@ def _drop(path: tuple):
     return change
 
 
-# (id, mutation, our code, does the portal's own bind_preview_sidecar reject it too?)
+# (id, mutation, our code, does the portal's own bind_preview_sidecar reject it too?[, the snapshot, base by default])
 SIDECAR_MUTATIONS = [
     ("sha256", _set(("snapshot", "sha256"), "0" * 64), "sidecar_snapshot_mismatch", True),
     ("topic_id", _set(("snapshot", "topic_id"), "other-topic"), "sidecar_snapshot_mismatch", True),
@@ -432,6 +560,9 @@ SIDECAR_MUTATIONS = [
     ("capture-missing", _drop(("corpus_as_of_utc",)), "invalid_sidecar", True),
     ("capture-before-start", _set(("corpus_as_of_utc",), "2026-10-25T09:29Z"), "sidecar_capture_outside_window", True),
     ("capture-after-end", _set(("corpus_as_of_utc",), "2026-10-26T09:31Z"), "sidecar_capture_outside_window", True),
+    # a pre-cut run: inside the window but after generated_at (08:00:00Z), so min(window.end, generated_at) binds
+    ("capture-after-generated-at", _set(("corpus_as_of_utc",), "2026-10-26T09:00Z"), "sidecar_capture_outside_window",
+     True, pre_cut_snapshot),
     ("window-reversed", lambda s: s["edition_window_utc"].reverse(), "sidecar_window_mismatch", True),
     ("window-reformatted", _set(("edition_window_utc",), ["2026-10-25T09:30Z", "2026-10-26T09:30Z"]),
      "sidecar_window_mismatch", True),
@@ -453,12 +584,14 @@ SIDECAR_MUTATIONS = [
      "invalid_config_sha256", False),
     ("config-wrong", _set(("producer", "config_sha256"), "0" * 64), "producer_config_mismatch", False),
 ]
+SIDECAR_CASES = [(row_id, mutate, code, portal_rejects, rest[0] if rest else base_snapshot)
+                 for row_id, mutate, code, portal_rejects, *rest in SIDECAR_MUTATIONS]
 
 
-@pytest.mark.parametrize("mutate, code", [(m, c) for _, m, c, _ in SIDECAR_MUTATIONS],
-                         ids=[i for i, *_ in SIDECAR_MUTATIONS])
-def test_validate_sidecar_rejects(edition, producer, mutate, code):
-    path = edition()
+@pytest.mark.parametrize("mutate, code, snapshot", [(m, c, s) for _, m, c, _, s in SIDECAR_CASES],
+                         ids=[i for i, *_ in SIDECAR_CASES])
+def test_validate_sidecar_rejects(edition, producer, mutate, code, snapshot):
+    path = edition(snapshot())
     sidecar = good_sidecar(path, producer)
     mutate(sidecar)
     with pytest.raises(es.SidecarError) as caught:
@@ -545,6 +678,10 @@ def _snap(change):
 SNAPSHOT_MUTATIONS = [
     ("not-object", lambda: b"[]", "invalid_reasoning_1_0"),
     ("duplicate-key", lambda: b'{"a":1,"a":2}', "duplicate_json_key"),
+    ("too-large", lambda: b" " * (es.MAX_BYTES + 1), "payload_too_large"),
+    ("not-utf8", lambda: b"\xff", "invalid_reasoning_json"),
+    ("nan", lambda: b'{"a":NaN}', "non_finite_number"),
+    ("nesting", lambda: b"[" * 30 + b"0" + b"]" * 30, "excessive_nesting"),
     ("missing-field", _snap(lambda s: s.pop("summary")), "missing_reasoning_field"),
     ("extra-field", _snap(lambda s: s.update(private="x")), "unsupported_reasoning_field"),
     ("schema-version", _snap(lambda s: s.update(schema_version="1.1")), "unsupported_reasoning_version"),
@@ -552,6 +689,7 @@ SNAPSHOT_MUTATIONS = [
     ("run-id", _snap(lambda s: s.update(run_id="")), "invalid_reasoning_id"),
     ("edition-date", _snap(lambda s: s.update(edition_date="2026-10-32")), "invalid_reasoning_date"),
     ("edition-date-basic", _snap(lambda s: s.update(edition_date="20261026")), "invalid_reasoning_date"),
+    ("edition-date-no-previous-day", _snap(lambda s: s.update(edition_date="0001-01-01")), "invalid_reasoning_date"),
     ("generated-no-seconds", _snap(lambda s: s.update(generated_at="2026-10-26T11:02Z")), "invalid_reasoning_timestamp"),
     ("generated-impossible", _snap(lambda s: s.update(generated_at="2026-02-30T11:02:00Z")), "invalid_reasoning_timestamp"),
     ("expires-offset", _snap(lambda s: s.update(expires_at="2026-10-27T08:00:00-04:00")), "invalid_reasoning_timestamp"),
@@ -567,12 +705,24 @@ SNAPSHOT_MUTATIONS = [
     ("provenance-missing-model", _snap(lambda s: s["provenance"].pop("model")), "missing_reasoning_field"),
     ("provenance-extra", _snap(lambda s: s["provenance"].update(key="x")), "unsupported_reasoning_field"),
     ("provenance-empty-model", _snap(lambda s: s["provenance"].update(model="")), "missing_reasoning_provenance"),
+    ("provenance-model-too-long", _snap(lambda s: s["provenance"].update(model="x" * 20001)), "invalid_reasoning_1_0"),
     ("provenance-fictional-text", _snap(lambda s: s["provenance"].update(fictional="false")), "invalid_reasoning_1_0"),
     ("provenance-empty-checker", _snap(lambda s: s["provenance"].update(fact_checker_model="")),
      "missing_reasoning_provenance"),
     ("calls-negative", _snap(lambda s: s["provenance"].update(model_calls=-1)), "invalid_model_call_count"),
     ("calls-bool", _snap(lambda s: s["provenance"].update(model_calls=True)), "invalid_model_call_count"),
+    ("calls-over-bound", _snap(lambda s: s["provenance"].update(model_calls=100001)), "invalid_model_call_count"),
+    ("errors-over-bound", _snap(lambda s: s["provenance"].update(model_errors=100001)), "invalid_model_call_count"),
     ("answered-zero", _snap(lambda s: s["provenance"]["answered_by"].update(other=0)), "invalid_answered_by"),
+    ("answered-too-many-models", _snap(lambda s: s["provenance"].update(
+        answered_by={f"model-{i}": 1 for i in range(101)}, model_calls=101)), "invalid_answered_by"),
+    ("answered-count-over-bound", _snap(lambda s: [s["provenance"].pop("model_calls"),
+                                                   s["provenance"].update(answered_by={"test-model": 100001})]),
+     "invalid_answered_by"),
+    # 61 transport errors beside 63 in all is allowed only for the historical v3 bytes, never for a new hash
+    ("historical-error-exception-elsewhere", _snap(lambda s: s["provenance"].update(
+        model_calls=64, model_errors=63, answered_by={"test-model": 2, "test-checker": 1, "error": 61})),
+     "inconsistent_model_error_count"),
     ("answered-sum", _snap(lambda s: s["provenance"].update(model_calls=4)), "inconsistent_model_call_count"),
     ("answered-errors", _snap(lambda s: s["provenance"].update(model_errors=1)), "inconsistent_model_error_count"),
     ("errors-over-calls", _snap(lambda s: [s["provenance"].pop("answered_by"), s["provenance"].update(model_errors=4)]),
@@ -589,6 +739,100 @@ def test_check_snapshot_rejects(make, code):
     with pytest.raises(es.SidecarError) as caught:
         es.check_snapshot(make())
     assert caught.value.code == code
+    # the envelope rules are refused by this tool's own explained check, before the portal copy runs
+    assert not caught.value.message.startswith(es.PORTAL_REJECTS), caught.value.message
+
+
+def _story_change(change):
+    def make():
+        snap = story_snapshot()
+        change(snap)
+        return snapshot_bytes(snap)
+    return make
+
+
+def _evidence(snap: dict) -> dict:
+    return snap["stories"][0]["claims"][0]["evidence"][0]
+
+
+def _article(snap: dict, index: int) -> dict:
+    return snap["stories"][0]["article"][index]
+
+
+# Content parse_reasoning checks after the envelope; each is refused only by the portal copy in the script.
+CONTENT_MUTATIONS = [
+    ("evidence-url-port", _story_change(lambda s: _evidence(s).update(url="https://example.com:8443/evidence")),
+     "unsafe_reasoning_url"),
+    ("roundup-source-url", _story_change(lambda s: s["roundup"]["groups"][0]["items"][0]["sources"].append(
+        {"title": "Local", "url": "http://localhost/item"})), "unsafe_reasoning_url"),
+    ("evidence-fetched-at", _story_change(lambda s: _evidence(s).update(fetched_at="2026-10-26T09:00Z")),
+     "invalid_reasoning_timestamp"),
+    ("roundup-count", _story_change(lambda s: s["roundup"].update(count=2)), "invalid_roundup_count"),
+    ("fact-unconfirmed", _story_change(lambda s: _article(s, 0).update(claim_ids=["c-2"])),
+     "unsafe_fact_claim_reference"),
+    ("ok-missing-framing", _story_change(lambda s: s["stories"][0]["spectrum"].pop("left")),
+     "missing_completed_framing"),
+    ("context-unsourced", _story_change(lambda s: _article(s, 1).update(sources=[])), "unsourced_article_context"),
+    ("article-unknown-claim", _story_change(lambda s: _article(s, 1).update(claim_ids=["c-9"])),
+     "invalid_article_claim_reference"),
+    ("rubric-total", _story_change(lambda s: s["stories"][0]["rubric"].update(total=7)), "invalid_impact_total"),
+    ("story-rank", _story_change(lambda s: s["stories"][0].update(rank=0)), "invalid_reasoning_rank"),
+    ("story-id", _story_change(lambda s: s["stories"][0].update(event_id="ev story")), "invalid_reasoning_id"),
+    ("story-missing-field", _story_change(lambda s: s["stories"][0].pop("trace_ref")), "missing_reasoning_field"),
+    ("story-extra-field", _story_change(lambda s: s["stories"][0].update(private="x")), "unsupported_reasoning_field"),
+    ("story-reading-minutes", _story_change(lambda s: s["stories"][0].update(reading_minutes=0)),
+     "invalid_reasoning_1_0"),
+    ("duplicate-event", _story_change(lambda s: s["roundup"]["groups"][0]["items"][0].update(event_id="ev-story-1")),
+     "duplicate_reasoning_event"),
+    ("duplicate-claim", _story_change(lambda s: s["stories"][0]["claims"][1].update(id="c-1")),
+     "duplicate_reasoning_claim"),
+    ("cohort-counts", _story_change(lambda s: s["stories"][0]["spectrum"]["coverage"].update(center=[3, 2])),
+     "invalid_cohort_counts"),
+    ("empty-with-stories", _story_change(lambda s: s.update(status="empty")), "invalid_empty_snapshot"),
+    ("quiet-day-with-stories", _story_change(lambda s: s["roundup"].update(empty_day=True)), "invalid_quiet_day"),
+    ("trace-unknown-event", _story_change(lambda s: s["trace"][0].update(event_id="ev-unknown")),
+     "invalid_trace_event_reference"),
+    ("error-unknown-event", _story_change(lambda s: s.update(
+        errors=[{"node": "plan", "event_id": "ev-unknown", "message": "Synthetic failure."}])),
+     "invalid_error_event_reference"),
+    ("conflicting-document-source", _story_change(lambda s: s["stories"][0]["claims"][1]["evidence"].append(
+        {**_evidence(s), "source_id": "src-other"})), "conflicting_document_source"),
+]
+CONTENT = {row_id: (make, code) for row_id, make, code in CONTENT_MUTATIONS}
+
+
+@pytest.mark.parametrize("make, code", [(m, c) for _, m, c in CONTENT_MUTATIONS], ids=[i for i, *_ in CONTENT_MUTATIONS])
+def test_check_snapshot_rejects_content_through_the_portal_copy(make, code):
+    with pytest.raises(es.SidecarError) as caught:
+        es.check_snapshot(make())
+    assert caught.value.code == code
+    assert caught.value.message.startswith(f"{es.PORTAL_REJECTS} ({code}): ")
+
+
+@pytest.mark.parametrize("row_id", ["evidence-url-port", "roundup-count", "fact-unconfirmed", "ok-missing-framing"])
+def test_refuses_a_snapshot_whose_content_the_portal_rejects(edition, producer, capsys, row_id):
+    """The four snapshots of review round 1 that got a sidecar and hash files although the portal rejects them."""
+    make, code = CONTENT[row_id]
+    path = edition(raw=make())
+    err = refused(capsys, cli(path, producer), code, path)
+    assert es.PORTAL_REJECTS in err and es.CONTENT_HINTS[code] in err
+
+
+def test_unreadable_content_gets_the_portal_command_catch_all_code(monkeypatch):
+    def broken(_raw):
+        raise KeyError("x")
+
+    monkeypatch.setattr(es, "parse_reasoning", broken)
+    with pytest.raises(es.SidecarError) as caught:
+        es.check_snapshot(snapshot_bytes(base_snapshot()))
+    assert caught.value.code == "acceptance_input_unavailable_or_invalid"
+
+
+def test_a_snapshot_with_a_story_gets_a_sidecar(edition, producer, capsys):
+    path = edition(story_snapshot())
+    rc, _, err = run_main(capsys, *cli(path, producer))
+    assert rc == 0, err
+    assert path.with_name("v1.json.sidecar.json").exists()
 
 
 def test_check_snapshot_accepts_the_synthetic_snapshot_and_its_dst_day():
@@ -648,13 +892,16 @@ def module_namespace(source: str, filename: str, imported: dict | None = None) -
 
 @pytest.fixture(scope="module")
 def portal():
-    validation = module_namespace(portal_source(VALIDATION), VALIDATION)
+    validation_source = portal_source(VALIDATION)
+    validation = module_namespace(validation_source, VALIDATION)
     imported = {name: validation[name] for name in
                 ("MAX_BYTES", "SnapshotError", "require", "bounded_structure", "edition_date", "public_url")}
     preview_source = portal_source(PREVIEW)
     preview = module_namespace(preview_source, PREVIEW, imported)
     return SimpleNamespace(validation=validation, preview=preview, preview_tree=ast.parse(preview_source),
-                           command_tree=ast.parse(portal_source(COMMAND)))
+                           command_tree=ast.parse(portal_source(COMMAND)),
+                           sources={PREVIEW: preview_source, VALIDATION: validation_source},
+                           namespaces={PREVIEW: preview, VALIDATION: validation})
 
 
 def portal_result(portal, raw: bytes) -> dict:
@@ -719,11 +966,11 @@ def test_parity_the_portal_binding_accepts_our_sidecar(portal, edition, producer
                                                    "sidecar_sha256": hashlib.sha256(data).hexdigest()}
 
 
-@pytest.mark.parametrize("mutate, portal_rejects", [(m, r) for _, m, _, r in SIDECAR_MUTATIONS],
-                         ids=[i for i, *_ in SIDECAR_MUTATIONS])
-def test_parity_sidecar_mutations_portal_binding_agrees(portal, edition, producer, mutate, portal_rejects):
+@pytest.mark.parametrize("mutate, portal_rejects, snapshot", [(m, r, s) for _, m, _, r, s in SIDECAR_CASES],
+                         ids=[i for i, *_ in SIDECAR_CASES])
+def test_parity_sidecar_mutations_portal_binding_agrees(portal, edition, producer, mutate, portal_rejects, snapshot):
     """Where the portal's binding rejects, so do we; where only the command or our contract rejects, the binding passes."""
-    path = edition()
+    path = edition(snapshot())
     raw = path.read_bytes()
     sidecar = good_sidecar(path, producer)
     mutate(sidecar)
@@ -746,6 +993,102 @@ def test_parity_snapshot_envelope_codes_match_the_portal(portal, make, code):
 
 def test_parity_the_portal_accepts_the_synthetic_snapshot(portal):
     assert portal.preview["parse_reasoning"](snapshot_bytes(base_snapshot()))["run_id"] == "2026-10-26-test-topic-1"
+    assert portal.preview["parse_reasoning"](snapshot_bytes(story_snapshot()))["stories"][0]["event_id"] == "ev-story-1"
+    assert portal.preview["parse_reasoning"](snapshot_bytes(pre_cut_snapshot()))["generated_at"] == "2026-10-26T08:00:00Z"
+
+
+@pytest.mark.parametrize("make, code", [(m, c) for _, m, c in CONTENT_MUTATIONS], ids=[i for i, *_ in CONTENT_MUTATIONS])
+def test_parity_content_codes_match_the_portal(portal, make, code):
+    with pytest.raises(portal.validation["SnapshotError"]) as caught:
+        portal.preview["parse_reasoning"](make())
+    assert str(caught.value) == code
+
+
+def test_parity_the_portal_binding_accepts_the_sidecar_of_a_story_snapshot(portal, edition, producer, capsys):
+    path = edition(story_snapshot())
+    assert run_main(capsys, *cli(path, producer))[0] == 0
+    raw, data = path.read_bytes(), path.with_name("v1.json.sidecar.json").read_bytes()
+    portal.preview["bind_preview_sidecar"](data, raw, portal_result(portal, raw))
+
+
+def portal_closure(portal) -> dict:
+    """Every module-level name master's parse_reasoning reaches, resolved per module as Python resolves it.
+
+    Returns {name: (kind, module, node or None)}, kind "def" (a function or class), "const" or "import"; the script
+    holds them all in one namespace, so a def or constant name defined in both portal modules fails loudly.
+    """
+    trees = {module: ast.parse(source) for module, source in portal.sources.items()}
+    defs = {m: {n.name: n for n in t.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))} for m, t in trees.items()}
+    consts = {m: {target.id for n in t.body if isinstance(n, ast.Assign) for target in n.targets
+                  if isinstance(target, ast.Name)} for m, t in trees.items()}
+    relative = {m: {alias.asname or alias.name for n in t.body if isinstance(n, ast.ImportFrom) and n.level
+                    and n.module == "snapshot_validation" for alias in n.names} for m, t in trees.items()}
+    tables = {m: {child.get_name(): child for child in symtable.symtable(source, m, "exec").get_children()}
+              for m, source in portal.sources.items()}
+
+    def global_names(table) -> set:
+        names = {s.get_name() for s in table.get_symbols() if s.is_global() and s.is_referenced()}
+        for child in table.get_children():
+            names |= global_names(child)
+        return names
+
+    def resolve(module: str, name: str):
+        if name in defs[module]:
+            return "def", module
+        if name in consts[module]:
+            return "const", module
+        if name in relative[module]:
+            return resolve(VALIDATION, name)
+        return (None, None) if hasattr(builtins, name) else ("import", module)
+
+    found: dict = {}
+    todo = [(PREVIEW, "parse_reasoning")]
+    while todo:
+        module, name = todo.pop()
+        kind, home = resolve(module, name)
+        if kind is None:
+            continue
+        if name in found:
+            same = found[name][1] == home or found[name][0] == kind == "import"  # e.g. `re` imported by both
+            assert same, SHAPE_CHANGED.format(what=f"{name} (defined in both portal modules)")
+            continue
+        found[name] = (kind, home, defs[home][name] if kind == "def" else None)
+        if kind == "def":
+            todo.extend((home, n) for n in global_names(tables[home][name]))
+    return found
+
+
+def test_parity_the_portal_copy_is_verbatim(portal):
+    """The script's portal copy is master's parse_reasoning and everything it calls, node for node."""
+    closure = portal_closure(portal)
+    ours = {n.name: n for n in ast.parse(SCRIPT.read_text(encoding="utf-8")).body
+            if isinstance(n, (ast.FunctionDef, ast.ClassDef))}
+    assert {"parse_reasoning", "envelope", "quote_binding", "public_url", "bounded_structure"} <= set(closure)
+    for name, (kind, module, node) in sorted(closure.items()):
+        if kind == "def":
+            theirs = copy.deepcopy(node)
+            theirs.decorator_list = []  # jsonschema format registrations, not checks
+            assert name in ours and ast.dump(ours[name]) == ast.dump(theirs), \
+                SHAPE_CHANGED.format(what=f"{module} › {name} (copy it verbatim into the portal copy section)")
+        elif kind == "const":
+            assert getattr(es, name) == portal.namespaces[module][name], SHAPE_CHANGED.format(what=f"{module} › {name}")
+        else:
+            assert getattr(es, name) is portal.namespaces[module][name], \
+                SHAPE_CHANGED.format(what=f"{module} › the import of {name}")
+
+
+def test_parity_every_code_parse_reasoning_raises_is_exercised(portal):
+    codes = {find_function(portal.preview_tree, "fail").args.defaults[0].value}
+    for kind, _, node in portal_closure(portal).values():
+        for call in ast.walk(node) if kind == "def" else ():
+            if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Name)):
+                continue
+            position = {"fail": 1, "require": 1, "SnapshotError": 0}.get(call.func.id)
+            if position is not None and len(call.args) > position and isinstance(call.args[position], ast.Constant):
+                codes.add(call.args[position].value)
+    covered = {code for *_, code in SNAPSHOT_MUTATIONS} | {code for *_, code in CONTENT_MUTATIONS}
+    assert len(codes) > 30 and not codes - covered, \
+        SHAPE_CHANGED.format(what=f"parse_reasoning (codes without a test: {sorted(codes - covered)})")
 
 
 def command_handle(portal) -> ast.FunctionDef:
