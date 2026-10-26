@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from collections import Counter
@@ -81,11 +82,24 @@ def _isolate(env_file: str | None, blank: list[str]) -> None:
         sys.path.insert(0, str(REASONING))
 
 
-def topic_id_ok(topic: Any) -> bool:
-    """The shared topic-id rule (decision at run_editions.topic_id_ok)."""
+# the same as run_editions.WINDOWS_DEVICE (decisions at run_editions.topic_id_problem; a test pins both scripts)
+WINDOWS_DEVICE = re.compile(r"^(?:con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])$", re.IGNORECASE)
+
+
+def topic_id_problem(topic: Any) -> str | None:
+    """Why `topic` cannot be checked, or None: the shared topic-id rule, then no Windows device name."""
     from quorum_reasoning.tools.corpus import _TOPIC_ID
 
-    return isinstance(topic, str) and _TOPIC_ID.fullmatch(topic) is not None
+    if not isinstance(topic, str) or _TOPIC_ID.fullmatch(topic) is None:
+        return f"not a topic id by the shared rule {TOPIC_RULE}"
+    if WINDOWS_DEVICE.fullmatch(topic):
+        return "a Windows reserved device name (con, prn, aux, nul, com0-9, lpt0-9): as a report or store name it opens a device"
+    return None
+
+
+def topic_id_ok(topic: Any) -> bool:
+    """The shared topic-id rule and no Windows device name (decisions at run_editions.topic_id_problem)."""
+    return topic_id_problem(topic) is None
 
 
 def list_topics() -> dict[str, Any]:
@@ -111,11 +125,12 @@ def list_topics() -> dict[str, Any]:
     skipped: list[dict[str, str]] = []
     for row in rows:
         tid = str((row or {}).get("id") or "").strip()
-        if topic_id_ok(tid):
+        problem = topic_id_problem(tid)
+        if problem is None:
             if tid not in topics:
                 topics.append(tid)
         else:
-            skipped.append({"id": tid[:64], "reason": f"not a topic id by the shared rule {TOPIC_RULE} ({len(tid)} characters)"})
+            skipped.append({"id": tid[:64], "reason": f"{problem} ({len(tid)} characters)"})
     return {"topics": topics, "filtered": filtered, "skipped": skipped}
 
 
@@ -187,8 +202,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not (args.topic and args.date and args.out):
         ap.error("--topic, --date and --out are required (or --list-topics)")
-    if not topic_id_ok(args.topic):
-        ap.error(f"--topic must follow the shared topic-id rule {TOPIC_RULE}")
+    problem = topic_id_problem(args.topic)
+    if problem:
+        ap.error(f"--topic is {problem}")
     out = Path(args.out)
     if (out / "_journal").exists() or (out / "_checkpoints").exists():
         print(f"refusing to run: {out} holds live runs (_journal/_checkpoints); a dry check writes stand-in snapshots to a scratch store only", file=sys.stderr)

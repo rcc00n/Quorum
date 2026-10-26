@@ -55,6 +55,11 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$TOPIC" ] && [ -n "$DATE" ] || { echo "--topic and --date are required (see --help)" >&2; exit 2; }
 [[ "$TOPIC" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || { echo "--topic must follow the shared topic-id rule ^[a-z0-9][a-z0-9-]{0,63}\$" >&2; exit 2; }
+# no Windows device name (decision at run_editions.topic_id_problem); the rule above already refuses upper case and
+# the superscript digits, so the lower-case ASCII forms are all that can reach this line
+if [[ "$TOPIC" =~ ^(con|prn|aux|nul|com[0-9]|lpt[0-9])$ ]]; then
+  echo "--topic may not be a Windows reserved device name (con, prn, aux, nul, com0-9, lpt0-9)" >&2; exit 2
+fi
 [[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "--date must be YYYY-MM-DD" >&2; exit 2; }
 [[ "$ATTEMPT" =~ ^[1-9][0-9]*$ ]] || { echo "--attempt must be a positive integer" >&2; exit 2; }
 for arg in ${EXTRA[@]+"${EXTRA[@]}"}; do

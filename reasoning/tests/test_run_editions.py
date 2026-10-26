@@ -5,6 +5,7 @@ mistake refuses (exit 2) instead of spending anything."""
 
 from __future__ import annotations
 
+import _thread
 import importlib.util
 import json
 import os
@@ -12,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -170,6 +172,7 @@ class Env:
             monkeypatch.setenv(name, "")
         for name in ("QTEST_KEY_A", "QTEST_KEY_B", "QTEST_KEY_C"):
             monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("MODEL_API_KEY_8", "fake-exported-key-8888")  # an exported extra key: blank in every child too
         monkeypatch.setenv("FAKE_SCENARIO", str(tmp / "scenario.json"))
         monkeypatch.setenv("FAKE_STATUS_DIR", str(self.status))
         self.scenario({})
@@ -178,7 +181,8 @@ class Env:
         """db_topics None (the default): collection's table holds exactly the topics each invocation lists."""
         sc = {"live": live, "dry": dry or {}, "records": str(self.records), "dry_records": str(self.dry_records), "env_file": str(self.env_file),
               "values": {VALUE_A: "QTEST_KEY_A", VALUE_B: "QTEST_KEY_B", VALUE_C: "QTEST_KEY_C"},
-              "blank_expected": ["QTEST_KEY_A", "QTEST_KEY_B", "MODEL_API_KEY_9"], "db_topics": None}  # the --keys names and any MODEL_API_KEY_*
+              "blank_expected": ["QTEST_KEY_A", "QTEST_KEY_B", "MODEL_API_KEY_8", "MODEL_API_KEY_9"],  # the --keys names, MODEL_API_KEY_* exported or in .env
+              "db_topics": None}
         sc.update(extra)
         self.sc = sc
         (self.tmp / "scenario.json").write_text(json.dumps(sc))
@@ -411,8 +415,15 @@ def test_clean_reason_drops_paths_and_secrets():
 def test_topic_ids_follow_the_shared_rule():
     from quorum_reasoning.tools.corpus import _TOPIC_ID
 
-    for good in ("climate-policy", "ai--jobs", "covid-19-", "a", "x" * 64):
+    for good in ("climate-policy", "ai--jobs", "covid-19-", "a", "x" * 64, "con-policy", "console", "com10", "lpt", "nul-hypothesis", "auxiliary"):
         assert re_mod.topic_id_ok(good) and dc_mod.topic_id_ok(good) and _TOPIC_ID.match(good)
+    for bad in ("con", "prn", "aux", "nul", "com0", "com1", "com9", "lpt0", "lpt1", "lpt9"):
+        # the shared rule admits them; Windows opens a device under each name, in every folder
+        assert _TOPIC_ID.fullmatch(bad) and not re_mod.topic_id_ok(bad) and not dc_mod.topic_id_ok(bad), bad
+        assert "device" in re_mod.topic_id_problem(bad) and "device" in dc_mod.topic_id_problem(bad)
+    for variant in ("CON", "Nul", "COM1", "lpt¹", "com²", "LPT³"):  # any case, superscript digits
+        assert re_mod.WINDOWS_DEVICE.fullmatch(variant) and dc_mod.WINDOWS_DEVICE.fullmatch(variant), variant
+        assert not re_mod.topic_id_ok(variant) and not dc_mod.topic_id_ok(variant)
     for bad in ("", "-x", "A-topic", "a.b", "../etc", "a/b", "x" * 65, "abc\n", "a b", None):
         assert not re_mod.topic_id_ok(bad) and not dc_mod.topic_id_ok(bad)
 
@@ -666,7 +677,7 @@ def test_without_live_only_dry_checks_run(world: Env):
     dry = world.dry_runs()
     assert sorted(d["topic"] for d in dry) == ["t1", "t2"]
     assert all(d["dry_env"] == "1" and d["model_key"] == "" for d in dry)
-    assert all("QTEST_KEY_A" in d["blank"].split(",") for d in dry)
+    assert all({"QTEST_KEY_A", "QTEST_KEY_B", "MODEL_API_KEY_8", "MODEL_API_KEY_9"} <= set(d["blank"].split(",")) for d in dry)
     st = world.status_of("t1")
     assert st["state"] == "queued" and st["reason"].startswith("dry check only (no --live)")
     assert [s["key"] for s in st["plan"]] == ["QTEST_KEY_A", "QTEST_KEY_B"] and st["plan_outcome"] == "published"
@@ -725,7 +736,8 @@ def test_a_listed_topic_that_is_not_a_row_fails_without_a_run(world: Env):
     assert [r["topic"] for r in world.runs()] == ["real-topic"] and [d["topic"] for d in world.dry_runs()] == ["real-topic"]
     world.scenario({"real-topic": [{"exit": 0}]}, db_topics=["real-topic"], db_filtered=True)
     assert world.main(world.argv("no-such-topic-xyz", live=False)) == 1
-    assert "not an active row" in world.status_of("no-such-topic-xyz")["reason"]
+    st = world.status_of("no-such-topic-xyz")  # the live invocation's verdict stays; the plan's goes beside it
+    assert st["state"] == "failed" and "not a row in" in st["reason"] and "not an active row" in st["plan_reason"]
 
 
 def test_listed_topics_by_the_shared_rule_are_run(world: Env):
@@ -777,6 +789,114 @@ def test_dry_mode_may_run_before_the_cut(world: Env):
     argv = world.argv("t1", live=False)
     argv[argv.index("--date") + 1] = "2099-01-01"
     assert world.main(argv) == 0
+
+
+def test_a_plan_run_keeps_a_live_failure_in_the_status_file(world: Env):
+    """The README's step 1 (the plan, any time) into the same --status-dir after a live failure: the failure stays."""
+    world.scenario({"t1": [{"exit": 7, "publish": False, "say": "something odd"}, {"exit": 0}]}, {"t1": {"fast": 300, "ultra": 30}})
+    assert world.main(world.argv("t1")) == 1
+    live = world.status_of("t1")
+    assert (live["state"], live["exit_code"], live["state_mode"]) == ("failed", 7, "live")
+    assert world.main(world.argv("t1", live=False)) == 1  # the plan's exit code still shows the failure
+    st = world.status_of("t1")
+    assert (st["state"], st["exit_code"], st["reason"], st["state_mode"]) == ("failed", 7, "exit 7: something odd", "live")
+    assert st["runs"] == live["runs"] and st["attempts"] == 1 and st["log"] == live["log"]
+    assert st["plan_outcome"] == "published" and st["plan_reason"].startswith("dry check only (no --live)") and st["plan"]
+    assert [(r["topic"], r["state"]) for r in world.summary()["topics"]] == [("t1", "failed")]
+    assert len(world.runs()) == 1  # the plan started nothing
+    assert world.main(world.argv("t1")) == 0  # the next live run writes its own outcome
+    st = world.status_of("t1")
+    assert st["state"] == "published" and "exit_code" not in st and "plan_reason" not in st and len(st["runs"]) == 2
+
+
+def test_a_plan_run_keeps_waiting_for_key_and_exits_3(world: Env):
+    world.scenario({"t1": [{"exit": 3, "fast": 100}]}, {"t1": {"fast": 300, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 3
+    assert world.status_of("t1")["state"] == "waiting_for_key"
+    assert world.main(world.argv("t1", live=False)) == 3  # rested keys would finish it, but it is still waiting for one
+    st = world.status_of("t1")
+    assert st["state"] == "waiting_for_key" and "every key is drained" in st["reason"] and st["plan_outcome"] == "published"
+    assert [r["state"] for r in world.summary()["topics"]] == ["waiting_for_key"]
+    world.scenario({"t1": [{"exit": 3, "fast": 100}]}, {"t1": {"error": True}})
+    assert world.main(world.argv("t1", live=False)) == 1  # a failed dry check fails the plan, not the live state
+    st = world.status_of("t1")
+    assert st["state"] == "waiting_for_key" and st["plan_outcome"] == "failed" and "plan" not in st
+    assert st["plan_reason"].startswith("dry check failed")
+
+
+def test_a_plan_run_replaces_what_an_earlier_plan_run_set(world: Env):
+    world.scenario({}, {"t1": {"error": True}})
+    assert world.main(world.argv("t1", live=False)) == 1
+    st = world.status_of("t1")
+    assert (st["state"], st["state_mode"]) == ("failed", "dry")
+    world.scenario({}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1", live=False)) == 0
+    st = world.status_of("t1")
+    assert (st["state"], st["state_mode"]) == ("queued", "dry") and st["reason"].startswith("dry check only") and "plan_reason" not in st
+
+
+@pytest.mark.parametrize("topic", ["con", "nul"])
+def test_a_listed_windows_device_name_is_refused(world: Env, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], topic: str):
+    # on Windows a status file named after a device blocks the runner: fail fast instead if the refusal is gone
+    monkeypatch.setattr(re_mod, "_run", lambda *a, **k: pytest.fail("a device name got past the topic-id check"))
+    assert world.main(world.argv(f"good-topic,{topic}")) == 2
+    assert world.main(world.argv(topic, live=False)) == 2
+    assert world.runs() == [] and world.dry_runs() == []
+    assert "device name" in capsys.readouterr().err
+
+
+def test_topics_all_skips_rows_named_after_a_windows_device(world: Env, monkeypatch: pytest.MonkeyPatch):
+    real_path = re_mod.Statuses.path
+
+    def guarded(self, topic: str) -> Path:  # on Windows the real file name would block or fail: fail fast instead
+        assert not re_mod.WINDOWS_DEVICE.fullmatch(topic), f"{topic!r} reached a status file name"
+        return real_path(self, topic)
+
+    monkeypatch.setattr(re_mod.Statuses, "path", guarded)
+    world.scenario({}, {}, db_topics=["alpha-topic", "con", "nul"])
+    assert world.main(world.argv("all", live=False)) == 1  # the rows it cannot run count as failed
+    assert [d["topic"] for d in world.dry_runs()] == ["alpha-topic"]
+    bad = [r for r in world.summary()["topics"] if r.get("skipped_row")]
+    assert [r["topic"] for r in bad] == ["con", "nul"] and all(r["state"] == "failed" and "device name" in r["reason"] for r in bad)
+    assert sorted(p.name for p in (world.status / DATE).glob("*.json")) == ["_summary.json", "alpha-topic.json"]
+    assert world.status_of("alpha-topic")["state"] == "queued"  # the other topics of the date went on
+
+
+def test_ctrl_c_stops_the_children_keeps_their_checkpoints_and_releases_the_lock(world: Env):
+    """Ctrl-C while a live child runs: exit 130, the child is stopped (a paid run must not go on), its checkpoint stays,
+    its status says interrupted, the lock is gone."""
+    world.scenario({"slow": [{"exit": 0, "sleep": 20}]})
+    rid = f"{DATE}-slow-1"
+    stop, fired = threading.Event(), threading.Event()
+
+    def ctrl_c_once_running() -> None:
+        deadline = time.monotonic() + 120
+        while not stop.is_set() and time.monotonic() < deadline:
+            try:
+                state = world.status_of("slow").get("state")
+            except (OSError, ValueError):
+                state = None
+            if state == "running" and re_mod.checkpoint_has_thread(world.out, rid):
+                time.sleep(0.5)  # the child is in its sleep; the runner waits on its queue
+                if not stop.is_set():
+                    fired.set()
+                    _thread.interrupt_main()
+                return
+            time.sleep(0.05)
+
+    poker = threading.Thread(target=ctrl_c_once_running, daemon=True)
+    poker.start()
+    try:
+        rc = world.main(world.argv("slow", keys="QTEST_KEY_A"))
+    finally:
+        stop.set()
+        poker.join(5)
+    assert fired.is_set() and rc == 130
+    assert world.runs() == []  # the fake writes its record after its 20 s sleep: it was stopped before
+    st = world.status_of("slow")
+    assert st["state"] != "running" and "interrupted" in st["reason"] and st["runs"][0]["key"] == "QTEST_KEY_A"
+    assert (world.out / "_checkpoints" / f"{rid}.sqlite").is_file()
+    assert not (world.status / DATE / ".runner.lock").exists()
 
 
 @pytest.mark.parametrize("resume", [False, True])
@@ -874,12 +994,12 @@ def test_list_topics_reads_active_rows_in_collection_order_and_reports_bad_ids(m
 
     def fake_sql(sql: str, limit: int):
         sqls.append(sql)
-        return [{"id": "climate-policy"}, {"id": "ai--jobs"}, {"id": "covid-19-"}, {"id": "Not A Slug"}, {"id": "climate-policy"}]
+        return [{"id": "climate-policy"}, {"id": "ai--jobs"}, {"id": "covid-19-"}, {"id": "Not A Slug"}, {"id": "climate-policy"}, {"id": "nul"}]
 
     monkeypatch.setattr(corpus, "_run_sql", fake_sql)
     got = dc_mod.list_topics()
     assert got["filtered"] is True and got["topics"] == ["climate-policy", "ai--jobs", "covid-19-"]
-    assert [s["id"] for s in got["skipped"]] == ["Not A Slug"]
+    assert [s["id"] for s in got["skipped"]] == ["Not A Slug", "nul"] and "device name" in got["skipped"][1]["reason"]
     assert len(sqls) == 1 and sqls[0].endswith(".topics WHERE active ORDER BY created_at, id")
 
 
@@ -967,7 +1087,9 @@ def argv_holders(value):
             pass
     return ",".join(hits)
 
-row = {"argv": args, "key": sc["values"].get(key, "?"), "blank_ok": os.environ.get("QTEST_KEY_A", "") == "" and os.environ.get("QTEST_KEY_B", "") == ""}
+# the listed names, an exported MODEL_API_KEY_6 and the env file's MODEL_API_KEY_7 must all reach this process blank
+row = {"argv": args, "key": sc["values"].get(key, "?"), "dry_env": os.environ.get("QUORUM_DRY_RUN"),
+       "blank_ok": all(os.environ.get(n, "") == "" for n in ("QTEST_KEY_A", "QTEST_KEY_B", "MODEL_API_KEY_6", "MODEL_API_KEY_7"))}
 if sc.get("scan"):
     row["holders"] = argv_holders(key)
     row["control"] = argv_holders("-m quorum_reasoning.run --topic")  # this very process: proves the lookup works
@@ -978,22 +1100,30 @@ sys.exit(codes[min(n, len(codes) - 1)])
 '''
 
 
-def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str], scan: bool = False) -> tuple[subprocess.CompletedProcess, list[dict], str]:
+def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str], scan: bool = False, topic: str = "climate-policy",
+                       flags: tuple[str, ...] = (), extra: tuple[str, ...] = ("--quiet",)) -> tuple[subprocess.CompletedProcess, list[dict], str]:
+    """`flags` go before `--`, `extra` after it (run.py arguments)."""
     pkg = tmp_path / "work" / "quorum_reasoning"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text("")
     (pkg / "run.py").write_text(FAKE_PACKAGE_RUN)
     env_file = tmp_path / ".env"
-    env_file.write_text(f"QTEST_KEY_A={values[0]}\nQTEST_KEY_B={values[1]}\n")
+    env_file.write_text(f"QTEST_KEY_A={values[0]}\nQTEST_KEY_B={values[1]}\nMODEL_API_KEY_7=fake-env-file-key-7777\n")
     records = tmp_path / "records.jsonl"
     (tmp_path / "scenario.json").write_text(json.dumps({"records": str(records), "codes": codes, "env_file": str(env_file), "scan": scan,
                                                         "values": {values[0]: "QTEST_KEY_A", values[1]: "QTEST_KEY_B"}}))
     log = tmp_path / "run.log"
     env = {k: v for k, v in os.environ.items() if not k.startswith("QTEST_")}
     env["FAKE_SCENARIO"] = str(tmp_path / "scenario.json")
-    proc = subprocess.run([_git_bash(), str(SCRIPTS / "resume_with_next_key.sh"), "--topic", "climate-policy", "--date", DATE,
+    env["MODEL_API_KEY_6"] = "fake-exported-key-6666"
+    # fail closed: the script hardcodes --model live; if --workdir ever stops reaching the child, the real run.py refuses
+    # (QUORUM_DRY_RUN=1, exit 2) and the repo .env cannot fill in a route (load_dotenv never overrides a set variable)
+    env["QUORUM_DRY_RUN"] = "1"
+    for name in ("METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN", "MODEL_BASE_URL"):
+        env[name] = ""
+    proc = subprocess.run([_git_bash(), str(SCRIPTS / "resume_with_next_key.sh"), "--topic", topic, "--date", DATE,
                            "--attempt", "2", "--out", str(tmp_path / "store"), "--log", str(log), "--keys", "QTEST_KEY_A,QTEST_KEY_B",
-                           "--env-file", str(env_file), "--python", sys.executable, "--workdir", str(tmp_path / "work"), "--", "--quiet"],
+                           "--env-file", str(env_file), "--python", sys.executable, "--workdir", str(tmp_path / "work"), *flags, "--", *extra],
                           env=env, capture_output=True, text=True, timeout=300)
     rows = [json.loads(line) for line in records.read_text().splitlines()] if records.exists() else []
     return proc, rows, (log.read_text(encoding="utf-8") if log.exists() else "") + proc.stdout + proc.stderr
@@ -1007,9 +1137,43 @@ def test_resume_with_next_key_rotates_on_exit_3(tmp_path: Path, codes: list[int]
     assert [r["key"] for r in rows] == keys_used
     assert ["--resume" in r["argv"] for r in rows] == [False, True][: len(rows)]
     assert all("--quiet" in r["argv"] and "--attempt" in r["argv"] for r in rows)
-    assert all(r["blank_ok"] for r in rows)
+    assert all(r["blank_ok"] for r in rows)  # the other listed key, an exported and an env-file MODEL_API_KEY_*
+    assert all(r["dry_env"] == "1" for r in rows)  # the fail-closed guard reaches the child
     assert VALUE_A not in text and VALUE_B not in text and "MODEL_API_KEY=[redacted]" in text
     assert f"live exit={codes[0]} (QTEST_KEY_A)" in text
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+@pytest.mark.parametrize("topic", ["../etc", "a.b", "con", "nul"])
+def test_resume_with_next_key_refuses_a_topic_off_the_shared_rule(tmp_path: Path, topic: str):
+    proc, rows, text = _run_resume_script(tmp_path, [0], (VALUE_A, VALUE_B), topic=topic)
+    assert proc.returncode == 2 and rows == [], text
+    assert "--topic" in proc.stderr
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+def test_resume_with_next_key_takes_a_topic_by_the_shared_rule(tmp_path: Path):
+    proc, rows, text = _run_resume_script(tmp_path, [0], (VALUE_A, VALUE_B), topic="ai--jobs")
+    assert proc.returncode == 0, text
+    row, = rows
+    assert row["argv"][row["argv"].index("--topic") + 1] == "ai--jobs"
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+@pytest.mark.parametrize("extra", [("--model", "dry"), ("--model=dry",), ("--out", "elsewhere"), ("--resume",)])
+def test_resume_with_next_key_refuses_managed_run_arguments_after_dashdash(tmp_path: Path, extra: tuple[str, ...]):
+    """argparse takes the last --model: `-- --model dry` would write a dry run into the live store."""
+    proc, rows, text = _run_resume_script(tmp_path, [0], (VALUE_A, VALUE_B), extra=extra)
+    assert proc.returncode == 2 and rows == [], text
+    assert "managed by this script" in proc.stderr
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+def test_resume_with_next_key_resume_flag_continues_from_the_first_run(tmp_path: Path):
+    """A run that drained elsewhere: the first run on the listed keys already resumes."""
+    proc, rows, text = _run_resume_script(tmp_path, [3, 0], (VALUE_A, VALUE_B), flags=("--resume",))
+    assert proc.returncode == 0, text
+    assert [(r["key"], "--resume" in r["argv"]) for r in rows] == [("QTEST_KEY_A", True), ("QTEST_KEY_B", True)]
 
 
 @pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")

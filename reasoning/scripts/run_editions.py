@@ -11,7 +11,8 @@ one log per run and one status file per topic-date.
 
 Topics: the listed ids, each checked against collection's `topics` table (a listed id that is not a row fails), or
 `all` = every row (only active rows in collection order once Zetaris registers `active` and `created_at`; until then
-`all` plans only and --live with it is refused). Topic ids follow the shared rule (tools/corpus._TOPIC_ID).
+`all` plans only and --live with it is refused). Topic ids follow the shared rule (tools/corpus._TOPIC_ID) and are no
+Windows device name (con, nul, com1, ...).
 
 Per topic: `scripts/dry_check.py` runs the graph with stand-ins on the day's corpus into --dry-check-out and counts the
 model calls per lane; the count, scaled by --estimate-factor, is the estimate. Topics are placed greedily, in the order
@@ -30,14 +31,15 @@ or a single direct key. The route counts as one key under the same caps (behind 
 account), so --max-calls-per-key bounds what one invocation starts there.
 
 Status files: <status-dir>/<date>/<topic>.json, written atomically (temp file + os.replace), plus _summary.json at the
-end. They hold key variable names, never values, and file names relative to --log-dir, never paths. Logs: one per run
+end. They hold key variable names, never values, and file names relative to --log-dir, never paths. A run without
+--live never changes a live outcome there: it writes its plan beside it (decision at Statuses.open). Logs: one per run
 in <log-dir>/ (<date>_<topic>_run<NN>_<key>.log, <date>_<topic>_dry.log, <date>_runner.log); every key and token value
 the runner knows is replaced by [redacted] before a byte reaches a log.
 
 Exit code: 0 every topic published (or, without --live, every dry check passed and the plan finishes every topic in
 this invocation), 1 a topic failed (a listed id that is not a row, or a row whose id breaks the rule, counts), 3 a
 topic is waiting for a key (none failed; without --live: the plan leaves one for the next window), 2 a usage or
-preflight refusal, 130 interrupted.
+preflight refusal, 130 interrupted. Without --live a live outcome kept in a status file counts as it would with it.
 """
 
 from __future__ import annotations
@@ -105,16 +107,37 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def topic_id_ok(topic: Any) -> bool:
-    """The shared topic-id rule: collection's CHECK on topics.id, tools/corpus._TOPIC_ID (run.py) and the collectors.
+WINDOWS_DEVICE = re.compile(r"^(?:con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])$", re.IGNORECASE)  # decision at topic_id_problem
+DEVICE_REASON = "a Windows reserved device name (con, prn, aux, nul, com0-9, lpt0-9): as a status, log or store name it opens a device"
+
+
+def topic_id_problem(topic: Any) -> str | None:
+    """Why `topic` cannot be run, or None: the shared topic-id rule, then no Windows device name.
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the runner, the dry check and resume_with_next_key.sh take topic
     ids by the shared rule (fullmatch, so not even a trailing newline passes), not a stricter slug of their own. Why: a
     row such as `ai--jobs` is collected and run.py runs it; the stricter rule refused it when listed and dropped it from
-    `all` without a trace. The rule has no dots or slashes, so status and log names stay inside their folders."""
+    `all` without a trace. The rule has no dots or slashes, so status and log names stay inside their folders
+    (superseded 2026-10-26, review round 2: not on Windows; see the next decision).
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): an id that is a Windows reserved device name (con, prn, aux, nul,
+    com0-9, lpt0-9, any case, superscript digits too) is refused like one that breaks the rule: a listed one is a
+    refusal, a row under `--topics all` is a skipped row. Why: the shared rule admits them, and on Windows
+    <status-dir>/<date>/con.json, _estimates/<date>/con.json and <out>/con/ are the console device in every folder:
+    reading the status file blocked the runner and saving it raised FileExistsError, which aborted every topic of the
+    date (review round 2 probes). collection's CHECK and tools/corpus._TOPIC_ID still admit them (not this module's)."""
     from quorum_reasoning.tools.corpus import _TOPIC_ID
 
-    return isinstance(topic, str) and _TOPIC_ID.fullmatch(topic) is not None
+    if not isinstance(topic, str) or _TOPIC_ID.fullmatch(topic) is None:
+        return f"not a topic id by the shared rule {TOPIC_RULE}"
+    if WINDOWS_DEVICE.fullmatch(topic):
+        return DEVICE_REASON
+    return None
+
+
+def topic_id_ok(topic: Any) -> bool:
+    """The shared topic-id rule (collection's CHECK on topics.id, tools/corpus._TOPIC_ID, the collectors) and no
+    Windows device name (decisions at topic_id_problem)."""
+    return topic_id_problem(topic) is None
 
 
 def edition_cut_utc(edition_date: str) -> datetime:
@@ -486,14 +509,29 @@ def describe_plan(entry: dict[str, Any]) -> str:
 # status files
 
 
-class Statuses:
-    """One JSON file per topic-date: <status-dir>/<date>/<topic>.json. Only the main thread writes them."""
+LIVE_ONLY_STATES = ("running", "published", "waiting_for_key")  # states no plan run (without --live) ever sets
 
-    def __init__(self, status_dir: Path, edition_date: str, redactor: Redactor):
+
+def holds_live_outcome(doc: dict[str, Any]) -> bool:
+    """True when a status document records what live runs did: a run row, a state only a live invocation (or the live
+    store) sets, or another state a live invocation set (`state_mode` live, e.g. failed). `queued` alone is not one."""
+    state = doc.get("state")
+    return bool(doc.get("runs")) or state in LIVE_ONLY_STATES or (doc.get("state_mode") == "live" and state not in (None, "queued"))
+
+
+class Statuses:
+    """One JSON file per topic-date: <status-dir>/<date>/<topic>.json. Only the main thread writes them.
+
+    `state_mode` in a document says what set its `state`: `live` (a live invocation, or a snapshot of the run id in the
+    live store), or `dry` (a plan run)."""
+
+    def __init__(self, status_dir: Path, edition_date: str, redactor: Redactor, mode: str = "live"):
         self.dir = status_dir / edition_date
         self.date = edition_date
         self.redactor = redactor
+        self.mode = mode
         self.docs: dict[str, dict[str, Any]] = {}
+        self.kept: set[str] = set()  # dry mode: topics whose file keeps its live outcome (decision at open)
 
     def path(self, topic: str) -> Path:
         return self.dir / f"{topic}.json"
@@ -506,10 +544,22 @@ class Statuses:
             return None
 
     def open(self, topic: str, rid: str) -> dict[str, Any]:
-        """The topic's document for this invocation: an earlier one of the same run id keeps its history."""
+        """The topic's document for this invocation: an earlier one of the same run id keeps its history.
+
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a plan run (no --live) whose status file already holds a live
+        outcome of the same run id (holds_live_outcome) keeps the whole document: `state`, `reason`, `exit_code` and the
+        live fields stay, and the plan's verdict goes to `plan`, `plan_outcome`, `plan_reason` and the estimates only;
+        its exit code counts the kept state (failed -> 1; waiting_for_key, queued or running -> 3). Why: the README says
+        to run the plan any time into the same --status-dir; it turned a live `failed` (exit 7) or `waiting_for_key`
+        into `queued` with exit 0, so neither the file, _summary.json nor the exit code showed the failure or the wait.
+        A state an earlier plan run set (`state_mode` dry) is replaced as before; a live run replaces everything."""
         old = self.load(topic)
         now = now_iso()
-        if old and old.get("run_id") == rid:
+        same = bool(old) and old.get("run_id") == rid
+        if same and self.mode == "dry" and holds_live_outcome(old):
+            doc = dict(old)
+            self.kept.add(topic)
+        elif same:
             doc = {k: v for k, v in old.items() if k in ("started_at", "attempts", "runs")}
         else:
             doc = {}
@@ -520,17 +570,28 @@ class Statuses:
         self.docs[topic] = doc
         return doc
 
+    def verdict(self, topic: str, state: str, reason: str | None, **more: Any) -> dict[str, Any]:
+        """A verdict of this invocation that is not a live run's outcome (not a row, a dry check, the plan): into `state`
+        and `reason`, or, when the file keeps a live outcome, into `plan_outcome` and `plan_reason` (decision at open)."""
+        if topic in self.kept:
+            more.setdefault("plan_outcome", state)
+            return self.save(topic, plan_reason=reason, **more)
+        return self.save(topic, state=state, reason=reason, **more)
+
     def save(self, topic: str, **changes: Any) -> dict[str, Any]:
         doc = self.docs[topic]
-        if "reason" in changes:
-            changes["reason"] = clean_reason(changes["reason"], self.redactor)
+        if "state" in changes:
+            changes.setdefault("state_mode", self.mode)
+        for name in ("reason", "plan_reason"):
+            if name in changes:
+                changes[name] = clean_reason(changes[name], self.redactor)
         for k, v in changes.items():
             if v is None:
                 doc.pop(k, None)
             else:
                 doc[k] = v
         doc["updated_at"] = now_iso()
-        ordered = {k: doc[k] for k in ("topic", "date", "state", "run_id", "started_at", "updated_at", "attempts") if k in doc}
+        ordered = {k: doc[k] for k in ("topic", "date", "state", "state_mode", "run_id", "started_at", "updated_at", "attempts") if k in doc}
         ordered.update({k: v for k, v in doc.items() if k not in ordered})
         write_json_atomic(self.path(topic), ordered)
         return ordered
@@ -783,7 +844,8 @@ def resolve_value(name: str, file_values: dict[str, str]) -> str:
 
 def list_db_topics(ctx: Ctx) -> dict[str, Any]:
     """collection's topics table through `dry_check.py --list-topics`: {"topics": [ids], "filtered": bool (active rows in
-    collection order), "skipped": [{"id", "reason"}]}. A listed id that breaks the shared rule moves to skipped."""
+    collection order), "skipped": [{"id", "reason"}]}. A listed id that breaks the shared rule or is a Windows device name
+    moves to skipped (decisions at topic_id_problem)."""
     argv = ctx.dry_cmd + ["--list-topics"] + (["--env-file", str(ctx.env_file)] if ctx.env_file else [])
     env = _child_env(ctx, None)
     for name in ("MODEL_API_KEY", "METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN"):
@@ -798,11 +860,12 @@ def list_db_topics(ctx: Ctx) -> dict[str, Any]:
     topics: list[str] = []
     skipped = [s for s in (doc.get("skipped") or []) if isinstance(s, dict)]
     for t in doc["topics"]:
-        if topic_id_ok(t):
+        problem = topic_id_problem(t)
+        if problem is None:
             if t not in topics:
                 topics.append(t)
         else:
-            skipped.append({"id": str(t)[:64], "reason": f"not a topic id by the shared rule {TOPIC_RULE}"})
+            skipped.append({"id": str(t)[:64], "reason": problem})
     return {"topics": topics, "filtered": doc.get("filtered") is True, "skipped": skipped}
 
 
@@ -860,7 +923,10 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
     topics: list[str] = []
     if topics_arg != "all":
         for t in [t.strip() for t in topics_arg.split(",") if t.strip()]:
-            if not topic_id_ok(t):
+            problem = topic_id_problem(t)
+            if problem == DEVICE_REASON:
+                return refuse(f"--topics {t[:64]!r} is {DEVICE_REASON}")
+            if problem:
                 return refuse(f"a topic id follows the shared rule {TOPIC_RULE} (lower-case letters, digits, hyphens; "
                               f"at most 64 characters): {t[:64]!r}")
             if t not in topics:
@@ -984,7 +1050,7 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
         ctx.say("note: Zetaris shows no topics.active / created_at: 'all' is every row in no set order, retired topics included")
     for s in skipped:
         ctx.say(f"skipped a topics row {s.get('id')!r}: {s.get('reason')}")
-    statuses = Statuses(ctx.status_dir, ctx.date, ctx.redactor)
+    statuses = Statuses(ctx.status_dir, ctx.date, ctx.redactor, mode)
     usable_keys = [k for k in keys if not k.inject or k.name in ctx.key_values]  # live mode refused unusable ones already
 
     # 1. what is not a row, what is already published, and the dry checks for the rest
@@ -993,17 +1059,21 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
     for topic in topics:
         rid = run_id(topic, ctx.date, ctx.attempt)
         statuses.open(topic, rid)
+        if topic in statuses.kept:
+            ctx.say(f"{topic}: its status keeps the live outcome {statuses.docs[topic].get('state')!r}; the plan goes to plan / plan_outcome")
         if topic in not_rows:
-            final[topic] = statuses.save(topic, state="failed", reason=f"not {row_word} in collection's topics table: nothing is "
-                                         "collected under it (add the row, e.g. with topics --suggest --sql, then rerun)")
+            final[topic] = statuses.verdict(topic, "failed", f"not {row_word} in collection's topics table: nothing is "
+                                            "collected under it (add the row, e.g. with topics --suggest --sql, then rerun)", plan=None)
             ctx.say(f"{topic}: failed, not {row_word} in collection's topics table")
             continue
         done = published_by(ctx.out, topic, ctx.date, rid)
-        if done:
-            final[topic] = statuses.save(topic, state="published", version=done[0], snapshot_status=done[1], reason="already published by an earlier run")
+        if done:  # a snapshot of this run id in the live store is a live outcome, whichever mode found it
+            final[topic] = statuses.save(topic, state="published", state_mode="live", version=done[0], snapshot_status=done[1],
+                                         reason="already published by an earlier run", exit_code=None)
             ctx.say(f"{topic}: already published (version {done[0]}), skipped")
             continue
-        statuses.save(topic, state="queued", reason="dry check running")
+        if topic not in statuses.kept:
+            statuses.save(topic, state="queued", reason="dry check running")
         todo.append(topic)
 
     reports: dict[str, dict[str, Any]] = {}
@@ -1016,9 +1086,9 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
         report = reports[topic]
         rid = run_id(topic, ctx.date, ctx.attempt)
         if report.get("error") or not isinstance(report.get("calls"), dict):
-            final[topic] = statuses.save(topic, state="failed", reason=f"dry check failed: {report.get('error') or 'no counts'}",
-                                         dry_check_log=report.get("log"))
-            ctx.say(f"{topic}: dry check failed ({final[topic].get('reason')})")
+            final[topic] = statuses.verdict(topic, "failed", f"dry check failed: {report.get('error') or 'no counts'}",
+                                            dry_check_log=report.get("log"), plan=None)
+            ctx.say(f"{topic}: dry check failed ({final[topic].get('plan_reason' if topic in statuses.kept else 'reason')})")
             continue
         est_f, est_u = scaled_estimate(report["calls"], ctx.factor)
         done_f, done_u = journal_counts(ctx.out, rid)
@@ -1038,9 +1108,8 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
         entry = plan[item.topic]
         ctx.say(f"plan {item.topic}: {describe_plan(entry)}")
         if mode == "dry":
-            final[item.topic] = statuses.save(item.topic, state="queued", plan=entry["segments"],
-                                              plan_outcome=entry["outcome"],
-                                              reason=f"dry check only (no --live); plan: {describe_plan(entry)}")
+            final[item.topic] = statuses.verdict(item.topic, "queued", f"dry check only (no --live); plan: {describe_plan(entry)}",
+                                                 plan=entry["segments"], plan_outcome=entry["outcome"])
         else:
             statuses.save(item.topic, state="queued", plan=entry["segments"], plan_outcome=entry["outcome"], reason=None)
 
@@ -1151,11 +1220,11 @@ def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, top
     rows = []
     for t in topics:
         doc = final.get(t) or ctx_status(ctx, t)
-        rows.append({"topic": t, "state": doc.get("state"), "calls_estimate": doc.get("calls_estimate_lanes"),
+        rows.append({"topic": t, "state": doc.get("state"), "state_mode": doc.get("state_mode"), "calls_estimate": doc.get("calls_estimate_lanes"),
                      "version": doc.get("version"), "attempts": doc.get("attempts"), "reason": doc.get("reason"),
                      "plan_outcome": doc.get("plan_outcome")})
     for s in skipped or []:  # no status file: the id is not safe as a file name
-        rows.append({"topic": str(s.get("id"))[:64], "state": "failed", "calls_estimate": None, "version": None, "attempts": None,
+        rows.append({"topic": str(s.get("id"))[:64], "state": "failed", "state_mode": mode, "calls_estimate": None, "version": None, "attempts": None,
                      "reason": f"topics row skipped, not run: {s.get('reason')}", "plan_outcome": None, "skipped_row": True})
     summary = {"date": ctx.date, "mode": mode, "started_at": started_at, "ended_at": now_iso(),
                "keys": [{"name": k.name, "cap_fast": k.cap_fast, "cap_ultra": k.cap_ultra, "used_fast": k.used_fast,
@@ -1169,10 +1238,11 @@ def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, top
         ctx.say(f"  {name:<32} {r['state'] or '-':<16} est {est.get('fast', '-')}/{est.get('ultra', '-')}"
                 + (f"  v{r['version']}" if r["version"] else "") + (f"  ({r['reason']})" if r["reason"] else ""))
     states = [r["state"] for r in rows]
-    if "failed" in states:
+    if "failed" in states or (mode == "dry" and any(r["plan_outcome"] == "failed" for r in rows)):
         return 1
-    if mode == "dry":
-        return 3 if any(r["plan_outcome"] == "waiting_for_key" for r in rows) else 0
+    if mode == "dry":  # a kept live outcome counts as it would in live mode (decision at Statuses.open)
+        live_open = any(r["state_mode"] == "live" and r["state"] in ("waiting_for_key", "queued", "running") for r in rows)
+        return 3 if live_open or any(r["plan_outcome"] == "waiting_for_key" for r in rows) else 0
     if "waiting_for_key" in states or "queued" in states or "running" in states:
         return 3
     return 0
