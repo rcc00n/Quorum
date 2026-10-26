@@ -56,8 +56,17 @@ STOPWORDS = frozenset(
 )
 
 
+def _strip_format(s: str) -> str:
+    """`s` without format characters (Unicode category Cf: soft hyphen, zero-width space and joiners, bidi controls,
+    BOM). Pasted web text carries them invisibly; kept, they split a word in two ("Ukr\\u00adaine") or reorder a name.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): deleted, not rejected, before keying, checking and deriving.
+    Why: soft hyphens and zero-width spaces are common in text copied from web pages, and the reader cannot see them."""
+    return "".join(c for c in s if unicodedata.category(c) != "Cf")
+
+
 def _clean(text: Any) -> str:
-    s = str(text or "").replace("’", "'").replace("‘", "'").replace("–", "-").replace("—", "-")
+    s = _strip_format(str(text or "")).replace("’", "'").replace("‘", "'").replace("–", "-").replace("—", "-")
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -163,8 +172,12 @@ def derive(phrase: str) -> dict[str, Any]:
         if _significant(w):
             candidates += [w, plural(w)]
     terms, _ = clean_terms([c for c in candidates if c])
-    if not terms and normalize_term(text) is None and TERM_MIN_CHARS <= len(text) <= TERM_MAX_CHARS and _TERM_CHARS.match(text):
-        terms = [text.lower()]  # a phrase of short words only ("tax"): keep it whole rather than return nothing
+    if not terms and TERM_MIN_CHARS <= len(text) <= TERM_MAX_CHARS and _TERM_CHARS.match(text):
+        # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a phrase with no significant word is kept whole, as
+        # `normalize_term` gives it when that is a valid term ("Me Too" -> "me too"), else lowercased ("tax"). Why: the
+        # old condition kept it only when it was NOT a valid term, so "Me Too" got no term at all; the intake still
+        # refuses a whole phrase that breaks the term rules ("us", "may": `_resolve_one`, too generic).
+        terms = [normalize_term(text) or text.lower()]
     name = " ".join(w if _ACRONYM.match(w) or w.lower() in STOPWORDS else w[:1].upper() + w[1:] for w in text.split(" "))
     if name:
         name = name[:1].upper() + name[1:]
@@ -280,22 +293,25 @@ REQUEST_MAX_CHARS = 80
 KEY_STOPWORDS = frozenset("a about an and at by for from in into of on or over s the to vs with news".split())
 INTAKE_STATUSES = ("existing", "new", "needs_review", "rejected")
 # mapping.json: one object per request entry, every field present (null when it does not apply), in this order.
-# match: name | slug | headline for existing (and for a retired-topic needs_review); source: derive | model | fallback
-# for a proposed row; order: 1-based insert order of a new row in rows.sql; key_mismatch: the contract's key when the
-# web app sent a different one.
+# match: name | slug | headline for existing (and for a retired-topic needs_review); source: derive | model |
+# dry-run stand-in | fallback for a proposed row; order: 1-based insert order of a new row in rows.sql; key_mismatch:
+# the contract's key when the web app sent a different one.
 MAPPING_FIELDS = ("index", "key", "text", "count", "status", "topic_id", "name", "terms", "conflicts", "reason",
                   "match", "source", "order", "key_mismatch")
-# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a live batch (no --dry-run) makes at most this many model calls;
-# the requests beyond it are needs_review with a "deferred" reason and are proposed again on the next batch. Why: one
-# fast-lane call per new topic, and the per-account budget rules (README › Run it) need a bound a web form cannot set.
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a live batch (no --dry-run, and a model route configured) makes
+# at most this many model calls; the requests beyond it are needs_review with a "deferred" reason and are proposed
+# again on the next batch. Why: one fast-lane call per new topic, and the per-account budget rules (README › Run it)
+# need a bound a web form cannot set. A batch whose environment is dry makes no call and has no cap.
 MAX_MODEL_CALLS = 25
 WITHHELD = "[withheld]"
 _COLLECTION_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")  # collectors/schema.sql topics.id CHECK; tools/corpus.py --topic
+ID_BASE_MAX = 60  # a new id's base, so that a "-999" suffix still fits collection's 64 characters
 
 
 def request_key(text: Any) -> str:
-    """The normalised request key: the contract shared with the web app (docs/DECISIONS.md › Daily editions for users).
+    r"""The normalised request key: the contract shared with the web app (docs/DECISIONS.md › Daily editions for users).
 
+    0. delete every format character (general category Cf: soft hyphen, zero-width space, bidi controls, BOM);
     1. lowercase, Unicode NFKD, drop every combining mark (general category M), lowercase again;
     2. delete a full stop that stands between two letters ("U.S." -> "us", "e.g." -> "eg");
     3. tokens = maximal runs of letters and digits (categories L and N); everything else separates tokens;
@@ -305,13 +321,14 @@ def request_key(text: Any) -> str:
     in the web app (JavaScript):
 
         const STOP = new Set("a about an and at by for from in into of on or over s the to vs with news".split(" "));
-        const requestKey = t => [...new Set((String(t ?? "").toLowerCase().normalize("NFKD").replace(/\\p{M}/gu, "")
-          .toLowerCase().replace(/(?<=\\p{L})\\.(?=\\p{L})/gu, "").match(/[\\p{L}\\p{N}]+/gu) || [])
+        const requestKey = t => [...new Set((String(t ?? "").replace(/\p{Cf}/gu, "").toLowerCase().normalize("NFKD")
+          .replace(/\p{M}/gu, "").toLowerCase().replace(/(?<=\p{L})\.(?=\p{L})/gu, "").match(/[\p{L}\p{N}]+/gu) || [])
           .filter(w => !STOP.has(w)))].sort().join(" ");
 
-    (`sort()` compares UTF-16 units, which equals code-point order unless the text has astral-plane letters.)
+    (`sort()` compares UTF-16 units, which equals code-point order unless the text has astral-plane letters. The
+    docstring is a raw string so that the source shows the JavaScript exactly as it must be copied.)
     """
-    s = unicodedata.normalize("NFKD", str(text if text is not None else "").lower())
+    s = unicodedata.normalize("NFKD", _strip_format(str(text if text is not None else "")).lower())
     s = "".join(c for c in s if not unicodedata.category(c).startswith("M")).lower()
     s = "".join(c for i, c in enumerate(s) if not (c == "." and 0 < i < len(s) - 1 and s[i - 1].isalpha() and s[i + 1].isalpha()))
     tokens: set[str] = set()
@@ -325,28 +342,44 @@ def request_key(text: Any) -> str:
     return " ".join(sorted(t for t in tokens if t not in KEY_STOPWORDS))
 
 
-_EMAIL_RE = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): any "@" is rejected and withheld (an e-mail address is any
+# word@word, a dotted domain not required; every other "@" counts as a handle), and a dotted name followed by "/" or
+# ending in a common TLD is a URL. Why: "john@localhost" and "janedoe.blog" passed the narrower patterns and became
+# public topic names; a typed topic never needs an "@".
+_EMAIL_RE = re.compile(r"[\w.%+-]+@[\w-]+")
 _URL_RE = re.compile(
     r"(?i)\b[a-z][a-z0-9+.-]*://|\bwww\.|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\."
-    r"(?:com|org|net|gov|edu|mil|int|io|co|ai|app|dev|info|biz|news|ly|me|tv|us|uk|ru|ua|de|fr|eu|ca|au|cn|jp|in|xyz)\b"
+    r"(?:com|org|net|gov|edu|mil|int|io|co|ai|app|dev|info|biz|news|ly|me|tv|us|uk|ru|ua|de|fr|eu|ca|au|cn|jp|in|xyz"
+    r"|blog|shop|store|online|site|website|live|top|club|tech|space|cloud|page|link|wiki|media|email|pro|art|life"
+    r"|world|today)\b"
+    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/"  # any dotted name followed by a path: "janedoe.foo/post"
 )
-_HANDLE_RE = re.compile(r"(?<![\w.])@\w{2,}")
 _PHONE_RE = re.compile(
     r"\+\d[\d\s().-]{6,}\d"  # international: +44 20 7946 0958
     r"|(?<!\d)\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"  # North American: (555) 123-4567, 555.123.4567, 5551234567
     r"|(?<![\d.-])\d{3}[.-]\d{4}(?![\d.-])"  # local: 555-1234 (not "2026-2027", not "100 2026")
 )
-_MARKUP_RE = re.compile(r"[<>\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_MARKUP_RE = re.compile(r"[<>\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")  # markup, C0 controls but tab/newline/return, DEL, C1
+_UNUSABLE = frozenset(("Co", "Cs", "Cn"))  # private use, unpaired surrogate, unassigned
+
+
+def _echo(text: str) -> str:
+    """Text safe to write into mapping.json and report.txt: controls, private-use, unpaired surrogates (which UTF-8
+    cannot encode) and unassigned code points become U+FFFD."""
+    return "".join("\ufffd" if unicodedata.category(c) in _UNUSABLE or unicodedata.category(c) == "Cc" else c for c in text)
 
 
 def check_request(text: Any) -> tuple[str, bool]:
     """("", False) for an acceptable typed topic, else (why, withheld): the checks the web app must run before it
     stores a request, and that the batch repeats. `withheld` is true when the text may carry personal data (an
-    e-mail address, a URL, an @handle, a phone number), so outputs must not echo it.
+    e-mail address, a URL, an "@", a phone number), so outputs must not echo it.
 
-    Order: not text, over 25 × REQUEST_MAX_CHARS raw (not scanned, withheld), empty, e-mail, URL, @handle, phone,
-    markup (`<`, `>`) or control characters, over REQUEST_MAX_CHARS code points after collapsing whitespace (JS:
-    `[...text].length`), no letter at all, nothing left after `request_key`.
+    Format characters (Cf) are deleted first (`_strip_format`), and the personal-data patterns scan the NFKC form, so
+    a zero-width space or a full-width "＠" hides nothing. Order: not text, over 25 × REQUEST_MAX_CHARS raw (not
+    scanned, withheld), empty, e-mail, URL, any other "@" (a handle), phone, markup (`<`, `>`) or control characters
+    (C0 but tab, newline and return; DEL; C1), private-use, unpaired-surrogate or unassigned code points (Co, Cs, Cn),
+    over REQUEST_MAX_CHARS code points after collapsing whitespace (JS: `[...text].length`), no letter at all,
+    nothing left after `request_key`.
     """
     if not isinstance(text, str):
         return "not text", False
@@ -355,12 +388,18 @@ def check_request(text: Any) -> tuple[str, bool]:
     cleaned = _clean(text)
     if not cleaned:
         return "empty", False
-    for pattern, why in ((_EMAIL_RE, "contains an e-mail address"), (_URL_RE, "contains a URL"),
-                         (_HANDLE_RE, "contains an @handle"), (_PHONE_RE, "contains a phone number")):
-        if pattern.search(cleaned):
+    scan = unicodedata.normalize("NFKC", cleaned)
+    for pattern, why in ((_EMAIL_RE, "contains an e-mail address"), (_URL_RE, "contains a URL")):
+        if pattern.search(scan):
             return why, True
+    if "@" in scan:
+        return "contains an @handle", True
+    if _PHONE_RE.search(scan):
+        return "contains a phone number", True
     if _MARKUP_RE.search(text):
         return "contains markup or control characters", False
+    if any(unicodedata.category(c) in _UNUSABLE for c in cleaned):
+        return "contains private-use, unpaired surrogate or unassigned characters", False
     if len(cleaned) > REQUEST_MAX_CHARS:
         return f"longer than {REQUEST_MAX_CHARS} characters ({len(cleaned)})", False
     if not any(c.isalpha() for c in cleaned):
@@ -527,19 +566,35 @@ def _view(topic: dict[str, Any], *, batch: bool = False) -> dict[str, Any]:
     return {**topic, "name_key": request_key(topic["name"]), "slug_key": request_key(topic["id"]), "batch": batch}
 
 
+def _id_base(slug: str) -> str:
+    """The proposed slug as the base of a new id that holds collection's rule `^[a-z0-9][a-z0-9-]{0,63}$`.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a base over ID_BASE_MAX (60) characters is cut at its last hyphen
+    within the limit; when no hyphen is there (one long word), or what is left breaks the rule, the base is
+    `topic-<8 hex of the slug>`. Why: collection's CHECK rejects a longer id, while the mapping would report it `new`;
+    60 leaves room for the "-999" suffix of a taken id."""
+    base = slug if _COLLECTION_ID.match(slug or "") else slug_for(slug or "")
+    if len(base) > ID_BASE_MAX:
+        head = base[: ID_BASE_MAX + 1]
+        base = head.rsplit("-", 1)[0] if "-" in head else ""
+    base = base.rstrip("-")
+    if not _COLLECTION_ID.match(base):
+        base = "topic-" + hashlib.sha256((slug or "").encode("utf-8")).hexdigest()[:8]
+    return base
+
+
 def _free_slug(slug: str, taken: set[str]) -> str:
     """The slug, or slug-2, slug-3, … when an existing or earlier row holds it (ids are never reused or overwritten).
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a taken id gets a numeric suffix rather than failing the request.
     Why: the request's words already differ from that topic's name and slug (the key check ran first), so it is a
     different topic that happens to slug alike; collection's id rule allows the extra segment."""
-    base = slug if _COLLECTION_ID.match(slug or "") else slug_for(slug or "")
+    base = _id_base(slug)
     if base not in taken:
         return base
-    stem = base[:60].rstrip("-")
     for n in range(2, 1000):
-        if f"{stem}-{n}" not in taken:
-            return f"{stem}-{n}"
+        if f"{base}-{n}" not in taken:
+            return f"{base}-{n}"
     return "topic-" + hashlib.sha256(base.encode("utf-8")).hexdigest()[:12]  # pragma: no cover - 998 namesakes
 
 
@@ -558,39 +613,81 @@ def _resolve_one(key: str, text: str, known: list[dict[str, Any]], taken: set[st
                 return _existing(t, how, f"same words as the {how} of {t['id']}")
             return {**_existing(t, how, ""), "status": "needs_review",
                     "reason": f"same words as the {how} of retired topic {t['id']} (active = false); reactivating it is the operator's call"}
-    # 2. A headline that says what the reader typed would be collected under an existing topic: that topic.
+    # 2. A headline saying what the reader typed is collected under an active topic, and every word of the request is in
+    #    that topic's name, slug or matching terms: that topic (the first such topic in collection order).
+    #    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed, to confirm by Yelysei): one shared term alone does
+    #    not make a request `existing`; it falls through to a new row. Why: "nuclear plant shutdown in Germany" shares
+    #    only "shutdown" with federal-budget-shutdown, and mapping it there would show that reader another topic's
+    #    edition; a new row still receives every document that matches its own terms and no older topic's terms.
+    words = set(key.split())
+    shared: tuple[str, str] | None = None  # (topic id, term) of the first headline hit that does not cover the request
     for t in known:
         hits = [term for term in t["terms"] if _occurs(term, text)] if t["active"] else []
-        if hits:
-            return _existing(t, "headline", f"a headline saying {text!r} is collected under {t['id']} (term {hits[0]!r}): "
-                             "one topic per document, the older topic first")
-    # 3. A new row: the proposed terms minus every term that overlaps an active topic's term.
+        if not hits:
+            continue
+        covered = set(t["name_key"].split()) | set(t["slug_key"].split()) | {w for h in hits for w in request_key(h).split()}
+        if words <= covered:
+            return _existing(t, "headline", f"a headline saying {text!r} is collected under {t['id']} (term {hits[0]!r}), "
+                             "and every word of the request is in its name, slug or matching terms")
+        shared = shared or (t["id"], hits[0])
+    # 3. A new row: the proposed terms that hold the term rules, minus every term that overlaps an active topic's term.
     if propose is None:
         return {"status": "needs_review", "match": None, "topic_id": None, "name": None, "terms": [], "conflicts": [],
                 "reason": f"deferred: this batch reached its cap of {MAX_MODEL_CALLS} model calls; run the batch again"}
     row = propose(text)
     slug = _free_slug(str(row.get("slug") or ""), taken)
+    proposed = [term for term in row.get("terms") or [] if isinstance(term, str) and term.strip()]
+    usable: list[str] = []
+    generic: list[str] = []
+    for term in proposed:
+        norm = normalize_term(term)  # derive's whole-phrase fallback ("us", "may") skips it; a model reply does not
+        if norm is None:
+            generic.append(term)
+        elif norm.lower() not in {u.lower() for u in usable}:
+            usable.append(norm)
     kept: list[str] = []
     conflicts: list[dict[str, str]] = []
-    for term in row.get("terms") or []:
+    for term in usable:
         flags = [{"term": term, "topic_id": t["id"], "topic_term": other, "relation": rel}
                  for t in known if t["active"] for other in t["terms"] if (rel := term_relation(term, other))]
         if flags:
             conflicts += flags
         else:
             kept.append(term)
+    generic_list = ", ".join(repr(g) for g in generic)
+    tail = ""
+    if shared:
+        tail += f"; a headline saying it also matches {shared[1]!r} of {shared[0]}, which keeps the documents both match"
+    if row.get("source") == "fallback" and row.get("reason"):
+        tail += f"; terms from the fallback ({row['reason']})"
     out = {"match": None, "topic_id": slug, "name": str(row.get("name") or text)[:NAME_MAX_CHARS], "terms": kept,
            "conflicts": conflicts, "source": row.get("source")}
+    if generic and usable:
+        tail = f"; too generic, dropped: {generic_list}" + tail
+
+    def review(why: str) -> dict[str, Any]:
+        return {**out, "status": "needs_review", "reason": why + tail}
+
+    if not proposed:
+        return review("no usable term could be derived from the phrase")
+    if not usable:
+        return review(f"terms too generic to collect: {generic_list} (a stopword, a single word under 4 letters, or "
+                      "another break of the term rules)")
     if not kept:
-        return {**out, "status": "needs_review", "reason": "every proposed term overlaps a term of an existing topic"}
-    if not any(_occurs(term, text) for term in kept):
-        return {**out, "status": "needs_review",
-                "reason": f"without the overlapping terms no term would collect a headline saying {text!r}"}
+        return review("every proposed term overlaps a term of an existing topic or of an earlier row of this batch")
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed, to confirm by Yelysei): a row whose kept terms would not
+    # collect a headline made of the typed words is needs_review only when the overlap dropped a term that would have
+    # ("China" keeps only "chinas"). Why: a model's English terms for "Wahlen in Deutschland" or a paraphrase ("the Fed
+    # raising rates": "Federal Reserve") never occur in the typed words, and such a row is a good new topic.
+    lost = list(dict.fromkeys(c["term"] for c in conflicts if _occurs(c["term"], text)))
+    if lost and not any(_occurs(term, text) for term in kept):
+        return review(f"the terms that would collect a headline saying {text!r} ({', '.join(repr(x) for x in lost)}) overlap "
+                      "older topics, and none of the kept terms would")
     known.append(_view({"id": slug, "name": out["name"], "terms": kept, "active": True, "created_at": None}, batch=True))
     taken.add(slug)
     dropped = len({c["term"] for c in conflicts})
-    return {**out, "status": "new",
-            "reason": f"no existing topic covers these words; {len(kept)} terms" + (f", {dropped} overlapping dropped" if dropped else "")}
+    return {**out, "status": "new", "reason": f"no existing topic covers these words; {len(kept)} terms"
+            + (f", {dropped} overlapping dropped" if dropped else "") + tail}
 
 
 def _entry(index: int, raw: Any) -> dict[str, Any]:
@@ -603,8 +700,8 @@ def _entry(index: int, raw: Any) -> dict[str, Any]:
         count = 1
     web_key = entry.get("key") if isinstance(entry.get("key"), str) else None
     key = "" if why else request_key(_clean(text))
-    base: dict[str, Any] = {"index": index, "key": web_key if web_key is not None else key,
-                            "text": _clean(text) if isinstance(text, str) else None, "count": count}
+    base: dict[str, Any] = {"index": index, "key": _echo(web_key) if web_key is not None else key,
+                            "text": _echo(_clean(text)) if isinstance(text, str) else None, "count": count}
     if withheld:
         # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): text and key that may carry personal data are never echoed
         # into mapping.json or report.txt. Why: those files leave the web app's database; `index` still joins the entry.
@@ -667,9 +764,12 @@ def resolve_requests(entries: list[Any], existing: list[dict[str, Any]], *, prop
 
 
 def rows_sql(results: list[dict[str, Any]], *, header: str = "") -> str:
-    """rows.sql: one insert-only statement per new row, in collection order, with the order rule stated on top."""
+    """rows.sql: one insert-only statement per new row, in collection order, with the order rule stated on top.
+    Raises ValueError for an id that breaks collection's id rule (the CHECK on topics.id would reject the insert)."""
     new: dict[str, dict[str, Any]] = {}
     for r in sorted((r for r in results if r["status"] == "new"), key=lambda r: r["order"]):
+        if not _COLLECTION_ID.match(str(r["topic_id"] or "")):
+            raise ValueError(f"new topic id {str(r['topic_id'])[:80]!r} breaks collection's id rule {_COLLECTION_ID.pattern}")
         new.setdefault(r["topic_id"], r)
     lines = [
         "-- Quorum topic intake: new rows for collection's `topics` table" + (f" ({header})" if header else "") + ".",
@@ -686,18 +786,25 @@ def rows_sql(results: list[dict[str, Any]], *, header: str = "") -> str:
     return "\n".join(lines) + "\n"
 
 
-def report_text(results: list[dict[str, Any]], *, source_note: str, dry_run: bool, existing_count: int) -> str:
+MODE_DRY_RUN = "dry run (derive, no model call)"
+MODE_DRY_ENV = ("dry environment (no --dry-run, but QUORUM_DRY_RUN=1 or no model route: suggest answered with its "
+                "dry-run stand-in, derive's terms, no model call)")
+MODE_LIVE = f"live (suggest: one fast-lane call per new topic, at most {MAX_MODEL_CALLS})"
+
+
+def report_text(results: list[dict[str, Any]], *, source_note: str, mode: str, existing_count: int) -> str:
+    """report.txt. `mode` is MODE_DRY_RUN, MODE_DRY_ENV or MODE_LIVE: how the batch actually resolved, not only its flag."""
     counts = {s: sum(1 for r in results if r["status"] == s) for s in INTAKE_STATUSES}
     distinct = len({request_key(r["text"]) for r in results if r["status"] != "rejected"})
     lines = [
         "Quorum topic intake",
         f"generated:  {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
-        f"mode:       {'dry run (derive, no model call)' if dry_run else 'live (suggest: one fast-lane call per new topic)'}",
+        f"mode:       {mode}",
         f"existing:   {existing_count} topics; {source_note}",
         f"requests:   {len(results)} entries, {distinct} distinct",
         "status:     " + ", ".join(f"{s} {counts[s]}" for s in INTAKE_STATUSES),
     ]
-    if dry_run:
+    if mode != MODE_LIVE:
         lines.append("note:       dry-run terms are the phrase's own words and naive plurals (derive); single generic words "
                      "over-collect, so prefer a live batch for rows that will be applied")
     lines.append("")
@@ -741,18 +848,40 @@ def intake(args: argparse.Namespace) -> int:
         print(f"topics: existing topics unavailable, nothing written: {type(exc).__name__}: {str(exc)[:300]}", file=sys.stderr)
         return 2
     if args.dry_run:
+        mode, header = MODE_DRY_RUN, "dry run"
         propose: Callable[[str], dict[str, Any]] = lambda text: {**derive(text), "source": "derive"}  # noqa: E731
         cap = None
     else:
-        propose = lambda text: suggest(text, dry_run=None, language_hint=args.language)  # noqa: E731
-        cap = MAX_MODEL_CALLS
+        # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): without --dry-run the batch resolves the route once, as
+        # `suggest` will (llm.is_dry_run); a dry environment is labelled so in report.txt and rows.sql, and its rows
+        # carry source "dry-run stand-in", never "model". Why: an operator with no route configured would otherwise
+        # apply derive's naive terms believing a model chose them.
+        try:
+            env_dry = llm.is_dry_run(False)
+        except Exception:
+            env_dry = True
+        mode, header = (MODE_DRY_ENV, "dry environment, stand-in terms") if env_dry else (MODE_LIVE, "live")
+        cap = None if env_dry else MAX_MODEL_CALLS
+
+        def propose(text: str) -> dict[str, Any]:
+            row = suggest(text, dry_run=None, language_hint=args.language)
+            if row.get("source") == "model" and row.get("dry_run"):
+                row = {**row, "source": "dry-run stand-in"}
+            return row
+
     results = resolve_requests(entries, existing, propose=propose, max_proposals=cap)
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        sql = rows_sql(results, header=f"{stamp}, {header}")
+    except ValueError as exc:  # pragma: no cover - _free_slug keeps every id inside the rule; this is the last check
+        print(f"topics: nothing written: {exc}", file=sys.stderr)
+        return 2
+    mapping = json.dumps(results, ensure_ascii=False, indent=2) + "\n"
+    report = report_text(results, source_note=source_note, mode=mode, existing_count=len(existing))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "mapping.json").write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    (out / "rows.sql").write_text(rows_sql(results, header=f"{stamp}, {'dry run' if args.dry_run else 'live'}"), encoding="utf-8")
-    report = report_text(results, source_note=source_note, dry_run=bool(args.dry_run), existing_count=len(existing))
+    (out / "mapping.json").write_text(mapping, encoding="utf-8")
+    (out / "rows.sql").write_text(sql, encoding="utf-8")
     (out / "report.txt").write_text(report, encoding="utf-8")
     print("\n".join(report.splitlines()[:6]))
     print(f"wrote {out / 'mapping.json'}, {out / 'rows.sql'}, {out / 'report.txt'}")
