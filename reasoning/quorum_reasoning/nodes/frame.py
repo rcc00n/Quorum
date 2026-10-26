@@ -15,6 +15,7 @@ from collections import Counter, defaultdict
 from .. import llm, untrusted
 from ..state import DocRef, RunState, StepError
 from ..trace import finish, step
+from ..tools import memory
 
 COHORTS = ("major_left", "minor_left", "major_right", "minor_right", "center")
 
@@ -119,4 +120,5 @@ def run(state: RunState) -> dict:
                 s.decision = "failed; coverage counts only"
                 s.reason = untrusted.public_failure(exc)
         steps.append(finish(state, s))
-    return {"events": events, "steps": steps, "errors": errors}
+    memory_steps, memory_errors = memory.remember(state | {"steps": state.get("steps", []) + steps}, events)
+    return {"events": events, "steps": steps + memory_steps, "errors": errors + memory_errors}

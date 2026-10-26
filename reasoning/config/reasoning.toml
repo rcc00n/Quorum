@@ -129,3 +129,8 @@ min_interval_ms = 6000            # base pause between live calls; env QUORUM_MI
 # too (an explicit shared 0 wins over the values below unless a lane's own env is set; decision in llm.min_interval_ms).
 min_interval_ms_fact_checker = 10000
 min_interval_ms_reviewer = 10000
+
+# DECISION(2026-10-24, rcc00n/Codex): proposed source memory is opt-in; dry mode never touches it.
+# Why: owner review and genuine feature evidence are required before enabling the sidecar.
+[engines]
+hmem = "off"
