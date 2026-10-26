@@ -1,0 +1,401 @@
+/* The story page (web/components/story.tsx): an event whose reasoning output supplied article paragraphs, laid out
+   as a printed page on the portal's column. Scoped to .story-page, .story, .story-* and .story-crumb; the
+   workspace sections under the appendix keep Vadim's rules (globals.css under workspace.css); only their heads
+   are restyled here. Tokens: web/app/identity.css; roles and the panel's verdict: web/DESIGN.md › Decisions.
+   DECISION(2026-10-26, Anastasia/Claude Code): one text measure of 560 px, centred on the 980 px column (about
+   65 characters at 18 px), the photo and the section bodies on the full column. Why: the prototype's indentation,
+   which Anastasia asked to keep, and DESIGN.md's 56–66 character measure. */
+.story-crumb {
+  margin: 0 0 24px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.story-crumb a {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  padding: 10px 0;
+  text-decoration: none;
+}
+.story-crumb a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--umber);
+  text-underline-offset: 3px;
+}
+.story-crumb-glyph {
+  color: var(--ink-2);
+  margin-right: 8px;
+}
+
+.story-page {
+  --story-measure: 560px;
+}
+.story {
+  margin-top: 0;
+  font-family: var(--body);
+}
+.story > * {
+  min-width: 0;
+}
+.story > :not(.story-photo) {
+  max-width: var(--story-measure);
+  margin-inline: auto;
+}
+
+/* The lead photo: the one element on the full column above the text. */
+.story-photo {
+  margin: 0;
+  width: 100%;
+}
+.story-photo-frame {
+  position: relative;
+  aspect-ratio: 2 / 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.story-photo-frame img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* DECISION(2026-10-26, Anastasia/Claude Code): the credit over the picture carries the identity's one text shadow,
+   for legibility on any photograph; box shadows stay out. Why: a white word on an unknown picture needs it. */
+.story-credit {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-decoration: none;
+}
+.story-credit:hover {
+  text-decoration: underline;
+}
+.story-credit:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  border-radius: var(--radius-s);
+}
+.story-caption {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.story-caption a,
+.story-source {
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.18s ease-out;
+}
+.story-caption a:hover,
+.story-source:hover {
+  text-decoration-color: var(--umber);
+}
+
+/* The head of the story on the measure */
+.story-date {
+  display: block;
+  margin-top: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.story-photo + .story-date {
+  margin-top: 40px;
+}
+.story-page .story-headline {
+  margin: 12px auto 0;
+  font-size: clamp(30px, 4.2vw, 40px);
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.story-page .story-standfirst {
+  margin-top: 16px;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.story-page .story-meta {
+  margin-top: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.story-page .story-key {
+  margin-top: 12px;
+  margin-bottom: 40px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 8px 0;
+}
+
+/* The body: plain text; the marks ride at the end of the paragraph. */
+.story-page .story-p {
+  margin-top: 28px;
+  font-size: 18px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.story-page .story-key + .story-p {
+  margin-top: 0;
+}
+.story-runin {
+  font-weight: 500;
+  color: var(--ink);
+}
+.story-marks {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  white-space: normal;
+  vertical-align: baseline;
+}
+.story-marks > a,
+.story-marks > .story-mark-word {
+  white-space: nowrap;
+}
+.story-marks .story-source {
+  color: var(--ink-2);
+}
+.story-marks .story-key-link {
+  color: var(--ink-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+.story-marks .story-key-link + .story-key-link {
+  margin-left: 6px;
+}
+.story-marks .story-mark-word + .story-key-link {
+  margin-left: 6px;
+}
+.story-marks .story-key-link:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--umber);
+  text-underline-offset: 3px;
+}
+.story-sep {
+  color: var(--ink-2);
+}
+.story-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.story-page .story-silence {
+  margin-top: 32px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--ink);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 12px 0;
+}
+.story-page :is(.story-crumb a, .story-source, .story-key-link, .story-caption a):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-s);
+}
+
+/* The end of the article and the appendix head */
+.story-end {
+  width: 100%;
+  max-width: var(--story-measure);
+  margin: 96px auto 48px;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+.story-appendix {
+  max-width: var(--story-measure);
+  margin-inline: auto;
+}
+.story-page .story-appendix-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.story-appendix-tail {
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.story-page .story-appendix-sub {
+  margin-top: 12px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.story-page .story-appendix-data {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.story-page .story-appendix-bar {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.story-page .story-appendix-bar strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* The workspace sections under the appendix: the contents line and the heads on the measure, eyebrows and
+   icons hidden by CSS; ids, headings, rows and controls are Vadim's and unchanged. */
+.story-page .analysis-navigation {
+  max-width: var(--story-measure);
+  margin: 24px auto 0;
+  padding: 0;
+  border-top: 0;
+  border-bottom: 0;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.story-page .analysis-navigation a {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--ink);
+  min-height: 24px;
+  text-decoration: none;
+}
+.story-page .analysis-navigation a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--umber);
+  text-underline-offset: 3px;
+}
+.story-page .analysis-navigation a svg {
+  display: none;
+}
+.story-page .analysis-navigation + .analysis-block {
+  margin-top: 64px;
+}
+.story-page .analysis-block {
+  padding-top: 0;
+  margin-top: 96px;
+  scroll-margin-top: 88px;
+}
+.story-page .analysis-block-heading {
+  max-width: var(--story-measure);
+  margin: 0 auto 32px;
+}
+.story-page .analysis-block-heading .eyebrow {
+  display: none;
+}
+.story-page .analysis-block-heading h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+.story-page .analysis-block-heading > p:last-child {
+  margin-top: 8px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  max-width: none;
+}
+.story-page .revision-section {
+  margin-top: 96px;
+  padding-top: 0;
+  border-top: 0;
+}
+.story-page .revision-section > h2 {
+  max-width: var(--story-measure);
+  margin: 0 auto 24px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.story-page .claim-detail {
+  scroll-margin-top: 88px;
+}
+
+@media (max-width: 700px) {
+  .story-page {
+    --story-measure: 100%;
+  }
+  .story-photo-frame {
+    aspect-ratio: 3 / 2;
+  }
+  .story-credit {
+    right: 12px;
+    bottom: 12px;
+  }
+  .story-page .story-headline {
+    font-size: 30px;
+  }
+  .story-page .story-standfirst {
+    font-size: 18px;
+  }
+  .story-page .story-p {
+    margin-top: 24px;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .story-end {
+    margin: 64px auto 32px;
+  }
+  .story-page .story-appendix-title {
+    font-size: 24px;
+  }
+  .story-appendix-tail {
+    display: block;
+    white-space: normal;
+  }
+  .story-page .analysis-block-heading h2,
+  .story-page .revision-section > h2 {
+    font-size: 22px;
+  }
+  .story-page .analysis-block,
+  .story-page .revision-section {
+    margin-top: 64px;
+  }
+  .story-page .analysis-navigation + .analysis-block {
+    margin-top: 48px;
+  }
+  .story-page .analysis-block,
+  .story-page .claim-detail {
+    scroll-margin-top: 120px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-page a,
+  .story-caption a,
+  .story-source {
+    transition: none;
+  }
+}

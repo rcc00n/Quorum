@@ -22,6 +22,7 @@ import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
 import { BriefStatus } from "./brief-status";
 import { TodayBoard } from "./today-board";
+import { StoryCrumb } from "./story";
 import {
   api,
   session,
@@ -337,7 +338,13 @@ export function Portal({
             </div>
           ) : (
             <>
-              {view !== "dashboard" && (
+              {view === "event" ? (
+                // The story page's navigation: the topic's name, back to its page (components/story.tsx).
+                <StoryCrumb
+                  topic={data?.topics.find((t) => t.id === data?.events.find((e) => e.id === id)?.topic_id) ?? null}
+                  date={data?.events.find((e) => e.id === id)?.date ?? initialDay}
+                />
+              ) : view !== "dashboard" && (
               <div className="page-heading">
                 <p className="eyebrow">
                   {view === "dashboard"
