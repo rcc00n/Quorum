@@ -837,8 +837,17 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
         return {"status": "needs_review", "match": None, "topic_id": None, "name": None, "terms": [], "conflicts": [],
                 "reason": f"deferred: this batch reached its cap of {MAX_MODEL_CALLS} model calls; run the batch again"}
     row = propose(texts[0])
-    slug = _free_slug(str(row.get("slug") or ""), taken)
-    proposed = [term for term in row.get("terms") or [] if isinstance(term, str) and term.strip()]
+    # (c) of the closing-round-3 DECISION at the name check below: a proposed term that may carry personal data is
+    # withheld before the term rules (whose "too generic" list is echoed) and the overlap step.
+    proposed: list[str] = []
+    withheld_terms = 0
+    for term in row.get("terms") or []:
+        if not (isinstance(term, str) and term.strip()):
+            continue
+        if _personal_data(_scan_form(_clean(term))):
+            withheld_terms += 1
+        else:
+            proposed.append(term)
     usable: list[str] = []
     generic: list[str] = []
     for term in proposed:
@@ -861,14 +870,37 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
     if row.get("source") == "fallback" and row.get("reason"):
         tail += f"; terms from the fallback ({row['reason']})"
     name = str(row.get("name") or texts[0])[:NAME_MAX_CHARS]
-    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 2, to confirm by Yelysei): the proposed
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 2, to confirm by Yelysei; superseded
+    # 2026-10-26 in closing round 3 by the comment below, which widens it to the id and the terms): the proposed
     # name passes `check_request` like the typed text, else derive's name of the typed text replaces it (the reason says
     # so, without the name). Why: `validate` only trims a model's name, so a reply named "<img src=x onerror=…> call
     # jane@x.org" went into mapping.json, report.txt and rows.sql, and from there into collection's public topic name.
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 3, to confirm by Yelysei): what a
+    # proposed row (a model's reply on the live path, derive's otherwise) puts into a public output passes the
+    # personal-data checks of the typed text. (a) The name passes `check_request`, else derive's name of the typed text
+    # replaces it. (b) The id: the proposed slug is scanned with `_personal_data` as it is (a hyphen counts as a phone
+    # separator, so "call-jane-555-1234567" is a phone number; reading the hyphens as spaces finds nothing more); when
+    # it is flagged, or (a) replaced the name, derive's slug of the typed text is the id, and `topic-<8 hex>` when that
+    # is flagged too. (c) A proposed term that `_personal_data` flags is withheld (above). The reason says what was
+    # replaced and how many terms were withheld, never their text. Why: `validate` rebuilds an invalid model slug from
+    # the model's own name (the common case: 3 of 4 first live replies), and a valid one was never checked, so a name
+    # replaced for an e-mail address or a phone number still gave the public id ("jane-doe-example-org",
+    # "call-jane-5551234567"), and a term "call jane 5551234567" went into query_terms, mapping.json and report.txt.
     name_why, _ = check_request(name)
     if name_why:
         name = derive(texts[0])["name"]
         tail += f"; model name replaced: {name_why}"
+    base = str(row.get("slug") or "")
+    slug_why = _personal_data(_scan_form(base))
+    if name_why or slug_why:
+        base = derive(texts[0])["slug"]
+        if _personal_data(_scan_form(base)):
+            base = "topic-" + hashlib.sha256(texts[0].encode("utf-8")).hexdigest()[:8]
+        tail += (f"; {'model' if row.get('source') == 'model' else 'derived'} slug replaced: "
+                 f"{slug_why or 'it may be built from the replaced name'}")
+    slug = _free_slug(base, taken)
+    if withheld_terms:
+        tail += f"; {withheld_terms} proposed term{'s' if withheld_terms != 1 else ''} withheld: may carry personal data"
     out = {"match": None, "topic_id": slug, "name": name, "terms": kept,
            "conflicts": conflicts, "source": row.get("source"), "caution": _caution(row.get("source"), kept, texts[0])}
     if generic and usable:

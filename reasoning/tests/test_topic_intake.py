@@ -257,6 +257,13 @@ def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
         ("Jane 447911123456", "contains a phone number", True),
         ("call 01701234567", "contains a phone number", True),
         ("Ivan 123456789", "contains a phone number", True),
+        # closing round 3: caught only by the 9-digit run check, and only because it scans the form with "/", "_" and
+        # the dash-like characters turned into "-" (no North American, international or local shape matches these)
+        ("call 0170/1234567", "contains a phone number", True),
+        ("Ivan 030_123456", "contains a phone number", True),
+        ("Jane 0170‐1234567", "contains a phone number", True),  # U+2010 hyphen
+        ("call 030/123/456", "contains a phone number", True),
+        ("Jane 0170−1234567", "contains a phone number", True),  # U+2212 minus sign
     ],
 )
 def test_rejections(text, why, withheld):
@@ -302,13 +309,14 @@ def test_unicode_personal_data_never_becomes_a_row(existing):
 
 
 def test_phone_numbers_without_separators_never_become_a_row(existing):
-    """Before closing round 2 "call Jane 07911123456" became a `new` row named "Call Jane 07911123456"."""
-    texts = ["call Jane 07911123456", "John Smith 01701234567", "Ivan 123456789"]
+    """Before closing round 2 "call Jane 07911123456" became a `new` row named "Call Jane 07911123456"; "call
+    0170/1234567" and "Ivan 030_123456" are caught only because the run check scans the separator-converted form."""
+    texts = ["call Jane 07911123456", "John Smith 01701234567", "Ivan 123456789", "call 0170/1234567", "Ivan 030_123456"]
     res = resolve(texts, existing)
     assert [r["status"] for r in res] == ["rejected"] * len(texts)
     assert all(r["text"] == r["key"] == topics.WITHHELD and r["reason"] == "contains a phone number" for r in res)
     sql = topics.rows_sql(res)
-    assert sql.count("INSERT") == 0 and not any(d in sql for d in ("07911123456", "01701234567", "123456789"))
+    assert sql.count("INSERT") == 0 and not any(d in sql for d in ("07911123456", "01701234567", "123456789", "1234567", "123456"))
 
 
 @pytest.mark.parametrize(
@@ -1159,26 +1167,100 @@ def test_cli_model_rows_carry_no_caution(tmp_path, monkeypatch):
         "terms derived from the phrase's own words (derive), not chosen by a model: review them before applying")
 
 
+def _outputs(tmp_path, sql, report):
+    """rows.sql, mapping.json and report.txt of the last `_batch`, lowercased for leak checks."""
+    mapping = (tmp_path / "out" / "mapping.json").read_text(encoding="utf-8")
+    return [sql.lower(), mapping.lower(), report.lower()]
+
+
 @pytest.mark.parametrize(
-    "bad_name, why, leaks",
+    "reply, why, leaks",
     [
-        ("<img src=x onerror=alert(1)> Mars sample return", "contains markup or control characters", ["<img", "onerror"]),
-        ("Mars sample return, write to jane@x.org", "contains an e-mail address", ["jane@x.org", "x.org"]),
+        ({"name": "<img src=x onerror=alert(1)> Mars sample return"}, "contains markup or control characters", ["<img", "onerror"]),
+        ({"name": "Mars sample return, write to jane@x.org"}, "contains an e-mail address", ["jane", "x.org"]),
+        # closing round 3: `validate` rebuilds an invalid model slug from the model's name (the common case), so before
+        # this round the id still held what the name check had just replaced ("jane-doe-example-org")
+        ({"name": "jane.doe@example.org Mars", "slug": "mars sample return mission program"}, "contains an e-mail address",
+         ["jane", "example-org", "example.org"]),
+        ({"name": "jane@x.org Mars sample return", "slug": "NOT A SLUG AT ALL x y"}, "contains an e-mail address",
+         ["jane", "x-org", "x.org"]),
+        ({"name": "Jane Doe janedoe@example.org", "slug": ""}, "contains an e-mail address", ["jane", "example"]),
+        # here the slug rebuilt from the name is itself flagged, and the reason says so
+        ({"name": "Call Jane 5551234567", "slug": "a-b-c-d-e"}, "contains a phone number", ["jane", "5551234567"]),
+        ({"name": "Jane Doe 555 123 4567", "slug": "NOT A SLUG AT ALL x y"}, "contains a phone number",
+         ["jane", "555-123", "555 123"]),
     ],
 )
-def test_cli_a_model_name_that_fails_the_checks_is_replaced_by_the_derived_name(tmp_path, monkeypatch, bad_name, why, leaks):
+def test_cli_a_model_name_that_fails_the_checks_is_replaced_by_the_derived_name_and_id(tmp_path, monkeypatch, reply, why, leaks):
     """The typed text passed every check, so a bad name can only come from the model (an injection or a
-    hallucination); `validate` accepts it, and before closing round 2 it reached rows.sql as the public topic name."""
-    _recording_json_task(monkeypatch, {**MARS_REPLY, "name": bad_name})
+    hallucination); `validate` accepts it, and before closing round 2 it reached rows.sql as the public topic name,
+    before closing round 3 also as the public id (the model's slug is not trusted once its name failed)."""
+    _recording_json_task(monkeypatch, {**MARS_REPLY, **reply})
     _route(monkeypatch, live=True)
     code, (m,), sql, report = _batch(tmp_path, SAMPLE[2:3])
-    assert code == 0 and m["status"] == "new" and m["source"] == "model" and m["topic_id"] == "mars-sample-return"
+    assert code == 0 and m["status"] == "new" and m["source"] == "model"
+    assert m["topic_id"] == topics.derive("Mars sample return mission")["slug"] == "mars-sample-return-mission"
     assert m["name"] == topics.derive("Mars sample return mission")["name"] == "Mars Sample Return Mission"
-    assert m["reason"].endswith(f"; model name replaced: {why}") and m["terms"] == ["mars sample return", "MSR", "perseverance"]
-    mapping = (tmp_path / "out" / "mapping.json").read_text(encoding="utf-8")
-    assert "'Mars Sample Return Mission'" in sql and sql.count("INSERT INTO topics") == 1
-    for leak in leaks:
-        assert leak not in sql and leak not in mapping and leak not in report
+    slug_why = "contains a phone number" if "5551234567" in reply["name"] else "it may be built from the replaced name"
+    assert m["reason"].endswith(f"; model name replaced: {why}; model slug replaced: {slug_why}")
+    assert m["terms"] == ["mars sample return", "MSR", "perseverance"]
+    assert "VALUES ('mars-sample-return-mission', 'Mars Sample Return Mission'," in sql and sql.count("INSERT INTO topics") == 1
+    for out in _outputs(tmp_path, sql, report):
+        assert not [leak for leak in leaks if leak.lower() in out]
+
+
+@pytest.mark.parametrize("slug", ["call-jane-555-1234567", "jane-doe-5551234567", "jane-555-123-4567", "call-jane-5551234567",
+                                  "555-1234"])
+def test_cli_a_model_slug_that_may_carry_personal_data_is_replaced_by_the_derived_id(tmp_path, monkeypatch, slug):
+    """A valid model slug was used as the id unchecked before closing round 3; a hyphen counts as a phone separator."""
+    _recording_json_task(monkeypatch, {**MARS_REPLY, "slug": slug})
+    _route(monkeypatch, live=True)
+    code, (m,), sql, report = _batch(tmp_path, SAMPLE[2:3])
+    assert code == 0 and m["status"] == "new" and m["source"] == "model" and m["topic_id"] == "mars-sample-return-mission"
+    assert m["name"] == "Mars Sample Return" and "model name replaced" not in m["reason"]  # a name that passes is kept
+    assert m["reason"].endswith("; model slug replaced: contains a phone number")
+    assert "VALUES ('mars-sample-return-mission', 'Mars Sample Return'," in sql
+    groups = [g for g in re.findall(r"\d+", slug) if len(g) >= 4]
+    for out in _outputs(tmp_path, sql, report):
+        assert slug not in out and "jane" not in out and not [g for g in groups if g in out]
+
+
+def test_cli_model_terms_that_may_carry_personal_data_are_withheld(tmp_path, monkeypatch):
+    """Before closing round 3 a model term "call jane 5551234567" passed normalize_term (digits and spaces are allowed)
+    and went into query_terms, mapping.json and report.txt; the model's clean slug and name are kept."""
+    terms = ["Mars sample return", "MSR", "jane doe 5551234567", "call jane 5551234567", "555 123 4567", "Perseverance"]
+    _recording_json_task(monkeypatch, {**MARS_REPLY, "terms": terms})
+    _route(monkeypatch, live=True)
+    code, (m,), sql, report = _batch(tmp_path, SAMPLE[2:3])
+    assert code == 0 and m["status"] == "new" and m["source"] == "model"
+    assert (m["topic_id"], m["name"]) == ("mars-sample-return", "Mars Sample Return")
+    assert m["terms"] == ["mars sample return", "MSR", "perseverance"]
+    assert m["reason"].endswith("; 3 proposed terms withheld: may carry personal data") and "replaced" not in m["reason"]
+    assert "ARRAY['mars sample return', 'MSR', 'perseverance']" in sql
+    for out in _outputs(tmp_path, sql, report):
+        assert "jane" not in out and "5551234567" not in out and "555 123 4567" not in out
+
+
+def test_a_proposed_term_with_personal_data_is_withheld_before_the_term_rules(existing):
+    """"jane@x.org" breaks the term rules, whose "too generic, dropped" list echoes the raw term: it is withheld first."""
+    (r,) = resolve(["measles cases"], existing, propose=model_row(["measles cases", "jane@x.org", "it"]))
+    assert r["status"] == "new" and r["terms"] == ["measles cases"]
+    assert r["reason"].endswith("; too generic, dropped: 'it'; 1 proposed term withheld: may carry personal data")
+    assert "jane" not in json.dumps(r) and "jane" not in topics.rows_sql([r])
+
+
+def test_a_derived_slug_that_looks_like_a_phone_number_becomes_a_hashed_id(existing):
+    """The typed text passes check_request (its digit groups are words apart), but slug_for drops the stopwords and
+    puts 11 digits side by side; with no clean slug to fall back on, the id is `topic-<8 hex>`."""
+    text = "2026 and 2027 and 100 plans"
+    assert topics.check_request(text) == ("", False) and topics.derive(text)["slug"] == "2026-2027-100-plans"
+    (r,) = resolve([text], existing)
+    assert r["status"] == "new" and re.fullmatch(r"topic-[0-9a-f]{8}", r["topic_id"])
+    assert r["reason"].endswith("; derived slug replaced: contains a phone number")
+    (clean,) = resolve(["Mars sample return mission"], existing,
+                       propose=lambda t: {**topics.derive(t), "slug": "call-jane-5551234567", "source": "derive"})
+    assert clean["topic_id"] == "mars-sample-return-mission"
+    assert clean["reason"].endswith("; derived slug replaced: contains a phone number")
 
 
 def test_cli_an_empty_zetaris_read_writes_nothing(tmp_path, monkeypatch, capsys):
