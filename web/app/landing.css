@@ -632,7 +632,8 @@
   margin: 28px auto 0;
 }
 
-/* What you get: the anatomy of a story, a page with margin labels in umber parentheses. */
+/* What you get: the anatomy of a story, a page with margin labels in grey parentheses (Anastasia, 2026-10-26: no
+   umber inside the anatomy page or the timeline; grey and ink only). */
 .lp-page {
   margin: 64px auto 0;
   max-width: 760px;
@@ -655,7 +656,7 @@
   color: var(--ink);
 }
 .lp-paren {
-  color: var(--umber);
+  color: var(--ink-2);
   font-weight: 400;
 }
 .lp-part-note {
@@ -704,7 +705,7 @@
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: var(--umber);
+  color: var(--ink-2);
 }
 .landing .lp-slot-appendix p {
   font-size: 15px;
@@ -740,7 +741,8 @@
   color: var(--ink);
 }
 
-/* How it works: the graph as a timeline. A rail, a dot per step, a label column and a text column. */
+/* How it works: the graph as a timeline. A rail, a dot per step, a label column and a text column. Grey and ink
+   only: numbers and node lines grey, the vendor line ink, looping steps with an ink dot. */
 .lp-steps {
   list-style: none;
   margin: 64px 0 0;
@@ -778,7 +780,7 @@
   background: var(--ink-2);
 }
 .lp-step-loop::before {
-  background: var(--umber);
+  background: var(--ink);
 }
 .lp-step-label {
   display: grid;
@@ -790,7 +792,7 @@
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
-  color: var(--umber);
+  color: var(--ink-2);
 }
 .landing .lp-step-nodes {
   font-family: var(--mono);
@@ -804,7 +806,7 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
-  color: var(--umber);
+  color: var(--ink);
 }
 .lp-chip {
   justify-self: start;
@@ -820,7 +822,7 @@
   padding: 3px 8px;
 }
 .lp-chip-mark {
-  color: var(--umber);
+  color: var(--ink-2);
 }
 .landing .lp-step-lead {
   font-family: var(--display);
