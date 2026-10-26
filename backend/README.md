@@ -84,6 +84,8 @@ python backend/manage.py reasoning_snapshot --file <private-original.json> --sha
 
 The JSON report separates `compatible` from `metadata_valid`. A config discrepancy exits nonzero; even matching metadata keeps `execution_verified`, `source_text_verified` and `published` false. It never rewrites inputs. Optional local tests take `QUORUM_TEST_GENUINE_SNAPSHOT`; CI skips those two private-original tests and uses synthetic negative cases instead.
 
+2026-10-26 · Anastasia / Claude Code (Vadim's and Yelysei's agreement given privately via Anastasia) · The reasoning preview adapter (`reasoning_preview.py`, `present_reasoning`) also hands each story's article to the portal as the presentation model `event.article` (paragraph kinds fact/context/statement/not_confirmed with claim ids, `reading_minutes`; the photo stays withheld). It still invents no `analysis`: no document ids, hashes, offsets or review times (the existing test keeps asserting that); the story page reads the claims from `event.reasoning`. Test: `test_reasoning_article.py`. Why: the story page (web/DESIGN.md › Decisions) renders only an article the writer wrote, and the preview is the only path that carries one until the projection maps it.
+
 ### Historical v4 editorial hold
 
 The exact original closed-v4 hash has a preview advisory and acceptance hold for

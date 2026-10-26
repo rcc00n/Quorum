@@ -22,12 +22,13 @@ import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
 import { BriefStatus } from "./brief-status";
 import { TodayBoard } from "./today-board";
-import { StoryCrumb } from "./story";
+import { StoryCrumb, Story, storyReadable } from "./story";
 import {
   api,
   session,
   feed,
   eventSnapshot,
+  previewSnapshot,
   User,
   Snapshot,
   Event,
@@ -69,16 +70,25 @@ function Analysis({
         sources={sources}
       />
     );
+  // The story layout also on the claims-only page when the reasoning story carries a readable article
+  // (components/story.tsx); the claim sections below become its appendix.
+  const readable = storyReadable(event, sources);
   return (
-    <>
-      <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
-      <h1>{event.title}</h1>
-      <p className="lede">{event.summary}</p>
-      {event.importance && (
-        <aside className="notice">
-          <strong>{event.importance.label}</strong>
-          <p>{event.importance.explanation}</p>
-        </aside>
+    <div className={readable ? "story-page story-page-plain" : undefined}>
+      {readable ? (
+        <Story event={event} sources={sources} />
+      ) : (
+        <>
+          <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
+          <h1>{event.title}</h1>
+          <p className="lede">{event.summary}</p>
+          {event.importance && (
+            <aside className="notice">
+              <strong>{event.importance.label}</strong>
+              <p>{event.importance.explanation}</p>
+            </aside>
+          )}
+        </>
       )}
       {(
         [
@@ -89,7 +99,7 @@ function Analysis({
           "coverage",
         ] as const
       ).map((key, i) => (
-        <section className="analysis-section" key={key}>
+        <section className="analysis-section" id={`claims-${key}`} key={key}>
           <p className="eyebrow">0{i + 1}</p>
           <h2>
             {
@@ -136,7 +146,7 @@ function Analysis({
         sources={sources}
         supplementary
       />
-    </>
+    </div>
   );
 }
 export function Portal({
@@ -144,11 +154,13 @@ export function Portal({
   id,
   initialDay,
   initialRevision,
+  initialPreview = false,
 }: {
   view: string;
   id?: string;
   initialDay?: string;
   initialRevision?: string;
+  initialPreview?: boolean;
 }) {
   const router = useRouter();
   const path = usePathname();
@@ -174,7 +186,9 @@ export function Portal({
       setSelected(s.user.topics);
       setData(
         view === "event"
-          ? await eventSnapshot(id || "", initialDay, initialRevision)
+          ? initialPreview
+            ? await previewSnapshot(initialDay)
+            : await eventSnapshot(id || "", initialDay, initialRevision)
           : await feed(day, topic),
       );
     } catch (e) {
@@ -182,7 +196,7 @@ export function Portal({
     } finally {
       setLoading(false);
     }
-  }, [router, day, topic, view, id, initialDay, initialRevision]);
+  }, [router, day, topic, view, id, initialDay, initialRevision, initialPreview]);
   useEffect(() => {
     void load();
   }, [load]);

@@ -3,10 +3,10 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 import type { Event, Source, Topic } from "@/lib/api";
 import { rating, cohort, safeUrl } from "@/lib/api";
-import type { Claim, Document, StructuredAnalysis } from "@/lib/analysis";
+import type { Claim, StructuredAnalysis } from "@/lib/analysis";
 import type { EditorialPhoto } from "@/lib/editorial";
-import type { ReasoningStory } from "@/lib/reasoning";
 import { licensedPhoto, readableArticle } from "@/lib/editorial";
+import type { ReasoningStory } from "@/lib/reasoning";
 import "@/app/story.css";
 
 // DECISION(2026-10-26, Anastasia/Claude Code): the story page (an event whose reasoning output supplied article
@@ -17,6 +17,11 @@ import "@/app/story.css";
 // a counted number or one of the constants below (Yelysei's to approve). Why: Anastasia's brief of 2026-10-26
 // (the prototype's indentation and ease of reading, in our identity), Yelysei's story-page specification and
 // docs/DECISIONS.md › Stories as articles; the design panel's verdict is in web/DESIGN.md › Decisions.
+// DECISION(2026-10-26, Anastasia/Claude Code; Vadim's and Yelysei's agreement given privately via Anastasia): the
+// claims behind the article come from `event.analysis` when the portal supplied it, otherwise from the reasoning
+// story under `event.reasoning` (the preview path, which by Vadim's rule invents no analysis). Claim keys and the
+// evidence links exist only with an analysis; the reasoning path shows the sources' names and links alone. Why:
+// the preview must show the writer's article without fabricating document ids, hashes or offsets.
 
 const KEY_LINE =
   "Plain text is a confirmed fact with its sources after it. A statement is attributed in the sentence itself. What is not confirmed is listed at the end. No evaluation is added.";
@@ -48,6 +53,15 @@ type Paragraph = NonNullable<Event["article"]>["paragraphs"][number];
 type Spectrum = ReasoningStory["spectrum"];
 type Pair = [number, number];
 type Mark = { kind: "word" | "source" | "key"; text: string; href?: string; title?: string; sep: boolean };
+// One view of a claim, from either source of claims.
+type ClaimView = {
+  id: string;
+  status: Claim["status"];
+  speaker: string | null;
+  text: string;
+  supporting: { label: string; url: string; official: boolean; group: string }[];
+};
+type Claims = { byId: Map<string, ClaimView>; order: string[]; hasAnalysis: boolean };
 
 function plural(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
@@ -66,6 +80,81 @@ function formatDate(iso: string) {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
+  });
+}
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function claimsFromAnalysis(analysis: StructuredAnalysis, sources: Source[]): Claims {
+  const byId = new Map<string, ClaimView>();
+  analysis.claims.forEach((c) => {
+    const supporting = c.supporting
+      .map((citation) => analysis.documents.find((d) => d.id === citation.document_id))
+      .filter((d): d is NonNullable<typeof d> => !!d)
+      .map((d) => {
+        const source = sources.find((s) => s.id === d.source_id);
+        return {
+          label: d.kind === "official" ? d.title : source?.name || d.title,
+          url: d.url,
+          official: d.kind === "official",
+          group: d.kind === "official" ? `doc:${d.id}` : source?.independence_group || d.source_id,
+        };
+      });
+    byId.set(c.id, { id: c.id, status: c.status, speaker: c.attribution?.speaker ?? null, text: c.text, supporting });
+  });
+  return { byId, order: analysis.claims.map((c) => c.id), hasAnalysis: true };
+}
+
+function claimsFromReasoning(story: ReasoningStory): Claims {
+  const byId = new Map<string, ClaimView>();
+  story.claims.forEach((c) => {
+    const status: Claim["status"] =
+      c.kind === "statement" ? "attributed" : c.status === "confirmed" ? "established" : c.status === "disputed" ? "disputed" : "unknown";
+    const supporting = c.evidence
+      .filter((e) => e.stance === "supports")
+      .map((e) => ({
+        label: e.title,
+        url: e.url,
+        official: !!e.is_document,
+        group: e.is_document ? `doc:${e.url}` : e.independence_group || hostOf(e.url),
+      }));
+    byId.set(c.id, { id: c.id, status, speaker: c.speaker ?? null, text: c.text, supporting });
+  });
+  return { byId, order: story.claims.map((c) => c.id), hasAnalysis: false };
+}
+
+function claimsOf(event: Event, sources: Source[]): Claims | null {
+  if (event.analysis) return claimsFromAnalysis(event.analysis, sources);
+  if (event.reasoning) return claimsFromReasoning(event.reasoning);
+  return null;
+}
+
+// Readable: with an analysis, lib/editorial's rule; with a reasoning story alone, the same rule over its claims
+// (facts and context on established claims, statements on attributed claims with a speaker, the rest on
+// unknown or disputed ones), in the fixed order facts → statements → not confirmed.
+export function storyReadable(event: Event, sources: Source[]) {
+  if (event.analysis) return readableArticle(event);
+  const article = event.article;
+  const claims = claimsOf(event, sources);
+  if (!article?.paragraphs.length || !claims) return false;
+  let previous = 0;
+  return article.paragraphs.every((p) => {
+    const order = p.kind === "statement" ? 1 : p.kind === "not_confirmed" ? 2 : 0;
+    if (order < previous || !p.text.trim() || !p.claim_ids.length) return false;
+    previous = order;
+    return p.claim_ids.every((id) => {
+      const c = claims.byId.get(id);
+      return (
+        !!c &&
+        (order === 0 ? c.status === "established" : order === 1 ? c.status === "attributed" && !!c.speaker : ["unknown", "disputed"].includes(c.status))
+      );
+    });
   });
 }
 
@@ -118,16 +207,18 @@ function Photo({ photo }: { photo: EditorialPhoto }) {
 
 // The marks after a paragraph: speaker words (statements whose sentence lacks the name), then the supporting
 // documents (official texts first, one article per independence group, as write.py's claim_sources), then the
-// claim keys; after a not-confirmed paragraph only a status word and the key per claim, never an outlet.
-function marksFor(p: Paragraph, analysis: StructuredAnalysis, sources: Source[], byId: Map<string, Claim>): Mark[] {
-  const claims = p.claim_ids.map((id) => byId.get(id)).filter((c): c is Claim => !!c);
+// claim keys when an analysis exists; after a not-confirmed paragraph only a status word and the key per claim,
+// never an outlet.
+function marksFor(p: Paragraph, claims: Claims): Mark[] {
+  const views = p.claim_ids.map((id) => claims.byId.get(id)).filter((c): c is ClaimView => !!c);
   const marks: Mark[] = [];
-  const keyFor = (c: Claim, sep: boolean): Mark | null => {
-    const index = analysis.claims.findIndex((x) => x.id === c.id);
+  const keyFor = (c: ClaimView, sep: boolean): Mark | null => {
+    if (!claims.hasAnalysis) return null;
+    const index = claims.order.indexOf(c.id);
     return index < 0 ? null : { kind: "key", text: claimKey(index), href: `#claim-${encodeURIComponent(c.id)}`, title: c.text, sep };
   };
   if (p.kind === "not_confirmed") {
-    claims.forEach((c) => {
+    views.forEach((c) => {
       marks.push({ kind: "word", text: STATUS_WORDS[c.status] ?? c.status, sep: marks.length > 0 });
       const key = keyFor(c, false);
       if (key) marks.push(key);
@@ -136,36 +227,25 @@ function marksFor(p: Paragraph, analysis: StructuredAnalysis, sources: Source[],
   }
   if (p.kind === "statement") {
     const lower = p.text.toLowerCase();
-    const speakers = [...new Set(claims.map((c) => c.attribution?.speaker).filter((s): s is string => !!s))];
+    const speakers = [...new Set(views.map((c) => c.speaker).filter((s): s is string => !!s))];
     speakers.forEach((speaker) => {
       if (!lower.includes(speaker.toLowerCase())) marks.push({ kind: "word", text: `${speaker} ${SAYS}`, sep: marks.length > 0 });
     });
   }
-  const docs: Document[] = [];
-  claims.forEach((c) =>
-    c.supporting.forEach((citation) => {
-      const d = analysis.documents.find((x) => x.id === citation.document_id);
-      if (d && !docs.includes(d)) docs.push(d);
-    }),
-  );
-  const ordered = [...docs.filter((d) => d.kind === "official"), ...docs.filter((d) => d.kind !== "official")];
+  const docs = views.flatMap((c) => c.supporting);
+  const ordered = [...docs.filter((d) => d.official), ...docs.filter((d) => !d.official)];
   const groups = new Set<string>();
   const labels = new Set<string>();
   ordered.forEach((d) => {
-    const source = sources.find((s) => s.id === d.source_id);
-    if (d.kind !== "official") {
-      const group = source?.independence_group || d.source_id;
-      if (groups.has(group)) return;
-      groups.add(group);
-    }
-    const label = d.kind === "official" ? d.title : source?.name || d.title;
-    if (labels.has(label)) return;
-    labels.add(label);
+    if (groups.has(d.group)) return;
+    groups.add(d.group);
+    if (labels.has(d.label)) return;
+    labels.add(d.label);
     const href = safeUrl(d.url);
-    marks.push({ kind: href ? "source" : "word", text: label, href, title: d.kind === "official" ? d.title : undefined, sep: marks.length > 0 });
+    marks.push({ kind: href ? "source" : "word", text: d.label, href, title: d.official ? d.label : undefined, sep: marks.length > 0 });
   });
   let first = true;
-  claims.forEach((c) => {
+  views.forEach((c) => {
     const key = keyFor(c, first && marks.length > 0);
     if (key) {
       marks.push(key);
@@ -207,11 +287,11 @@ function Marks({ marks }: { marks: Mark[] }) {
 // DECISION(2026-10-26, Anastasia/Claude Code): the meta line counts only the claims the article cites, never the
 // analysis as a whole, and omits every zero segment. Why: the line describes the story the reader is about to
 // read; a claim below the bar or outside the article is the Evidence Explorer's business.
-function metaSegments(article: NonNullable<Event["article"]>, byId: Map<string, Claim>) {
+function metaSegments(article: NonNullable<Event["article"]>, claims: Claims) {
   const ids = (kinds: string[]) => new Set(article.paragraphs.filter((p) => kinds.includes(p.kind)).flatMap((p) => p.claim_ids));
   const facts = ids(["fact", "context"]).size;
   const statements = ids(["statement"]).size;
-  const open = [...ids(["not_confirmed"])].map((id) => byId.get(id)?.status);
+  const open = [...ids(["not_confirmed"])].map((id) => claims.byId.get(id)?.status);
   const disputed = open.filter((s) => s === "disputed").length;
   const unknown = open.filter((s) => s === "unknown").length;
   const segments: string[] = [];
@@ -322,18 +402,19 @@ function runIn(text: string): [string | null, string] {
 }
 
 export function Story({ event, sources }: { event: Event; sources: Source[] }) {
-  if (!readableArticle(event)) return null;
+  const claims = claimsOf(event, sources);
+  if (!claims || !storyReadable(event, sources)) return null;
   const article = event.article!;
-  const analysis = event.analysis!;
-  const byId = new Map(analysis.claims.map((c) => [c.id, c]));
-  const meta = metaSegments(article, byId);
-  const data = dataSegments(analysis, sources);
-  const silence = silentCohorts(analysis, sources);
+  const analysis = event.analysis;
+  const meta = metaSegments(article, claims);
+  const data = analysis ? dataSegments(analysis, sources) : [];
+  const silence = analysis ? silentCohorts(analysis, sources) : [];
   const spectrum = event.reasoning?.spectrum;
   const coverage = spectrum ? coverageLine(spectrum) : null;
   const spectrumSilence = spectrum ? silenceLines(spectrum) : [];
   const readAs = spectrum ? interpretationsLine(spectrum) : null;
   const sides = spectrum ? (["left", "right"] as const).filter((s) => spectrum[s]) : [];
+  const claimsHref = claims.hasAnalysis ? "#evidence-explorer" : "#claims-established";
   let runInUsed = false;
   return (
     <>
@@ -367,7 +448,7 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
                 </>
               )}
               {text}
-              <Marks marks={marksFor(p, analysis, sources, byId)} />
+              <Marks marks={marksFor(p, claims)} />
             </p>
           );
         })}
@@ -405,8 +486,8 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
           </p>
         )}
         <p className="story-appendix-links">
-          <a href="#evidence-explorer">{`All ${plural(analysis.claims.length, "claim", "claims")} with evidence`}</a>
-          <a href="#investigation-timeline">{CHECKED_LINK}</a>
+          <a href={claimsHref}>{`All ${plural(claims.order.length, "claim", "claims")} with evidence`}</a>
+          {claims.hasAnalysis && <a href="#investigation-timeline">{CHECKED_LINK}</a>}
         </p>
       </div>
     </>

@@ -684,6 +684,25 @@ def present_reasoning(raw, *, now=None, catalog=None):
             ),
             sources=sources,
             reasoning=deepcopy(s),
+            # DECISION(2026-10-26, Anastasia/Claude Code; Vadim's and Yelysei's agreement given privately via
+            # Anastasia): the preview also hands the writer's article to the portal as its presentation model
+            # (paragraph kinds fact/context/statement/not_confirmed with their claim ids, the reading minutes; the
+            # photo stays withheld as decided above), so the story page can lay it out. No analysis is invented:
+            # the rule that the preview fabricates no document ids, hashes, offsets or review times stands, and
+            # the page reads the claims from `reasoning`. Why: the story layout renders only an article the
+            # writer wrote (web/DESIGN.md › Decisions, story page).
+            article=dict(
+                reading_minutes=s["reading_minutes"],
+                paragraphs=[
+                    dict(
+                        kind="statement" if b["kind"] == "statements" else b["kind"],
+                        text=b["text"],
+                        claim_ids=list(b["claim_ids"]),
+                    )
+                    for b in s["article"]
+                ],
+                photo=None,
+            ),
             established=[],
             statements=[],
             disputed=[],
