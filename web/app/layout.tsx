@@ -3,6 +3,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/schibsted-grotesk";
 import "./globals.css";
 import "./identity.css";
+import "./workspace.css";
 export const metadata: Metadata = {
   title: { default: "Quorum — The news, with its working shown", template: "%s · Quorum" },
   description:
