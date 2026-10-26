@@ -31,7 +31,7 @@ Read them with `git show origin/support/offline-integration-hmem:integration_sup
 
 ## Steps
 
-1. [ ] Get the reference engine checkout; record its commit.
+1. [x] Get the reference engine checkout; record its commit.
 2. [ ] Apply 0002, 0004 and 0012 onto this branch (`git apply --3way`), resolve against the current code, and credit Vadim in the commit message.
 3. [ ] Full reasoning suite green; `tests/test_source_memory.py` green, with `METERLESS_HOME` set.
 4. [ ] Conformance run against the engine actually used, recorded below with its exit code, the checks, the engine commit and the date.
@@ -53,3 +53,4 @@ Read them with `git show origin/support/offline-integration-hmem:integration_sup
 ## Status
 
 - 2026-10-26 18:3xZ: branch created from 522f848; this file written. Next: step 1.
+- 2026-10-26 (step 1 done): reference checkout at `C:\Users\eshki\Projects\meterless-hmem` (outside the repository; sparse clone of `github.com/Meterless/Meterless`, folder `engines/hmem`), engine commit `1742dec56a66e58eef9dda2d2b865823758ca8cd` (2026-10-19T10:55:26-07:00). Dev dependencies installed there only, from its lock file (`npm ci --ignore-scripts`; tsx 4.23.0, 38 MB). Not committed. Note: executing the downloaded engine code (conformance runner, engine-backed tests) needs Yelysei's explicit permission in this session; the assistant's tool guard refused the first run. Next: step 2.
