@@ -201,9 +201,25 @@ def test_abstract_is_the_federal_register_summary_paragraph():
 def test_a_federal_register_document_without_a_summary_has_no_abstract():
     # the Federal Register API's abstract is null for these documents: they are matched on their title alone
     assert topic_match.official_abstract(FR_NO_SUMMARY) == ""  # recognised by its page header
-    assert topic_match.official_abstract("TIME AND DATE: Friday.", "federal-register") == ""  # or by its source
+    assert topic_match.official_abstract(FR_NO_SUMMARY, "federal-register") == ""
     assert topic_match.official_abstract(FR_NO_SUMMARY, "whitehouse") == ""  # the header wins over a mislabelled source
     assert topic_match.official_abstract(FR_RULE, "federal-register").startswith("The Office approves rules")
+
+
+# A Federal Register row stored without raw text: collection (collectors/federal_register.py) stores the API's
+# `abstract` as full_text when the document has no raw_text_url, and skips a document with neither.
+FR_API_ABSTRACT = ("The Bureau of Industry and Security amends the Export Administration Regulations to impose\n"
+                   "export controls on advanced AI chips.")
+
+
+def test_a_headerless_federal_register_row_is_the_api_abstract():
+    a = topic_match.official_abstract(FR_API_ABSTRACT, "federal-register")
+    assert a == " ".join(FR_API_ABSTRACT.split())  # read whole, whitespace collapsed: no page header, so not "no abstract"
+    title = "Revisions to the Export Administration Regulations"
+    assert topic_match.official_seed_match(_doc(title, FR_API_ABSTRACT), ["export controls"]) == "lead"
+    assert topic_match.official_abstract("TIME AND DATE: Friday.", "federal-register") == "TIME AND DATE: Friday."
+    long = "Export controls on chips. " * 400  # longer than any summary: capped at ABSTRACT_MAX, not at LEAD_MAX
+    assert len(topic_match.official_abstract(long, "federal-register")) == topic_match.ABSTRACT_MAX
 
 
 def test_other_sources_fall_back_to_the_first_600_characters():
@@ -351,8 +367,10 @@ def test_the_cover_page_list_of_other_documents_seeds_nothing():
 
 def test_a_meeting_agenda_without_a_summary_seeds_nothing():
     assert topic_match.official_seed_match(_doc("Sunshine Act Meetings Notice", FR_SUNSHINE), ["fiscal year"]) is None
-    headerless = "DATES AND TIME: Every second Wednesday through Fiscal Year 2027."  # the row's source alone says Federal Register
-    assert topic_match.official_seed_match(_doc("Sunshine Act Meetings Notice", headerless), ["fiscal year"]) is None
+    # the page header says "no abstract", whatever the row's source; without it a federal-register row is the API's abstract
+    assert topic_match.official_seed_match(_doc("Sunshine Act Meetings Notice", FR_SUNSHINE, "congress-gov"), ["fiscal year"]) is None
+    headerless = "DATES AND TIME: Every second Wednesday through Fiscal Year 2027."
+    assert topic_match.official_seed_match(_doc("Sunshine Act Meetings Notice", headerless), ["fiscal year"]) == "lead"
     assert topic_match.official_seed_match(_doc("Board notice", headerless, "congress-gov"), ["fiscal year"]) == "lead"
 
 
@@ -369,8 +387,10 @@ def test_only_the_enacting_clause_up_to_its_colon_is_dropped():
     proclaim = ("NOW, THEREFORE, I, the President, by virtue of the authority vested in me by the Constitution and the laws of the "
                 "United States, do hereby proclaim November 2026 as National Ukraine Remembrance Month.")
     assert topic_match.official_abstract(proclaim, "whitehouse") == proclaim  # a proclamation's operative sentence stays
-    no_colon = "By the authority vested in me as President, I order a review of Ukraine aid.\n\nSection 2. More."
-    assert topic_match.official_abstract(no_colon, "whitehouse") == "By the authority vested in me as President, I order a review of Ukraine aid. Section 2. More."
+    # no colon in the clause's own paragraph: the clause stays whole, and a colon after the blank line does not end it
+    no_colon = "By the authority vested in me as President, I order a review of Ukraine aid.\n\nSection 2. Policy: more."
+    assert topic_match.official_abstract(no_colon, "whitehouse") == "By the authority vested in me as President, I order a review of Ukraine aid. Section 2. Policy: more."
+    assert topic_match.official_seed_match(_doc("Presidential memorandum", no_colon, "whitehouse"), ["Ukraine"]) == "lead"
 
 
 FR_SUMMARY_ACROSS_A_PAGE = """[FR Doc No: 2026-15000]

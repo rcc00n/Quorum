@@ -156,17 +156,19 @@ _PAGE_MARK = re.compile(r"\[\[Page \d+\]\]")
 _AUTHORITY = re.compile(r"\bBy the authority vested in me\b(?:(?!\n[ \t]*\n)[^:]){0,1500}:", re.I)
 FEDERAL_REGISTER = "federal-register"  # collectors/sources.csv id of the Federal Register
 LEAD_MAX = 600  # collection's cap on documents.lead (collectors/common.py LEAD_MAX)
-ABSTRACT_MAX = 4000  # a safety bound on the SUMMARY paragraph; Federal Register summaries run to ~2 000 characters
+ABSTRACT_MAX = 4000  # a safety bound on the SUMMARY paragraph or the API abstract; Federal Register summaries run to ~2 000 characters
 
 
 def official_abstract(text: str | None, source_id: str | None = None) -> str:
     """The abstract of an official document, for the seed rule: its "SUMMARY:" paragraph when it has one (Federal
-    Register rules, proposed rules and notices). A Federal Register document without one (source `federal-register`,
-    or a text carrying the Federal Register page header) has no abstract: "" (presidential documents, Sunshine Act and
-    filing notices). Any other document's abstract is its first LEAD_MAX characters (a bill's title, latest action and
-    the start of its summary; a White House release's opening), an executive order's enacting clause left out. Tags
-    are stripped, entities unescaped, page-break markers removed and whitespace collapsed, as collection's
-    `clean_field` does for a lead, so a term broken over a line or a page still matches.
+    Register rules, proposed rules and notices). A Federal Register page without one (the text carries the Federal
+    Register page header) has no abstract: "" (presidential documents, Sunshine Act and filing notices). A
+    `federal-register` row without the page header is the Federal Register API's abstract itself, which collection
+    stores as the text when a document has no raw text URL: the whole text, up to ABSTRACT_MAX characters. Any other
+    document's abstract is its first LEAD_MAX characters (a bill's title, latest action and the start of its summary;
+    a White House release's opening), an executive order's enacting clause left out. Tags are stripped, entities
+    unescaped, page-break markers removed and whitespace collapsed, as collection's `clean_field` does for a lead, so
+    a term broken over a line or a page still matches.
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): reasoning derives the abstract from `official_docs.full_text`.
     Why: official_docs stores no abstract column and the corpus SQL delivers `lead` empty for official rows; the
@@ -179,6 +181,11 @@ def official_abstract(text: str | None, source_id: str | None = None) -> str:
     documents, and their first 600 characters are the issue's cover page (titles of the other documents in the same
     Part), an order's enacting clause ("section 301 of title 3" seeded tariffs-trade-war-china) or a meeting agenda
     ("Fiscal Year 2027" seeded federal-budget-shutdown). See docs/DECISIONS.md › Sources (official documents: seed rule).
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; review round 2): only the page header says a Federal Register
+    document has no abstract; a `federal-register` row without it is read as the API's abstract. Why: collection
+    (collectors/federal_register.py) stores the API's `abstract` as full_text when there is no raw_text_url, and skips
+    a document with neither, so a headerless row is a non-null abstract; judged by source alone it was matched on its
+    title only. All 256 federal-register rows of the rehearsal dump carry the header, so no verdict there changes.
     """
     if not text:
         return ""
@@ -187,8 +194,10 @@ def official_abstract(text: str | None, source_id: str | None = None) -> str:
     m = _SUMMARY.search(cleaned)
     if m:
         return " ".join(m.group(1).split())[:ABSTRACT_MAX]
-    if source_id == FEDERAL_REGISTER or _FR_HEADER_END.search(cleaned[:2000]):
+    if _FR_HEADER_END.search(cleaned[:2000]):
         return ""
+    if source_id == FEDERAL_REGISTER:
+        return " ".join(cleaned.split())[:ABSTRACT_MAX]
     body = _AUTHORITY.sub(" ", cleaned)
     return " ".join(_RULE.sub(" ", body).split())[:LEAD_MAX]
 

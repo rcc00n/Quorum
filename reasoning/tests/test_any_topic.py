@@ -170,7 +170,17 @@ def test_a_failed_topics_lookup_makes_the_run_partial_not_a_crash(monkeypatch):
     assert state["events"] and all(1 in e["document_ids"] for e in state["events"]), "the official document seeds no event of its own"
 
 
-@pytest.mark.parametrize("phrase", ["Mars sample return mission", "Élections en Côte d’Ivoire", "Выборы в Молдове", "北京"])
+# topics.slug_for caps a slug at 4 words but not at 64 characters, while corpus._TOPIC_ID and collection's _TOPIC_SLUG
+# allow at most 64: a phrase of long words gets a slug that load_documents and topic_terms_sql reject (ValueError) and
+# collection skips as a bad slug. topics.py is outside the seed workstream; reported to the owner (Issue #2 handoff).
+_SLUG_TOO_LONG = pytest.mark.xfail(strict=True, raises=ValueError, reason="topics.slug_for has no 64-char cap; reported")
+
+
+@pytest.mark.parametrize("phrase", [
+    "Mars sample return mission", "Élections en Côte d’Ivoire", "Выборы в Молдове", "北京",
+    pytest.param("Counterintelligence telecommunications infrastructure modernization", marks=_SLUG_TOO_LONG),  # 67 characters
+    pytest.param("Bundesverfassungsgericht Klimaschutzgesetz Entscheidung Verfassungsbeschwerde", marks=_SLUG_TOO_LONG),  # 77
+])
 def test_typed_phrases_give_slugs_the_corpus_accepts(monkeypatch, phrase):
     slug = topics.slug_for(phrase)
     _fake_zetaris(monkeypatch, topic_row=None, documents=[], official=[])
