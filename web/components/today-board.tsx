@@ -64,24 +64,22 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
     <div className="tb">
       <header className="tb-head">
         <div>
-          <p className="tb-kicker">
-            {`Edition ${day} · `}
-            <span>{`${n} ${n === 1 ? "topic" : "topics"} in your brief`}</span>
-          </p>
           <h1>
-            {isToday ? "Today" : "Edition"} <span className="tb-date">{longDate(day)}</span>
+            {isToday ? "Today" : "Edition"}, <span className="tb-date">{longDate(day)}</span>
           </h1>
-          <p className="tb-status">
-            {status === "pending"
-                ? "No editions have been published to this portal yet. No published events are available for this edition."
-                : stories.length === 0
-                  ? "No published events are available for this edition."
-                  : `${stories.length} ${stories.length === 1 ? "story" : "stories"} above the bar across your topics.`}
-          </p>
+          <p className="tb-count">{`${n} ${n === 1 ? "topic" : "topics"} in your brief`}</p>
+          {status === "pending" && (
+            <p className="tb-status">
+              No editions have been published to this portal yet. No published events are available for this edition.
+            </p>
+          )}
+          {status !== "pending" && status !== "demo" && stories.length === 0 && (
+            <p className="tb-status">No published events are available for this edition.</p>
+          )}
         </div>
         <div className="tb-controls">
           <label className="tb-date-pick">
-            Edition date
+            <span>Edition date</span>
             <input type="date" value={day} max={today} onChange={(e) => onDay(e.target.value || today)} />
           </label>
           <Link href="/settings" className="tb-link">
@@ -94,7 +92,6 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
         <section className="tb-section tb-tint-2" aria-labelledby="tb-none">
           <div className="tb-section-head">
             <h2 id="tb-none">You follow no topics yet.</h2>
-            <p className="tb-section-meta">The board fills one section per topic you choose.</p>
           </div>
           <Link href="/onboarding" className="button tb-choose">
             Choose your topics
@@ -112,8 +109,8 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
           : own.length
             ? `${own.length} ${own.length === 1 ? "story" : "stories"} today`
             : passed
-              ? `Waiting for the ${day} edition`
-              : `Edition cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
+              ? "Waiting for the edition"
+              : `Cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
         return (
           <section key={t.id} className={`tb-section tb-tint-${(i % 4) + 1}`} aria-labelledby={`tb-${t.id}`}>
             <div className="tb-section-head">
@@ -131,7 +128,7 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
                   <div className="tb-card-link">
                     <span className="tb-card-topic">{t.name}</span>
                     <h3>No story crossed the bar today.</h3>
-                    <p>Nothing was large enough on the rubric; the roundup carries the day.</p>
+                    <p>The roundup carries the day.</p>
                   </div>
                 </li>
               )}
@@ -140,8 +137,8 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
                   <Link href={`/topics/${encodeURIComponent(t.id)}?date=${day}`} className="tb-card-link">
                     <span className="tb-card-topic">Also today</span>
                     <h3>{`${below} ${below === 1 ? "event" : "events"} below the bar`}</h3>
-                    <p>{edition.roundup.map((g) => g.name).filter(Boolean).join(" · ") || "One line each, with source and status."}</p>
-                    <span className="tb-card-meta">{edition.completion === "partial" ? "partial edition" : "complete edition"}</span>
+                    <p>{edition.roundup.map((g) => g.name).filter(Boolean).join(" · ")}</p>
+                    {edition.completion === "partial" && <span className="tb-card-meta">partial edition</span>}
                   </Link>
                 </li>
               )}
@@ -149,9 +146,8 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
                 <li className="tb-card tb-card-wait">
                   <div className="tb-card-link">
                     <span className="tb-card-topic">{t.name}</span>
-                    <h3>{passed ? `The ${longDate(day)} edition is not published yet.` : `The ${longDate(day)} edition has not been cut yet.`}</h3>
-                    <p>{`Cut 05:30 New York · ${utcLabel(cut)} · ${passed ? "passed" : `in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}. The team starts one run per topic after the cut; nothing is started from this page.`}</p>
-                    <span className="tb-card-meta">waiting</span>
+                    <h3>{passed ? "Not published yet." : "Not cut yet."}</h3>
+                    <p>{`Edition cut 05:30 New York, ${utcLabel(cut)}${passed ? "" : `, in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}. The team prepares the edition after the cut.`}</p>
                   </div>
                 </li>
               )}
@@ -160,10 +156,6 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
         );
       })}
 
-      <p className="tb-fine">
-        Stories are selected by an absolute impact bar, up to ten a day per topic and none on a quiet day; everything
-        below the bar is in the roundup. New topics start thin until feeds accumulate.
-      </p>
     </div>
   );
 }

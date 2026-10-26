@@ -364,7 +364,7 @@ export function Portal({
                   findings.
                 </p>
               )}
-              <PublicationNotice publication={data?.publication} />
+              {view !== "dashboard" && <PublicationNotice publication={data?.publication} />}
               {message && (
                 <p className="message" role="status">
                   {message}

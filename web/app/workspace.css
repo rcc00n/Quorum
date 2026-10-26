@@ -11,7 +11,7 @@
   --bg: var(--paper);
   --surface: var(--paper);
   --text: var(--ink);
-  --muted: var(--ink-2);
+  --muted: var(--ink);
   --accent: var(--umber);
   --border: var(--rule);
 }
@@ -84,12 +84,22 @@ summary:focus-visible {
   gap: 28px;
   min-height: 64px;
   padding: 0 40px;
-  background: var(--paper);
+  /* DECISION(2026-10-26, Anastasia/Claude Code): the bar is dark, matte and translucent (the page shows
+     through, blurred), with no rule under it; type on it is paper. Why: Anastasia asked for a bar that
+     stands out from the paper without a hard edge. */
+  background: rgba(20, 20, 20, 0.82);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  backdrop-filter: blur(16px) saturate(120%);
+  color: var(--paper);
   border-right: 0;
-  border-bottom: 3px double var(--ink);
+  border-bottom: 0;
 }
 .sidebar .brand {
   font-size: 24px;
+  color: var(--paper);
+}
+.sidebar .brand-dot {
+  color: var(--umber-light);
 }
 .nav-label,
 .sidebar-topics,
@@ -101,7 +111,7 @@ summary:focus-visible {
   gap: 24px;
 }
 .sidebar nav a {
-  color: var(--ink-2);
+  color: rgba(255, 255, 255, 0.72);
   border-radius: 0;
   font-size: 15px;
   font-weight: 500;
@@ -113,8 +123,8 @@ summary:focus-visible {
 .sidebar nav a.active {
   background: none;
   box-shadow: none;
-  color: var(--ink);
-  border-bottom-color: var(--ink);
+  color: var(--paper);
+  border-bottom-color: var(--paper);
 }
 .sidebar-bottom {
   margin: 0 0 0 auto;
@@ -125,24 +135,27 @@ summary:focus-visible {
   font-size: 14px;
 }
 .sidebar-bottom > a {
-  color: var(--ink);
+  color: var(--paper);
   font-size: 14px;
   margin: 0;
 }
 .account-name {
-  color: var(--ink);
+  color: var(--paper);
   border: 0;
   padding: 0;
   font-weight: 500;
   margin: 0;
 }
 .text-button {
-  color: var(--ink-2);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 14px;
   padding: 0;
 }
 .text-button:hover {
-  color: var(--ink);
+  color: var(--paper);
+}
+.sidebar :is(a, button):focus-visible {
+  outline-color: var(--paper);
 }
 .workspace-header {
   display: none;
@@ -152,10 +165,10 @@ summary:focus-visible {
   max-width: 1280px;
 }
 .workspace-footer {
-  font-family: var(--mono);
+  font-family: var(--body);
   font-size: 12px;
   letter-spacing: 0.04em;
-  color: var(--ink-2);
+  color: var(--ink);
   border-top: 1px solid var(--rule);
 }
 .workspace-footer span:first-child {
@@ -165,11 +178,11 @@ summary:focus-visible {
 
 /* Type on the pages */
 .eyebrow {
-  font-family: var(--mono);
+  font-family: var(--body);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .page-heading h1 {
   font-size: clamp(32px, 3.4vw, 44px);
@@ -179,26 +192,26 @@ summary:focus-visible {
 .page-heading > p,
 .page-heading > p:last-child {
   font-size: 15px;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .help {
   font-size: 13px;
   line-height: 1.5;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .muted {
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .tabs > span {
   font-size: 14px;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .tabs .selected {
   border-bottom: 2px solid var(--ink);
   color: var(--ink);
 }
 .filters label {
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: 12px;
 }
 .section-heading h2,
@@ -207,8 +220,8 @@ summary:focus-visible {
   letter-spacing: -0.015em;
 }
 .edition-label {
-  font-family: var(--mono);
-  color: var(--ink-2);
+  font-family: var(--body);
+  color: var(--ink);
 }
 .event-row {
   border-bottom: 1px solid var(--rule);
@@ -220,11 +233,11 @@ summary:focus-visible {
   letter-spacing: -0.015em;
 }
 .event-row p {
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: 15px;
 }
 .empty svg {
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .empty h3 {
   font-family: var(--display);
@@ -232,7 +245,7 @@ summary:focus-visible {
   font-size: 22px;
 }
 .empty p {
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .empty a {
   color: var(--ink);
@@ -252,7 +265,7 @@ summary:focus-visible {
   font-weight: 500;
 }
 .brief-aside p:not(.eyebrow) {
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: 14px;
 }
 .brief-aside a {
@@ -305,7 +318,7 @@ input[type="checkbox"] {
   accent-color: var(--ink);
 }
 label {
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: 13px;
 }
 .message {
@@ -323,7 +336,7 @@ label {
   border-left: 2px solid var(--umber);
 }
 .notice p {
-  color: var(--ink-2);
+  color: var(--ink);
 }
 
 /* Analysis and reasoning views: the former teal chrome; cohort and status colours are left as they are. */
@@ -359,7 +372,7 @@ label {
 .r-paragraph.r-kind-not_confirmed > p:not(.help):not(.r-passage-label),
 .r-evidence-counts > span,
 .r-evidence .r-stance {
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .r-final,
 .r-disagreement {

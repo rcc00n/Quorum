@@ -16,15 +16,10 @@
   flex-wrap: wrap;
   padding-bottom: 8px;
 }
-.tb .tb-kicker {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-  margin: 0 0 8px;
-  font-variant-numeric: tabular-nums;
+.tb .tb-count {
+  font-size: 15px;
+  margin: 10px 0 0;
+  color: var(--ink);
 }
 .tb h1 {
   font-family: var(--display);
@@ -39,9 +34,9 @@
   font-weight: 500;
 }
 .tb .tb-status {
-  margin: 12px 0 0;
+  margin: 6px 0 0;
   font-size: 15px;
-  color: var(--ink-2);
+  color: var(--ink);
   max-width: 64ch;
 }
 .tb-controls {
@@ -52,11 +47,16 @@
 .tb .tb-date-pick {
   display: grid;
   gap: 6px;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-2);
+  font-size: 13px;
+  color: var(--ink);
+}
+.tb .tb-date-pick > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .tb .tb-date-pick input {
   min-height: 40px;
@@ -117,12 +117,9 @@
   text-underline-offset: 5px;
 }
 .tb .tb-section-meta {
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.03em;
-  color: var(--ink-2);
+  font-size: 14px;
+  color: var(--ink);
   margin: 0;
-  font-variant-numeric: tabular-nums;
 }
 .tb .tb-choose {
   justify-self: start;
@@ -176,11 +173,8 @@
   outline-offset: 3px;
 }
 .tb .tb-card-topic {
-  font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--umber-light);
 }
 .tb .tb-card h3 {
@@ -208,11 +202,8 @@
 }
 .tb .tb-card-meta {
   align-self: end;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.03em;
+  font-size: 12px;
   color: var(--night-ink-2);
-  font-variant-numeric: tabular-nums;
 }
 /* The roundup card is paper on the tint: the appendix, not a story */
 .tb .tb-card-roundup .tb-card-link {
@@ -225,7 +216,7 @@
 }
 .tb .tb-card-roundup p,
 .tb .tb-card-roundup .tb-card-meta {
-  color: var(--ink-2);
+  color: var(--ink);
 }
 /* Quiet and waiting cards: paper with a hairline, no link */
 .tb .tb-card-quiet .tb-card-link,
@@ -242,14 +233,7 @@
 .tb .tb-card-wait p,
 .tb .tb-card-quiet .tb-card-meta,
 .tb .tb-card-wait .tb-card-meta {
-  color: var(--ink-2);
-}
-.tb .tb-fine {
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-2);
-  max-width: 70ch;
+  color: var(--ink);
 }
 
 @media (max-width: 700px) {
