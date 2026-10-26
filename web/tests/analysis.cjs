@@ -151,6 +151,16 @@ const assert = require("node:assert/strict");
     await page
       .getByText("This edition is out of date", { exact: true })
       .waitFor();
+    // A provisional corpus (the login-only reader's label) is named with its capture time.
+    response.publication.status = "available";
+    response.publication.fallback = false;
+    response.publication.provisional = true;
+    response.publication.corpus_as_of_utc = "2026-10-22T09:30:00Z";
+    await open();
+    await page
+      .getByText("Provisional corpus as of", { exact: false })
+      .waitFor();
+    response.publication.provisional = false;
     response.events[0].analysis.trace = [];
     await open();
     await page
