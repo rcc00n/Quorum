@@ -40,11 +40,11 @@ class ReasoningEditionsTests(TestCase):
         self.env.start()
         self.addCleanup(self.env.stop)
 
-    def write(self, p, label):
+    def write(self, p, label, provisional=False):
         raw = json.dumps(p).encode()
         sidecar = dict(
             snapshot={k: p[k] for k in ("topic_id", "edition_date", "version", "run_id", "status")},
-            provisional=False, corpus_as_of_utc=p["window"]["start"],
+            provisional=provisional, corpus_as_of_utc=p["window"]["start"],
             edition_window_utc=[p["window"][k] for k in ("start", "end")],
             producer=dict(commit="aaaaaaa (TEST producer)", config_sha256=hashlib.sha256(CONFIG).hexdigest()),
             private_evidence=dict(log="TEST-private-path"),
@@ -184,3 +184,51 @@ class ReasoningEditionsTests(TestCase):
         report = self.accept(options)
         self.assertNotIn("installed", report)
         self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_honesty_labels_travel_with_the_edition(self):
+        story = genuine("snapshot.sample.json")
+        self.accept(self.write(story, "story", provisional=True), install=True)
+        self.client.force_login(self.reader)
+        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        edition = data["editions"][0]
+        self.assertTrue(edition["provisional"])
+        self.assertEqual(edition["corpus_as_of_utc"], story["window"]["start"])
+        self.assertEqual(edition["edition_window_utc"], [story["window"]["start"], story["window"]["end"]])
+        self.assertFalse(edition["closed_edition"])
+        self.assertTrue(any("not publication-approved" in w for w in edition["warnings"]))
+        self.assertTrue(data["publication"]["provisional"])
+        self.assertEqual(data["publication"]["warnings"], edition["warnings"])
+        self.assertEqual(data["publication"]["installed_at"], data["publication"]["published_at"])
+
+    def test_roundup_vocabulary_maps_to_claim_statuses_and_keeps_the_labels(self):
+        quiet = genuine("snapshot.empty-day.sample.json", "climate-policy")
+        items = [i for g in quiet["roundup"]["groups"] for i in g["items"]]
+        labels = ["statements only", "single source", "reported, not confirmed"][: len(items)]
+        for item, label in zip(items, labels):
+            item["status"] = label
+            item["line_source"] = "title"
+            item["needs_review"] = True
+        self.accept(self.write(quiet, "quiet"), install=True)
+        self.client.force_login(self.reader)
+        data = self.client.get("/api/feed/?date=2026-10-22&topic=climate-policy").json()
+        rows = [i for g in data["editions"][0]["roundup"] for i in g["items"]]
+        self.assertEqual([r["label"] for r in rows], labels)
+        expected = {"statements only": "attributed", "single source": "unknown", "reported, not confirmed": "unknown"}
+        self.assertEqual([r["status"] for r in rows], [expected[l] for l in labels])
+        self.assertTrue(all(r["line_source"] == "title" and r["needs_review"] is True for r in rows))
+
+    def test_producer_config_file_replaces_the_git_lookup(self):
+        story = genuine("snapshot.sample.json")
+        options = self.write(story, "story")
+        config = self.work / "reasoning.toml"
+        config.write_bytes(CONFIG)
+        out = io.StringIO()
+        with patch(COMMAND, side_effect=AssertionError("git must not be called")):
+            call_command("reasoning_snapshot", stdout=out, **options, producer_config=str(config), install=True)
+        report = json.loads(out.getvalue())
+        self.assertTrue(report["metadata_valid"] and report["installed"])
+        config.write_bytes(b"TEST other config")
+        out = io.StringIO()
+        with patch(COMMAND, side_effect=AssertionError("git must not be called")), self.assertRaises(CommandError):
+            call_command("reasoning_snapshot", stdout=out, **options, producer_config=str(config))
+        self.assertIn("producer_config_mismatch", json.loads(out.getvalue())["issues"])

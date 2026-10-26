@@ -34,6 +34,17 @@ def write_private(path, data):
         raise
 
 
+def producer_config(options, commit):
+    """The producer's reasoning.toml bytes: from --producer-config when given, else from the local Git history."""
+    if options.get('producer_config'):
+        return read_bounded(Path(options['producer_config']))
+    try:
+        return subprocess.check_output(['git', 'show', f'{commit}:reasoning/config/reasoning.toml'],
+                                       cwd=Path(__file__).resolve().parents[4], stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        raise SnapshotError('producer_config_unavailable') from None
+
+
 def install(raw, sidecar_raw, p, options, report):
     """Copy the accepted edition into QUORUM_REASONING_EDITIONS_ROOT/<topic>/<date>/v<N>.*; versions are immutable."""
     root = os.getenv(ROOT, '')
@@ -77,6 +88,11 @@ class Command(BaseCommand):
         # Why: Yelysei's hand-over plan (Issue #2 comment 6426106426) installs the edition files after the cut.
         parser.add_argument('--install', action='store_true')
         parser.add_argument('--allow-fictional', action='store_true')
+        # DECISION(2026-10-26, Anastasia/Claude Code; Yelysei's review of PR #31): a VPS release is a tarball
+        # without .git, so --producer-config names the producer's reasoning/config/reasoning.toml bytes to
+        # hash instead of `git show`; the declared sha256 in the sidecar must still match. Why: otherwise every
+        # install on the VPS fails with producer_config_unavailable.
+        parser.add_argument('--producer-config')
 
     def handle(self, *args, **options):
         report = dict(report_version=1, compatible=False, metadata_valid=False,
@@ -107,11 +123,7 @@ class Command(BaseCommand):
                 prefix = producer['commit_of_the_publishing_process']
                 require(isinstance(prefix, str) and re.fullmatch(r'[0-9a-f]{7,40}', prefix)
                         and commit.startswith(prefix), 'producer_commit_mismatch')
-                try:
-                    config = subprocess.check_output(['git', 'show', f'{commit}:reasoning/config/reasoning.toml'],
-                        cwd=Path(__file__).resolve().parents[4], stderr=subprocess.DEVNULL)
-                except subprocess.CalledProcessError:
-                    raise SnapshotError('producer_config_unavailable') from None
+                config = producer_config(options, commit)
                 report.update(producer_commit=commit, git_config_sha256=hashlib.sha256(config).hexdigest(),
                               git_config_crlf_sha256=hashlib.sha256(config.replace(b'\n', b'\r\n')).hexdigest())
                 # DECISION(2026-10-25, rcc00n/Codex): compare both complete LF/CRLF declarations for v5/v6.
@@ -130,11 +142,7 @@ class Command(BaseCommand):
                 require(isinstance(declared, str) and re.fullmatch(r'[0-9a-f]{64}', declared), 'invalid_config_sha256')
                 # DECISION(2026-10-24, rcc00n/Codex): compare local Git bytes, never repair the sidecar or fetch a corpus.
                 # Why: metadata compatibility is separate from independently verified execution and publication.
-                try:
-                    config = subprocess.check_output(['git', 'show', f'{commit}:reasoning/config/reasoning.toml'],
-                                                     cwd=Path(__file__).resolve().parents[4], stderr=subprocess.DEVNULL)
-                except subprocess.CalledProcessError:
-                    raise SnapshotError('producer_config_unavailable') from None
+                config = producer_config(options, commit)
                 actual = hashlib.sha256(config).hexdigest()
                 report.update(producer_commit=commit, declared_config_sha256=declared, git_config_sha256=actual)
                 require(actual == declared, 'producer_config_mismatch')

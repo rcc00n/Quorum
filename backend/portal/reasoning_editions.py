@@ -24,11 +24,14 @@ ROOT = "QUORUM_REASONING_EDITIONS_ROOT"
 TOPIC = re.compile(r"[a-z0-9][a-z0-9-]{0,79}")
 DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 VERSION = re.compile(r"v(\d{1,4})\.json")
-# Roundup lines keep the producer's wording; only these statuses map to the portal's claim statuses.
+# Reasoning's roundup vocabulary (reasoning/quorum_reasoning/nodes/roundup.py: "confirmed", "disputed",
+# "statements only", "single source", "reported, not confirmed", "unverified") mapped to the portal's claim
+# statuses; the producer's own wording travels with every line as `label`. Anything unmapped is unknown.
 STATUS = {
     "confirmed": "established",
     "established": "established",
     "disputed": "disputed",
+    "statements only": "attributed",
     "statement": "attributed",
     "attributed": "attributed",
 }
@@ -106,14 +109,25 @@ def load(path, catalog):
     return result, meta
 
 
-def edition_of(p):
-    """The edition row the brief reads: completion, quiet day, summary and the roundup lines."""
+def edition_of(p, result):
+    """The edition row the brief reads: completion, quiet day, summary, the preview's honesty labels, the roundup."""
+    preview = result["preview"]
+    binding = preview.get("corpus_binding") or {}
+    # The preview's labels travel with the edition (Yelysei's review of PR #31): the sidecar's provisional
+    # flag and corpus capture time, the edition window and the preview warnings, so the reader never
+    # presents an edition as firmer than the preview would. No bound flag reads as provisional.
+    provisional = preview.get("provisional")
     return {
         "topic_id": p["topic_id"],
         "date": p["edition_date"],
         "completion": "partial" if p["status"] == "partial" or p.get("errors") else "complete",
         "quiet_day": bool(p["roundup"]["empty_day"]),
         "summary": p["summary"],
+        "provisional": True if provisional is None else bool(provisional),
+        "corpus_as_of_utc": binding.get("corpus_as_of_utc"),
+        "edition_window_utc": [p["window"]["start"], p["window"]["end"]],
+        "closed_edition": bool(binding.get("closed_edition")),
+        "warnings": list(preview.get("warnings") or []),
         "roundup": [
             {
                 "name": group["name"],
@@ -123,6 +137,9 @@ def edition_of(p):
                         "event_id": None,
                         "text": item["line"],
                         "status": STATUS.get(item["status"], "unknown"),
+                        "label": item["status"],
+                        "line_source": item.get("line_source"),
+                        "needs_review": item.get("needs_review"),
                         "sources": [{"title": s["title"], "url": s["url"]} for s in item["sources"]],
                     }
                     for item in group["items"]
@@ -173,7 +190,7 @@ def snapshot(day, topic="", revision=None):
         events.extend(result["events"])
         digests.extend(result["digests"])
         errors.extend(p.get("errors", []))
-        editions.append(edition_of(p))
+        editions.append(edition_of(p, result))
         generated.append(p["generated_at"])
         expires.append(p["expires_at"])
         run_ids.append(p["run_id"])
@@ -204,7 +221,12 @@ def snapshot(day, topic="", revision=None):
             "run_id": ", ".join(run_ids),
             "generated_at": max(generated),
             "expires_at": min(expires),
+            # published_at is when the reader began serving the edition to signed-in readers, i.e. the
+            # install time; installed_at says the same under its own name.
             "published_at": max(published) if published else None,
+            "installed_at": max(published) if published else None,
+            "provisional": any(e["provisional"] for e in editions),
+            "warnings": list(dict.fromkeys(w for e in editions for w in e["warnings"])),
             "fallback": False,
             "mode": "demo" if fictional else "live",
         },
