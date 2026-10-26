@@ -3014,3 +3014,22 @@ def test_suite_guard_fails_a_test_that_forgets_the_stub(tmp_path, monkeypatch, u
         report = guarded.phase(f"test{seam}_on_the_derived_name")
         assert report.failed and f"through llm.{seam}: {expected}" in report.longreprtext
     assert reached == [], "with the guard nothing is opened"
+
+
+@pytest.mark.parametrize("entrypoint", ["_client", "list_models", "probe", "test_connection"])
+@pytest.mark.parametrize("setup", [
+    {"MODEL_BASE_URL": "https://integrate.api.nvidia.com/v1", "METERLESS_TOKEN": "TEST-runtime-token"},
+    {"MODEL_BASE_URL": "https://integrate.api.nvidia.com/v1", "METERLESS_RUNTIME_TOKEN": "TEST-runtime-token"},
+    {"METERLESS_BASE_URL": "http://127.0.0.1:8088/v1", "MODEL_API_KEY": "TEST-model-key"},
+])
+def test_mixed_route_diagnostics_never_construct_sdk_client(env, monkeypatch, setup, entrypoint):
+    import openai
+    for name, value in setup.items():
+        env.setenv(name, value)
+    def forbidden(**kwargs):
+        raise AssertionError("mixed route reached the SDK constructor")
+    monkeypatch.setattr(openai, "OpenAI", forbidden)
+    with pytest.raises(ValueError, match="mixed model route") as failure:
+        getattr(llm, entrypoint)()
+    assert "TEST-runtime-token" not in str(failure.value)
+    assert "TEST-model-key" not in str(failure.value)
