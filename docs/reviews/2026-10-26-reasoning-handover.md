@@ -93,3 +93,16 @@ Do not write "Build rule met" before those.
 - Never force-push.
 - Reasoning never merges into `integration` or `master`; Anastasia does.
 - Vendor checkouts and the H-MEM store stay outside the repository.
+
+## 7. Status at about 00:00Z on 27 Oct (last update from this session)
+
+- **`yelysei/meterless-engine` at 5453884 is NOT merged.** The review stopped after 3 rounds. Code is clean, including the sidecar env allowlist. The remaining should-fix items are evidence and doc only:
+  1. Re-run the three engine-backed test files with `METERLESS_HOME` set on the current head, which has the trimmed env: 16 passed and 2 symlink skips are expected.
+  2. Re-run both conformance commands with `EXIT=$?` into new date-stamped scorecards. A reviewer's rerun gave 13/13 and EXIT=0.
+  3. Record both results.
+  4. In the engine hand-over log, replace each "see the last Status line" with the named entry (21:3xZ / 22:1xZ), and change BLOCKED to done.
+
+  Then merge it into demo-ready (§ 3).
+- **The bar 6 → 4 (D4) is NOT committed.** The workflow never reached that step.
+- **`yelysei/tuesday-runs` and the re-reviews of #23, #25, #27, #30 and #31** were still running. Check the branch head, and redo and post the re-reviews if they are not in the PR threads.
+- **`yelysei/demo-ready-wip`** is a backup of local demo-ready, at d57bd6f.
