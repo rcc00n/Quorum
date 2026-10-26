@@ -135,10 +135,18 @@ def reading_payload(d: DocRef, fetched: FetchResult) -> dict[str, Any]:
     }
 
 
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a model-written document_id is an int, or a string of 1 to 18
+# ASCII digits (surrounding whitespace allowed); anything else is no id, so the sentence fails closed as cited from
+# another document. Why: str.isdigit() also accepts "²" and "①", and int() raises on those and on digit strings past
+# Python's 4300-digit limit; an exception there would fail the whole frame step, not just that sentence.
+_DOC_ID = re.compile(r"[0-9]{1,18}")
+
+
 def _doc_id(value: Any) -> int | None:
+    """The document id a model reply cites, or None; total: never raises, whatever the reply holds."""
     if type(value) is int:
         return value
-    if isinstance(value, str) and value.strip().isdigit():
+    if isinstance(value, str) and _DOC_ID.fullmatch(value.strip()):
         return int(value.strip())
     return None
 
@@ -218,7 +226,10 @@ def flank_finder(inputs: dict[tuple[int, str], DocRef], *, dry_run: bool) -> Fin
         doc = inputs.get((doc_id, quote)) if doc_id is not None else None
         if doc is None:
             return "quote is not one of this flank's verified outlet quotes"
-        fetched = fetch_result(doc, dry_run=dry_run)
+        try:
+            fetched = fetch_result(doc, dry_run=dry_run)
+        except Exception as exc:  # noqa: BLE001 — a failed re-read drops this sentence, not the frame step
+            return f"its document's text could not be read again ({untrusted.public_failure(exc)})"
         span = find_quote(fetched.quote_text, quote) if fetched is not None else None
         return (doc, span) if span else "quote no longer verbatim in its document's text"
 

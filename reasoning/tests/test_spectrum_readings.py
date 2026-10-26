@@ -355,6 +355,74 @@ def test_an_outlet_sentence_whose_quote_fails_is_dropped(monkeypatch, quote, doc
     assert "1 reading note(s)" in rec["decision"] and errors == []
 
 
+BAD_DOC_IDS = ["²", "①", "١", "9" * 5000, "1" * 19, "-1", "1.0", "0x1", True, 1.0, [1], {"id": 1}, None]
+
+
+@pytest.mark.parametrize("value, expected", [(1, 1), ("1", 1), (" 12 ", 12), ("9" * 18, int("9" * 18))] + [(v, None) for v in BAD_DOC_IDS],
+                         ids=lambda v: ascii(v)[:24])
+def test_doc_id_is_total(value, expected):
+    """A model-written document_id is an int or 1-18 ASCII digits; anything else is no id, and nothing raises."""
+    assert frame._doc_id(value) == expected
+
+
+@pytest.mark.parametrize("bad", BAD_DOC_IDS[:5], ids=["superscript-two", "circled-one", "arabic-indic-one", "5000-digits", "19-digits"])
+def test_a_malformed_outlet_document_id_drops_only_that_sentence(monkeypatch, bad):
+    """str.isdigit() accepts all of these, and int() raises on the first, second and fourth, which used to fail the whole
+    frame step: each must fail closed as that one sentence."""
+    _flag(monkeypatch, "on")
+    docs = [_doc(1, "Left One", "left", text=TEXT_L1), _doc(2, "Right One", "right", text=TEXT_R1)]
+    _script(monkeypatch, {
+        1: _reply(1, "a risk",
+                  ("direction", "Left One presents the rule as a risk to families.", "The rule tightens asylum screening at the southern border"),
+                  ("judgement", "It presents the rule as bad for families.", "the change puts families at risk", bad)),
+        2: _reply(2, "order", ("direction", "Right One presents the rule as restoring order.", "The rule restores order at the southern border")),
+    })
+    framing, rec, errors = _run(_state(docs))
+    assert list(framing) == ["rating_mode", "left", "right", "note", "coverage", "interpretations", "outlets", "readings"]
+    assert framing["left"]["example_url"] == "https://news.example.org/1" and len(framing["outlets"]) == 2
+    left = _entry(framing["readings"], "left")
+    assert [s["answers"] for s in left["sentences"]] == ["direction"] and left["unanswered"][0] == "judgement"
+    assert {"text": "It presents the rule as bad for families.", "reason": "Left One: quote cited from another document than this outlet's (judgement)"} in rec["detail"]
+    assert rec["decision"] != "failed; coverage counts only" and errors == []
+
+
+@pytest.mark.parametrize("bad", BAD_DOC_IDS[:5], ids=["superscript-two", "circled-one", "arabic-indic-one", "5000-digits", "19-digits"])
+def test_a_malformed_flank_document_id_drops_only_that_sentence(monkeypatch, bad):
+    _flag(monkeypatch, "on")
+    flank_sentences = [
+        {"answers": "direction", "text": "Left outlets present the rule as a risk to families.", "quote": "the change puts families at risk", "document_id": 1},
+        {"answers": "judgement", "text": "They present it as bad.", "quote": "Critics called it a cruel step that ignores the law", "document_id": bad},
+    ]
+    _script(monkeypatch, _left_pair_replies(flank_sentences=flank_sentences))
+    framing, rec, errors = _run(_state(_left_pair()))
+    assert {"left", "right", "outlets", "interpretations", "readings"} <= set(framing) and len(framing["outlets"]) == 3
+    left = _entry(framing["readings"], "left")
+    assert [s["answers"] for s in left["sentences"]] == ["direction"] and left["unanswered"][0] == "judgement"
+    assert {"text": "They present it as bad.", "reason": "left flank: quote is not one of this flank's verified outlet quotes (judgement)"} in rec["detail"]
+    assert errors == []
+
+
+def test_a_failed_flank_re_read_drops_only_that_sentence(monkeypatch):
+    _flag(monkeypatch, "on")
+    real = frame.fetch_result
+    seen: dict[int, int] = {}
+
+    def failing(doc, *, dry_run):
+        seen[doc["id"]] = seen.get(doc["id"], 0) + 1
+        if doc["id"] == 3 and seen[3] > 1:  # the outlet reading read it; the flank check's re-read fails
+            raise OSError("connection reset by https://news.example.org/3?token=secret")
+        return real(doc, dry_run=dry_run)
+
+    monkeypatch.setattr(frame, "fetch_result", failing)
+    _script(monkeypatch, _left_pair_replies())
+    framing, rec, errors = _run(_state(_left_pair()))
+    left = _entry(framing["readings"], "left")
+    assert [s["answers"] for s in left["sentences"]] == ["direction"]
+    (row,) = [r for r in rec["detail"] if r["text"] == "They present it as bad."]
+    assert row["reason"].startswith("left flank: its document's text could not be read again (") and row["reason"].endswith(" (judgement)")
+    assert "secret" not in row["reason"] and errors == []
+
+
 def test_a_reading_with_no_passing_sentence_is_not_published(monkeypatch):
     _flag(monkeypatch, "on")
     docs = [_doc(1, "Left One", "left", text=TEXT_L1), _doc(2, "Right One", "right", text=TEXT_R1)]
