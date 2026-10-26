@@ -239,7 +239,7 @@ def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
         ("example\uff0ecom/jane", "contains a URL", True),
         ("example\uff61com/jane", "contains a URL", True),
         ("x.xn--p1ai/path", "contains a URL", True),
-        # dash-like separators, "/" and "_" between phone digits; 9+ digits in 2+ groups
+        # dash-like separators, "/" and "_" between phone digits; 9+ digits in a run of digits and separators
         ("call 555\u2011123\u20114567", "contains a phone number", True),  # non-breaking hyphen (NFKC: U+2010)
         ("Jane Doe 555\u2010123\u20104567", "contains a phone number", True),
         ("call 555\u2212123\u22124567", "contains a phone number", True),  # minus sign
@@ -250,6 +250,13 @@ def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
         ("+49\u2011170\u20111234567", "contains a phone number", True),
         ("555\u2011123\u20114567", "contains a phone number", True),  # digits alone: withheld, not "no letters"
         ("dial 555\u20101234", "contains a phone number", True),
+        # closing round 2: the boundary of 9 digits in groups, and 9+ digits with no separator at all
+        ("call 030 123456", "contains a phone number", True),  # 9 digits (a Berlin landline)
+        ("06 12 34 56 78", "contains a phone number", True),  # 10 digits in 5 groups (a French mobile)
+        ("call 07911123456", "contains a phone number", True),
+        ("Jane 447911123456", "contains a phone number", True),
+        ("call 01701234567", "contains a phone number", True),
+        ("Ivan 123456789", "contains a phone number", True),
     ],
 )
 def test_rejections(text, why, withheld):
@@ -263,7 +270,9 @@ def test_rejections(text, why, withheld):
      "Ukr\u00adaine war", "\u202eevil topic", "x" * 80 + "\u00ad\u200b",
      # closing round 1: years, fractions and big numbers are no phone numbers; a non-ASCII word or full stop is no URL
      "2024-2025 season", "2024\u20132025 budget", "24/7 news", "9/11 anniversary", "1 000 000 dollars",
-     "St. Louis floods", "\u6771\u4eac\u3002\u9078\u6319", "M\u00fcnchen Oktoberfest", "version 1.25 release"],
+     "St. Louis floods", "\u6771\u4eac\u3002\u9078\u6319", "M\u00fcnchen Oktoberfest", "version 1.25 release",
+     # closing round 2: 8 digits in a row stay acceptable (9 are a phone number, test_rejections)
+     "population 33000000"],
 )
 def test_acceptable_requests(text):
     assert topics.check_request(text) == ("", False)
@@ -292,6 +301,16 @@ def test_unicode_personal_data_never_becomes_a_row(existing):
     assert topics.rows_sql(res).count("INSERT") == 0
 
 
+def test_phone_numbers_without_separators_never_become_a_row(existing):
+    """Before closing round 2 "call Jane 07911123456" became a `new` row named "Call Jane 07911123456"."""
+    texts = ["call Jane 07911123456", "John Smith 01701234567", "Ivan 123456789"]
+    res = resolve(texts, existing)
+    assert [r["status"] for r in res] == ["rejected"] * len(texts)
+    assert all(r["text"] == r["key"] == topics.WITHHELD and r["reason"] == "contains a phone number" for r in res)
+    sql = topics.rows_sql(res)
+    assert sql.count("INSERT") == 0 and not any(d in sql for d in ("07911123456", "01701234567", "123456789"))
+
+
 @pytest.mark.parametrize(
     "web_key, text, status",
     [
@@ -301,6 +320,9 @@ def test_unicode_personal_data_never_becomes_a_row(existing):
         ("jаnedoe.com/profile", "Iran", "new"),
         ("k" * 5000, "Iran", "new"),
         ("k" * 81, "Iran", "new"),
+        # closing round 2: personal data that shows only in the NFKC form with the ideographic full stops as dots
+        ("john＠example．com", "Iran", "new"),  # full-width "@" and full stop
+        ("example。com/jane", "Iran", "new"),  # ideographic full stop
     ],
 )
 def test_a_web_key_that_may_carry_personal_data_is_withheld(existing, web_key, text, status):
@@ -1040,6 +1062,7 @@ def test_cli_live_batch_uses_suggest(tmp_path, monkeypatch):
     assert code == 0 and calls == [("topic_terms", "Mars sample return mission", False)]
     assert m["status"] == "new" and m["source"] == "model" and m["topic_id"] == "mars-sample-return"
     assert m["terms"] == ["mars sample return", "MSR", "perseverance"]
+    assert m["name"] == "Mars Sample Return" and "model name replaced" not in m["reason"]  # a name that passes is kept
     assert f"mode:       {topics.MODE_LIVE}" in report and ", live)." in sql.splitlines()[0]
 
 
@@ -1134,6 +1157,28 @@ def test_cli_model_rows_carry_no_caution(tmp_path, monkeypatch):
     assert topics.REVIEW_BEFORE_APPLYING not in sql and "caution:" not in report
     assert topics.resolve_requests([{"text": "Me Too"}], [], propose=dry)[0]["caution"] == (
         "terms derived from the phrase's own words (derive), not chosen by a model: review them before applying")
+
+
+@pytest.mark.parametrize(
+    "bad_name, why, leaks",
+    [
+        ("<img src=x onerror=alert(1)> Mars sample return", "contains markup or control characters", ["<img", "onerror"]),
+        ("Mars sample return, write to jane@x.org", "contains an e-mail address", ["jane@x.org", "x.org"]),
+    ],
+)
+def test_cli_a_model_name_that_fails_the_checks_is_replaced_by_the_derived_name(tmp_path, monkeypatch, bad_name, why, leaks):
+    """The typed text passed every check, so a bad name can only come from the model (an injection or a
+    hallucination); `validate` accepts it, and before closing round 2 it reached rows.sql as the public topic name."""
+    _recording_json_task(monkeypatch, {**MARS_REPLY, "name": bad_name})
+    _route(monkeypatch, live=True)
+    code, (m,), sql, report = _batch(tmp_path, SAMPLE[2:3])
+    assert code == 0 and m["status"] == "new" and m["source"] == "model" and m["topic_id"] == "mars-sample-return"
+    assert m["name"] == topics.derive("Mars sample return mission")["name"] == "Mars Sample Return Mission"
+    assert m["reason"].endswith(f"; model name replaced: {why}") and m["terms"] == ["mars sample return", "MSR", "perseverance"]
+    mapping = (tmp_path / "out" / "mapping.json").read_text(encoding="utf-8")
+    assert "'Mars Sample Return Mission'" in sql and sql.count("INSERT INTO topics") == 1
+    for leak in leaks:
+        assert leak not in sql and leak not in mapping and leak not in report
 
 
 def test_cli_an_empty_zetaris_read_writes_nothing(tmp_path, monkeypatch, capsys):

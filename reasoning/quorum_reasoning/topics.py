@@ -392,9 +392,14 @@ _PHONE_RE = re.compile(
 )
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): before the
 # phone patterns run, every dash-like character (category Pd, and U+2212 minus), "/" and "_" become "-", and a run of
-# digits and separators (space . - ( )) that holds 9 or more digits in 2 or more groups is also a phone number. Why:
+# digits and separators (space . - ( )) that holds 9 or more digits in 2 or more groups (this group condition superseded
+# 2026-10-26, closing round 2: below) is also a phone number. Why:
 # "555‑123‑4567" (a non-breaking hyphen), "555−123−4567", "555/123/4567" and "0170 1234567" passed the ASCII-only,
 # North-American-shaped patterns; "2024-2025" (8 digits) and "Boeing 737-800" stay acceptable.
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 2, to confirm by Yelysei): a run of
+# digits and separators that holds 9 or more digits is a phone number whatever its number of groups. Why:
+# "call 07911123456", "Jane 447911123456" and "Ivan 123456789", phone numbers typed without separators, became public
+# topic names; a typed topic hardly ever holds 9 digits in a row ("$1000000000" was already rejected as North American).
 _PHONE_RUN = re.compile(r"\d[\d\s().-]*\d")
 PHONE_MIN_DIGITS = 9
 
@@ -407,11 +412,7 @@ def _has_phone(scan: str) -> bool:
     form = _phone_form(scan)
     if _PHONE_RE.search(form):
         return True
-    for run in _PHONE_RUN.findall(form):
-        groups = re.findall(r"\d+", run)
-        if len(groups) >= 2 and sum(len(g) for g in groups) >= PHONE_MIN_DIGITS:
-            return True
-    return False
+    return any(len(re.findall(r"\d", run)) >= PHONE_MIN_DIGITS for run in _PHONE_RUN.findall(form))
 
 
 def _scan_form(cleaned: str) -> str:
@@ -859,7 +860,16 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
     tail = ""
     if row.get("source") == "fallback" and row.get("reason"):
         tail += f"; terms from the fallback ({row['reason']})"
-    out = {"match": None, "topic_id": slug, "name": str(row.get("name") or texts[0])[:NAME_MAX_CHARS], "terms": kept,
+    name = str(row.get("name") or texts[0])[:NAME_MAX_CHARS]
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 2, to confirm by Yelysei): the proposed
+    # name passes `check_request` like the typed text, else derive's name of the typed text replaces it (the reason says
+    # so, without the name). Why: `validate` only trims a model's name, so a reply named "<img src=x onerror=…> call
+    # jane@x.org" went into mapping.json, report.txt and rows.sql, and from there into collection's public topic name.
+    name_why, _ = check_request(name)
+    if name_why:
+        name = derive(texts[0])["name"]
+        tail += f"; model name replaced: {name_why}"
+    out = {"match": None, "topic_id": slug, "name": name, "terms": kept,
            "conflicts": conflicts, "source": row.get("source"), "caution": _caution(row.get("source"), kept, texts[0])}
     if generic and usable:
         tail = f"; too generic, dropped: {generic_list}" + tail
