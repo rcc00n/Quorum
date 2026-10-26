@@ -684,7 +684,9 @@ SIDECAR_MUTATIONS = [
     ("status", _set(("snapshot", "status"), "partial"), "sidecar_snapshot_mismatch", True),
     ("identity-missing", _drop(("snapshot", "run_id")), "invalid_sidecar", True),
     ("bytes-value", lambda s: s["snapshot"].update(bytes=s["snapshot"]["bytes"] + 1), "sidecar_size_mismatch", True),
+    # bytes-bool is refused by value too (True != the file size); bytes-float keeps the value and pins the int type
     ("bytes-bool", _set(("snapshot", "bytes"), True), "sidecar_size_mismatch", True),
+    ("bytes-float", lambda s: s["snapshot"].update(bytes=float(s["snapshot"]["bytes"])), "sidecar_size_mismatch", True),
     ("bytes-missing", _drop(("snapshot", "bytes")), "sidecar_size_mismatch", False),
     ("provisional-string", _set(("provisional",), "true"), "invalid_sidecar", True),
     ("provisional-false", _set(("provisional",), False), "provisional_required", False),
