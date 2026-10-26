@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Topic } from "@/lib/api";
 import { matchTopics } from "@/lib/topic-search.mjs";
-import "@/app/night.css";
+import { ThemeToggle } from "./theme-toggle";
+import "@/app/gate.css";
 
 // DECISION(2026-10-26, Anastasia/Claude Code): the picker searches the catalog the backend already serves and
 // never pretends to create a topic. The portal's preferences endpoint accepts catalog ids only and no
@@ -127,19 +128,22 @@ export function FirstSetup({
   children: React.ReactNode;
 }) {
   return (
-    <main id="main" className="night setup">
-      <header className="night-head">
-        <Link href="/" className="night-masthead" aria-label="Quorum home">
+    <main id="main" className="gate setup">
+      <header className="gate-head">
+        <Link href="/" className="gate-masthead" aria-label="Quorum home">
           Quorum
         </Link>
-        <Link href="/dashboard" className="night-link">
-          Later
-        </Link>
+        <div className="gate-actions">
+          <ThemeToggle />
+          <Link href="/dashboard" className="gate-link">
+            Later
+          </Link>
+        </div>
       </header>
-      <div className="night-body">
-        <p className="night-kicker">First setup · topics</p>
+      <div className="gate-body">
+        <p className="gate-kicker">First setup · topics</p>
         <h1>What do you want to follow?</h1>
-        <p className="night-lead">
+        <p className="gate-lead">
           Name it in your own words. The agents collect and verify stories on your topics alone, then show how
           outlets across the spectrum read each one.
         </p>
@@ -154,9 +158,9 @@ export function FirstSetup({
           </p>
         )}
         {loading ? (
-          <p className="night-lead">Loading your account…</p>
+          <p className="gate-lead">Loading your account…</p>
         ) : error ? (
-          <div className="night-error">
+          <div className="gate-error">
             <p className="message error" role="alert">
               {error}
             </p>
