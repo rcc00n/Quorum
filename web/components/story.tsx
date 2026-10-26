@@ -5,6 +5,7 @@ import type { Event, Source, Topic } from "@/lib/api";
 import { rating, cohort, safeUrl } from "@/lib/api";
 import type { Claim, Document, StructuredAnalysis } from "@/lib/analysis";
 import type { EditorialPhoto } from "@/lib/editorial";
+import type { ReasoningStory } from "@/lib/reasoning";
 import { licensedPhoto, readableArticle } from "@/lib/editorial";
 import "@/app/story.css";
 
@@ -27,8 +28,25 @@ const APPENDIX_TITLE = "Across the spectrum";
 const APPENDIX_TAIL = " · Evidence and investigation";
 const APPENDIX_SUB = "How the outlets told this story, every claim with its evidence, and the trace of the investigation.";
 const CRUMB_FALLBACK = "Today";
+// The spectrum body (Yelysei's story-page specification, 2026-10-26): his wording for the coverage sentence; the
+// column labels, "Read as", "Example" and the two links are service lines for him to approve.
+const SPECTRUM_SUB = "How outlets told this story, measured from their texts.";
+const SIDE_WORDS = { left: "Left outlets", right: "Right outlets" } as const;
+const SPECTRUM_LABELS = { highlights: "Leads with", omits: "Leaves out", wording: "Wording" } as const;
+const EXAMPLE = "Example";
+const READ_AS = "Read as";
+const COHORT_WORDS: Record<string, string> = {
+  major_left: "Big left outlets",
+  minor_left: "Small left outlets",
+  major_right: "Big right outlets",
+  minor_right: "Small right outlets",
+  center: "Centre outlets",
+};
+const CHECKED_LINK = "How this was checked";
 
 type Paragraph = NonNullable<Event["article"]>["paragraphs"][number];
+type Spectrum = ReasoningStory["spectrum"];
+type Pair = [number, number];
 type Mark = { kind: "word" | "source" | "key"; text: string; href?: string; title?: string; sep: boolean };
 
 function plural(n: number, one: string, many: string) {
@@ -251,6 +269,53 @@ function silentCohorts(analysis: StructuredAnalysis, sources: Source[]) {
   return lines;
 }
 
+// Coverage in Yelysei's words: big = major left + major right, small = minor left + minor right, each a pair
+// [covered, total] of spectrum.coverage; a cohort with a total and no coverage is named as silent.
+function coveragePairs(spectrum: Spectrum) {
+  const pair = (key: string): Pair => (spectrum.coverage as Record<string, Pair | undefined>)[key] ?? [0, 0];
+  const sum = (a: Pair, b: Pair): Pair => [a[0] + b[0], a[1] + b[1]];
+  return { big: sum(pair("major_left"), pair("major_right")), small: sum(pair("minor_left"), pair("minor_right")), centre: pair("center") };
+}
+function coverageLine(spectrum: Spectrum) {
+  const { big, small, centre } = coveragePairs(spectrum);
+  const part = ([c, t]: Pair, word: string) => (t ? (c === t ? `all ${t} ${word}` : `${c} of ${t} ${word}`) : null);
+  const parts = [part(big, "big outlets"), part(small, "small ones"), part(centre, "centre outlets")].filter((p): p is string => !!p);
+  return parts.length ? `Covered by ${parts.join(" and ")}, by the ${spectrum.rating_mode} rating.` : null;
+}
+function silenceLines(spectrum: Spectrum) {
+  return Object.entries(spectrum.coverage as Record<string, Pair | undefined>)
+    .filter(([, v]) => v && v[1] > 0 && v[0] === 0)
+    .map(([key]) => `${COHORT_WORDS[key] ?? key} did not cover this story.`);
+}
+function interpretationsLine(spectrum: Spectrum) {
+  const items = (spectrum.interpretations ?? []).filter((i) => i.label);
+  return items.length ? items.map((i) => `${i.label} — ${plural(i.outlets, "outlet", "outlets")}, mostly ${i.mostly}`).join(" · ") : null;
+}
+
+function SpectrumSide({ side, data }: { side: "left" | "right"; data: NonNullable<Spectrum["left"]> }) {
+  const rows = (["highlights", "omits", "wording"] as const).filter((k) => data[k]?.trim());
+  const example = safeUrl(data.example_url);
+  if (!rows.length && !example) return null;
+  return (
+    <div className="story-spectrum-side">
+      <h3>{SIDE_WORDS[side]}</h3>
+      <dl>
+        {rows.map((k) => (
+          <Fragment key={k}>
+            <dt>{SPECTRUM_LABELS[k]}</dt>
+            <dd>{k === "wording" ? `“${data[k]}”` : data[k]}</dd>
+          </Fragment>
+        ))}
+      </dl>
+      {example && (
+        <a className="story-spectrum-example" href={example} target="_blank" rel="noopener noreferrer">
+          {EXAMPLE}
+        </a>
+      )}
+    </div>
+  );
+}
+
 function runIn(text: string): [string | null, string] {
   const m = text.match(/^(not confirmed[.:])\s*/i);
   return m ? [m[1], text.slice(m[0].length)] : [null, text];
@@ -264,6 +329,11 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
   const meta = metaSegments(article, byId);
   const data = dataSegments(analysis, sources);
   const silence = silentCohorts(analysis, sources);
+  const spectrum = event.reasoning?.spectrum;
+  const coverage = spectrum ? coverageLine(spectrum) : null;
+  const spectrumSilence = spectrum ? silenceLines(spectrum) : [];
+  const readAs = spectrum ? interpretationsLine(spectrum) : null;
+  const sides = spectrum ? (["left", "right"] as const).filter((s) => spectrum[s]) : [];
   let runInUsed = false;
   return (
     <>
@@ -313,13 +383,31 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
           {APPENDIX_TITLE}
           <span className="story-appendix-tail">{APPENDIX_TAIL}</span>
         </h2>
-        <p className="story-appendix-sub">{APPENDIX_SUB}</p>
-        {data.length > 0 && <p className="story-appendix-data">{data.join(" · ")}</p>}
+        <p className="story-appendix-sub">{spectrum ? `${SPECTRUM_SUB}${coverage ? ` ${coverage}` : ""}` : APPENDIX_SUB}</p>
+        {!spectrum && data.length > 0 && <p className="story-appendix-data">{data.join(" · ")}</p>}
+        {sides.length > 0 && (
+          <div className={sides.length === 2 ? "story-spectrum" : "story-spectrum story-spectrum-one"}>
+            {sides.map((s) => (
+              <SpectrumSide key={s} side={s} data={spectrum![s]!} />
+            ))}
+          </div>
+        )}
+        {readAs && <p className="story-appendix-read">{`${READ_AS}: ${readAs}.`}</p>}
+        {spectrum?.note?.trim() && <p className="story-appendix-note">{spectrum.note}</p>}
+        {spectrumSilence.map((line) => (
+          <p className="story-appendix-silence" key={line}>
+            {line}
+          </p>
+        ))}
         {event.importance && (
           <p className="story-appendix-bar">
             <strong>{event.importance.label}</strong> {event.importance.explanation}
           </p>
         )}
+        <p className="story-appendix-links">
+          <a href="#evidence-explorer">{`All ${plural(analysis.claims.length, "claim", "claims")} with evidence`}</a>
+          <a href="#investigation-timeline">{CHECKED_LINK}</a>
+        </p>
       </div>
     </>
   );
