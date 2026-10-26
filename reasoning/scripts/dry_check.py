@@ -3,7 +3,7 @@ live run would make. No model call of any kind is sent.
 
     python -X utf8 scripts/dry_check.py --topic climate-policy --date 2026-10-26 --out <scratch store> [--report r.json]
     python -X utf8 scripts/dry_check.py --topic russia-ukraine-war --date 2026-10-22 --corpus fixture --out <scratch>
-    python -X utf8 scripts/dry_check.py --list-topics     # topic ids in collection's `topics` table (JSON list)
+    python -X utf8 scripts/dry_check.py --list-topics     # collection's `topics` table: {"topics", "filtered", "skipped"}
 
 The count is per task and lane: `default` is the fast lane (Lightning), `fact_checker` and `reviewer` are the Ultra
 lanes. It is an estimate: the stand-ins answer differently from the model (event keys, claims, rubric facts), so a
@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 import tempfile
 from collections import Counter
@@ -29,9 +28,11 @@ from typing import Any
 REASONING = Path(__file__).resolve().parents[1]
 FAST_LANES = ("default",)
 ULTRA_LANES = ("fact_checker", "reviewer")
-SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+TOPIC_RULE = "^[a-z0-9][a-z0-9-]{0,63}$"  # printed in messages; the rule itself is tools/corpus._TOPIC_ID
 # Model credentials the dry check must never hold (llm._route_family reads exactly these).
 MODEL_CREDENTIALS = ("MODEL_API_KEY", "METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN")
+# The llm attributes estimate() replaces (decision at _isolate); a rename in llm.py must fail the check, not void it.
+LLM_SEAMS = ("_create", "_client", "disable_hmem_injection", "json_task")
 
 
 class LiveCallRefused(RuntimeError):
@@ -66,8 +67,9 @@ def _isolate(env_file: str | None, blank: list[str]) -> None:
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the dry check blanks MODEL_API_KEY, the Meterless tokens and
     every key name it is given before it loads any .env (load_dotenv never overrides a variable that is present, even
     empty), on top of `--model dry`, and replaces `llm._create`, `llm._client` and `llm.disable_hmem_injection` with a
-    refusal. Why: the estimate runs on the owner's machine next to the real keys; with no route the graph is dry by
-    construction, so not even a bug in the dry switch can send a paid call or touch the Nightshift control plane."""
+    refusal; a missing seam (LLM_SEAMS) fails the check instead of leaving the patch a no-op. Why: the estimate runs on
+    the owner's machine next to the real keys; with no route the graph is dry by construction, so not even a bug in the
+    dry switch can send a paid call or touch the Nightshift control plane."""
     os.environ["QUORUM_DRY_RUN"] = "1"
     for name in (*MODEL_CREDENTIALS, *blank):
         os.environ[name] = ""
@@ -79,26 +81,50 @@ def _isolate(env_file: str | None, blank: list[str]) -> None:
         sys.path.insert(0, str(REASONING))
 
 
-def list_topics() -> list[str]:
-    """Topic ids from collection's `topics` table through Zetaris (read-only SELECT), in the order Zetaris returns them;
-    an id that is not a lower-case slug is skipped with a warning on stderr."""
+def topic_id_ok(topic: Any) -> bool:
+    """The shared topic-id rule (decision at run_editions.topic_id_ok)."""
+    from quorum_reasoning.tools.corpus import _TOPIC_ID
+
+    return isinstance(topic, str) and _TOPIC_ID.fullmatch(topic) is not None
+
+
+def list_topics() -> dict[str, Any]:
+    """collection's `topics` table through Zetaris (read-only SELECTs): {"topics": [ids], "filtered": bool, "skipped":
+    [{"id", "reason"}]}. A row whose id breaks the shared rule is listed under skipped, never dropped silently.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the listing first asks for active rows in collection order
+    (`WHERE active ORDER BY created_at, id`, as collectors/common.load_topics reads them) and, when Zetaris refuses
+    that, falls back to every row in the order Zetaris returns them with "filtered": false; the runner then plans
+    `--topics all` but refuses it with --live. Why: on 2026-10-26 Zetaris exposes only id, name and query_terms of
+    topics (HTTP 400 on `active` and `created_at`), so retired rows and the order are invisible; the first query
+    starts working once collection registers both columns (ask in Issue #2), with no change here. Two queries at most."""
     from quorum_reasoning.tools import corpus
 
-    rows = corpus._run_sql(f"SELECT id FROM {corpus._zetaris_db()}.topics", 1000)
-    out: list[str] = []
+    db = corpus._zetaris_db()
+    try:
+        rows = corpus._run_sql(f"SELECT id FROM {db}.topics WHERE active ORDER BY created_at, id", 1000)
+        filtered = True
+    except Exception:  # noqa: BLE001 — the columns are not registered (HTTP 400); a second failure below is raised
+        rows = corpus._run_sql(f"SELECT id FROM {db}.topics", 1000)
+        filtered = False
+    topics: list[str] = []
+    skipped: list[dict[str, str]] = []
     for row in rows:
         tid = str((row or {}).get("id") or "").strip()
-        if SLUG.match(tid) and len(tid) <= 64:
-            if tid not in out:
-                out.append(tid)
+        if topic_id_ok(tid):
+            if tid not in topics:
+                topics.append(tid)
         else:
-            print(f"skipped a topics row whose id is not a slug ({len(tid)} characters)", file=sys.stderr)
-    return out
+            skipped.append({"id": tid[:64], "reason": f"not a topic id by the shared rule {TOPIC_RULE} ({len(tid)} characters)"})
+    return {"topics": topics, "filtered": filtered, "skipped": skipped}
 
 
 def estimate(topic: str, date: str, out: Path, corpus: str, fixture: str | None) -> dict[str, Any]:
     from quorum_reasoning import llm, run, store
 
+    missing = [name for name in LLM_SEAMS if not callable(getattr(llm, name, None))]
+    if missing:
+        raise RuntimeError(f"dry check: llm.{', llm.'.join(missing)} not found; the refusal seams no longer match llm.py")
     llm._create = _refuse  # type: ignore[assignment]  # decision at _isolate
     llm._client = _refuse  # type: ignore[assignment]
     llm.disable_hmem_injection = _refuse  # type: ignore[assignment]
@@ -161,8 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not (args.topic and args.date and args.out):
         ap.error("--topic, --date and --out are required (or --list-topics)")
-    if not SLUG.match(args.topic):
-        ap.error("--topic must be a lower-case slug (letters, digits, hyphens)")
+    if not topic_id_ok(args.topic):
+        ap.error(f"--topic must follow the shared topic-id rule {TOPIC_RULE}")
     out = Path(args.out)
     if (out / "_journal").exists() or (out / "_checkpoints").exists():
         print(f"refusing to run: {out} holds live runs (_journal/_checkpoints); a dry check writes stand-in snapshots to a scratch store only", file=sys.stderr)

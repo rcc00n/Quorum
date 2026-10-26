@@ -1,16 +1,19 @@
-"""scripts/run_editions.py and scripts/resume_with_next_key.sh, fully offline: fake child commands stand in for run.py
-and the dry check (exit 0 / 2 / 3 / 1, slow, crash); no model, no Zetaris, no control plane is ever reached."""
+"""scripts/run_editions.py, scripts/dry_check.py and scripts/resume_with_next_key.sh, fully offline: fake child commands
+stand in for run.py and the dry check (exit 0 / 2 / 3 / 1, slow, crash); no model, no Zetaris, no control plane is ever
+reached. Every live test runs with QUORUM_DRY_RUN=1 and the model credentials blank, so a real run.py reached by
+mistake refuses (exit 2) instead of spending anything."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
-import threading
 import time
+import uuid
 from pathlib import Path
 
 import pytest
@@ -18,11 +21,18 @@ import pytest
 REASONING = Path(__file__).resolve().parents[1]
 SCRIPTS = REASONING / "scripts"
 
-_spec = importlib.util.spec_from_file_location("run_editions", SCRIPTS / "run_editions.py")
-re_mod = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-sys.modules["run_editions"] = re_mod
-_spec.loader.exec_module(re_mod)
+
+def _load(name: str):
+    spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+re_mod = _load("run_editions")
+dc_mod = _load("dry_check")
 
 DATE = "2026-10-20"  # its cut (2026-10-20 09:30Z) has passed, so --live needs no --allow-before-cut
 VALUE_A = "fake-key-value-AAAA-0001"
@@ -60,10 +70,12 @@ if sd:
         seen = "unreadable"
 rec = {"topic": topic, "argv": args, "resume": "--resume" in args, "key_name": sc["values"].get(key, "?" if key else ""),
        "blank_ok": all(os.environ.get(nm, "") == "" for nm in sc.get("blank_expected", [])), "status_seen": seen,
-       "start": time.time()}
+       "dry_env": os.environ.get("QUORUM_DRY_RUN"), "start": time.time()}
 if sc.get("echo_key"):
     print(f"stdout sees MODEL_API_KEY={key}", flush=True)
     print(f"stderr sees {key}", file=sys.stderr, flush=True)
+if step.get("echo"):
+    print(step["echo"], flush=True)
 journal = out / "_journal" / f"{rid}.jsonl"
 journal.parent.mkdir(parents=True, exist_ok=True)
 with journal.open("a") as fh:
@@ -105,7 +117,10 @@ def opt(name, default=None):
     return args[args.index(name) + 1] if name in args else default
 sc = json.loads(Path(os.environ["FAKE_SCENARIO"]).read_text())
 if "--list-topics" in args:
-    print(json.dumps(sc["db_topics"]))
+    if sc.get("db_error"):
+        print("listing topics failed: RuntimeError: Zetaris REST HTTP 503; body withheld", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({"topics": sc["db_topics"], "filtered": sc.get("db_filtered", False), "skipped": sc.get("db_skipped", [])}))
     sys.exit(0)
 topic, date, report = opt("--topic"), opt("--date"), opt("--report")
 d = sc["dry"].get(topic, {"fast": 100, "ultra": 0})
@@ -148,6 +163,11 @@ class Env:
                                  "MODEL_BASE_URL=https://integrate.api.nvidia.com/v1\n")
         monkeypatch.setattr(re_mod, "DEFAULT_ENV_FILE", self.env_file)
         monkeypatch.setenv("MODEL_BASE_URL", "https://integrate.api.nvidia.com/v1")
+        # fail closed: if a test ever loses its fake live command, the real run.py refuses --model live under
+        # QUORUM_DRY_RUN=1 (exit 2, run.live_mode_problem) and finds no model credential to load from the repo .env
+        monkeypatch.setenv("QUORUM_DRY_RUN", "1")
+        for name in ("MODEL_API_KEY", "METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN"):
+            monkeypatch.setenv(name, "")
         for name in ("QTEST_KEY_A", "QTEST_KEY_B", "QTEST_KEY_C"):
             monkeypatch.delenv(name, raising=False)
         monkeypatch.setenv("FAKE_SCENARIO", str(tmp / "scenario.json"))
@@ -155,10 +175,12 @@ class Env:
         self.scenario({})
 
     def scenario(self, live: dict, dry: dict | None = None, **extra) -> None:
+        """db_topics None (the default): collection's table holds exactly the topics each invocation lists."""
         sc = {"live": live, "dry": dry or {}, "records": str(self.records), "dry_records": str(self.dry_records), "env_file": str(self.env_file),
               "values": {VALUE_A: "QTEST_KEY_A", VALUE_B: "QTEST_KEY_B", VALUE_C: "QTEST_KEY_C"},
-              "blank_expected": ["QTEST_KEY_A", "QTEST_KEY_B", "MODEL_API_KEY_9"], "db_topics": []}  # the --keys names and any MODEL_API_KEY_*
+              "blank_expected": ["QTEST_KEY_A", "QTEST_KEY_B", "MODEL_API_KEY_9"], "db_topics": None}  # the --keys names and any MODEL_API_KEY_*
         sc.update(extra)
+        self.sc = sc
         (self.tmp / "scenario.json").write_text(json.dumps(sc))
 
     def argv(self, topics: str, *more: str, keys: str | None = "QTEST_KEY_A,QTEST_KEY_B", live: bool = True) -> list[str]:
@@ -170,9 +192,14 @@ class Env:
             a.append("--live")
         return a + list(more)
 
-    def main(self, argv: list[str]) -> int:
+    def main(self, argv: list[str], live_cmd: list[str] | None = None) -> int:
+        sc = dict(self.sc)
+        if sc["db_topics"] is None:
+            listed = argv[argv.index("--topics") + 1]
+            sc["db_topics"] = [] if listed == "all" else [t.strip() for t in listed.split(",") if t.strip()]
+        (self.tmp / "scenario.json").write_text(json.dumps(sc))
         # -I -S: the fakes need only the standard library, and a bare interpreter starts several times faster on Windows
-        return re_mod.main(argv, live_cmd=[sys.executable, "-I", "-S", str(self.tmp / "fake_run.py")],
+        return re_mod.main(argv, live_cmd=live_cmd or [sys.executable, "-I", "-S", str(self.tmp / "fake_run.py")],
                            dry_cmd=[sys.executable, "-I", "-S", str(self.tmp / "fake_dry.py")])
 
     def runs(self) -> list[dict]:
@@ -185,6 +212,9 @@ class Env:
 
     def status_of(self, topic: str) -> dict:
         return json.loads((self.status / DATE / f"{topic}.json").read_text(encoding="utf-8"))
+
+    def summary(self) -> dict:
+        return json.loads((self.status / DATE / "_summary.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture
@@ -242,27 +272,103 @@ def test_a_split_topic_holds_the_rest_of_its_estimate_on_the_other_keys():
     (i2, k2, res2), = p.place()
     assert (i2.topic, k2.name, res2) == ("big", "B", (350, 0)) and keys[1].used_fast == 350  # the hold became the reservation
     p.finish(i2, k2, res2, "published", (340, 0))
-    assert p.place() == [] and [i.topic for i, _ in p.take_waiting()] == ["next"]  # 310 left on B: never placed whole
-    assert keys[1].used_fast == 340 and p.holds == {}
+    (i3, k3, res3), = p.place()  # 310 left on B, every live key idle: "next" starts there, its rest waits for a rerun
+    assert (i3.topic, k3.name, res3) == ("next", "B", (310, 0)) and p.holds == {}
+    assert keys[1].used_fast == 650
 
 
-def test_waiting_for_key_when_all_keys_together_lack_room_and_drained_keys_take_nothing():
+def test_a_topic_larger_than_all_keys_together_starts_continues_and_waits_for_the_next_window():
     keys = [K("A"), K("B")]
     p = re_mod.Planner(keys, [re_mod.Item("huge", 2000, 0), re_mod.Item("small", 100, 0)])
     started = p.place()
-    assert [(i.topic, k.name) for i, k, _ in started] == [("small", "A")]
-    (huge, reason), = p.take_waiting()  # 2000 calls against 1300 on both keys together: never placeable today
-    assert huge.topic == "huge" and "needs about 2000 fast-lane" in reason and "1300" in reason
+    assert [(i.topic, k.name, res) for i, k, res in started] == [("huge", "A", (650, 0))]
+    assert keys[1].used_fast == 650 and not keys[1].busy  # its rest is held on B: "small" may not take it
+    assert [i.topic for i in p.pending] == ["small"] and p.take_waiting() == []
     i, k, res = started[0]
-    p.finish(i, k, res, "drained", (100, 0))
-    (i2, k2, _), = p.place()
-    assert (i2.topic, k2.name, i2.resume) == ("small", "B", True)  # never back on the drained key
-    p.finish(i2, k2, _, "drained", (5, 0))
+    p.finish(i, k, res, "drained", (650, 0))
+    (i2, k2, res2), = p.place()
+    assert (i2.topic, k2.name, res2, i2.resume) == ("huge", "B", (650, 0), True)  # never back on the drained key
+    p.finish(i2, k2, res2, "drained", (650, 0))
     assert p.place() == []
-    assert "every key is drained" in p.take_waiting()[0][1]
-    keys[1].drained = True
+    waiting = {i.topic: reason for i, reason in p.take_waiting()}
+    assert set(waiting) == {"huge", "small"} and all("every key is drained" in r for r in waiting.values())
+    # the next window's rerun: fresh caps, 1 300 calls in the journal; it resumes with the rest
+    rerun = re_mod.Planner([K("A"), K("B")], [re_mod.Item("huge", 2000, 0, done_fast=1300, resume=True)])
+    (i3, k3, res3), = rerun.place()
+    assert (k3.name, res3, i3.resume) == ("A", (650, 0), True) and rerun.keys[1].used_fast == 50
+    keys[0].drained = keys[1].drained = True
     p2 = re_mod.Planner(keys, [re_mod.Item("x", 1, 0)])
     assert p2.place() == [] and "every key is drained" in p2.take_waiting()[0][1]
+
+
+def test_one_key_and_an_estimate_above_its_cap_starts_on_it():
+    """The route without --keys is one key: a whole topic-day (~1 500 fast-lane calls live) is above its cap."""
+    route, = re_mod.parse_keys(None, 650, 250)
+    p = re_mod.Planner([route], [re_mod.Item("russia-ukraine-war", 1479, 148)])
+    (i, k, res), = p.place()
+    assert (k.name, res) == (re_mod.ROUTE, (650, 148)) and p.holds == {}
+    p.finish(i, k, res, "drained", (600, 20))
+    assert p.place() == [] and "every key is drained" in p.take_waiting()[0][1]
+    plan = re_mod.simulate(re_mod.parse_keys(None, 650, 250), [re_mod.Item("russia-ukraine-war", 1479, 148)])
+    assert [s["key"] for s in plan["russia-ukraine-war"]["segments"]] == [re_mod.ROUTE]
+    assert plan["russia-ukraine-war"]["outcome"] == "waiting_for_key"
+
+
+def test_three_keys_and_an_estimate_above_their_sum():
+    plan = re_mod.simulate([K("A"), K("B"), K("C")], [re_mod.Item("broad", 2100, 210)])
+    segs = plan["broad"]["segments"]
+    assert [s["key"] for s in segs] == ["A", "B", "C"] and [s["resume"] for s in segs] == [False, True, True]
+    assert plan["broad"]["outcome"] == "waiting_for_key" and "every key is drained" in plan["broad"]["reason"]
+
+
+def test_a_drained_topic_continues_on_a_key_with_less_room_than_its_rest():
+    keys = [K("A"), K("B")]
+    p = re_mod.Planner(keys, [re_mod.Item("t", 1000, 0)])
+    (i, k, res), = p.place()
+    p.finish(i, k, res, "drained", (300, 0))  # the key had been used elsewhere: it drained early
+    assert i.need() == (700, 0)
+    (i2, k2, res2), = p.place()
+    assert (k2.name, res2, i2.resume) == ("B", (650, 0), True)
+
+
+def test_waiting_for_key_only_when_no_live_key_has_the_minimum_room():
+    key = K("A")
+    key.used_fast = 640  # 10 fast-lane calls of room left
+    p = re_mod.Planner([key], [re_mod.Item("t", 300, 0)])
+    assert p.place() == []
+    (item, reason), = p.take_waiting()
+    assert item.topic == "t" and "no key left has 25 calls of room" in reason and "most: 10 fast-lane" in reason
+
+
+def test_a_resumed_topic_gets_the_freed_key_before_later_topics():
+    keys = [K("A"), K("B")]
+    t1, t2, t3 = re_mod.Item("t1", 600, 0), re_mod.Item("t2", 600, 0), re_mod.Item("t3", 300, 0)
+    p = re_mod.Planner(keys, [t1, t2, t3])
+    started = p.place()
+    assert [(i.topic, k.name) for i, k, _ in started] == [("t1", "A"), ("t2", "B")]
+    (_, ka, ra), (_, kb, rb) = started
+    p.finish(t1, ka, ra, "drained", (400, 0))  # t1 needs 200 more and A is spent
+    assert p.place() == []  # B is busy: both wait
+    p.finish(t2, kb, rb, "published", (300, 0))  # B has 350 left: room for t1 (200) or t3 (300), not both
+    (i, k, _), = p.place()
+    assert (i.topic, k.name, i.resume) == ("t1", "B", True)
+    assert [i.topic for i in p.pending] == ["t3"]
+
+
+def test_a_split_topic_starts_only_on_a_key_with_the_minimum_room_on_each_lane():
+    a, b = K("A"), K("B")
+    a.used_ultra = 230  # A: 650 fast-lane and 20 Ultra calls left (more room by share)
+    b.used_fast = 610  # B: 40 fast-lane and 250 Ultra calls left
+    p = re_mod.Planner([a, b], [re_mod.Item("t", 600, 30)])
+    (i, k, res), = p.place()
+    assert (k.name, res) == ("B", (40, 30))  # A has fewer than 25 Ultra calls of room
+
+
+def test_a_topic_that_fits_only_a_busy_key_waits_instead_of_splitting_onto_an_idle_one():
+    keys = [K("A"), K("B", 200)]
+    p = re_mod.Planner(keys, [re_mod.Item("t1", 100, 10), re_mod.Item("t2", 400, 10)])
+    assert [(i.topic, k.name) for i, k, _ in p.place()] == [("t1", "A")]
+    assert [i.topic for i in p.pending] == ["t2"] and not keys[1].busy and keys[1].used_fast == 0
 
 
 def test_unknown_remainder_after_estimate_is_used_up():
@@ -275,6 +381,7 @@ def test_simulated_plan_shows_segments_and_waiting():
     assert [s["key"] for s in plan["big"]["segments"]] == ["A", "B"]
     assert [s["resume"] for s in plan["big"]["segments"]] == [False, True]
     assert plan["big"]["outcome"] == "published"
+    assert [s["key"] for s in plan["next"]["segments"]] == ["B"]  # after big, on what B has left; the rest waits
     assert plan["next"]["outcome"] == "waiting_for_key"
 
 
@@ -301,6 +408,15 @@ def test_clean_reason_drops_paths_and_secrets():
     assert "[redacted]" in out and "meterless/fast" in out
 
 
+def test_topic_ids_follow_the_shared_rule():
+    from quorum_reasoning.tools.corpus import _TOPIC_ID
+
+    for good in ("climate-policy", "ai--jobs", "covid-19-", "a", "x" * 64):
+        assert re_mod.topic_id_ok(good) and dc_mod.topic_id_ok(good) and _TOPIC_ID.match(good)
+    for bad in ("", "-x", "A-topic", "a.b", "../etc", "a/b", "x" * 65, "abc\n", "a b", None):
+        assert not re_mod.topic_id_ok(bad) and not dc_mod.topic_id_ok(bad)
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # status files
 
@@ -320,6 +436,23 @@ def test_status_writes_are_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         re_mod.write_json_atomic(path, {"state": object()})  # fails while writing the temp file
     assert json.loads(path.read_text()) == {"state": "queued"}
     assert [p.name for p in path.parent.iterdir()] == ["t.json"]  # no temp file left behind
+
+
+def test_status_files_are_saved_through_the_atomic_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    statuses = re_mod.Statuses(tmp_path / "status", DATE, re_mod.Redactor([]))
+    statuses.open("t1", f"{DATE}-t1-1")
+    statuses.save("t1", state="queued")
+    path = statuses.path("t1")
+    before = path.read_text(encoding="utf-8")
+
+    def broken_replace(src, dst):
+        raise OSError("disk went away")
+
+    monkeypatch.setattr(re_mod.os, "replace", broken_replace)
+    with pytest.raises(OSError):
+        statuses.save("t1", state="running")
+    assert path.read_text(encoding="utf-8") == before and json.loads(before)["state"] == "queued"
+    assert [p.name for p in path.parent.iterdir()] == ["t1.json"]  # no temp file left behind
 
 
 def test_status_replace_retries_while_a_reader_holds_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -358,6 +491,7 @@ def test_rotation_requeues_a_drained_topic_as_resume_on_another_key(world: Env):
     runs = world.runs()
     assert [(r["key_name"], r["resume"]) for r in runs] == [("QTEST_KEY_A", False), ("QTEST_KEY_B", True)]
     assert all(r["blank_ok"] for r in runs)  # every other key variable was blank in the child
+    assert all(r["dry_env"] == "1" for r in runs)  # the fixture's fail-closed guard reaches the children
     st = world.status_of("t1")
     assert st["state"] == "published" and st["version"] == 1 and st["attempts"] == 2
     assert [r["outcome"] for r in st["runs"]] == ["drained", "published"]
@@ -366,8 +500,7 @@ def test_rotation_requeues_a_drained_topic_as_resume_on_another_key(world: Env):
     assert {"topic", "date", "state", "run_id", "started_at", "updated_at", "attempts"} <= set(st)
     assert (world.logs / f"{DATE}_t1_run01_QTEST_KEY_A.log").is_file()
     assert (world.logs / f"{DATE}_t1_run02_QTEST_KEY_B.log").is_file()
-    summary = json.loads((world.status / DATE / "_summary.json").read_text())
-    assert [k["drained"] for k in summary["keys"]] == [True, False]
+    assert [k["drained"] for k in world.summary()["keys"]] == [True, False]
 
 
 def test_failures_do_not_stop_the_rest_and_have_short_reasons(world: Env):
@@ -413,15 +546,50 @@ def test_a_rerun_skips_published_and_resumes_what_has_a_checkpoint(world: Env):
     assert half["state"] == "published" and half["attempts"] == 3 and len(half["runs"]) == 3
 
 
+def test_route_mode_starts_a_topic_larger_than_its_cap_and_the_rerun_resumes_it(world: Env):
+    """The documented Meterless path (no --keys): a topic-day above the route's cap runs until the route drains, and
+    the next window's rerun of the same command finishes it."""
+    world.scenario({"big": [{"exit": 3, "fast": 300}, {"exit": 0, "fast": 200}]}, {"big": {"fast": 2000, "ultra": 0}}, blank_expected=[])
+    assert world.main(world.argv("big", keys=None, live=False)) == 3  # the plan: starts now, finishes in a later window
+    plan = world.status_of("big")
+    assert [s["key"] for s in plan["plan"]] == [re_mod.ROUTE] and plan["plan_outcome"] == "waiting_for_key"
+    assert world.main(world.argv("big", keys=None)) == 3
+    st = world.status_of("big")
+    assert st["state"] == "waiting_for_key" and "every key is drained" in st["reason"]
+    assert [r["outcome"] for r in st["runs"]] == ["drained"] and st["runs"][0]["key"] == re_mod.ROUTE
+    assert [r["resume"] for r in world.runs()] == [False]
+    assert world.main(world.argv("big", keys=None)) == 0
+    assert [r["resume"] for r in world.runs()] == [False, True]
+    st = world.status_of("big")
+    assert st["state"] == "published" and st["calls_done"] == {"fast": 500, "ultra": 0}
+
+
+def test_dry_mode_exits_3_when_the_plan_leaves_a_topic_for_the_next_window(world: Env):
+    world.scenario({}, {"t1": {"fast": 1500, "ultra": 0}})
+    assert world.main(world.argv("t1", live=False)) == 3
+    st = world.status_of("t1")
+    assert st["plan_outcome"] == "waiting_for_key" and [s["key"] for s in st["plan"]] == ["QTEST_KEY_A", "QTEST_KEY_B"]
+    assert world.runs() == []
+
+
+def test_max_calls_per_key_sets_the_caps(world: Env):
+    world.scenario({}, {"t1": {"fast": 150, "ultra": 0}})  # estimate 150 / 15 (factor 1, Ultra floor 10 %)
+    assert world.main(world.argv("t1", "--max-calls-per-key", "100", "--max-ultra-calls-per-key", "40", live=False)) == 0
+    st = world.status_of("t1")
+    assert [s["key"] for s in st["plan"]] == ["QTEST_KEY_A", "QTEST_KEY_B"] and st["plan_outcome"] == "published"
+    assert [(k["cap_fast"], k["cap_ultra"]) for k in world.summary()["keys"]] == [(100, 40), (100, 40)]
+    assert world.main(world.argv("t1", "--max-calls-per-key", "100", keys="QTEST_KEY_A", live=False)) == 3
+    st = world.status_of("t1")
+    assert [s["key"] for s in st["plan"]] == ["QTEST_KEY_A"] and st["plan_outcome"] == "waiting_for_key"
+
+
 def test_slow_runs_on_two_keys_overlap_and_the_status_says_running(world: Env):
     world.scenario({"s1": [{"exit": 0, "sleep": 1.2}], "s2": [{"exit": 0, "sleep": 1.2}]})
-    t0 = time.monotonic()
     assert world.main(world.argv("s1,s2")) == 0
     runs = {r["topic"]: r for r in world.runs()}
     assert runs["s1"]["start"] < runs["s2"]["end"] and runs["s2"]["start"] < runs["s1"]["end"]  # one process per key, in parallel
     assert {r["key_name"] for r in runs.values()} == {"QTEST_KEY_A", "QTEST_KEY_B"}
     assert all(r["status_seen"] == "running" for r in runs.values())
-    assert time.monotonic() - t0 < 2.4 + 6  # not serial (2.4 s of sleeps) plus generous process start-up
 
 
 def test_relative_folders_reach_the_children_as_absolute_paths(world: Env, monkeypatch: pytest.MonkeyPatch):
@@ -455,8 +623,7 @@ def test_a_run_over_its_time_limit_is_stopped_and_failed(world: Env):
 
 def test_a_command_that_cannot_start_fails_that_topic(world: Env):
     world.scenario({})
-    rc = re_mod.main(world.argv("t1"), live_cmd=[str(world.tmp / "no-such-interpreter.exe")],
-                     dry_cmd=[sys.executable, "-I", "-S", str(world.tmp / "fake_dry.py")])
+    rc = world.main(world.argv("t1"), live_cmd=[str(world.tmp / "no-such-interpreter.exe")])
     assert rc == 1
     st = world.status_of("t1")
     assert st["state"] == "failed" and st["reason"].startswith("could not start the run")
@@ -473,6 +640,22 @@ def test_no_key_value_reaches_a_log_or_a_status_file(world: Env):
     for p in (world.status / DATE).glob("*.json"):
         doc = p.read_text(encoding="utf-8")
         assert str(world.tmp) not in doc and str(world.tmp).replace("\\", "\\\\") not in doc  # no absolute paths
+
+
+def test_route_mode_redacts_tokens_from_the_env_file_and_paths_in_reasons(world: Env):
+    """No --keys (the Meterless path): the values the runner redacts are the .env's secret-named ones, not key values."""
+    token, zkey = "fake-meterless-token-7777", "fake-zetaris-key-8888"
+    with world.env_file.open("a") as fh:
+        fh.write(f"METERLESS_TOKEN={token}\nZETARIS_API_KEY={zkey}\n")
+    where = str(world.tmp / "store" / "_checkpoints" / "x.sqlite")
+    world.scenario({"t1": [{"exit": 2, "publish": False, "echo": f"route token {token} zetaris {zkey}",
+                            "say": f"refusing to run: {where} {token}"}]}, blank_expected=[])
+    assert world.main(world.argv("t1", keys=None)) == 1
+    text = _all_text(world.logs, world.status)
+    assert token not in text and zkey not in text
+    assert "route token [redacted] zetaris [redacted]" in (world.logs / f"{DATE}_t1_run01_{re_mod.ROUTE}.log").read_text(encoding="utf-8")
+    reason = world.status_of("t1")["reason"]
+    assert reason == "exit 2: refusing to run: <path> [redacted]", reason
 
 
 def test_without_live_only_dry_checks_run(world: Env):
@@ -513,10 +696,43 @@ def test_a_failed_dry_check_fails_the_topic_and_starts_no_live_run(world: Env):
     assert [r["topic"] for r in world.runs()] == ["good"]
 
 
-def test_topics_all_reads_the_topics_table(world: Env):
-    world.scenario({}, {}, db_topics=["alpha-topic", "beta-topic", "Not A Slug"])
-    assert world.main(world.argv("all", live=False)) == 0
-    assert sorted(d["topic"] for d in world.dry_runs()) == ["alpha-topic", "beta-topic"]
+def test_topics_all_plans_every_row_and_reports_a_row_it_cannot_run(world: Env):
+    world.scenario({}, {}, db_topics=["alpha-topic", "ai--jobs", "covid-19-", "Not A Slug"],
+                   db_skipped=[{"id": "x/y", "reason": "not a topic id by the shared rule"}])
+    assert world.main(world.argv("all", live=False)) == 1  # the rows it cannot run count as failed
+    assert sorted(d["topic"] for d in world.dry_runs()) == ["ai--jobs", "alpha-topic", "covid-19-"]
+    bad = [r for r in world.summary()["topics"] if r.get("skipped_row")]
+    assert [r["topic"] for r in bad] == ["x/y", "Not A Slug"] and all(r["state"] == "failed" for r in bad)
+    runner_log = (world.logs / f"{DATE}_runner.log").read_text(encoding="utf-8")
+    assert "'Not A Slug'" in runner_log and "'x/y'" in runner_log
+    assert not (world.status / DATE / "x").exists()  # no status file for an id that is not safe as a name
+
+
+def test_topics_all_with_live_is_refused_until_zetaris_shows_active_rows(world: Env):
+    world.scenario({"alpha-topic": [{"exit": 0}]}, {}, db_topics=["alpha-topic"])
+    assert world.main(world.argv("all")) == 2
+    assert world.runs() == [] and world.dry_runs() == []
+    world.scenario({"alpha-topic": [{"exit": 0}]}, {}, db_topics=["alpha-topic"], db_filtered=True)
+    assert world.main(world.argv("all")) == 0
+    assert [r["topic"] for r in world.runs()] == ["alpha-topic"]
+
+
+def test_a_listed_topic_that_is_not_a_row_fails_without_a_run(world: Env):
+    world.scenario({"real-topic": [{"exit": 0}], "no-such-topic-xyz": [{"exit": 0}]}, db_topics=["real-topic"])
+    assert world.main(world.argv("real-topic,no-such-topic-xyz")) == 1
+    st = world.status_of("no-such-topic-xyz")
+    assert st["state"] == "failed" and "not a row in collection's topics table" in st["reason"]
+    assert [r["topic"] for r in world.runs()] == ["real-topic"] and [d["topic"] for d in world.dry_runs()] == ["real-topic"]
+    world.scenario({"real-topic": [{"exit": 0}]}, db_topics=["real-topic"], db_filtered=True)
+    assert world.main(world.argv("no-such-topic-xyz", live=False)) == 1
+    assert "not an active row" in world.status_of("no-such-topic-xyz")["reason"]
+
+
+def test_listed_topics_by_the_shared_rule_are_run(world: Env):
+    world.scenario({"ai--jobs": [{"exit": 0}], "covid-19-": [{"exit": 0}]})
+    assert world.main(world.argv("ai--jobs,covid-19-")) == 0
+    assert sorted(r["topic"] for r in world.runs()) == ["ai--jobs", "covid-19-"]
+    assert world.status_of("covid-19-")["state"] == "published"
 
 
 def test_route_mode_injects_no_key(world: Env):
@@ -527,7 +743,8 @@ def test_route_mode_injects_no_key(world: Env):
     assert world.status_of("t1")["key"] == re_mod.ROUTE
 
 
-@pytest.mark.parametrize("case", ["dry_inside_out", "meterless_with_keys", "before_cut", "unusable_key", "env_file_live", "bad_topic", "lock"])
+@pytest.mark.parametrize("case", ["dry_inside_out", "meterless_with_keys", "before_cut", "unusable_key", "env_file_live", "bad_topic",
+                                  "bad_topic_dot", "lock", "listing_fails"])
 def test_refusals(world: Env, monkeypatch: pytest.MonkeyPatch, case: str):
     argv = world.argv("t1")
     if case == "dry_inside_out":
@@ -544,9 +761,13 @@ def test_refusals(world: Env, monkeypatch: pytest.MonkeyPatch, case: str):
         argv += ["--env-file", str(other)]
     elif case == "bad_topic":
         argv[argv.index("--topics") + 1] = "../etc"
+    elif case == "bad_topic_dot":
+        argv[argv.index("--topics") + 1] = "a.b"
     elif case == "lock":
         (world.status / DATE).mkdir(parents=True)
         (world.status / DATE / ".runner.lock").write_text("{}")
+    elif case == "listing_fails":
+        world.scenario({}, db_error=True)
     assert world.main(argv) == 2
     assert world.runs() == [] and world.dry_runs() == []
 
@@ -571,7 +792,7 @@ def test_run_py_accepts_the_live_arguments(tmp_path: Path, resume: bool, capsys:
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# the real dry check, on the bundled fixture day (stand-ins, no network)
+# the dry check: the real one on the bundled fixture day (stand-ins, no network), and its guards in process
 
 
 def test_dry_check_counts_calls_per_lane_on_the_fixture(tmp_path: Path):
@@ -598,22 +819,121 @@ def test_dry_check_refuses_a_live_store(tmp_path: Path):
     assert proc.returncode == 2 and "holds live runs" in proc.stderr
 
 
+def test_dry_check_isolation_blanks_every_model_credential(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    names = ("MODEL_API_KEY", "METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN", "QTEST_KEY_X")
+    for name in (*names, "QUORUM_DRY_RUN"):
+        monkeypatch.setenv(name, "set-before-isolation-0000")  # monkeypatch restores each after the test
+    env_file = tmp_path / ".env"
+    env_file.write_text("MODEL_API_KEY=from-the-env-file-1111\nMETERLESS_TOKEN=from-the-env-file-2222\nQTEST_KEY_X=from-the-env-file-3333\n")
+    dc_mod._isolate(str(env_file), ["QTEST_KEY_X"])
+    assert {name: os.environ[name] for name in names} == {name: "" for name in names}  # blank, and the .env cannot refill them
+    assert os.environ["QUORUM_DRY_RUN"] == "1"
+
+
+def _guard_llm_seams(monkeypatch: pytest.MonkeyPatch):
+    """estimate() replaces llm attributes for the rest of its process; in this process they are restored after the test."""
+    from quorum_reasoning import llm, run
+
+    for name in dc_mod.LLM_SEAMS:
+        monkeypatch.setattr(llm, name, getattr(llm, name))
+    monkeypatch.setattr(run, "main", run.main)
+    return llm, run
+
+
+def test_dry_check_estimate_replaces_every_live_seam_with_a_refusal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    llm, run = _guard_llm_seams(monkeypatch)
+    seen: dict[str, object] = {}
+
+    def fake_main(argv: list[str]) -> int:  # inspects the seams; never calls a real one
+        for name in ("_create", "_client", "disable_hmem_injection"):
+            seen[name] = getattr(llm, name) is dc_mod._refuse
+        seen["json_task"] = getattr(llm.json_task, "__name__", "")
+        seen["model"] = argv[argv.index("--model") + 1]
+        return 0
+
+    monkeypatch.setattr(run, "main", fake_main)
+    rep = dc_mod.estimate("t", "2026-10-22", tmp_path / "dry", "fixture", None)
+    assert seen == {"_create": True, "_client": True, "disable_hmem_injection": True, "json_task": "counting", "model": "dry"}
+    assert rep["calls"]["total"] == 0 and rep["exit_code"] == 0
+    with pytest.raises(dc_mod.LiveCallRefused):
+        dc_mod._refuse("m", [], 0.0, {})
+
+
+def test_dry_check_fails_loudly_when_a_seam_is_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    llm, run = _guard_llm_seams(monkeypatch)
+    monkeypatch.delattr(llm, "_client")
+    monkeypatch.setattr(run, "main", lambda argv: pytest.fail("the graph ran without its refusal seams"))
+    with pytest.raises(RuntimeError, match=r"llm\._client not found"):
+        dc_mod.estimate("t", "2026-10-22", tmp_path / "dry", "fixture", None)
+
+
+def test_list_topics_reads_active_rows_in_collection_order_and_reports_bad_ids(monkeypatch: pytest.MonkeyPatch):
+    from quorum_reasoning.tools import corpus
+
+    sqls: list[str] = []
+
+    def fake_sql(sql: str, limit: int):
+        sqls.append(sql)
+        return [{"id": "climate-policy"}, {"id": "ai--jobs"}, {"id": "covid-19-"}, {"id": "Not A Slug"}, {"id": "climate-policy"}]
+
+    monkeypatch.setattr(corpus, "_run_sql", fake_sql)
+    got = dc_mod.list_topics()
+    assert got["filtered"] is True and got["topics"] == ["climate-policy", "ai--jobs", "covid-19-"]
+    assert [s["id"] for s in got["skipped"]] == ["Not A Slug"]
+    assert len(sqls) == 1 and sqls[0].endswith(".topics WHERE active ORDER BY created_at, id")
+
+
+def test_list_topics_falls_back_to_every_row_while_zetaris_lacks_the_columns(monkeypatch: pytest.MonkeyPatch):
+    from quorum_reasoning.tools import corpus
+
+    sqls: list[str] = []
+
+    def fake_sql(sql: str, limit: int):
+        sqls.append(sql)
+        if "WHERE active" in sql:
+            raise RuntimeError("Zetaris REST HTTP 400; body withheld")
+        return [{"id": "b-topic"}, {"id": "a-topic"}]
+
+    monkeypatch.setattr(corpus, "_run_sql", fake_sql)
+    assert dc_mod.list_topics() == {"topics": ["b-topic", "a-topic"], "filtered": False, "skipped": []}
+    assert len(sqls) == 2 and "WHERE" not in sqls[1]
+
+    def down(sql: str, limit: int):
+        raise RuntimeError("Zetaris REST HTTP 503; body withheld")
+
+    monkeypatch.setattr(corpus, "_run_sql", down)
+    with pytest.raises(RuntimeError, match="503"):  # two attempts at most, then the error
+        dc_mod.list_topics()
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # resume_with_next_key.sh
 
 
 def _git_bash() -> str | None:
+    """A POSIX bash: `bash` on PATH unless it is the WSL launcher (PowerShell and cmd find that one first), else Git for
+    Windows' own bash next to git.exe or under Program Files."""
     found = shutil.which("bash")
-    if not found:
+    if found and not (os.name == "nt" and any(s in found.lower() for s in ("system32", "windowsapps"))):
+        return found
+    if os.name != "nt":
         return None
-    low = found.lower()
-    if os.name == "nt" and ("system32" in low or "windowsapps" in low):  # the WSL launcher, not Git Bash
-        return None
-    return found
+    roots: list[Path] = []
+    git = shutil.which("git")
+    if git:
+        roots += list(Path(git).resolve().parents)[1:3]  # ...\Git\cmd\git.exe or ...\Git\mingw64\bin\git.exe
+    for var in ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"):
+        if os.environ.get(var):
+            roots.append(Path(os.environ[var]) / "Git")
+    for root in roots:
+        for rel in ("bin/bash.exe", "usr/bin/bash.exe"):
+            if (root / rel).is_file():
+                return str(root / rel)
+    return None
 
 
 FAKE_PACKAGE_RUN = r'''
-import json, os, sys
+import json, os, subprocess, sys
 from pathlib import Path
 args = sys.argv[1:]
 sc = json.loads(Path(os.environ["FAKE_SCENARIO"]).read_text())
@@ -627,38 +947,89 @@ for line in Path(sc["env_file"]).read_text().splitlines():
         if k not in os.environ:
             os.environ[k] = v
 key = os.environ.get("MODEL_API_KEY", "")
+
+def argv_holders(value):
+    """Names of the running processes whose command line holds `value` (looked up while this run is alive; the value
+    reaches the lookup through its environment only)."""
+    if os.name == "nt":
+        ps = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+        script = ("$v = $env:QPROBE_VALUE; @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and "
+                  "$_.CommandLine.Contains($v) } | ForEach-Object { $_.Name }) -join ','")
+        p = subprocess.run([ps, "-NoProfile", "-NonInteractive", "-Command", script], env=dict(os.environ, QPROBE_VALUE=value),
+                           capture_output=True, text=True, timeout=120)
+        return p.stdout.strip() if p.returncode == 0 else f"scan failed: {p.returncode}"
+    hits = []
+    for f in Path("/proc").glob("[0-9]*/cmdline"):
+        try:
+            if value.encode() in f.read_bytes():
+                hits.append(f.parent.name)
+        except OSError:
+            pass
+    return ",".join(hits)
+
+row = {"argv": args, "key": sc["values"].get(key, "?"), "blank_ok": os.environ.get("QTEST_KEY_A", "") == "" and os.environ.get("QTEST_KEY_B", "") == ""}
+if sc.get("scan"):
+    row["holders"] = argv_holders(key)
+    row["control"] = argv_holders("-m quorum_reasoning.run --topic")  # this very process: proves the lookup works
 print(f"fake run sees MODEL_API_KEY={key}")
 with rec.open("a") as fh:
-    fh.write(json.dumps({"argv": args, "key": sc["values"].get(key, "?"), "blank_ok": os.environ.get("QTEST_KEY_A", "") == "" and os.environ.get("QTEST_KEY_B", "") == ""}) + "\n")
+    fh.write(json.dumps(row) + "\n")
 sys.exit(codes[min(n, len(codes) - 1)])
 '''
 
 
-@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
-@pytest.mark.parametrize("codes,expected,keys_used", [([3, 0], 0, ["QTEST_KEY_A", "QTEST_KEY_B"]), ([3, 3], 3, ["QTEST_KEY_A", "QTEST_KEY_B"]), ([1], 1, ["QTEST_KEY_A"])])
-def test_resume_with_next_key_rotates_on_exit_3(tmp_path: Path, codes: list[int], expected: int, keys_used: list[str]):
+def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str], scan: bool = False) -> tuple[subprocess.CompletedProcess, list[dict], str]:
     pkg = tmp_path / "work" / "quorum_reasoning"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text("")
     (pkg / "run.py").write_text(FAKE_PACKAGE_RUN)
     env_file = tmp_path / ".env"
-    env_file.write_text(f"QTEST_KEY_A={VALUE_A}\nQTEST_KEY_B={VALUE_B}\n")
+    env_file.write_text(f"QTEST_KEY_A={values[0]}\nQTEST_KEY_B={values[1]}\n")
     records = tmp_path / "records.jsonl"
-    (tmp_path / "scenario.json").write_text(json.dumps({"records": str(records), "codes": codes, "env_file": str(env_file),
-                                                        "values": {VALUE_A: "QTEST_KEY_A", VALUE_B: "QTEST_KEY_B"}}))
+    (tmp_path / "scenario.json").write_text(json.dumps({"records": str(records), "codes": codes, "env_file": str(env_file), "scan": scan,
+                                                        "values": {values[0]: "QTEST_KEY_A", values[1]: "QTEST_KEY_B"}}))
     log = tmp_path / "run.log"
     env = {k: v for k, v in os.environ.items() if not k.startswith("QTEST_")}
     env["FAKE_SCENARIO"] = str(tmp_path / "scenario.json")
     proc = subprocess.run([_git_bash(), str(SCRIPTS / "resume_with_next_key.sh"), "--topic", "climate-policy", "--date", DATE,
                            "--attempt", "2", "--out", str(tmp_path / "store"), "--log", str(log), "--keys", "QTEST_KEY_A,QTEST_KEY_B",
                            "--env-file", str(env_file), "--python", sys.executable, "--workdir", str(tmp_path / "work"), "--", "--quiet"],
-                          env=env, capture_output=True, text=True, timeout=120)
-    assert proc.returncode == expected, proc.stdout + proc.stderr
-    rows = [json.loads(line) for line in records.read_text().splitlines()]
+                          env=env, capture_output=True, text=True, timeout=300)
+    rows = [json.loads(line) for line in records.read_text().splitlines()] if records.exists() else []
+    return proc, rows, (log.read_text(encoding="utf-8") if log.exists() else "") + proc.stdout + proc.stderr
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+@pytest.mark.parametrize("codes,expected,keys_used", [([3, 0], 0, ["QTEST_KEY_A", "QTEST_KEY_B"]), ([3, 3], 3, ["QTEST_KEY_A", "QTEST_KEY_B"]), ([1], 1, ["QTEST_KEY_A"])])
+def test_resume_with_next_key_rotates_on_exit_3(tmp_path: Path, codes: list[int], expected: int, keys_used: list[str]):
+    proc, rows, text = _run_resume_script(tmp_path, codes, (VALUE_A, VALUE_B))
+    assert proc.returncode == expected, text
     assert [r["key"] for r in rows] == keys_used
     assert ["--resume" in r["argv"] for r in rows] == [False, True][: len(rows)]
     assert all("--quiet" in r["argv"] and "--attempt" in r["argv"] for r in rows)
     assert all(r["blank_ok"] for r in rows)
-    text = log.read_text(encoding="utf-8") + proc.stdout + proc.stderr
     assert VALUE_A not in text and VALUE_B not in text and "MODEL_API_KEY=[redacted]" in text
     assert f"live exit={codes[0]} (QTEST_KEY_A)" in text
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+def test_resume_with_next_key_keeps_the_key_off_every_command_line(tmp_path: Path):
+    """While the run is alive no process (an `env` program, a wrapper shell, the run itself) shows the key value in its
+    command line; the value is unique to this test, so no other test's process can match it."""
+    values = (f"fake-key-scan-{uuid.uuid4().hex}", f"fake-key-scan-{uuid.uuid4().hex}")
+    proc, rows, text = _run_resume_script(tmp_path, [0], values, scan=True)
+    assert proc.returncode == 0, text
+    row, = rows
+    assert row["key"] == "QTEST_KEY_A" and row["control"] and not row["control"].startswith("scan failed"), row
+    assert row["holders"] == "", row
+
+
+def test_resume_with_next_key_never_calls_the_env_program():
+    """Static half of the check above, for machines without Git Bash: no code line runs `env` (it would take the key
+    as an argument) and the key is exported inside the run's subshell."""
+    text = (SCRIPTS / "resume_with_next_key.sh").read_text(encoding="utf-8")
+    code = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
+    env_call = re.compile(r"(?:^|[\s(;&|])(?:/usr/bin/)?env\s+(?:[\"'$-]|[A-Za-z_][A-Za-z0-9_]*=)")  # env "$X" / env -i / env NAME=
+    assert env_call.search('( cd "$WORKDIR" && env "${BLANK[@]}" "MODEL_API_KEY=$key" "$PY"') and env_call.search("env MODEL_API_KEY=1 x")
+    assert [line for line in code if env_call.search(line)] == []
+    assert 'export MODEL_API_KEY="$key"' in text and 'exec "$PY" -X utf8 -m quorum_reasoning.run' in text

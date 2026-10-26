@@ -9,27 +9,35 @@ one log per run and one status file per topic-date.
     # the same command with --live starts the paid runs
     python -X utf8 scripts/run_editions.py ... --live
 
+Topics: the listed ids, each checked against collection's `topics` table (a listed id that is not a row fails), or
+`all` = every row (only active rows in collection order once Zetaris registers `active` and `created_at`; until then
+`all` plans only and --live with it is refused). Topic ids follow the shared rule (tools/corpus._TOPIC_ID).
+
 Per topic: `scripts/dry_check.py` runs the graph with stand-ins on the day's corpus into --dry-check-out and counts the
 model calls per lane; the count, scaled by --estimate-factor, is the estimate. Topics are placed greedily, in the order
 given, on the key with the most room under the per-key caps (--max-calls-per-key fast-lane calls, --max-ultra-calls-per-key
-Ultra calls); a topic larger than any key's room starts on the key with the most room and continues on the next ones.
+Ultra calls); a topic larger than any key's room starts on the key with the most room and continues on the next ones,
+also when it is larger than all keys together: what is left when the keys have drained waits for the next window.
 Each key runs one live process at a time (`python -m quorum_reasoning.run --model live --corpus zetaris`) with
 MODEL_API_KEY set from that key's variable and every other key variable blank, so a process holds exactly one key.
 Exit 0 (or 2 with a stored snapshot of this run, i.e. published partial) -> published; exit 3 (route drained) -> the key
-is spent for this invocation and the topic is requeued as --resume on another key with room, else waiting_for_key;
-any other outcome -> failed with a short reason, the rest continue. A rerun of the same command skips what is
-published, resumes what has a checkpoint, and starts the rest.
+is spent for this invocation and the topic is requeued as --resume on another key with at least MIN_SEGMENT_CALLS of
+room, else waiting_for_key; any other outcome -> failed with a short reason, the rest continue. A rerun of the same
+command skips what is published, resumes what has a checkpoint, and starts the rest.
 
 Without --keys one worker runs every topic on the route in .env as it is (no key is injected): the Meterless route,
-or a single direct key.
+or a single direct key. The route counts as one key under the same caps (behind Nightshift it is still one NVIDIA
+account), so --max-calls-per-key bounds what one invocation starts there.
 
 Status files: <status-dir>/<date>/<topic>.json, written atomically (temp file + os.replace), plus _summary.json at the
 end. They hold key variable names, never values, and file names relative to --log-dir, never paths. Logs: one per run
 in <log-dir>/ (<date>_<topic>_run<NN>_<key>.log, <date>_<topic>_dry.log, <date>_runner.log); every key and token value
 the runner knows is replaced by [redacted] before a byte reaches a log.
 
-Exit code: 0 every topic published (or, without --live, every dry check passed and every topic has a key in the plan),
-1 a topic failed, 3 a topic is waiting for a key (none failed), 2 a usage or preflight refusal, 130 interrupted.
+Exit code: 0 every topic published (or, without --live, every dry check passed and the plan finishes every topic in
+this invocation), 1 a topic failed (a listed id that is not a row, or a row whose id breaks the rule, counts), 3 a
+topic is waiting for a key (none failed; without --live: the plan leaves one for the next window), 2 a usage or
+preflight refusal, 130 interrupted.
 """
 
 from __future__ import annotations
@@ -74,11 +82,11 @@ ESTIMATE_FACTOR = 1.6
 ULTRA_FLOOR_SHARE = 0.1
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a topic that fits no key whole starts only on a key with at least
 # 25 calls of room on each lane it needs, and a lane whose estimate is used up while the run still drains is taken to
-# need 25 more. Why: a resume first replays its journal, then needs room for real calls; starting it on a near-empty
-# key only adds refused requests to an empty bucket.
+# need 25 more; when no live key has that room the topic waits for a key. Why: a resume first replays its journal,
+# then needs room for real calls; starting it on a near-empty key only adds refused requests to an empty bucket.
 MIN_SEGMENT_CALLS = 25
 PACE_S = {"fast": 6.0, "ultra": 10.0}  # base pacing per call (README): the plan's duration is pacing only
-SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+TOPIC_RULE = "^[a-z0-9][a-z0-9-]{0,63}$"  # printed in messages; the rule itself is tools/corpus._TOPIC_ID
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SECRET_NAME = re.compile(r"KEY|TOKEN|SECRET|PASSWORD", re.I)
 EXTRA_KEY_NAME = re.compile(r"^MODEL_API_KEY_\w+$")
@@ -95,6 +103,18 @@ ROUTE = "route"  # the pseudo-key name without --keys: the route in .env as it i
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def topic_id_ok(topic: Any) -> bool:
+    """The shared topic-id rule: collection's CHECK on topics.id, tools/corpus._TOPIC_ID (run.py) and the collectors.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the runner, the dry check and resume_with_next_key.sh take topic
+    ids by the shared rule (fullmatch, so not even a trailing newline passes), not a stricter slug of their own. Why: a
+    row such as `ai--jobs` is collected and run.py runs it; the stricter rule refused it when listed and dropped it from
+    `all` without a trace. The rule has no dots or slashes, so status and log names stay inside their folders."""
+    from quorum_reasoning.tools.corpus import _TOPIC_ID
+
+    return isinstance(topic, str) and _TOPIC_ID.fullmatch(topic) is not None
 
 
 def edition_cut_utc(edition_date: str) -> datetime:
@@ -292,15 +312,19 @@ class Planner:
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): topics are taken in the order given (a resumed topic goes back to
     the front); each goes to the idle key with the most room that fits its whole estimate on both lanes; when only a
-    busy key could fit it, it waits for that key and later topics may use the idle keys; when no key fits it whole but
-    all keys together have room, it starts on the idle key with the most room and continues with --resume on the next
-    key once that one drains, and the rest of its estimate is held on the other keys (most room first) so later topics
-    cannot take it; when even all keys together lack the room, it waits for a key (state waiting_for_key). A key that
-    drained (exit 3) takes nothing more in this invocation. A reservation is replaced by the calls the journal shows
-    once the run ends; a topic's holds are given back when it is placed again or ends. Why: one live topic-day is
-    1 500-1 600 fast-lane calls (2026-10-24 attempts 3 and 5) against ~650 per key per window, so most topics span
-    keys; finishing a started topic before starting the next publishes whole editions instead of several half-done
-    ones, and the journal plus checkpoint make a split lossless.
+    busy key could fit it, it waits for that key and later topics may use the idle keys; when no key fits it whole, it
+    starts on the idle key with the most room (at least MIN_SEGMENT_CALLS on each lane it needs) if all live keys
+    together have its room, or, once every live key is idle, whatever they have; it continues with --resume on the
+    next key once that one drains, and the rest of its estimate is held on the other keys (most room first) so later
+    topics cannot take it. What is left when every key has drained waits for the next window's rerun, which resumes
+    it from its checkpoint and journal with a smaller need (state waiting_for_key, also when no live key has
+    MIN_SEGMENT_CALLS of room). A key that drained (exit 3) takes nothing more in this invocation. A reservation is
+    replaced by the calls the journal shows once the run ends; a topic's holds are given back when it is placed again
+    or ends. Why: one live topic-day is 1 500-1 600 fast-lane calls (2026-10-24 attempts 3 and 5) against ~650 per key
+    per window, so most topics span keys, and on one key or the route nearly every topic is larger than all keys
+    together; finishing a started topic before starting the next publishes whole editions instead of several half-done
+    ones, and the journal plus checkpoint make a split lossless. Supersedes (review round 1, 2026-10-26) the first
+    rule that a topic larger than all keys together waits without starting: no rerun could ever start it.
     """
 
     def __init__(self, keys: list[Key], items: Iterable[Item]):
@@ -353,16 +377,18 @@ class Planner:
             return "start", _most_room(fit_idle), ""
         if any(fits(k) for k in busy):
             return "wait", None, ""
+        starters = [k for k in idle if k.room[0] >= min(MIN_SEGMENT_CALLS, nf) and k.room[1] >= min(MIN_SEGMENT_CALLS, nu)]
         total_f = sum(k.room[0] for k in alive)
         total_u = sum(k.room[1] for k in alive)
-        if total_f >= nf and total_u >= nu:
-            starters = [k for k in idle if k.room[0] >= min(MIN_SEGMENT_CALLS, nf) and k.room[1] >= min(MIN_SEGMENT_CALLS, nu)]
-            if starters:
-                return "start", _most_room(starters), ""
+        if starters and ((total_f >= nf and total_u >= nu) or not busy):
+            return "start", _most_room(starters), ""  # all idle: whatever the keys have; the rest waits for a rerun
         if busy:
             return "wait", None, ""  # a running reservation may come back when its run ends
-        return "none", None, (f"needs about {nf} fast-lane and {nu} Ultra calls; the keys left have {total_f} and {total_u}: "
-                              "rerun the same command once the keys have rested (>= 6 h), or add a key")
+        most_f = max(k.room[0] for k in alive)
+        most_u = max(k.room[1] for k in alive)
+        return "none", None, (f"needs about {nf} fast-lane and {nu} Ultra calls; no key left has {MIN_SEGMENT_CALLS} calls of room "
+                              f"on each lane it needs (most: {most_f} fast-lane, {most_u} Ultra): rerun the same command once the "
+                              "keys have rested (>= 6 h), or add a key")
 
     def place(self) -> list[tuple[Item, Key, tuple[int, int]]]:
         started: list[tuple[Item, Key, tuple[int, int]]] = []
@@ -755,7 +781,9 @@ def resolve_value(name: str, file_values: dict[str, str]) -> str:
     return (os.environ.get(name) or "").strip() or (file_values.get(name) or "").strip()
 
 
-def list_db_topics(ctx: Ctx) -> list[str]:
+def list_db_topics(ctx: Ctx) -> dict[str, Any]:
+    """collection's topics table through `dry_check.py --list-topics`: {"topics": [ids], "filtered": bool (active rows in
+    collection order), "skipped": [{"id", "reason"}]}. A listed id that breaks the shared rule moves to skipped."""
     argv = ctx.dry_cmd + ["--list-topics"] + (["--env-file", str(ctx.env_file)] if ctx.env_file else [])
     env = _child_env(ctx, None)
     for name in ("MODEL_API_KEY", "METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN"):
@@ -763,14 +791,26 @@ def list_db_topics(ctx: Ctx) -> list[str]:
     proc = subprocess.run(argv, cwd=str(ctx.workdir), env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
     if proc.returncode != 0:
         raise RuntimeError(clean_reason(proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else f"exit {proc.returncode}", ctx.redactor))
-    topics = json.loads(proc.stdout.strip().splitlines()[-1])
-    return [t for t in topics if isinstance(t, str) and SLUG.match(t)]
+    lines = proc.stdout.strip().splitlines()
+    doc = json.loads(lines[-1]) if lines else None
+    if not isinstance(doc, dict) or not isinstance(doc.get("topics"), list):
+        raise RuntimeError("dry_check.py --list-topics printed no topic listing")
+    topics: list[str] = []
+    skipped = [s for s in (doc.get("skipped") or []) if isinstance(s, dict)]
+    for t in doc["topics"]:
+        if topic_id_ok(t):
+            if t not in topics:
+                topics.append(t)
+        else:
+            skipped.append({"id": str(t)[:64], "reason": f"not a topic id by the shared rule {TOPIC_RULE}"})
+    return {"topics": topics, "filtered": doc.get("filtered") is True, "skipped": skipped}
 
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Run one date's editions for a list of topics with key rotation (dry checks only unless --live).")
     ap.add_argument("--date", required=True, help="edition date, YYYY-MM-DD")
-    ap.add_argument("--topics", required=True, help="comma-separated topic ids, or 'all' for every row of collection's topics table")
+    ap.add_argument("--topics", required=True, help="comma-separated topic ids (each must be a row of collection's topics table), or 'all' "
+                                                    "for every row (plan only until Zetaris registers topics.active and created_at)")
     ap.add_argument("--keys", default=None, help="comma-separated environment variable NAMES holding direct-route keys, each NAME[=FAST[/ULTRA]] "
                                                  "to set its caps; omit to run every topic on the route in .env as it is (one worker, nothing injected)")
     ap.add_argument("--out", required=True, help="the live snapshot store (run.py --out)")
@@ -820,8 +860,9 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
     topics: list[str] = []
     if topics_arg != "all":
         for t in [t.strip() for t in topics_arg.split(",") if t.strip()]:
-            if not (SLUG.match(t) and len(t) <= 64):
-                return refuse(f"topic ids are lower-case slugs (letters, digits, single hyphens), at most 64 characters: {t[:64]!r}")
+            if not topic_id_ok(t):
+                return refuse(f"a topic id follows the shared rule {TOPIC_RULE} (lower-case letters, digits, hyphens; "
+                              f"at most 64 characters): {t[:64]!r}")
             if t not in topics:
                 topics.append(t)
         if not topics:
@@ -910,29 +951,53 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
 def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str], unusable: list[str]) -> int:
     mode = "live" if args.live else "dry"
     started_at = now_iso()
-    if not topics:
-        try:
-            topics = list_db_topics(ctx)
-        except Exception as exc:  # noqa: BLE001
-            print(f"refusing to run: --topics all could not read collection's topics table: {exc}", file=sys.stderr)
+    try:
+        listing = list_db_topics(ctx)
+    except Exception as exc:  # noqa: BLE001
+        print(f"refusing to run: could not read collection's topics table: {exc}", file=sys.stderr)
+        return 2
+    rows: list[str] = listing["topics"]
+    skipped: list[dict[str, Any]] = listing["skipped"]
+    row_word = "an active row" if listing["filtered"] else "a row"
+    not_rows: set[str] = set()
+    if not topics:  # --topics all
+        # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): `--topics all --live` is refused while the listing is
+        # unfiltered (decision at dry_check.list_topics). Why: retired rows would each get a paid ~1 500-call run, in
+        # no set order, while the order given decides what is finished first.
+        if args.live and not listing["filtered"]:
+            print("refusing to run: --topics all with --live needs topics.active and topics.created_at through Zetaris (retired "
+                  "topics, collection order), which are not registered there yet; list the topics in priority order instead, "
+                  "or drop --live to plan", file=sys.stderr)
             return 2
-        if not topics:
+        topics = list(rows)
+        if not topics and not skipped:
             print("refusing to run: collection's topics table is empty", file=sys.stderr)
             return 2
+    else:
+        not_rows = {t for t in topics if t not in set(rows)}
     ctx.say(f"run_editions {mode}: {args.date}, {len(topics)} topics ({', '.join(topics)}); keys: "
             + ", ".join(f"{k.name} {k.cap_fast}/{k.cap_ultra}" for k in keys)
             + (f"; not usable (no value): {', '.join(unusable)}" if unusable else ""))
     if datetime.now(timezone.utc) < edition_cut_utc(args.date):
         ctx.say(f"note: before the edition cut ({edition_cut_utc(args.date).strftime('%Y-%m-%dT%H:%MZ')}): the day's corpus is not complete yet")
+    if args.topics.strip() == "all" and not listing["filtered"]:
+        ctx.say("note: Zetaris shows no topics.active / created_at: 'all' is every row in no set order, retired topics included")
+    for s in skipped:
+        ctx.say(f"skipped a topics row {s.get('id')!r}: {s.get('reason')}")
     statuses = Statuses(ctx.status_dir, ctx.date, ctx.redactor)
     usable_keys = [k for k in keys if not k.inject or k.name in ctx.key_values]  # live mode refused unusable ones already
 
-    # 1. what is already published, and the dry checks for the rest
+    # 1. what is not a row, what is already published, and the dry checks for the rest
     todo: list[str] = []
     final: dict[str, dict[str, Any]] = {}
     for topic in topics:
         rid = run_id(topic, ctx.date, ctx.attempt)
         statuses.open(topic, rid)
+        if topic in not_rows:
+            final[topic] = statuses.save(topic, state="failed", reason=f"not {row_word} in collection's topics table: nothing is "
+                                         "collected under it (add the row, e.g. with topics --suggest --sql, then rerun)")
+            ctx.say(f"{topic}: failed, not {row_word} in collection's topics table")
+            continue
         done = published_by(ctx.out, topic, ctx.date, rid)
         if done:
             final[topic] = statuses.save(topic, state="published", version=done[0], snapshot_status=done[1], reason="already published by an earlier run")
@@ -981,7 +1046,7 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
 
     if mode == "live":
         _drive(ctx, statuses, usable_keys, items, final)
-    return _summary(ctx, args, mode, started_at, topics, final, keys, plan)
+    return _summary(ctx, args, mode, started_at, topics, final, keys, plan, skipped)
 
 
 def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], final: dict[str, dict[str, Any]]) -> None:
@@ -1081,13 +1146,17 @@ def _record(ctx: Ctx, statuses: Statuses, planner: Planner, final: dict[str, dic
 
 
 def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, topics: list[str],
-             final: dict[str, dict[str, Any]], keys: list[Key], plan: dict[str, dict[str, Any]]) -> int:
+             final: dict[str, dict[str, Any]], keys: list[Key], plan: dict[str, dict[str, Any]],
+             skipped: list[dict[str, Any]] | None = None) -> int:
     rows = []
     for t in topics:
         doc = final.get(t) or ctx_status(ctx, t)
         rows.append({"topic": t, "state": doc.get("state"), "calls_estimate": doc.get("calls_estimate_lanes"),
                      "version": doc.get("version"), "attempts": doc.get("attempts"), "reason": doc.get("reason"),
                      "plan_outcome": doc.get("plan_outcome")})
+    for s in skipped or []:  # no status file: the id is not safe as a file name
+        rows.append({"topic": str(s.get("id"))[:64], "state": "failed", "calls_estimate": None, "version": None, "attempts": None,
+                     "reason": f"topics row skipped, not run: {s.get('reason')}", "plan_outcome": None, "skipped_row": True})
     summary = {"date": ctx.date, "mode": mode, "started_at": started_at, "ended_at": now_iso(),
                "keys": [{"name": k.name, "cap_fast": k.cap_fast, "cap_ultra": k.cap_ultra, "used_fast": k.used_fast,
                          "used_ultra": k.used_ultra, "drained": k.drained, "usable": (not k.inject) or k.name in ctx.key_values} for k in keys],
@@ -1096,7 +1165,8 @@ def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, top
     ctx.say(f"summary ({mode}, {ctx.date}):")
     for r in rows:
         est = r["calls_estimate"] or {}
-        ctx.say(f"  {r['topic']:<32} {r['state'] or '-':<16} est {est.get('fast', '-')}/{est.get('ultra', '-')}"
+        name = repr(r["topic"]) if r.get("skipped_row") else r["topic"]
+        ctx.say(f"  {name:<32} {r['state'] or '-':<16} est {est.get('fast', '-')}/{est.get('ultra', '-')}"
                 + (f"  v{r['version']}" if r["version"] else "") + (f"  ({r['reason']})" if r["reason"] else ""))
     states = [r["state"] for r in rows]
     if "failed" in states:

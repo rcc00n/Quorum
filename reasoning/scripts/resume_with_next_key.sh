@@ -25,6 +25,9 @@
 # extra run.py arguments, starts the first run itself and reads each run's exit code, instead of waiting for a
 # "live exit=N" line in a fixed log. Why: run.py never prints that line, so the old script waited forever; it also
 # hardcoded russia-ukraine-war 2026-10-24, snapshots/_private and the _2 -> _3 order.
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the run's subshell sets MODEL_API_KEY and the blanks with the
+# `export` builtin and then execs Python; no external `env` program is used. Why: /usr/bin/env took them as arguments
+# and, under Git Bash, stayed alive as the run's parent for hours with the key readable in its process command line.
 set -u
 
 usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -51,7 +54,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$TOPIC" ] && [ -n "$DATE" ] || { echo "--topic and --date are required (see --help)" >&2; exit 2; }
-[[ "$TOPIC" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "--topic must be a lower-case slug" >&2; exit 2; }
+[[ "$TOPIC" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || { echo "--topic must follow the shared topic-id rule ^[a-z0-9][a-z0-9-]{0,63}\$" >&2; exit 2; }
 [[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "--date must be YYYY-MM-DD" >&2; exit 2; }
 [[ "$ATTEMPT" =~ ^[1-9][0-9]*$ ]] || { echo "--attempt must be a positive integer" >&2; exit 2; }
 for arg in ${EXTRA[@]+"${EXTRA[@]}"}; do
@@ -92,10 +95,10 @@ sys.stdout.write((dotenv_values(sys.argv[1]).get(sys.argv[2]) or "").strip())' "
 }
 
 # every key variable is blank in the child (one key per process): the listed names and any MODEL_API_KEY_* known here
-BLANK=()
+BLANK_NAMES=()
 for name in "${KEY_NAMES[@]}" $(compgen -e | grep -E '^MODEL_API_KEY_[A-Za-z0-9_]+$' || true) \
             $( [ -f "$ENVFILE" ] && grep -oE '^MODEL_API_KEY_[A-Za-z0-9_]+' "$ENVFILE" || true ); do
-  BLANK+=("$name=")
+  BLANK_NAMES+=("$name")
 done
 
 # the log filter: the key value (passed in the filter's environment, never on a command line) becomes [redacted]
@@ -118,7 +121,11 @@ for name in "${KEY_NAMES[@]}"; do
   flag=(); [ "$resume" = 1 ] && flag=(--resume)
   echo "$(stamp) $TOPIC $DATE attempt $ATTEMPT on $name${flag[*]:+ (resume)}; log $LOG"
   echo "=== $TOPIC $DATE attempt $ATTEMPT on $name${flag[*]:+ (resume)} at $(stamp) ===" >> "$LOG"
-  ( cd "$WORKDIR" && env "${BLANK[@]}" "MODEL_API_KEY=$key" PYTHONUNBUFFERED=1 "$PY" -X utf8 -m quorum_reasoning.run \
+  # builtins only between the key and Python: nothing carries the value on a command line (decision at the top)
+  ( cd "$WORKDIR" || exit 1
+    for n in "${BLANK_NAMES[@]}"; do export "$n="; done
+    export MODEL_API_KEY="$key" PYTHONUNBUFFERED=1
+    exec "$PY" -X utf8 -m quorum_reasoning.run \
       --topic "$TOPIC" --date "$DATE" --model live --corpus zetaris --out "$OUT" --attempt "$ATTEMPT" --verbose \
       ${flag[@]+"${flag[@]}"} ${EXTRA[@]+"${EXTRA[@]}"} 2>&1 ) | QUORUM_REDACT_VALUE="$key" "$PY" -c "$REDACT" >> "$LOG"
   code=${PIPESTATUS[0]}
