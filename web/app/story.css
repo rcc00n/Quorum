@@ -285,8 +285,10 @@
   color: var(--ink);
 }
 
-/* The contents line and the three sections: each section one object on the full column, a hairline above its
-   head, the head and the body on the same left edge, a part number before the title; 96 px of air between. */
+/* The contents line and the three sections: each section one panel on the full column with its own paper
+   (Anastasia, 2026-10-26: the sections must stand apart as objects): 01 on --paper-2, 02 on paper in a hairline
+   frame, 03 on --paper-3; 8 px corners, the head and the body inside on one left edge, a part number before the
+   title; 32 px between panels. */
 .story-page .analysis-navigation {
   margin: 32px 0 0;
   padding: 0;
@@ -320,14 +322,23 @@
   display: none;
 }
 .story-page .analysis-navigation + .analysis-block {
-  margin-top: 96px;
+  margin-top: 64px;
 }
 .story-page .analysis-block {
-  margin-top: 96px;
-  padding-top: 32px;
-  border-top: 1px solid var(--rule);
+  margin-top: 32px;
+  padding: 40px 40px 48px;
+  border-top: 0;
+  border-radius: var(--radius);
+  background: var(--paper-2);
   scroll-margin-top: 88px;
   counter-increment: story-part;
+}
+.story-page #perspective-comparison {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+.story-page #investigation-timeline {
+  background: var(--paper-3);
 }
 .story-page .analysis-block-heading {
   max-width: none;
@@ -365,9 +376,10 @@
   border-top: 0;
 }
 .story-page .revision-section {
-  margin-top: 96px;
-  padding-top: 32px;
-  border-top: 1px solid var(--rule);
+  margin-top: 32px;
+  padding: 40px 40px 48px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 .story-page .revision-section > h2 {
   margin: 0 0 24px;
@@ -418,10 +430,12 @@
     font-size: 24px;
   }
   .story-page .analysis-block,
-  .story-page .revision-section,
+  .story-page .revision-section {
+    margin-top: 24px;
+    padding: 24px 20px 28px;
+  }
   .story-page .analysis-navigation + .analysis-block {
-    margin-top: 64px;
-    padding-top: 24px;
+    margin-top: 48px;
   }
   .story-page .analysis-block,
   .story-page .claim-detail {
