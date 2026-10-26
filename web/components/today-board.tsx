@@ -136,8 +136,10 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
             ? "No story crossed the bar today"
             : own.length
               ? `${own.length} ${own.length === 1 ? "story" : "stories"} today`
-              : isPast && noEdition
-                ? "No edition installed for this date"
+              : isPast
+                ? noEdition
+                  ? "No edition installed for this date"
+                  : "No edition for this topic on this date"
                 : passed
                   ? "Waiting for the edition"
                   : `Cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
@@ -176,8 +178,11 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
                 <li className="tb-card tb-card-wait">
                   <div className="tb-card-link">
                     <span className="tb-card-topic">{t.name}</span>
-                    <h3>{passed ? "Not published yet." : "Not cut yet."}</h3>
-                    <p>{`Edition cut 05:30 New York, ${utcLabel(cut)}${passed ? "" : `, in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}. The team prepares the edition after the cut.`}</p>
+                    <h3>{isPast ? "No edition for this topic." : passed ? "Not published yet." : "Not cut yet."}</h3>
+                    {/* DECISION(2026-10-26, Anastasia/Claude Code): on a past date a topic without an edition says so; the cut
+                        promise ("the team prepares the edition after the cut") is for today only. Why: once other topics
+                        of that day are installed, "waiting" would be false for the missing one. */}
+                    <p>{isPast ? `Nothing was installed for ${t.name} on ${longDate(day)}.` : `Edition cut 05:30 New York, ${utcLabel(cut)}${passed ? "" : `, in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}. The team prepares the edition after the cut.`}</p>
                   </div>
                 </li>
               )}
