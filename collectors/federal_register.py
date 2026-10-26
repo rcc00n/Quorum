@@ -26,9 +26,28 @@ _TYPE_MAP = {"PRESIDENTIALDOCUMENT": "order", "PRESDOCU": "order", "RULE": "law"
              "PROPOSEDRULE": "release", "PRORULE": "release", "NOTICE": "release"}
 
 
+def fr_term_query(query_terms: list[str]) -> str:
+    """Federal Register `conditions[term]`: terms joined with ` | ` (OR); multi-word terms in double quotes.
+
+    DECISION(2026-10-26, Anastasia/Claude Code; found by Yelysei, Issue #2 6405714186): a multi-word term must be
+    quoted, otherwise the API searches its words separately (implicit AND), so `data centers` matched any document
+    with both words anywhere. Why: live check 2026-10-26 on the AI topic's 13 terms: 19–23 October 65 documents
+    unquoted vs 13 quoted, 25–26 October 12 vs 3; the unquoted extras (SNAP card security, NIH meetings) carried no
+    topic term in their titles and two were final rules, which reasoning reads as establishing documents. Applies to
+    rows collected from now on; earlier rows stay (reasoning filters official documents by a title/abstract match).
+    """
+    parts = []
+    for term in query_terms:
+        t = term.strip().replace('"', "")
+        if not t:
+            continue
+        parts.append(f'"{t}"' if " " in t else t)
+    return " | ".join(parts)
+
+
 def collect(conn, fetcher: Fetcher, topic: dict, *, per_page: int = 50) -> dict:
     stats = {"seen": 0, "inserted": 0}
-    term = " | ".join(topic["query_terms"])  # FR search supports OR with '|'
+    term = fr_term_query(topic["query_terms"])
     resp = fetcher.get(
         API, respect_robots=False,
         params={"conditions[term]": term, "order": "newest", "per_page": per_page,

@@ -5,6 +5,7 @@ Usage:
     python3 -m collectors.run                # all collectors, all topics
     python3 -m collectors.run --only rss     # one collector: rss | guardian | federal_register | congress
     python3 -m collectors.run --loop 900     # repeat every 15 minutes
+    python3 -m collectors.run --topic <slug> # one pass for one topic only (COLL-DEMO-01, about 10 minutes)
 
 Schedule it with cron or `--loop`; no daemon framework yet (see collectors/README.md › Decisions).
 """
@@ -38,7 +39,7 @@ TOPICS = {
 log = logging.getLogger("collectors.run")
 
 
-def run_once(only: str | None = None) -> dict:
+def run_once(only: str | None = None, topic_id: str | None = None) -> dict:
     conn = connect()
     fetcher = Fetcher()
     n = load_sources_csv(conn)
@@ -69,9 +70,20 @@ def run_once(only: str | None = None) -> dict:
             report[key] = {"error": type(exc).__name__}
             errors += 1
 
-    for topic_id, spec in TOPICS.items():
-        ensure_topic(conn, topic_id, spec["name"], spec["query_terms"])
+    for seed_id, spec in TOPICS.items():
+        ensure_topic(conn, seed_id, spec["name"], spec["query_terms"])
     topics = load_topics(conn)
+    if topic_id is not None:
+        # DECISION(2026-10-26, Anastasia/Claude Code; asked by Yelysei, Issue #2 6405714186 item 3, COLL-DEMO-01): an
+        # on-demand pass for one topic, run by hand on the collector machine when a judge or user types a new topic,
+        # so its first documents arrive in about 10 minutes instead of waiting for the loop (45–75 min with six
+        # topics). Only the named topic is matched in this pass; the loop's collection order and ownership rule are
+        # unchanged, so a document the pass stores under this topic is one the older topics would not have claimed
+        # only if their terms do not match it — the next loop pass does not move rows. Why: the demo lets judges type
+        # their own topics and expects a brief during judging.
+        topics = [t for t in topics if t["id"] == topic_id]
+        if not topics:
+            log.error("topic %r is not an active topic with query terms; nothing collected", topic_id)
     log.info("topics: %s", ", ".join(f"{t['id']} ({len(t['query_terms'])} terms)" for t in topics) or "none active")
     if only in (None, "rss"):
         # Feeds are walked once per pass for all topics (first_topic_match in common.py; decision: README › Decisions,
@@ -100,13 +112,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", choices=["rss", "guardian", "federal_register", "congress"])
     parser.add_argument("--loop", type=int, metavar="SECONDS", help="repeat forever with this interval")
+    parser.add_argument("--topic", metavar="SLUG", help="collect only this active topic in this pass (COLL-DEMO-01)")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(name)s %(message)s")
     # httpx logs every request URL, including api-key query parameters; keep those out of terminals and screenshots.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     while True:
-        report = run_once(args.only)
+        report = run_once(args.only, args.topic)
         errors = report.pop("_errors", 0)
         total = sum(r.get("inserted", 0) for r in report.values())
         log.info("pass complete: %d new rows, %d collector errors", total, errors)

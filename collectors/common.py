@@ -185,10 +185,24 @@ def first_topic_match(title: str, lead: str | None, topics: list[dict]) -> tuple
 _TRACKING = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "cmpid", "ito"}
 
 
+_NEWSMAX_SECTION = re.compile(r"^/[a-z0-9-]+(/.+/id/\d+)$")
+
+
 def canonicalize(url: str) -> str:
     parts = urlsplit(url.strip())
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in _TRACKING]
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/") or "/", urlencode(query), ""))
+    netloc = parts.netloc.lower()
+    path = parts.path.rstrip("/") or "/"
+    if netloc.endswith("newsmax.com"):
+        # DECISION(2026-10-26, Anastasia/Claude Code; found by Yelysei, Issue #2 6405714186): Newsmax publishes one
+        # story under several section paths (/newsfront/<slug>/<date>/id/<n> and /politics/<slug>/<date>/id/<n>);
+        # the leading section segment is dropped from the canonical URL so the numeric id identifies the story and
+        # the second section feed refreshes the first row instead of inserting a duplicate. Why: 3 of 14 current
+        # Newsmax rows on 2026-10-26 were such pairs, counted twice in spread. documents.url keeps the URL as seen.
+        m = _NEWSMAX_SECTION.match(path)
+        if m:
+            path = m.group(1)
+    return urlunsplit((parts.scheme.lower(), netloc, path, urlencode(query), ""))
 
 
 def content_hash(title: str, lead: str | None, text: str | None) -> str:
