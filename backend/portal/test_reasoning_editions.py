@@ -1,0 +1,186 @@
+"""Login-only reader tests: synthetic editions in a temporary directory, stubbed Git reads, no provider calls."""
+import hashlib
+import io
+import json
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+from django.contrib.auth.models import User
+from django.core.management import call_command, CommandError
+from django.test import TestCase, override_settings
+from .reasoning_preview import SAMPLE
+from .reasoning_editions import ENABLE, ROOT
+
+CONFIG = b"TEST config"
+COMMAND = "portal.management.commands.reasoning_snapshot.subprocess.check_output"
+
+
+def genuine(name, topic_id=None):
+    """A bundled fictional sample relabelled as a TEST genuine run (never a real provider output)."""
+    p = json.loads(SAMPLE.with_name(name).read_bytes())
+    p["provenance"].update(fictional=False, corpus="zetaris", model="TEST/model", model_calls=1,
+                           model_errors=0, answered_by={"TEST/model": 1})
+    if topic_id:
+        p["topic_id"] = topic_id
+        p["run_id"] = f"{p['edition_date']}-{topic_id}-{p['version']}"
+    return p
+
+
+class ReasoningEditionsTests(TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "editions"
+        self.root.mkdir(mode=0o700)
+        self.work = Path(self.temp.name) / "work"
+        self.work.mkdir()
+        self.reader = User.objects.create_user("TEST-editions-reader")
+        self.env = patch.dict(os.environ, {ENABLE: "1", ROOT: str(self.root), "QUORUM_CATALOG_PATH": ""})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def write(self, p, label):
+        raw = json.dumps(p).encode()
+        sidecar = dict(
+            snapshot={k: p[k] for k in ("topic_id", "edition_date", "version", "run_id", "status")},
+            provisional=False, corpus_as_of_utc=p["window"]["start"],
+            edition_window_utc=[p["window"][k] for k in ("start", "end")],
+            producer=dict(commit="aaaaaaa (TEST producer)", config_sha256=hashlib.sha256(CONFIG).hexdigest()),
+            private_evidence=dict(log="TEST-private-path"),
+        )
+        sidecar["snapshot"]["sha256"] = hashlib.sha256(raw).hexdigest()
+        sidecar_raw = json.dumps(sidecar).encode()
+        (self.work / f"{label}.json").write_bytes(raw)
+        (self.work / f"{label}.sidecar.json").write_bytes(sidecar_raw)
+        return dict(file=str(self.work / f"{label}.json"), sha256=hashlib.sha256(raw).hexdigest(),
+                    sidecar=str(self.work / f"{label}.sidecar.json"),
+                    sidecar_sha256=hashlib.sha256(sidecar_raw).hexdigest(), producer_commit="a" * 40)
+
+    def accept(self, options, blocked=False, **changes):
+        out = io.StringIO()
+        with patch(COMMAND, return_value=CONFIG):
+            if blocked:
+                with self.assertRaises(CommandError):
+                    call_command("reasoning_snapshot", stdout=out, **(options | changes))
+            else:
+                call_command("reasoning_snapshot", stdout=out, **(options | changes))
+        self.assertNotIn("TEST-private-path", out.getvalue())
+        return json.loads(out.getvalue())
+
+    def install_two_topics(self):
+        story = genuine("snapshot.sample.json")
+        quiet = genuine("snapshot.empty-day.sample.json", "climate-policy")
+        self.accept(self.write(story, "story"), install=True)
+        self.accept(self.write(quiet, "quiet"), install=True)
+        return story, quiet
+
+    def test_reader_off_or_unconfigured_changes_nothing(self):
+        self.install_two_topics()
+        self.client.force_login(self.reader)
+        for env in ({ENABLE: "0"}, {ROOT: ""}, {ROOT: "relative/editions"}):
+            with self.subTest(env=env), patch.dict(os.environ, env):
+                data = self.client.get("/api/feed/?date=2026-10-22").json()
+                self.assertEqual(data["status"], "pending")
+                self.assertEqual(data["events"], [])
+                self.assertEqual(data["publication"]["status"], "pending")
+
+    def test_installed_editions_reach_only_signed_in_readers(self):
+        story, quiet = self.install_two_topics()
+        self.assertEqual(self.client.get("/api/feed/?date=2026-10-22").status_code, 401)
+        self.client.force_login(self.reader)
+        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        self.assertEqual(data["status"], "available")
+        self.assertEqual(data["publication"]["status"], "available")
+        self.assertEqual(data["publication"]["revision"], "editions-2026-10-22")
+        self.assertEqual(data["publication"]["mode"], "live")
+        self.assertFalse(data["publication"]["fallback"])
+        self.assertTrue(data["publication"]["published_at"].endswith("Z"))
+        self.assertEqual({t["id"] for t in data["topics"]}, {"russia-ukraine-war", "climate-policy"})
+        self.assertEqual([e["topic_id"] for e in data["events"]], ["russia-ukraine-war"] * len(story["stories"]))
+        for event in data["events"]:
+            # The presentation is the preview's: the story's reasoning block, never an invented analysis.
+            self.assertIn("reasoning", event)
+            self.assertNotIn("analysis", event)
+        editions = {e["topic_id"]: e for e in data["editions"]}
+        self.assertEqual(set(editions), {"russia-ukraine-war", "climate-policy"})
+        self.assertTrue(editions["climate-policy"]["quiet_day"])
+        self.assertEqual(editions["climate-policy"]["completion"], "complete")
+        self.assertEqual(editions["climate-policy"]["summary"], quiet["summary"])
+        items = [i for g in editions["climate-policy"]["roundup"] for i in g["items"]]
+        self.assertEqual(len(items), quiet["roundup"]["count"])
+        self.assertTrue(all(i["event_id"] is None and i["status"] == "unknown" for i in items))
+        self.assertEqual(data["errors"], [])
+        self.assertNotIn("TEST-private-path", json.dumps(data))
+        by_topic = self.client.get("/api/feed/?date=2026-10-22&topic=climate-policy").json()
+        self.assertEqual(by_topic["events"], [])
+        self.assertEqual([e["topic_id"] for e in by_topic["editions"]], ["climate-policy"])
+        other = self.client.get("/api/feed/?date=2026-10-22&revision=other").json()
+        self.assertEqual(other["publication"]["status"], "pending")
+        missing_day = self.client.get("/api/feed/?date=2026-10-23").json()
+        self.assertEqual(missing_day["publication"]["status"], "pending")
+        missing_topic = self.client.get("/api/feed/?date=2026-10-22&topic=ai-regulation").json()
+        self.assertEqual(missing_topic["publication"]["status"], "pending")
+
+    def test_event_detail_comes_from_the_installed_edition(self):
+        story, _ = self.install_two_topics()
+        event_id = story["stories"][0]["event_id"]
+        self.client.force_login(self.reader)
+        for query in ("?date=2026-10-22", ""):
+            with self.subTest(query=query):
+                data = self.client.get(f"/api/events/{event_id}/{query}").json()
+                self.assertEqual([e["id"] for e in data["events"]], [event_id])
+                self.assertEqual(data["events"][0]["reasoning"]["reading_minutes"], story["stories"][0]["reading_minutes"])
+                self.assertEqual(data["publication"]["revision"], "editions-2026-10-22")
+        unknown = self.client.get("/api/events/TEST-unknown/?date=2026-10-22").json()
+        self.assertEqual(unknown["events"], [])
+        self.assertEqual(unknown["publication"]["revision"], "editions-2026-10-22")
+        nowhere = self.client.get("/api/events/TEST-unknown/").json()
+        self.assertEqual(nowhere["events"], [])
+        self.assertEqual(nowhere["publication"]["status"], "pending")
+
+    def test_fictional_installs_only_in_debug_and_reads_as_demo(self):
+        sample = json.loads(SAMPLE.read_bytes())
+        options = self.write(sample, "fictional")
+        report = self.accept(options, blocked=True, install=True)
+        self.assertIn("genuine_model_output_required", report["issues"])
+        with override_settings(DEBUG=False):
+            report = self.accept(options, blocked=True, install=True, allow_fictional=True)
+        self.assertIn("allow_fictional_requires_debug", report["issues"])
+        with override_settings(DEBUG=True):
+            report = self.accept(options, install=True, allow_fictional=True)
+        self.assertTrue(report["installed"] and report["fictional"])
+        self.assertFalse(report["published"])
+        self.assertTrue((self.root / "russia-ukraine-war/2026-10-22/v1.json").is_file())
+        self.assertEqual((self.root / "russia-ukraine-war/2026-10-22/v1.json").stat().st_mode & 0o777, 0o600)
+        self.client.force_login(self.reader)
+        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        self.assertEqual(data["status"], "demo")
+        self.assertEqual(data["publication"]["mode"], "demo")
+        self.assertEqual(len(data["events"]), len(sample["stories"]))
+
+    def test_versions_are_immutable_and_a_broken_file_becomes_an_error_row(self):
+        story, _ = self.install_two_topics()
+        report = self.accept(self.write(story, "again"), blocked=True, install=True)
+        self.assertIn("edition_version_already_installed", report["issues"])
+        (self.root / "russia-ukraine-war/2026-10-22/v2.json").write_text("{not json")
+        self.client.force_login(self.reader)
+        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        self.assertEqual([e["code"] for e in data["errors"]], ["reasoning_edition_invalid"])
+        self.assertEqual(data["events"], [])
+        self.assertEqual([e["topic_id"] for e in data["editions"]], ["climate-policy"])
+        self.assertEqual(data["publication"]["status"], "available")
+
+    def test_install_needs_a_configured_root_and_a_clean_acceptance(self):
+        story = genuine("snapshot.sample.json")
+        options = self.write(story, "story")
+        with patch.dict(os.environ, {ROOT: ""}):
+            report = self.accept(options, blocked=True, install=True)
+        self.assertIn("editions_root_not_configured", report["issues"])
+        self.assertEqual(list(self.root.iterdir()), [])
+        report = self.accept(options, blocked=True, install=True, producer_commit="b" * 40)
+        self.assertIn("producer_commit_mismatch", report["issues"])
+        self.assertEqual(list(self.root.iterdir()), [])
+        report = self.accept(options)
+        self.assertNotIn("installed", report)
+        self.assertEqual(list(self.root.iterdir()), [])

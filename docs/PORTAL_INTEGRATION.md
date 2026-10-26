@@ -105,6 +105,8 @@ API path **`GET /api/preview/reasoning/`** is separate from normal feed/store. I
 
 Preview commands and three-fixture acceptance: [verification](PORTAL_VERIFICATION.md#current-reproducible-checks). The production validator intentionally rejects all three files.
 
+**Login-only reader for installed editions (2026-10-26).** Installed reasoning 1.0 editions reach signed-in readers through the normal `GET /api/feed/` and `GET /api/events/<id>/` when `QUORUM_ENABLE_REASONING_READER=1` and `QUORUM_REASONING_EDITIONS_ROOT` is set: `manage.py reasoning_snapshot … --install` copies an accepted file, its sidecar and an install record into `<root>/<topic>/<date>/v<N>.*` (versions immutable). The feed presents each edition with the preview's `present_reasoning`, so the labels, claim buckets and the `reasoning` block are the preview's; it adds one `editions` row per topic (completion, quiet day, summary, roundup lines without event links) and a `publication` with revision `editions-<date>`, `mode` live or demo. The proposal store, `portal_snapshot` and the DEBUG preview are unchanged; anonymous visitors still see nothing. Decision and layout: `backend/portal/reasoning_editions.py`; log row in [DECISIONS.md](DECISIONS.md).
+
 ## Publication states, revisions and safe trace
 
 | State | Meaning |

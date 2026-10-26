@@ -24,7 +24,12 @@ DJANGO_CSRF_ORIGINS=https://quorum.raccncode.com
 QUORUM_PORTAL_DATA=/var/lib/quorum
 QUORUM_STATIC_ROOT=/opt/quorum/static
 QUORUM_CATALOG_PATH=/etc/quorum/catalog.json
+# Optional, the judges' reader of installed reasoning editions (backend/README.md › Control and checks):
+# QUORUM_ENABLE_REASONING_READER=1
+# QUORUM_REASONING_EDITIONS_ROOT=/var/lib/quorum/editions
 ```
+
+The two reader variables are optional and outside `upgrade-release.py`'s publication checks: the proposal store and `QUORUM_ENABLE_SNAPSHOT_PUBLICATION` stay off. To show real editions to signed-in readers, create the editions directory (mode 0700, owned by the service user), set both variables, restart `quorum-api`, and install each accepted edition with `manage.py reasoning_snapshot … --install` from the release's venv; anonymous visitors see nothing new.
 
 Install `backend/requirements.txt` in the isolated venv, load the private environment without printing it, then run `manage.py migrate`, `check --deploy`, `collectstatic --noinput`, and optionally `createsuperuser` interactively. Source/migrations create no default administrator. The authorized production account provisioning is recorded in [status](STATUS.md#account-and-email-follow-up). Keep auth database backups private and take one before every subsequent migration. Stop only Quorum API briefly for a consistent SQLite copy, or use SQLite's backup API.
 
