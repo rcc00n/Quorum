@@ -20,6 +20,8 @@ Seven references (editorial sites and posters: black type on paper, hairlines, c
 
 What this changes in the plan: the page is laid out as a front page (masthead, date line, hairline rules, narrow columns); the hero gets the typewriter over the three real Reuters titles of one re-edited story from the evidence file (the chain-once rule shown, not told); section 2 becomes "What is truth?" with the project's own definition; a quotation from a journalist in the public domain opens section 7 (C. P. Scott, 1921). Not built: the agent chat (DECISIONS › Daily editions: the web app calls no model; it would be a product decision for Yelysei) and a full newspaper restyle of the app pages (WEB-UX-04). Vadim's approval of the handoff was given in person; the landing is not held for his thread answer (Anastasia, 2026-10-25).
 
+**Review of the first build (Anastasia, 2026-10-26):** the style is approved; the red accent goes (it read as a mobile-carrier line) in favour of a newspaper palette of black, white, warm greys and brown, recorded in DECISIONS item 9 and `web/DESIGN.md`; the hero topic should be a lighter one than the war, climate policy if a real artefact for it exists, otherwise the text change waits for the next PR.
+
 ## Who it is for, what it must do
 
 Two readers: a judge who has four minutes and wants to know whether this is an agent system with real verification loops, and a visitor who wants to know what they would get. One page answers both: the product in one sentence, a real artifact up front, the loop structure with its limits, each sponsor named by the job it does, the limits said plainly, the team. Primary action: create an account and choose topics. Secondary: read how one day is checked.

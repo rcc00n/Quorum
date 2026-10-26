@@ -169,7 +169,7 @@ export default function Home() {
               <div>
                 <dt>Left · right · agencies and unrated</dt>
                 <dd>
-                  <span className="lp-left">{f.left}</span> · <span className="lp-right">{f.right}</span> · {f.unrated}
+                  {f.left} · {f.right} · {f.unrated}
                 </dd>
               </div>
               <div>

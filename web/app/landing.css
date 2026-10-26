@@ -2,15 +2,13 @@
    routes keep their current look until WEB-UX-04 restyles them. */
 :root {
   --paper: #ffffff;
-  --paper-2: #f6f5f2;
-  --ink: #111111;
-  --ink-2: #4a4a4a;
-  --rule: #e6e3dd;
-  --red: #d81e4b;
-  --red-ink: #b0173c;
-  --cohort-left: #1d4ed8;
-  --cohort-right: #d81e4b;
-  --focus: #1d4ed8;
+  --paper-2: #f4f1eb;
+  --ink: #141414;
+  --ink-2: #5f5a53;
+  --rule: #dcd6cc;
+  --umber: #7b5634;
+  --umber-ink: #5a3e25;
+  --focus: #141414;
   --display: ui-rounded, "Nunito Variable", system-ui, sans-serif;
   --body: -apple-system, system-ui, "Inter Variable", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
@@ -60,7 +58,7 @@
 .landing p a:hover,
 .landing dd a:hover,
 .landing .lp-eyebrow a:hover {
-  text-decoration-color: var(--red);
+  text-decoration-color: var(--umber);
 }
 .landing :is(a, button, summary):focus-visible {
   outline: 3px solid var(--focus);
@@ -107,7 +105,7 @@
   top: 0;
   z-index: 10;
   background: var(--paper);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 3px double var(--ink);
   min-height: 72px;
   padding: 0 6%;
   display: grid;
@@ -133,7 +131,7 @@
 }
 .lp-nav a:hover,
 .lp-link:hover {
-  color: var(--red-ink);
+  color: var(--umber-ink);
 }
 .lp-actions {
   display: flex;
@@ -141,38 +139,40 @@
   gap: 20px;
   font-size: 15px;
 }
-.lp-button {
+/* DECISION(2026-10-26, Anastasia/Claude Code): button selectors carry the .landing scope. Why: `.landing a { color: inherit }`
+   outranks a bare `.lp-button` and painted the primary button's text in ink on ink. */
+.landing .lp-button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   min-height: 48px;
   padding: 0 22px;
   border-radius: 999px;
-  background: var(--red);
+  background: var(--ink);
   color: #fff;
   font-weight: 600;
   font-size: 15px;
-  border: 1px solid var(--red);
+  border: 1px solid var(--ink);
   transition:
     background 0.18s ease-out,
     border-color 0.18s ease-out,
     transform 0.18s ease-out;
 }
-.lp-button:hover {
-  background: var(--red-ink);
-  border-color: var(--red-ink);
+.landing .lp-button:hover {
+  background: var(--umber-ink);
+  border-color: var(--umber-ink);
   transform: translateY(-1px);
 }
-.lp-button-quiet {
+.landing .lp-button-quiet {
   background: transparent;
   color: var(--ink);
   border-color: var(--ink);
 }
-.lp-button-quiet:hover {
+.landing .lp-button-quiet:hover {
   background: var(--paper-2);
   border-color: var(--ink);
 }
-.lp-head .lp-button {
+.landing .lp-head .lp-button {
   min-height: 42px;
   padding: 0 18px;
 }
@@ -230,7 +230,7 @@
   display: inline-block;
   width: 0.55em;
   height: 1.05em;
-  background: var(--red);
+  background: var(--umber);
   vertical-align: text-bottom;
   margin-left: 2px;
   animation: lp-blink 1s steps(1) infinite;
@@ -289,12 +289,6 @@
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
-.lp-left {
-  color: var(--cohort-left);
-}
-.lp-right {
-  color: var(--cohort-right);
-}
 .lp-sql {
   margin: 22px 0 16px;
   border-top: 1px solid var(--rule);
@@ -309,7 +303,7 @@
 .lp-sql summary::before {
   content: "+ ";
   font-family: var(--mono);
-  color: var(--red);
+  color: var(--umber);
 }
 .lp-sql[open] summary::before {
   content: "− ";
@@ -339,7 +333,7 @@
   letter-spacing: -0.03em;
 }
 .lp-bracket span {
-  color: var(--red);
+  color: var(--umber);
   font-weight: 400;
 }
 .lp-truth-answer {
@@ -382,7 +376,7 @@
   font-family: var(--mono);
   font-weight: 500;
   font-size: 13px;
-  color: var(--red);
+  color: var(--umber);
   margin-right: 8px;
   vertical-align: 0.25em;
 }
@@ -409,7 +403,7 @@
 .lp-step-n {
   font-family: var(--mono);
   font-size: 14px;
-  color: var(--red);
+  color: var(--umber);
   padding-top: 6px;
 }
 .lp-steps p {
@@ -440,7 +434,7 @@
   max-width: 60ch;
   font-size: 15px;
   color: var(--ink-2);
-  border-left: 3px solid var(--red);
+  border-left: 3px solid var(--umber);
   padding-left: 16px;
 }
 
@@ -538,7 +532,7 @@
   content: "—";
   position: absolute;
   left: 0;
-  color: var(--red);
+  color: var(--umber);
 }
 
 /* Team */
@@ -597,7 +591,7 @@
   gap: 24px;
 }
 .lp-foot nav a:hover {
-  color: var(--red-ink);
+  color: var(--umber-ink);
 }
 
 @keyframes lp-blink {
