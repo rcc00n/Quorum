@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/inter";
+import "@fontsource-variable/nunito";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: { default: "Quorum — See the whole story", template: "%s · Quorum" },
+  title: { default: "Quorum — The news, with its working shown", template: "%s · Quorum" },
   description:
-    "Follow the evidence. Understand the coverage. A calmer way to read the news.",
+    "One event, read across the political spectrum and official documents: what is known, what is claimed, and the evidence under every line.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

@@ -1,0 +1,687 @@
+/* Landing page styles. Tokens and their roles: web/DESIGN.md. Scoped under .landing so the other
+   routes keep their current look until WEB-UX-04 restyles them. */
+:root {
+  --paper: #ffffff;
+  --paper-2: #f6f5f2;
+  --ink: #111111;
+  --ink-2: #4a4a4a;
+  --rule: #e6e3dd;
+  --red: #d81e4b;
+  --red-ink: #b0173c;
+  --cohort-left: #1d4ed8;
+  --cohort-right: #d81e4b;
+  --focus: #1d4ed8;
+  --display: ui-rounded, "Nunito Variable", system-ui, sans-serif;
+  --body: -apple-system, system-ui, "Inter Variable", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.landing {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.landing h1,
+.landing h2,
+.landing h3 {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+.landing h2 {
+  font-size: clamp(30px, 4vw, 40px);
+  line-height: 1.15;
+  max-width: 22ch;
+}
+.landing h3 {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+.landing p {
+  color: var(--ink);
+  margin: 0;
+}
+.landing a {
+  color: inherit;
+  text-decoration: none;
+}
+.landing p a,
+.landing dd a,
+.landing .lp-eyebrow a {
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+.landing p a:hover,
+.landing dd a:hover,
+.landing .lp-eyebrow a:hover {
+  text-decoration-color: var(--red);
+}
+.landing :is(a, button, summary):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.lp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.lp-eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 16px;
+}
+.lp-fine {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.lp-label {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 6px 12px;
+  margin: 16px 0 20px;
+}
+
+/* Masthead */
+.lp-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  min-height: 72px;
+  padding: 0 6%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 32px;
+}
+.lp-masthead {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.lp-masthead-small {
+  font-size: 22px;
+}
+.lp-nav {
+  display: flex;
+  gap: 28px;
+  font-size: 15px;
+  justify-content: center;
+}
+.lp-nav a:hover,
+.lp-link:hover {
+  color: var(--red-ink);
+}
+.lp-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 15px;
+}
+.lp-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  border: 1px solid var(--red);
+  transition:
+    background 0.18s ease-out,
+    border-color 0.18s ease-out,
+    transform 0.18s ease-out;
+}
+.lp-button:hover {
+  background: var(--red-ink);
+  border-color: var(--red-ink);
+  transform: translateY(-1px);
+}
+.lp-button-quiet {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.lp-button-quiet:hover {
+  background: var(--paper-2);
+  border-color: var(--ink);
+}
+.lp-head .lp-button {
+  min-height: 42px;
+  padding: 0 18px;
+}
+
+/* Sections share one measure */
+.landing main > section {
+  padding: 96px 6%;
+  border-bottom: 1px solid var(--rule);
+  scroll-margin-top: 80px;
+}
+.landing main > section:last-child {
+  border-bottom: 0;
+}
+
+/* Hero */
+.lp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 64px;
+  align-items: start;
+  padding-top: 72px !important;
+}
+.lp-hero h1 {
+  font-size: clamp(44px, 7vw, 84px);
+  line-height: 1;
+  max-width: 11ch;
+  margin: 12px 0 24px;
+}
+.lp-lead {
+  font-size: 21px;
+  line-height: 1.45;
+  max-width: 34ch;
+  color: var(--ink-2);
+}
+.lp-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 32px 0 48px;
+}
+.lp-chain {
+  margin: 0;
+  border-top: 1px solid var(--rule);
+  padding-top: 20px;
+  max-width: 44ch;
+}
+.lp-type-live {
+  font-family: var(--mono);
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 3.1em;
+  color: var(--ink);
+}
+.lp-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  background: var(--red);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: lp-blink 1s steps(1) infinite;
+}
+.lp-type-static {
+  font-family: var(--mono);
+  font-size: 15px;
+  padding-left: 1.2em;
+  margin: 0;
+  color: var(--ink);
+}
+.lp-type-static li + li {
+  margin-top: 6px;
+}
+.lp-chain figcaption {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* Evidence card */
+.lp-card {
+  background: var(--paper-2);
+  border-radius: 20px;
+  padding: 28px;
+  border: 1px solid var(--rule);
+}
+.landing .lp-card-title {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink);
+  max-width: none;
+  margin-bottom: 20px;
+}
+.lp-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 24px;
+  margin: 0;
+}
+.lp-figures > div:nth-child(3),
+.lp-figures > div:nth-child(4) {
+  grid-column: 1 / -1;
+}
+.lp-figures dt {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.lp-figures dd {
+  margin: 2px 0 0;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.lp-left {
+  color: var(--cohort-left);
+}
+.lp-right {
+  color: var(--cohort-right);
+}
+.lp-sql {
+  margin: 22px 0 16px;
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+}
+.lp-sql summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  list-style: none;
+}
+.lp-sql summary::before {
+  content: "+ ";
+  font-family: var(--mono);
+  color: var(--red);
+}
+.lp-sql[open] summary::before {
+  content: "− ";
+}
+.lp-sql pre {
+  margin: 14px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 14px;
+  color: var(--ink);
+}
+
+/* What is truth */
+.lp-truth {
+  background: var(--paper-2);
+}
+.landing .lp-bracket {
+  font-size: clamp(40px, 7vw, 84px);
+  line-height: 1;
+  max-width: none;
+  letter-spacing: -0.03em;
+}
+.lp-bracket span {
+  color: var(--red);
+  font-weight: 400;
+}
+.lp-truth-answer {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1.3;
+  max-width: 30ch;
+  margin: 32px 0 40px;
+}
+.lp-truth-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  max-width: 76ch;
+  border-top: 1px solid var(--rule);
+  padding-top: 24px;
+}
+.lp-truth-cols p {
+  color: var(--ink-2);
+}
+
+/* What you get */
+.lp-get-list {
+  list-style: none;
+  counter-reset: get;
+  margin: 48px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 48px;
+}
+.lp-get-list li {
+  counter-increment: get;
+  border-top: 1px solid var(--rule);
+  padding: 22px 0 28px;
+}
+.lp-get-list h3::before {
+  content: counter(get, decimal-leading-zero) " ";
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--red);
+  margin-right: 8px;
+  vertical-align: 0.25em;
+}
+.lp-get-list p {
+  margin-top: 8px;
+  color: var(--ink-2);
+  max-width: 44ch;
+}
+
+/* Loop */
+.lp-steps {
+  list-style: none;
+  margin: 48px 0 0;
+  padding: 0;
+  max-width: 76ch;
+}
+.lp-steps li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 16px;
+  border-top: 1px solid var(--rule);
+  padding: 24px 0;
+}
+.lp-step-n {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--red);
+  padding-top: 6px;
+}
+.lp-steps p {
+  margin-top: 8px;
+  color: var(--ink-2);
+}
+.lp-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 3px 9px;
+  margin-left: 8px;
+  vertical-align: 0.3em;
+}
+.lp-loop-note {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink) !important;
+}
+.lp-aside-note {
+  margin-top: 28px;
+  max-width: 60ch;
+  font-size: 15px;
+  color: var(--ink-2);
+  border-left: 3px solid var(--red);
+  padding-left: 16px;
+}
+
+/* Trace */
+.lp-trace {
+  background: var(--paper-2);
+}
+.lp-trace-table {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.lp-trace-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--rule);
+}
+.lp-trace-row:first-child {
+  border-top: 0;
+}
+.lp-trace-head {
+  background: var(--paper-2);
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+.lp-trace-row span:nth-child(3) {
+  color: var(--ink-2);
+}
+
+/* Sponsors */
+.lp-jobs {
+  margin: 48px 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 48px;
+}
+.lp-jobs > div {
+  border-top: 1px solid var(--rule);
+  padding: 22px 0 28px;
+}
+.lp-jobs dt {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+.lp-jobs dd {
+  margin: 8px 0 0;
+  color: var(--ink-2);
+  max-width: 44ch;
+}
+
+/* Limits */
+.lp-quote {
+  margin: 0 0 40px;
+  padding: 0;
+  max-width: 24ch;
+}
+.lp-quote p {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.lp-quote cite {
+  display: block;
+  margin-top: 12px;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.lp-limits-list {
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 64ch;
+}
+.lp-limits-list li {
+  border-top: 1px solid var(--rule);
+  padding: 14px 0 14px 28px;
+  position: relative;
+  color: var(--ink-2);
+}
+.lp-limits-list li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--red);
+}
+
+/* Team */
+.lp-team-list {
+  list-style: none;
+  margin: 40px 0 28px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.lp-team-list li {
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+.lp-team-list strong {
+  display: block;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.lp-team-list span {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-2);
+}
+
+/* Final */
+.lp-final {
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 28px;
+}
+.landing .lp-final h2 {
+  max-width: 18ch;
+}
+
+/* Footer */
+.lp-foot {
+  border-top: 1px solid var(--rule);
+  padding: 32px 6%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.lp-foot p {
+  color: var(--ink-2);
+}
+.lp-foot nav {
+  display: flex;
+  gap: 24px;
+}
+.lp-foot nav a:hover {
+  color: var(--red-ink);
+}
+
+@keyframes lp-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1000px) {
+  .lp-hero {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+  .lp-nav {
+    display: none;
+  }
+  .lp-head {
+    grid-template-columns: auto 1fr;
+  }
+  .lp-actions {
+    justify-self: end;
+  }
+  .landing main > section {
+    padding: 64px 24px;
+  }
+  .lp-foot {
+    padding-inline: 24px;
+  }
+  .lp-head {
+    padding-inline: 24px;
+  }
+}
+@media (max-width: 700px) {
+  .landing {
+    font-size: 16px;
+  }
+  .landing main > section {
+    padding: 48px 16px;
+  }
+  .lp-head,
+  .lp-foot {
+    padding-inline: 16px;
+  }
+  .lp-link {
+    display: none;
+  }
+  .lp-hero h1 {
+    font-size: clamp(40px, 12vw, 56px);
+  }
+  .lp-lead {
+    font-size: 18px;
+  }
+  .lp-truth-cols,
+  .lp-get-list,
+  .lp-jobs,
+  .lp-team-list {
+    grid-template-columns: 1fr;
+  }
+  .lp-figures dd {
+    font-size: 28px;
+  }
+  .lp-card {
+    padding: 20px;
+  }
+  .lp-trace-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .lp-trace-head span:not(:first-child) {
+    display: none;
+  }
+  .lp-steps li {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .lp-foot {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-caret {
+    animation: none;
+  }
+  .lp-button {
+    transition: none;
+  }
+}
