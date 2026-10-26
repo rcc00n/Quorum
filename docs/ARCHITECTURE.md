@@ -133,6 +133,8 @@ class RunState(TypedDict):                      # reasoning/quorum_reasoning/sta
 | `roundup` | events below the bar | one line per event with source and status, grouped, ordered by rubric total | yes, for the line text |
 | `publish` | everything | snapshot JSON, version +1, stored; summary paragraph for the topic page | yes, for the summary |
 
+Source memory (H-MEM, 2026-10-26; DECISIONS › Still to clarify, Build rule; `reasoning/memory/README.md`), only with `[engines] hmem = "on"` and never in a dry run: at the end of `frame`, one `memory` trace row (event null) for the write of each outlet's interpretation label and the bound supporting evidence of confirmed fact/number claims into the reference engine; in research round 2, one `memory` row per thin claim for the recall, which may move an exactly matching current document up the ordinary candidate list, under the unchanged cap. The recalled document is fetched and judged like any other candidate: no remembered quote, stance or verdict becomes evidence. A memory failure keeps the ordinary ranking, adds a run error with node `memory` and so makes the edition `partial`; the snapshot's shape does not change.
+
 ### Loops and limits
 
 - `verify → research`: at most 2 research rounds per event (`loops.research_rounds_max`). Round 2 runs only for thin claims and widens to the rest of the day's corpus, the official documents and the previous `research.previous_days` edition windows (built 2026-10-24: the same two SQL statements over the earlier interval; those documents are evidence only and an evidence row from one says `from_previous_day`). Still planned, DEFERRED: the official sites of record, and the GDELT DOC API as a discovery tool over the domains already in `sources` (an article GDELT finds counts toward confirmation only when its domain has an `independence_group`; other domains count as spread, never as confirmation). Google News RSS is dropped: its links do not resolve to the publication's URL without JavaScript (Anastasia, 2026-10-22). The trace shows round 2 as `research` iteration 2 and whether it changed a verdict.
@@ -261,11 +263,13 @@ reasoning/                      # the package; see reasoning/README.md for comma
     nodes/                      # one file per node: plan, cluster, score, extract, research, verify, fact_check,
                                 # adjudicate, escalate, frame, write, critique, roundup, publish; routes beside their node
     rules/                      # confirmation.py, impact_bar.py, writing_rules.py — pure functions, unit-tested
-    tools/                      # corpus.py (Zetaris SQL via agent/tools_zetaris.py, fixture in dry run), fetch_text.py
+    tools/                      # corpus.py (Zetaris SQL via agent/tools_zetaris.py, fixture in dry run), fetch_text.py,
+                                # memory.py (source memory hooks; off by default)
     prompts/                    # one Markdown system prompt per model task
     dryrun.py                   # deterministic twin of every model task (no credits)
     fixtures/sample_day.json    # fictional corpus for the dry run and the tests
     trace.py, ids.py, text.py, llm.py, config.py, run.py
+  memory/sidecar.mjs            # the unchanged Meterless H-MEM reference engine as a JSON-on-stdin subprocess (checkout in METERLESS_HOME)
   tests/                        # rules, end-to-end dry run, escalation path, Mermaid
 ```
 
