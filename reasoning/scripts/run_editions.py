@@ -42,8 +42,9 @@ _summary.json and the lock in <status-dir>/_runner/<date>/, never installed (dec
 variable names, never values, and file names relative to --log-dir, never paths. A run without --live writes no status
 file, never touches the record of another run id, and never changes a live outcome in its own run id's record: it
 writes its plan beside it (decisions at Statuses and Statuses.open). Logs: one per run in <log-dir>/
-(<date>_<topic>_run<NN>_<key>.log, <date>_<topic>_dry.log, <date>_runner.log); every key and token value the runner
-knows is replaced by [redacted] before a byte reaches a log.
+(<date>_<topic>_a<attempt>_run<NN>_<key>.log, NN counting the live runs of that run id: decision at run_log_name;
+<date>_<topic>_dry.log, <date>_runner.log); every key and token value the runner knows is replaced by [redacted]
+before a byte reaches a log.
 
 Exit code: 0 every topic published (or, without --live, every dry check passed and the plan finishes every topic in
 this invocation), 1 a topic failed (a listed id that is not a row, or a row whose id breaks the rule, counts), 3 a
@@ -236,6 +237,18 @@ def clean_reason(text: str | None, redactor: Redactor) -> str | None:
 
 def run_id(topic: str, edition_date: str, attempt: int) -> str:
     return f"{edition_date}-{topic}-{attempt}"  # quorum_reasoning.ids.run_id
+
+
+def run_log_name(edition_date: str, topic: str, attempt: int, n: int, key_name: str) -> str:
+    """The log file (relative to --log-dir) of live run `n` of run id <date>-<topic>-<attempt> on key `key_name`.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a live run's log is <date>_<topic>_a<attempt>_run<NN>_<key>.log,
+    and both live_run (the file it writes) and _drive (the name the record keeps in `log` and `runs[].log`) take it
+    from here. Why: NN counts the runs of one run id (its record's `attempts` + 1), so the first run of attempt 1 and
+    the first run of attempt 2 on the same key were both run01_<key>.log, opened for appending: one file held both
+    runs and both records named it (closing review round 4). Topic ids have no underscore, so the parts stay apart.
+    Supersedes <date>_<topic>_run<NN>_<key>.log."""
+    return f"{edition_date}_{topic}_a{attempt}_run{n:02d}_{key_name}.log"
 
 
 def journal_counts(out: Path, rid: str) -> tuple[int, int]:
@@ -1027,7 +1040,7 @@ def live_run(ctx: Ctx, item: Item, key: Key, n: int) -> RunResult:
     before_rows = journal_counts(ctx.out, rid)
     before_version = latest_version(ctx.out, item.topic, ctx.date)
     argv = ctx.live_cmd + live_args(item.topic, ctx.date, ctx.out, ctx.attempt, resume)
-    log_name = f"{ctx.date}_{item.topic}_run{n:02d}_{key.name}.log"
+    log_name = run_log_name(ctx.date, item.topic, ctx.attempt, n, key.name)  # decision at run_log_name
     started = now_iso()
     header = f"=== run {n} of {rid} on {key.name}{' (resume)' if resume else ''} at {started} ==="
     try:
@@ -1390,7 +1403,7 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
                 doc = statuses.docs[item.topic]
                 n = int(doc.get("attempts") or 0) + 1
                 resume = item.resume or checkpoint_has_thread(ctx.out, run_id(item.topic, ctx.date, ctx.attempt))
-                log_name = f"{ctx.date}_{item.topic}_run{n:02d}_{key.name}.log"
+                log_name = run_log_name(ctx.date, item.topic, ctx.attempt, n, key.name)  # the file live_run writes
                 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): `started_at` is the first live start of the run
                 # id; until then it is when its status was first written. Why: the portal shows `running` and
                 # `waiting_for_key` as "being prepared since started_at"; a plan run hours earlier must not date it.

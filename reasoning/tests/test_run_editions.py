@@ -581,8 +581,8 @@ def test_rotation_requeues_a_drained_topic_as_resume_on_another_key(world: Env):
     assert st["runs"][0]["calls"] == {"fast": 200, "ultra": 0}
     assert st["calls_estimate"] == 330 and st["calls_estimate_lanes"] == {"fast": 300, "ultra": 30}
     assert {"topic", "date", "state", "run_id", "started_at", "updated_at", "attempts"} <= set(st)
-    assert (world.logs / f"{DATE}_t1_run01_QTEST_KEY_A.log").is_file()
-    assert (world.logs / f"{DATE}_t1_run02_QTEST_KEY_B.log").is_file()
+    assert (world.logs / f"{DATE}_t1_a1_run01_QTEST_KEY_A.log").is_file()
+    assert (world.logs / f"{DATE}_t1_a1_run02_QTEST_KEY_B.log").is_file()
     assert [k["drained"] for k in world.summary()["keys"]] == [True, False]
 
 
@@ -722,7 +722,7 @@ def test_no_key_value_reaches_a_log_or_a_status_file(world: Env):
     text = _all_text(world.logs, world.status)
     for value in (VALUE_A, VALUE_B, VALUE_C):
         assert value not in text
-    assert "MODEL_API_KEY=[redacted]" in (world.logs / f"{DATE}_t1_run01_QTEST_KEY_A.log").read_text(encoding="utf-8")
+    assert "MODEL_API_KEY=[redacted]" in (world.logs / f"{DATE}_t1_a1_run01_QTEST_KEY_A.log").read_text(encoding="utf-8")
     assert "stderr sees [redacted]" in text
     for p in world.status.rglob("*.json"):
         doc = p.read_text(encoding="utf-8")
@@ -740,7 +740,7 @@ def test_route_mode_redacts_tokens_from_the_env_file_and_paths_in_reasons(world:
     assert world.main(world.argv("t1", keys=None)) == 1
     text = _all_text(world.logs, world.status)
     assert token not in text and zkey not in text
-    assert "route token [redacted] zetaris [redacted]" in (world.logs / f"{DATE}_t1_run01_{re_mod.ROUTE}.log").read_text(encoding="utf-8")
+    assert "route token [redacted] zetaris [redacted]" in (world.logs / f"{DATE}_t1_a1_run01_{re_mod.ROUTE}.log").read_text(encoding="utf-8")
     reason = world.status_of("t1")["reason"]
     assert reason == "exit 2: refusing to run: <path> [redacted]", reason
 
@@ -1153,7 +1153,7 @@ def test_a_plan_of_another_attempt_leaves_a_live_run_s_record_alone(world: Env):
         ("published", f"{DATE}-t1-2", 2, "2026-10-20T10:00:00Z")
     assert [r["outcome"] for r in world.status_of("t1")["runs"]] == ["drained", "published"]
     assert [r["resume"] for r in world.runs()] == [False, True]
-    assert sorted(p.name for p in world.logs.glob("*_run[0-9]*.log")) == [f"{DATE}_t1_run01_QTEST_KEY_A.log", f"{DATE}_t1_run02_QTEST_KEY_A.log"]
+    assert sorted(p.name for p in world.logs.glob("*_run[0-9]*.log")) == [f"{DATE}_t1_a2_run01_QTEST_KEY_A.log", f"{DATE}_t1_a2_run02_QTEST_KEY_A.log"]
 
 
 def test_a_rerun_of_a_published_attempt_after_a_plan_of_another_leaves_the_pair_alone(world: Env):
@@ -1192,6 +1192,69 @@ def test_a_rerun_of_a_published_run_rewrites_a_pair_whose_hash_is_stale_from_its
     assert again["reason"] == "already published by an earlier run"
 
 
+def test_a_rerun_of_a_published_run_rewrites_a_pair_that_still_says_running(world: Env):
+    """The runner died between the child's publish and its own record write, so the verified pair of this run id
+    still says `running`: the rerun ("already published") writes `published` (decision at Statuses.keep_published)."""
+    world.scenario({"t1": [{"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0
+    first = world.public_of("t1")
+    world.age_public("t1", state="running", reason=None)
+    world.set_record("t1", state="running")
+    assert world.main(world.argv("t1")) == 0  # already published
+    again = world.public_of("t1")  # the hash matches, and the file equals the record
+    assert (again["state"], again["run_id"], again["attempts"], again["started_at"]) == ("published", f"{DATE}-t1-1", 1, first["started_at"])
+    assert len(world.runs()) == 1
+
+
+def test_a_rerun_of_a_run_published_by_hand_rewrites_a_pair_of_another_run_id(world: Env):
+    """Attempt 2 published by hand (resume_with_next_key.sh) while the verified pair still shows attempt 1 published:
+    the store's newest version is attempt 2's, so the rerun of --attempt 2 shows attempt 2 (decision at
+    Statuses.keep_published)."""
+    world.scenario({"t1": [{"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0  # attempt 1 publishes version 1 through the runner
+    assert world.public_of("t1")["run_id"] == f"{DATE}-t1-1"
+    d = world.out / "t1" / DATE
+    snap = {"run_id": f"{DATE}-t1-2", "topic_id": "t1", "edition_date": DATE, "status": "ok", "version": 2,
+            "published_at": "2026-10-20T12:00:00Z"}
+    (d / "v2.json").write_text(json.dumps(snap))
+    (d / "latest.json").write_text(json.dumps(snap))
+    assert world.main(world.argv("t1", "--attempt", "2")) == 0  # already published
+    pub = world.public_of("t1")
+    assert (pub["state"], pub["run_id"], pub["reason"]) == ("published", f"{DATE}-t1-2", "already published by an earlier run")
+    assert len(world.runs()) == 1  # no run was started for attempt 2
+
+
+def test_a_rerun_of_a_published_run_writes_a_missing_pair_from_its_record(world: Env):
+    """The topic's status folder was deleted after its run published: the rerun ("already published") writes a
+    verified pair with `published`, this run id and the record's `attempts` and `started_at` (decision at
+    Statuses.keep_published)."""
+    world.scenario({"t1": [{"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0
+    first = world.public_of("t1")
+    shutil.rmtree(world.status / "t1")
+    assert world.main(world.argv("t1")) == 0  # already published
+    again = world.public_of("t1")  # the pair exists again, its hash matches, and the file equals the record
+    assert (again["state"], again["run_id"], again["attempts"], again["started_at"]) == ("published", f"{DATE}-t1-1", 1, first["started_at"])
+    assert len(world.runs()) == 1
+
+
+def test_two_attempts_on_one_key_each_get_their_own_run_log(world: Env):
+    """The first run of attempt 1 and the first run of attempt 2 on the same key write two logs, each holding its own
+    run only, and each run id's record names its own file (decision at run_log_name)."""
+    world.scenario({"t1": [{"exit": 1, "publish": False, "say": "boom"}, {"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1", keys="QTEST_KEY_A")) == 1  # attempt 1 fails live on key A
+    assert world.main(world.argv("t1", "--attempt", "2", keys="QTEST_KEY_A")) == 0  # attempt 2 publishes on key A
+    names = {1: f"{DATE}_t1_a1_run01_QTEST_KEY_A.log", 2: f"{DATE}_t1_a2_run01_QTEST_KEY_A.log"}
+    assert sorted(p.name for p in world.logs.glob("*_run[0-9]*.log")) == sorted(names.values())
+    for attempt, name in names.items():
+        text = (world.logs / name).read_text(encoding="utf-8")
+        headers = [ln for ln in text.splitlines() if ln.startswith("=== run")]
+        assert len(headers) == 1 and f"=== run 1 of {DATE}-t1-{attempt} on QTEST_KEY_A " in headers[0], headers
+        rec = world.status_of("t1", attempt)
+        assert [r["log"] for r in rec["runs"]] == [name] and rec["log"] == name, rec
+    assert len(world.runs()) == 2
+
+
 def test_a_live_run_without_its_record_continues_from_its_status_file(world: Env):
     """A run whose record lost its live history (the layout before one record per run id, or a deleted _runner folder,
     here followed by a plan) takes `attempts` and `started_at` from a verified status file of its run id (decision at
@@ -1205,7 +1268,7 @@ def test_a_live_run_without_its_record_continues_from_its_status_file(world: Env
     assert world.main(world.argv("t1", "--attempt", "2", keys="QTEST_KEY_A")) == 0
     done = world.public_of("t1")
     assert (done["state"], done["attempts"], done["started_at"]) == ("published", 2, "2026-10-20T10:00:00Z")
-    assert sorted(p.name for p in world.logs.glob("*_run[0-9]*.log")) == [f"{DATE}_t1_run01_QTEST_KEY_A.log", f"{DATE}_t1_run02_QTEST_KEY_A.log"]
+    assert sorted(p.name for p in world.logs.glob("*_run[0-9]*.log")) == [f"{DATE}_t1_a2_run01_QTEST_KEY_A.log", f"{DATE}_t1_a2_run02_QTEST_KEY_A.log"]
     world.age_public("t1", run_id=f"{DATE}-t1-3", state="waiting_for_key", attempts=5)
     (world.status / "t1" / f"{DATE}.json.sha256").write_text("0" * 64 + f"  {DATE}.json\n")  # a file the install would refuse
     shutil.rmtree(world.status / "_runner")
