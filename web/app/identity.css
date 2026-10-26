@@ -23,4 +23,17 @@
   --display: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
   --body: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* DECISION(2026-10-26, Anastasia/Claude Code): one page measure for every route: content in a centred column
+     of 1024 px including 22 px gutters (980 px of text), as on apple.com; a full-width bar or section reads
+     --column-gutter so its content lines up with the column, a centred block reads --measure and --gutter.
+     16 px gutters under 700 px. Why: Anastasia's review of 2026-10-26 (the hero of apple.com/apple-news sits
+     close to the centre; the same should hold here, on the landing and in the app). */
+  --measure: 1024px;
+  --gutter: 22px;
+  --column-gutter: max(var(--gutter), calc((100% - var(--measure)) / 2 + var(--gutter)));
+}
+@media (max-width: 700px) {
+  :root {
+    --gutter: 16px;
+  }
 }

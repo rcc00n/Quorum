@@ -84,9 +84,8 @@ summary:focus-visible {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 32px;
-  padding: 0 6%;
   color: var(--ink);
-  border-right: 0;
+  border-right: 0; /* the inline gutter comes from app/header.css */
 }
 .sidebar .brand {
   font-size: 24px;
@@ -161,8 +160,8 @@ summary:focus-visible {
   display: none;
 }
 .workspace-main {
-  padding: 32px 40px 48px;
-  max-width: 1280px;
+  padding: 32px var(--gutter) 48px;
+  max-width: var(--measure); /* the page column of identity.css; globals.css centres it */
 }
 .workspace-footer {
   font-family: var(--body);
@@ -170,6 +169,7 @@ summary:focus-visible {
   letter-spacing: 0.04em;
   color: var(--ink);
   border-top: 1px solid var(--rule);
+  padding-inline: var(--column-gutter);
 }
 .workspace-footer span:first-child {
   color: var(--ink);
@@ -394,7 +394,7 @@ label {
 @media (max-width: 700px) {
   .sidebar {
     grid-template-columns: auto 1fr;
-    padding: 12px 16px 0;
+    padding-top: 12px;
     gap: 4px 16px;
   }
   .sidebar nav {
@@ -419,6 +419,6 @@ label {
     display: none;
   }
   .workspace-main {
-    padding: 24px 16px 40px;
+    padding: 24px var(--gutter) 40px;
   }
 }

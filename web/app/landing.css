@@ -124,10 +124,10 @@
   max-width: 76ch;
 }
 
-/* Masthead: its surface (sticky, clear at rest, frosted paper once scrolled) is app/header.css. */
+/* Masthead: its surface and its gutter (sticky, clear at rest, frosted paper once scrolled, content on the page
+   column) are app/header.css. */
 .lp-head {
   min-height: 72px;
-  padding: 0 6%;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -203,9 +203,9 @@
   padding: 0 18px;
 }
 
-/* Sections share one measure */
+/* Sections share one measure: full-width hairlines, content on the centred page column (identity.css) */
 .landing main > section {
-  padding: 96px 6%;
+  padding: 96px var(--column-gutter);
   border-bottom: 1px solid var(--rule);
   scroll-margin-top: 80px;
 }
@@ -222,10 +222,11 @@
   grid-template-columns: repeat(12, minmax(0, 1fr));
   column-gap: 24px;
   row-gap: 44px;
+  /* Six columns of text and five of sheet on the 980 px column (seven and four when the column was wider). */
   grid-template-areas:
     "wire wire wire wire wire wire wire wire wire wire wire wire"
-    "text text text text text text text . card card card card"
-    "chain chain chain chain chain chain chain . card card card card";
+    "text text text text text text . card card card card card"
+    "chain chain chain chain chain chain . card card card card card";
   align-items: start;
 }
 .landing .lp-wire {
@@ -824,7 +825,7 @@
 /* Footer */
 .lp-foot {
   border-top: 1px solid var(--rule);
-  padding: 32px 6%;
+  padding: 32px var(--column-gutter);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -875,11 +876,7 @@
     justify-self: end;
   }
   .landing main > section {
-    padding: 64px 24px;
-  }
-  .lp-foot,
-  .lp-head {
-    padding-inline: 24px;
+    padding-block: 64px;
   }
   .lp-tally {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -910,11 +907,7 @@
     font-size: 16px;
   }
   .landing main > section {
-    padding: 48px 16px;
-  }
-  .lp-head,
-  .lp-foot {
-    padding-inline: 16px;
+    padding-block: 48px;
   }
   .lp-link {
     display: none;

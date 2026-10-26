@@ -84,8 +84,7 @@ html.theme-switching *::after {
   justify-content: space-between;
   align-items: center;
   min-height: 72px;
-  padding: 0 6%;
-  /* Surface (sticky, clear at rest, frosted once scrolled): app/header.css. */
+  /* Surface and gutter (sticky, clear at rest, frosted once scrolled, content on the page column): app/header.css. */
 }
 .gate-masthead {
   font-family: var(--display);
@@ -105,9 +104,9 @@ html.theme-switching *::after {
 }
 .gate-body {
   width: 100%;
-  max-width: 1120px;
-  padding: 64px 6% 96px;
-  justify-self: start;
+  max-width: var(--measure);
+  padding: 64px var(--gutter) 96px;
+  justify-self: center; /* the page column of identity.css */
 }
 .gate .gate-kicker {
   font-family: var(--mono);
@@ -388,11 +387,8 @@ html.theme-switching *::after {
   .gate {
     font-size: 16px;
   }
-  .gate-head {
-    padding-inline: 16px;
-  }
   .gate-body {
-    padding: 40px 16px 64px;
+    padding: 40px var(--gutter) 64px;
   }
   .gate h1 {
     font-size: clamp(32px, 9.5vw, 40px);
