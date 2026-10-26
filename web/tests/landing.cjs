@@ -159,7 +159,8 @@ if (!url) {
     assert.strictEqual(nodes.length, allowed.size, "field must carry exactly the by_source pairs");
     for (const t of nodes) assert.ok(allowed.has(t), "field text node is not an evidence pair: " + t);
   }
-  assert.ok(!/every call runs through Meterless/i.test(html), "forbidden claim about Meterless");
+  assert.ok(!/every (model )?(call|request) (runs|goes|is routed) through Meterless|all (calls|requests) (run|go) through Meterless/i.test(html), "forbidden claim about Meterless");
+  assert.ok(!/built (in|with) Cursor|Cursor/i.test(html), "forbidden claim about Cursor");
   assert.ok(!/Nunito/.test(html), "the rounded face must not be referenced on the landing");
   console.log("PASS: served landing carries anchors, figures, fictional label, chain order, tally ids, loop limits and an honest field");
 })().catch((e) => {
