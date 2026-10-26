@@ -779,6 +779,226 @@ def test_top_level_hmem_null_or_zero_beside_receipts_is_served(live):
     assert llm._hmem_report({"hmem": {"injected": 0}}) == (0, None)  # a top-level block alone is still read
 
 
+# closing round 4: Nightshift's egress manifest (engine/js/engine/redact.js egressManifest, filled by orchestrator.js
+# runChat) discloses injected memories too; it rides the top-level `meterless` object (openai.mjs) and every receipt copy
+EGRESS_WHERE = ["top", "receipt", "envelope body.receipt", "envelope receipt"]
+EGRESS_TEXT = "egress-text-never-copied"  # text inside an unreadable manifest: it must not reach any failure string
+HMEM_NEVER = {"reason": "local-only H-MEM records", "count": 2}  # orchestrator.js neverEligible under a local-only floor
+
+
+def _manifest(sources=("messages",), never=()) -> dict:
+    """An egress manifest as Nightshift 1.2.3's `redact.egressManifest` builds it."""
+    return {"destination": "nvidia", "coverage": "pattern_floor",
+            "sent": {"prompt_chars": 120, "context_sources": list(sources), "redacted": []},
+            "withheld": [], "never_eligible": list(never)}
+
+
+def _with_egress(where: str, egress, hmem_key: bool = True) -> tuple[dict, str]:
+    """A clean Ultra reply (hmem null in every receipt copy, or no hmem key at all with `hmem_key` False; from_cache
+    false; no cache block) whose egress manifest at `where` is `egress`, and the name a failure gives that manifest."""
+    copy: dict = {"hmem": None} if hmem_key else {}
+    met = {"receipt_id": "rcpt_test_1", "requested_model": ULTRA, "provider_model": ULTRA, "routed_model": ULTRA,
+           "from_cache": False, "receipt": dict(copy)}
+    if where == "top":
+        met["egress"] = egress
+        return met, "egress"
+    if where == "receipt":
+        met["receipt"]["egress"] = egress
+    elif where == "envelope body.receipt":
+        met["receipt_envelope"] = {"body": {"receipt": {**copy, "egress": egress}}}
+    else:  # the envelope's receipt beside its body (dgx-client.js receiptFromEnvelope: `body.receipt || env.receipt`)
+        met["receipt_envelope"] = {"body": {}, "receipt": {**copy, "egress": egress}}
+    return met, "a receipt's egress"
+
+
+def _assert_rejected_not_replayed(path: Path, met: dict, reason: str, count: int, unreadable: bool) -> None:
+    """json_task rejects `met`'s reply (an error row disclosing `count`, never journalled for replay), probe() and
+    test_connection() refuse it (`_refuse_injected`), and `reason` is in every failure string."""
+    with pytest.raises(llm.MemoryInjected) as caught:
+        llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")
+    row = llm.calls[-1]
+    assert row["served"] == "error" and row["answered_model"] == ULTRA and row["hmem_rejected"] is True
+    assert row["receipt_hmem_injected"] == count and row.get("hmem_unreadable", False) is unreadable
+    assert "reply_sha256" not in row and "cache_refused" not in row
+    assert llm.hmem_rejected_count() == 1 and llm.cache_refused_count() == 0 and llm.error_count() == 1
+    with pytest.raises(llm.MemoryInjected) as refused:
+        llm._refuse_injected("connection test on fact_checker", met)  # what probe() and test_connection() call
+    for text in (row["error"], str(caught.value), str(refused.value)):
+        assert reason in text and EGRESS_TEXT not in text and "rcpt_test_1" not in text
+    journalled = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert len(journalled) == 1 and "reply" not in journalled[0]
+    llm.reset_calls()
+    assert llm.load_journal(path) == 1 and llm.replay == {}  # not journalled for replay
+
+
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+@pytest.mark.parametrize("hmem_key", [True, False], ids=["hmem-null", "hmem-missing"])
+@pytest.mark.parametrize("egress", [
+    _manifest(sources=("messages", "hmem:2 records")),
+    _manifest(never=(HMEM_NEVER,)),
+    _manifest(sources=("messages", "hmem:2 records", "mcp:filesystem"), never=(HMEM_NEVER,)),  # local-only: both lists
+    _manifest(sources=("messages", "hmem:1 records"), never=({"reason": "local-only H-MEM records", "count": 2},)),  # max
+    json.dumps(_manifest(sources=("messages", "hmem:2 records"))),  # a JSON string holding the manifest is decoded
+], ids=["context_sources", "never_eligible", "both", "larger-wins", "json-string"])
+def test_egress_manifest_count_rejects_with_the_hmem_block_null_or_missing(live, tmp_path, monkeypatch, where, hmem_key, egress):
+    """Closing round 4 (coordinator decision 3, fail closed on any sign): with the hmem block null or missing, a manifest
+    listing "hmem:2 records" (or a never_eligible H-MEM entry of count 2) was served and the row said
+    `receipt_hmem_injected: 0`. The manifest now joins the max at the top level and in every receipt copy."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, _ = _with_egress(where, egress, hmem_key)
+    assert llm._hmem_report(met) == (2, None) and llm._cache_refusal(met) is None
+    live(_completion(ULTRA, met))
+    _assert_rejected_not_replayed(path, met, "runtime injected 2 prior answers (H-MEM) into the prompt", 2, False)
+
+
+def test_egress_in_the_reported_probe_is_rejected(live, tmp_path, monkeypatch):
+    """The reviewer's in-process probe: receipt hmem null, the envelope copy the same, top-level and receipt egress both
+    listing "hmem:2 records"; it was served with (0, None) and no cache refusal."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    egress = _manifest(sources=("messages", "hmem:2 records"))
+    receipt = {"hmem": None, "cache": {"status": "miss"}, "egress": egress}
+    met = {"receipt_id": "r", "provider_model": ULTRA, "routed_model": ULTRA, "from_cache": False,
+           "cache": {"status": "miss"}, "receipt": receipt, "receipt_envelope": {"body": {"receipt": dict(receipt)}},
+           "egress": egress}
+    assert llm._hmem_report(met) == (2, None)
+    live(_completion(ULTRA, met))
+    _assert_rejected_not_replayed(path, met, "runtime injected 2 prior answers (H-MEM) into the prompt", 2, False)
+
+
+UNREADABLE_EGRESS = [  # (manifest, the failure's detail; {name} is the manifest's name), each named by shape only
+    (EGRESS_TEXT, "is unreadable ({name} is a string that is not JSON)"),
+    (json.dumps([EGRESS_TEXT]), "is unreadable ({name} is a JSON string holding a list)"),
+    ([EGRESS_TEXT], "is unreadable ({name} is a list)"),
+    (7, "is unreadable ({name} is 7)"),
+    ({k: v for k, v in _manifest().items() if k != "sent"}, "is unreadable ({name}.sent is absent or null)"),
+    ({**_manifest(), "sent": EGRESS_TEXT}, "is unreadable ({name}.sent is a string that is not JSON)"),
+    ({**_manifest(), "sent": {"prompt_chars": 1}}, "is unreadable ({name}.sent.context_sources is absent or null, not a list)"),
+    ({**_manifest(), "sent": {"context_sources": EGRESS_TEXT}}, "is unreadable ({name}.sent.context_sources is a string, not a list)"),
+    (_manifest(sources=("messages", {"hmem": 2, "note": EGRESS_TEXT})),
+     "is unreadable ({name}.sent.context_sources has an entry that is a dict, not a string)"),
+    (_manifest(sources=("messages", None)), "is unreadable ({name}.sent.context_sources has an entry that is null, not a string)"),
+    (_manifest(sources=(f"H-MEM: two records {EGRESS_TEXT}",)),
+     'names H-MEM records with no readable count ({name}.sent.context_sources has an entry naming H-MEM not in the form "hmem:<n> records")'),
+    (_manifest(sources=("hmem:2",)),
+     'names H-MEM records with no readable count ({name}.sent.context_sources has an entry naming H-MEM not in the form "hmem:<n> records")'),
+    (_manifest(sources=("hmem:" + "9" * 19 + " records",)),
+     'names H-MEM records with no readable count ({name}.sent.context_sources has an entry naming H-MEM not in the form "hmem:<n> records")'),
+    ({k: v for k, v in _manifest().items() if k != "never_eligible"}, "is unreadable ({name}.never_eligible is absent or null, not a list)"),
+    ({**_manifest(), "never_eligible": {"reason": "local-only H-MEM records"}}, "is unreadable ({name}.never_eligible is a dict, not a list)"),
+    (_manifest(never=(EGRESS_TEXT,)), "is unreadable ({name}.never_eligible has an entry that is a string, not an object)"),
+    (_manifest(never=({"count": 2, "note": EGRESS_TEXT},)),
+     "is unreadable ({name}.never_eligible has an entry whose reason is absent or null, not a string)"),
+    (_manifest(never=({"reason": 3, "count": 2},)), "is unreadable ({name}.never_eligible has an entry whose reason is 3, not a string)"),
+    (_manifest(never=({"reason": f"local-only hmem {EGRESS_TEXT}"},)),
+     "names H-MEM records with no readable count ({name}.never_eligible has an H-MEM entry whose count is absent or null)"),
+    (_manifest(never=({**HMEM_NEVER, "count": EGRESS_TEXT},)),
+     "names H-MEM records with no readable count ({name}.never_eligible has an H-MEM entry whose count is a string)"),
+    (_manifest(never=({**HMEM_NEVER, "count": True},)),
+     "names H-MEM records with no readable count ({name}.never_eligible has an H-MEM entry whose count is true)"),
+    (_manifest(never=({**HMEM_NEVER, "count": -1},)),
+     "names H-MEM records with no readable count ({name}.never_eligible has an H-MEM entry whose count is -1)"),
+    (_manifest(never=({**HMEM_NEVER, "count": 2.0},)),
+     "names H-MEM records with no readable count ({name}.never_eligible has an H-MEM entry whose count is 2.0)"),
+]
+
+
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+@pytest.mark.parametrize("egress,detail", UNREADABLE_EGRESS, ids=[f"egress-{i}" for i in range(len(UNREADABLE_EGRESS))])
+def test_unreadable_egress_manifest_is_rejected_and_named_by_shape(live, tmp_path, monkeypatch, where, egress, detail):
+    """Closing round 4: a present manifest that is not readable (not an object, a list missing or of the wrong type, an
+    entry of the wrong type, an H-MEM entry with no readable count) is an unreadable hmem report: rejected
+    (`hmem_unreadable`), never served, named by shape only (no text of the manifest copied), at every place it rides."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, name = _with_egress(where, egress)
+    reason = "the response's egress manifest " + detail.format(name=name)
+    assert llm._hmem_report(met) == (0, reason)
+    live(_completion(ULTRA, met))
+    _assert_rejected_not_replayed(path, met, reason, 0, True)
+
+
+def test_readable_egress_count_beside_an_unreadable_manifest_copy_is_disclosed_and_rejected(live, tmp_path, monkeypatch):
+    """As for hmem blocks (round 5): the readable 2 of one manifest is kept beside another copy's unreadable reason."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, _ = _with_egress("top", _manifest(sources=("messages", "hmem:2 records")))
+    met["receipt"]["egress"] = EGRESS_TEXT
+    reason = "the response's egress manifest is unreadable (a receipt's egress is a string that is not JSON)"
+    assert llm._hmem_report(met) == (2, reason)
+    live(_completion(ULTRA, met))
+    _assert_rejected_not_replayed(path, met, reason, 2, True)
+    assert "injected 2 prior answers" in llm.calls[0]["error"]
+
+
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+@pytest.mark.parametrize("egress", [
+    None,  # null says nothing (orchestrator.js: `egress: egressMeta` is null when the redactor is not loaded)
+    _manifest(),
+    _manifest(sources=("messages", "mcp:filesystem", "tool:web")),
+    _manifest(never=({"reason": "local-only secrets", "count": 1},)),  # a never_eligible entry that is not H-MEM
+    _manifest(sources=("messages", "hmem:0 records")),
+    json.dumps(_manifest()),
+], ids=["null", "messages", "mcp", "never-other", "hmem-0", "json-string"])
+def test_egress_manifest_without_injected_memories_is_served(live, where, egress):
+    """The other side: a readable manifest naming no H-MEM records (or 0), or a null one, is served at every place it
+    rides, with `receipt_hmem_injected` 0 as before."""
+    met, _ = _with_egress(where, egress)
+    assert llm._hmem_report(met) == (0, None)
+    live(_completion(ULTRA, met))
+    assert llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")["stance"] == "neutral"
+    row = llm.calls[-1]
+    assert row["served"] == ULTRA and row["receipt_hmem_injected"] == 0 and not row.get("error")
+    assert "hmem_rejected" not in row and llm.hmem_rejected_count() == 0
+
+
+def test_egress_alone_without_a_receipt_reports_its_count():
+    """A top-level manifest with no receipt and no hmem block still reports its count; one that names no H-MEM adds
+    nothing (the count stays None: nothing says how many were injected)."""
+    assert llm._hmem_report({"receipt_id": "r", "egress": _manifest(sources=("messages", "hmem:3 records"))}) == (3, None)
+    assert llm._hmem_report({"receipt_id": "r", "egress": _manifest()}) == (None, None)
+
+
+@pytest.mark.parametrize("flag", ["--test-connection", "--probe"])
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+def test_cli_checks_refuse_an_egress_manifest_with_injected_memories(live, control, capsys, flag, where):
+    control()
+    met, _ = _with_egress(where, _manifest(sources=("messages", "hmem:2 records")))
+    live(_completion(LIGHTNING, {**met, "provider_model": LIGHTNING, "routed_model": LIGHTNING}, '{"stance": "neutral"}'))
+    assert run.main([flag]) == 2
+    err = capsys.readouterr().err
+    assert "MemoryInjected" in err and "injected 2 prior answers" in err
+
+
+@pytest.mark.parametrize("flag", ["--test-connection", "--probe"])
+def test_cli_checks_refuse_an_unreadable_egress_manifest(live, control, capsys, flag):
+    control()
+    met, _ = _with_egress("receipt", _manifest(sources=(f"H-MEM {EGRESS_TEXT}",)))
+    live(_completion(LIGHTNING, {**met, "provider_model": LIGHTNING, "routed_model": LIGHTNING}, '{"stance": "neutral"}'))
+    assert run.main([flag]) == 2
+    err = capsys.readouterr().err
+    assert "MemoryInjected" in err and "names H-MEM records with no readable count" in err and EGRESS_TEXT not in err
+
+
+def test_journal_row_of_an_egress_rejection_is_restored_but_not_replayed(live, tmp_path, monkeypatch, capsys):
+    """--resume / --seed-journal: the row json_task wrote for an egress-reported injection stays in the ledger (a paid
+    call, its count disclosed) and its request goes live again; the live reply is then used."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, _ = _with_egress("receipt", _manifest(sources=("messages", "hmem:2 records")))
+    live(_completion(ULTRA, met, '{"stance": "supports", "reason": "injected"}'))
+    with pytest.raises(llm.MemoryInjected):
+        llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")
+    llm.reset_calls()
+    assert llm.load_journal(path) == 1 and llm.replay == {}
+    restored = llm.calls[0]
+    assert restored["receipt_hmem_injected"] == 2 and restored["hmem_rejected"] is True and restored["served"] == "error"
+    client = live(_completion(ULTRA, _with_egress("receipt", _manifest())[0], '{"stance": "neutral", "reason": "live"}'))
+    assert llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")["reason"] == "live"
+    assert len(client.kwargs) == 1
+
+
 CACHE_HITS = [
     {"from_cache": True},  # the 1.2.3 response's own flag
     {"from_cache": False, "cache": {"status": "exact", "source_model": ULTRA}},  # openai.mjs: `cache` is receipt.cache

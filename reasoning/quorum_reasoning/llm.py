@@ -456,6 +456,95 @@ def _receipt_copies(met: dict[str, Any]) -> list[dict[str, Any]]:
     return _receipt_scan(met)[0]
 
 
+# orchestrator.js runChat: `hmem:${hmemMeta.injected || hmemMeta.count} records`; at most 18 digits, so int() never
+# meets Python's digit limit (a longer count is an H-MEM entry with no readable count, which rejects too)
+_HMEM_SOURCE = re.compile(r"hmem:([0-9]{1,18}) records")
+
+
+def _names_hmem(text: str) -> bool:
+    """True when `text` names H-MEM in any spelling ("hmem", "H-MEM", "h_mem", "H MEM"), case ignored."""
+    return "hmem" in re.sub(r"[\s_\-]", "", text.lower())
+
+
+def _egress_hmem(met: dict[str, Any], receipts: list[dict[str, Any]]) -> tuple[list[int], str | None]:
+    """(the H-MEM record counts the egress manifests disclose, why one manifest is unreadable): the top-level `egress`
+    and every readable receipt copy's `egress` (`_receipt_scan`), read for `_hmem_report`.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): Nightshift's egress manifest is read as a sign of injected
+    memories, at the top level and in every receipt copy (each through `_json_object`, so a JSON string holding an
+    object is decoded): a `sent.context_sources` entry "hmem:<n> records" and a `never_eligible` entry whose `reason`
+    names H-MEM (any spelling, case ignored) with a non-negative int `count` join `_hmem_report`'s max as that count.
+    A present (not absent, not null) manifest is unreadable, which rejects the reply as an unreadable hmem report, when
+    it is not an object, its `sent` is not an object, `sent.context_sources` or `never_eligible` is not a list, a
+    `context_sources` entry is not a string, a `never_eligible` entry is not an object with a string `reason`, a
+    `context_sources` entry names H-MEM in any other form (an MCP server named for it included), or an H-MEM
+    `never_eligible` entry has no readable `count`; each is named by shape only, never the entry's text. An absent or
+    null manifest says nothing. Why: closing review round 4 (coordinator decision 3, fail closed on any sign): with the
+    hmem block null or missing, a manifest listing "hmem:2 records" was served with `receipt_hmem_injected` 0, and
+    Nightshift's two-whitelist rule (orchestrator.js recordReceipt, data.js normalizeReceipt) is how one field can be
+    dropped while the other survives. Nightshift 1.2.3 builds every manifest with `redact.egressManifest` (both lists
+    always present, `context_sources` strings, `never_eligible` objects with a reason and a count) from the same
+    `hmemMeta` as the hmem block, so this refuses nothing it sends today."""
+    counts: list[int] = []
+    problems: list[str] = []
+
+    def unreadable(detail: str) -> None:
+        problems.append(f"the response's egress manifest is unreadable ({detail})")
+
+    def no_count(detail: str) -> None:
+        problems.append(f"the response's egress manifest names H-MEM records with no readable count ({detail})")
+
+    def shape(value: Any) -> str:  # a field: `.get` cannot tell absent from null
+        return "absent or null" if value is None else _flag_shape(value)
+
+    def item_shape(value: Any) -> str:  # a list entry: present, so None is a JSON null
+        return "null" if value is None else _flag_shape(value)
+
+    for name, raw in [("egress", met.get("egress")), *(("a receipt's egress", r.get("egress")) for r in receipts)]:
+        manifest, bad = _json_object(raw)
+        if bad:
+            unreadable(f"{name} is {bad}")
+            continue
+        if manifest is None:
+            continue
+        sent, bad = _json_object(manifest.get("sent"))
+        sources = sent.get("context_sources") if sent is not None else None
+        if bad or sent is None:
+            unreadable(f"{name}.sent is {bad or 'absent or null'}")
+        elif not isinstance(sources, list):
+            unreadable(f"{name}.sent.context_sources is {shape(sources)}, not a list")
+        else:
+            for entry in sources:
+                if not isinstance(entry, str):
+                    unreadable(f"{name}.sent.context_sources has an entry that is {item_shape(entry)}, not a string")
+                    continue
+                match = _HMEM_SOURCE.fullmatch(entry)
+                if match:
+                    counts.append(int(match.group(1)))
+                elif _names_hmem(entry):
+                    no_count(f'{name}.sent.context_sources has an entry naming H-MEM not in the form "hmem:<n> records"')
+        never = manifest.get("never_eligible")
+        if not isinstance(never, list):
+            unreadable(f"{name}.never_eligible is {shape(never)}, not a list")
+            continue
+        for item in never:
+            if not isinstance(item, dict):
+                unreadable(f"{name}.never_eligible has an entry that is {item_shape(item)}, not an object")
+                continue
+            reason = item.get("reason")
+            if not isinstance(reason, str):
+                unreadable(f"{name}.never_eligible has an entry whose reason is {shape(reason)}, not a string")
+                continue
+            if not _names_hmem(reason):
+                continue
+            count = item.get("count")
+            if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
+                counts.append(count)
+            else:
+                no_count(f"{name}.never_eligible has an H-MEM entry whose count is {shape(count)}")
+    return counts, (problems[0] if problems else None)
+
+
 def _hmem_report(met: dict[str, Any]) -> tuple[int | None, str | None]:
     """(injected count, why the hmem report is unreadable): how many H-MEM records the runtime injected into the prompt.
 
@@ -478,17 +567,22 @@ def _hmem_report(met: dict[str, Any]) -> tuple[int | None, str | None]:
     up to `hmemTopK` "prior vetted answers" retrieved by scope (`meterless-scope`) and app (`meterless-app`); the sync
     chat path exposes no per-request switch (`noMemory` is set only by the jobs plane). The count is disclosed per row,
     and a count above 0 rejects the reply (decision in `json_task`); the daemon-wide switch is `disable_hmem_injection`.
-    A `meterless` value or receipt copy that is present but not an object is unreadable too (decision at `_meterless`)."""
+    A `meterless` value or receipt copy that is present but not an object is unreadable too (decision at `_meterless`).
+    The egress manifests (top level and every receipt copy) join the same max and the same unreadable reason, after
+    the receipt and hmem reasons (decision at `_egress_hmem`); a readable manifest that names no H-MEM adds nothing."""
     if not met:
         return None, None
     if met.get(_UNREADABLE_METERLESS):
         return None, str(met[_UNREADABLE_METERLESS])
     receipts, unreadable_receipt = _receipt_scan(met)
+    egress_counts, unreadable_egress = _egress_hmem(met, receipts)
     blocks = [r["hmem"] for r in receipts if r.get("hmem") is not None]
     if met.get("hmem") is not None:
         blocks.append(met["hmem"])
     if not blocks:
-        return (0 if receipts else None), unreadable_receipt  # a receipt without an hmem block: nothing injected
+        if egress_counts:
+            return max(egress_counts), unreadable_receipt or unreadable_egress
+        return (0 if receipts else None), unreadable_receipt or unreadable_egress  # a receipt without an hmem block: nothing injected
     def readable(value: Any) -> bool:
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
@@ -499,7 +593,7 @@ def _hmem_report(met: dict[str, Any]) -> tuple[int | None, str | None]:
     # one max and the first unreadable one is kept as the reason, so a readable 2 beside an unreadable copy is returned
     # as (2, reason): the row discloses `receipt_hmem_injected` 2 and is still rejected. Why: review round 5: the parser
     # returned at the first unreadable block, so the readable count was dropped from the error row (coordinator decision 3).
-    counts: list[int] = []
+    counts: list[int] = list(egress_counts)
     unreadable: str | None = unreadable_receipt
     for block in blocks:
         if not isinstance(block, dict):
@@ -522,7 +616,7 @@ def _hmem_report(met: dict[str, Any]) -> tuple[int | None, str | None]:
                 counts.append(value)
             elif unreadable is None:
                 unreadable = f"the receipt's hmem block has no readable injected count ({name} is {shown(value)})"
-    return (max(counts) if counts else None), unreadable
+    return (max(counts) if counts else None), unreadable or unreadable_egress
 
 
 def _hmem_rejection(injected: int | None, unreadable: str | None) -> str | None:
@@ -679,9 +773,9 @@ def replay_refused_count() -> int:
 
 
 def _refuse_injected(where: str, met: dict[str, Any]) -> None:
-    """Raises MemoryInjected when the receipt says prior answers were injected, carries an hmem block with no readable
-    count, or the reply is a Nightshift cache replay; no receipt, a null block and 0 pass (decisions in `json_task`,
-    `_hmem_report` and `_cache_hit`)."""
+    """Raises MemoryInjected when the receipt or an egress manifest says prior answers were injected, carries an hmem
+    block or a manifest with no readable count, or the reply is a Nightshift cache replay; no receipt, a null block and
+    0 pass (decisions in `json_task`, `_hmem_report`, `_egress_hmem` and `_cache_hit`)."""
     why = _hmem_rejection(*_hmem_report(met)) or _cache_refusal(met)
     if why:
         raise MemoryInjected(f"{where}: {why}; reply not used")
