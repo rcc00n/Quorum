@@ -21,6 +21,7 @@ import type { Publication } from "@/lib/analysis";
 import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
 import { BriefStatus } from "./brief-status";
+import { TodayBoard } from "./today-board";
 import {
   api,
   session,
@@ -260,9 +261,12 @@ export function Portal({
         <p className="nav-label">YOUR WORKSPACE</p>
         <nav>
           {[
-            [LayoutDashboard, "Daily brief", "/dashboard"],
+            // DECISION(2026-10-26, Anastasia/Claude Code): the menu reads Today · History · My topics and sits
+            // in the top bar (styled by app/workspace.css); settings stay behind "My topics". Why: Anastasia's
+            // brief for the personal page.
+            [LayoutDashboard, "Today", "/dashboard"],
             [History, "History", "/history"],
-            [Settings, "Settings", "/settings"],
+            [Settings, "My topics", "/settings"],
           ].map(([Icon, label, url]) => {
             const I = Icon as typeof History;
             return (
@@ -333,6 +337,7 @@ export function Portal({
             </div>
           ) : (
             <>
+              {view !== "dashboard" && (
               <div className="page-heading">
                 <p className="eyebrow">
                   {view === "dashboard"
@@ -352,6 +357,7 @@ export function Portal({
                           : ""}
                 </p>
               </div>
+              )}
               {data?.status === "demo" && (
                 <p className="message" role="status">
                   DEMO · Fictional interface fixture. Not verified news or live
@@ -439,6 +445,8 @@ export function Portal({
                 </div>
               ) : view === "onboarding" ? (
                 topicsPanel
+              ) : view === "dashboard" ? (
+                <TodayBoard data={data} user={user} day={day} today={today()} onDay={(d) => setDay(d)} />
               ) : view === "event" ? (
                 (() => {
                   const event = data?.events.find((e) => e.id === id);
