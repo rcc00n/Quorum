@@ -209,6 +209,72 @@ def frame(p: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_READING_QUESTIONS = ("direction", "judgement", "cause", "why", "next")  # nodes/frame.py QUESTIONS (not imported: frame imports llm, llm imports this)
+_READING_CUES = {
+    "judgement": re.compile(r"\b(?:criticiz\w*|lacks?|cost\w*|open-ended|condemn\w*|welcom\w*|prais\w*|expected)\b", re.IGNORECASE),
+    "cause": re.compile(r"\b(?:because|blam\w*|responsib\w*|due to)\b", re.IGNORECASE),
+    "why": re.compile(r"\b(?:in order to|so that|aims? to|to (?:help|protect|fund|curb|stop))\b", re.IGNORECASE),
+    "next": re.compile(r"\b(?:will|expected|takes effect|next week|plans?)\b", re.IGNORECASE),
+}
+_READING_BAD = re.compile(r"\b(?:criticiz\w*|lacks?|cost\w*|open-ended|condemn\w*)\b", re.IGNORECASE)
+_READING_GOOD = re.compile(r"\b(?:welcom\w*|prais\w*|expected)\b", re.IGNORECASE)
+_READING_TEXT = {
+    "cause": "It ties the outcome to the circumstances the article reports.",
+    "why": "It gives the reason the article states.",
+    "next": "It reports what is expected to happen next.",
+}
+
+
+def _verbatim_quote(sentence: str) -> str:
+    """A verbatim prefix of the sentence, at most 300 characters, cut at a space (the evidence quote cap)."""
+    s = sentence.strip()
+    if len(s) <= 300:
+        return s
+    cut = s[:300]
+    return cut[: cut.rfind(" ")] if " " in cut else cut
+
+
+def frame_reading(p: dict[str, Any]) -> dict[str, Any]:
+    """Twin of the per-outlet reading: frame's four labels (so a flag-on dry run keeps every existing spectrum field)
+    plus one sentence per question whose cue a sentence of the document's text carries, that sentence as the quote.
+    The direction sentence quotes the first sentence; a question with no cue is left out (unanswered)."""
+    labels = frame(p)
+    doc = (p.get("documents") or [{}])[0]
+    text = doc.get("text") or doc.get("lead") or doc.get("title") or ""
+    found = [s for s in _sentences(text) if len(s.split()) >= 3]
+    source = p.get("source") or "The outlet"
+    out: list[dict[str, Any]] = []
+    if found:
+        out.append({"answers": "direction", "text": f"{source} presents the story as {labels['interpretation_label']}.", "quote": _verbatim_quote(found[0]), "document_id": doc.get("id")})
+    for q in _READING_QUESTIONS[1:]:
+        hit = next((s for s in found if _READING_CUES[q].search(s)), None)
+        if hit is None:
+            continue
+        if q == "judgement":
+            bad, good = bool(_READING_BAD.search(hit)), bool(_READING_GOOD.search(hit))
+            line = f"It presents the outcome as {'mixed' if bad and good else 'bad' if bad else 'good'}."
+        else:
+            line = _READING_TEXT[q]
+        out.append({"answers": q, "text": line, "quote": _verbatim_quote(hit), "document_id": doc.get("id")})
+    return labels | {"sentences": out}
+
+
+def frame_flank_reading(p: dict[str, Any]) -> dict[str, Any]:
+    """Twin of the flank paragraph: per question, the first input sentence answering it (outlets in input order),
+    its quote and document id reused unchanged; the direction sentence names the side and the first outlet's label."""
+    flank = str(p.get("flank") or "center")
+    readings = [r for r in (p.get("readings") or []) if isinstance(r, dict)]
+    out: list[dict[str, Any]] = []
+    for q in _READING_QUESTIONS:
+        hit = next(((r, s) for r in readings for s in (r.get("sentences") or []) if isinstance(s, dict) and s.get("answers") == q), None)
+        if hit is None:
+            continue
+        r, s = hit
+        line = f"{flank.capitalize()} outlets present the story as {r.get('interpretation_label') or 'a report'}." if q == "direction" else s.get("text", "")
+        out.append({"answers": q, "text": line, "quote": s.get("quote"), "document_id": s.get("document_id")})
+    return {"sentences": out}
+
+
 def _sentence(text: str) -> str:
     text = text.strip().rstrip(".")
     return (text[0].upper() + text[1:] + ".") if text else ""

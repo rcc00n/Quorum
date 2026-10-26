@@ -86,6 +86,20 @@ forbidden_words = [
 ]
 attribution_verbs = ["says", "said", "states", "stated", "claims", "claimed", "according to", "announced", "told"]
 
+[frame]
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): "Across the spectrum" readings (one paragraph per side on how it
+# interpreted the fact, every sentence backed by a verbatim quote; docs/DECISIONS.md › Stories as articles) are behind
+# this flag, committed "off". Why: the portal parser (backend/portal/reasoning_preview.py, spectrum's optional keys)
+# rejects any unknown spectrum key, so a snapshot with `spectrum.readings` is refused whole until the web side adopts
+# the interface change in docs/ARCHITECTURE.md § 8; off, frame's calls, prompts, request keys and output are as before.
+readings = "off"             # off | on
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): both reading tasks run on the default (fast, Lightning) lane.
+# Why: frame_reading replaces the frame call, which already runs there, so it keeps that lane's bucket and pacing;
+# a reading describes the outlets' own words, it is not a blind second check, and the Ultra lanes (fact_checker,
+# reviewer, ~250 requests per bucket on the direct route) are kept for those. Allowed: default | fact_checker | reviewer.
+reading_lane = "default"         # task frame_reading: one call per outlet (replaces frame's call when readings = "on")
+flank_reading_lane = "default"   # task frame_flank_reading: one call per flank with two or more outlet readings
+
 [models]
 # One hotspot (Meterless Nightshift: MODEL_BASE_URL / MODEL_API_KEY), two lanes by env: NEMOTRON_MODEL for every
 # task, NEMOTRON_MODEL_FACT_CHECKER for the blind second check (falls back to NEMOTRON_MODEL when unset). Through

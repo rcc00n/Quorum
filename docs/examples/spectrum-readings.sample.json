@@ -1,0 +1,420 @@
+{
+  "_note": "FICTIONAL example of spectrum.readings (docs/ARCHITECTURE.md § 8, interface change 2026-10-26): the dry run on the fixture day with [frame] readings = \"on\", every model task answered by its deterministic stand-in. Not a snapshot and not news: the portal parser does not accept spectrum.readings yet, so this file stays out of the snapshot*.json samples it validates. So that it also shows outlet entries (a flank whose outlets differ), the stand-in labels minor outlets \"a cost to taxpayers\" here; in an ordinary dry run every outlet of a flank gets one label. Rebuilt by reasoning/scripts/regenerate_samples.py --readings.",
+  "fictional": true,
+  "provenance": {
+    "corpus": "fixture:sample_day",
+    "model": "stand-ins",
+    "fictional": true
+  },
+  "topic_id": "russia-ukraine-war",
+  "edition_date": "2026-10-22",
+  "stories": [
+    {
+      "event_id": "84b6dd5f95fe",
+      "headline": "President signs Ukraine aid bill into law",
+      "spectrum": {
+        "rating_mode": "average",
+        "left": {
+          "highlights": "President signs Ukraine aid package into law",
+          "omits": "",
+          "wording": "president",
+          "example_url": "https://www.cnn.com/2026/10/21/politics/ukraine-aid-signed"
+        },
+        "right": {
+          "highlights": "Ukraine aid bill signed into law after Senate",
+          "omits": "",
+          "wording": "ukraine",
+          "example_url": "https://www.foxnews.com/politics/ukraine-aid-bill-signed"
+        },
+        "note": "",
+        "coverage": {
+          "major_left": [
+            1,
+            3
+          ],
+          "minor_left": [
+            0,
+            0
+          ],
+          "major_right": [
+            1,
+            2
+          ],
+          "minor_right": [
+            2,
+            2
+          ],
+          "center": [
+            0,
+            0
+          ]
+        },
+        "interpretations": [
+          {
+            "label": "a cost to taxpayers",
+            "outlets": 2,
+            "mostly": "right"
+          },
+          {
+            "label": "a commitment",
+            "outlets": 1,
+            "mostly": "left"
+          },
+          {
+            "label": "a cost",
+            "outlets": 1,
+            "mostly": "right"
+          }
+        ],
+        "outlets": [
+          {
+            "source": "CNN",
+            "cohort": "major_left",
+            "flank": "left",
+            "url": "https://www.cnn.com/2026/10/21/politics/ukraine-aid-signed",
+            "highlights": "President signs Ukraine aid package into law",
+            "omits": "",
+            "wording": "president",
+            "interpretation_label": "a commitment"
+          },
+          {
+            "source": "Fox News",
+            "cohort": "major_right",
+            "flank": "right",
+            "url": "https://www.foxnews.com/politics/ukraine-aid-bill-signed",
+            "highlights": "Ukraine aid bill signed into law after Senate",
+            "omits": "",
+            "wording": "ukraine",
+            "interpretation_label": "a cost"
+          },
+          {
+            "source": "Breitbart",
+            "cohort": "minor_right",
+            "flank": "right",
+            "url": "https://www.breitbart.com/politics/2026/10/21/ukraine-aid-signed-cost/",
+            "highlights": "Open-ended Ukraine aid bill signed into law",
+            "omits": "",
+            "wording": "open-ended",
+            "interpretation_label": "a cost to taxpayers"
+          },
+          {
+            "source": "The Daily Wire",
+            "cohort": "minor_right",
+            "flank": "right",
+            "url": "https://www.dailywire.com/news/ukraine-aid-bill-signed",
+            "highlights": "Ukraine aid bill signed into law",
+            "omits": "",
+            "wording": "ukraine",
+            "interpretation_label": "a cost to taxpayers"
+          }
+        ],
+        "readings": [
+          {
+            "flank": "left",
+            "source": null,
+            "text": "CNN presents the story as a commitment. It presents the outcome as good. It reports what is expected to happen next.",
+            "sentences": [
+              {
+                "answers": "direction",
+                "text": "CNN presents the story as a commitment.",
+                "quote": "President signs Ukraine aid package into law.",
+                "url": "https://www.cnn.com/2026/10/21/politics/ukraine-aid-signed",
+                "document_id": 103,
+                "char_start": 0,
+                "char_end": 45
+              },
+              {
+                "answers": "judgement",
+                "text": "It presents the outcome as good.",
+                "quote": "Officials said the first shipments are expected within three weeks.",
+                "url": "https://www.cnn.com/2026/10/21/politics/ukraine-aid-signed",
+                "document_id": 103,
+                "char_start": 46,
+                "char_end": 113
+              },
+              {
+                "answers": "next",
+                "text": "It reports what is expected to happen next.",
+                "quote": "Officials said the first shipments are expected within three weeks.",
+                "url": "https://www.cnn.com/2026/10/21/politics/ukraine-aid-signed",
+                "document_id": 103,
+                "char_start": 46,
+                "char_end": 113
+              }
+            ],
+            "unanswered": [
+              "cause",
+              "why"
+            ]
+          },
+          {
+            "flank": "right",
+            "source": null,
+            "text": "Right outlets present the story as a cost. It presents the outcome as bad. It reports what is expected to happen next.",
+            "sentences": [
+              {
+                "answers": "direction",
+                "text": "Right outlets present the story as a cost.",
+                "quote": "Ukraine aid bill signed into law after Senate and House votes.",
+                "url": "https://www.foxnews.com/politics/ukraine-aid-bill-signed",
+                "document_id": 104,
+                "char_start": 0,
+                "char_end": 62
+              },
+              {
+                "answers": "judgement",
+                "text": "It presents the outcome as bad.",
+                "quote": "An opposition caucus said the bill lacks an audit mechanism.",
+                "url": "https://www.foxnews.com/politics/ukraine-aid-bill-signed",
+                "document_id": 104,
+                "char_start": 135,
+                "char_end": 195
+              },
+              {
+                "answers": "next",
+                "text": "It reports what is expected to happen next.",
+                "quote": "The bill will cost each taxpayer an estimated amount, according to a think-tank figure.",
+                "url": "https://www.breitbart.com/politics/2026/10/21/ukraine-aid-signed-cost/",
+                "document_id": 106,
+                "char_start": 45,
+                "char_end": 132
+              }
+            ],
+            "unanswered": [
+              "cause",
+              "why"
+            ]
+          },
+          {
+            "flank": "right",
+            "source": "Fox News",
+            "text": "Fox News presents the story as a cost. It presents the outcome as bad.",
+            "sentences": [
+              {
+                "answers": "direction",
+                "text": "Fox News presents the story as a cost.",
+                "quote": "Ukraine aid bill signed into law after Senate and House votes.",
+                "url": "https://www.foxnews.com/politics/ukraine-aid-bill-signed",
+                "document_id": 104,
+                "char_start": 0,
+                "char_end": 62
+              },
+              {
+                "answers": "judgement",
+                "text": "It presents the outcome as bad.",
+                "quote": "An opposition caucus said the bill lacks an audit mechanism.",
+                "url": "https://www.foxnews.com/politics/ukraine-aid-bill-signed",
+                "document_id": 104,
+                "char_start": 135,
+                "char_end": 195
+              }
+            ],
+            "unanswered": [
+              "cause",
+              "why",
+              "next"
+            ]
+          },
+          {
+            "flank": "right",
+            "source": "Breitbart",
+            "text": "Breitbart presents the story as a cost to taxpayers. It presents the outcome as bad. It reports what is expected to happen next.",
+            "sentences": [
+              {
+                "answers": "direction",
+                "text": "Breitbart presents the story as a cost to taxpayers.",
+                "quote": "Open-ended Ukraine aid bill signed into law.",
+                "url": "https://www.breitbart.com/politics/2026/10/21/ukraine-aid-signed-cost/",
+                "document_id": 106,
+                "char_start": 0,
+                "char_end": 44
+              },
+              {
+                "answers": "judgement",
+                "text": "It presents the outcome as bad.",
+                "quote": "Open-ended Ukraine aid bill signed into law.",
+                "url": "https://www.breitbart.com/politics/2026/10/21/ukraine-aid-signed-cost/",
+                "document_id": 106,
+                "char_start": 0,
+                "char_end": 44
+              },
+              {
+                "answers": "next",
+                "text": "It reports what is expected to happen next.",
+                "quote": "The bill will cost each taxpayer an estimated amount, according to a think-tank figure.",
+                "url": "https://www.breitbart.com/politics/2026/10/21/ukraine-aid-signed-cost/",
+                "document_id": 106,
+                "char_start": 45,
+                "char_end": 132
+              }
+            ],
+            "unanswered": [
+              "cause",
+              "why"
+            ]
+          },
+          {
+            "flank": "right",
+            "source": "The Daily Wire",
+            "text": "The Daily Wire presents the story as a cost to taxpayers.",
+            "sentences": [
+              {
+                "answers": "direction",
+                "text": "The Daily Wire presents the story as a cost to taxpayers.",
+                "quote": "Ukraine aid bill signed into law.",
+                "url": "https://www.dailywire.com/news/ukraine-aid-bill-signed",
+                "document_id": 107,
+                "char_start": 0,
+                "char_end": 33
+              }
+            ],
+            "unanswered": [
+              "judgement",
+              "cause",
+              "why",
+              "next"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "5e4a66f922db",
+      "headline": "Executive Order: Additional sanctions on three sectors",
+      "spectrum": {
+        "rating_mode": "average",
+        "left": {
+          "highlights": "Executive order imposes additional sanctions on three sectors",
+          "omits": "",
+          "wording": "executive",
+          "example_url": "https://www.theguardian.com/us-news/2026/oct/21/executive-order-sanctions-three-sectors"
+        },
+        "right": {
+          "highlights": "Executive order adds sanctions on three sectors",
+          "omits": "",
+          "wording": "executive",
+          "example_url": "https://nypost.com/2026/10/21/executive-order-sanctions-three-sectors/"
+        },
+        "note": "",
+        "coverage": {
+          "major_left": [
+            1,
+            3
+          ],
+          "minor_left": [
+            0,
+            0
+          ],
+          "major_right": [
+            1,
+            2
+          ],
+          "minor_right": [
+            0,
+            2
+          ],
+          "center": [
+            0,
+            0
+          ]
+        },
+        "interpretations": [
+          {
+            "label": "a commitment",
+            "outlets": 1,
+            "mostly": "left"
+          },
+          {
+            "label": "a cost",
+            "outlets": 1,
+            "mostly": "right"
+          }
+        ],
+        "outlets": [
+          {
+            "source": "The Guardian",
+            "cohort": "major_left",
+            "flank": "left",
+            "url": "https://www.theguardian.com/us-news/2026/oct/21/executive-order-sanctions-three-sectors",
+            "highlights": "Executive order imposes additional sanctions on three sectors",
+            "omits": "",
+            "wording": "executive",
+            "interpretation_label": "a commitment"
+          },
+          {
+            "source": "New York Post",
+            "cohort": "major_right",
+            "flank": "right",
+            "url": "https://nypost.com/2026/10/21/executive-order-sanctions-three-sectors/",
+            "highlights": "Executive order adds sanctions on three sectors",
+            "omits": "",
+            "wording": "executive",
+            "interpretation_label": "a cost"
+          }
+        ],
+        "readings": [
+          {
+            "flank": "left",
+            "source": null,
+            "text": "The Guardian presents the story as a commitment. It reports what is expected to happen next.",
+            "sentences": [
+              {
+                "answers": "direction",
+                "text": "The Guardian presents the story as a commitment.",
+                "quote": "Executive order imposes additional sanctions on three sectors.",
+                "url": "https://www.theguardian.com/us-news/2026/oct/21/executive-order-sanctions-three-sectors",
+                "document_id": 112,
+                "char_start": 0,
+                "char_end": 62
+              },
+              {
+                "answers": "next",
+                "text": "It reports what is expected to happen next.",
+                "quote": "The order takes effect on November 1.",
+                "url": "https://www.theguardian.com/us-news/2026/oct/21/executive-order-sanctions-three-sectors",
+                "document_id": 112,
+                "char_start": 143,
+                "char_end": 180
+              }
+            ],
+            "unanswered": [
+              "judgement",
+              "cause",
+              "why"
+            ]
+          },
+          {
+            "flank": "right",
+            "source": null,
+            "text": "New York Post presents the story as a cost. It reports what is expected to happen next.",
+            "sentences": [
+              {
+                "answers": "direction",
+                "text": "New York Post presents the story as a cost.",
+                "quote": "Executive order adds sanctions on three sectors.",
+                "url": "https://nypost.com/2026/10/21/executive-order-sanctions-three-sectors/",
+                "document_id": 113,
+                "char_start": 0,
+                "char_end": 48
+              },
+              {
+                "answers": "next",
+                "text": "It reports what is expected to happen next.",
+                "quote": "The order takes effect on November 1.",
+                "url": "https://nypost.com/2026/10/21/executive-order-sanctions-three-sectors/",
+                "document_id": 113,
+                "char_start": 49,
+                "char_end": 86
+              }
+            ],
+            "unanswered": [
+              "judgement",
+              "cause",
+              "why"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

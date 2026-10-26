@@ -175,6 +175,9 @@ def relevance_note(irrelevant: int, ungrounded: int, off_fact: int = 0, supports
     return f"; {', '.join(parts)}" if parts else ""
 
 
+EVIDENCE_QUOTE_CAP = 300  # characters of a stored evidence quote (text.clip_sentences); frame's reading quotes share it
+
+
 def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str, fetched: FetchResult | None = None) -> Evidence:
     is_doc = bool(doc.get("official")) and doc.get("doc_type") in DOCUMENT_TYPES_THAT_ESTABLISH
     # DECISION(2026-10-24, Yelysei Shkirpan/Claude Code): an official release/statement and an attributed-only
@@ -192,7 +195,7 @@ def evidence_from(doc: DocRef, passage: str, stance: str, found_by: str, fetched
     # database id so analysis.evidence rows point at real official_docs rows.
     db_id = doc["id"] - OFFICIAL_ID_OFFSET if doc.get("official") and doc["id"] >= OFFICIAL_ID_OFFSET else doc["id"]
     ev = Evidence(
-        quote=clip_sentences(passage, 300),
+        quote=clip_sentences(passage, EVIDENCE_QUOTE_CAP),
         document_id=None if doc.get("official") else doc["id"],
         official_doc_id=db_id if doc.get("official") else None,
         source_id=doc["source_id"],
