@@ -89,7 +89,20 @@ KEY_VECTORS = [
     ("Ukr\u200baine war", "ukraine war"),  # zero-width space
     ("\u202eevil topic", "evil topic"),  # right-to-left override
     ("\ufeffClimate", "climate"),  # BOM
+    # vowel signs of Indic and Thai scripts are marks but not diacritics: kept, and part of the word
+    ("\u091a\u0940\u0928", "\u091a\u0940\u0928"),  # China
+    ("\u091a\u0928\u093e", "\u091a\u0928\u093e"),  # chickpea: a different key from China
+    ("\u092d\u093e\u0930\u0924", "\u092d\u093e\u0930\u0924"),
+    ("\u091a\u0940\u0928 \u0914\u0930 \u092d\u093e\u0930\u0924", "\u0914\u0930 \u091a\u0940\u0928 \u092d\u093e\u0930\u0924"),
+    ("\u0e1b\u0e35\u0e43\u0e2b\u0e21\u0e48", "\u0e1b\u0e35\u0e43\u0e2b\u0e21\u0e48"),
+    ("\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e", "\u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e"),
+    # every key stopword, so that both implementations are held to the whole list
+    ("a about an and at by for from in into of on or over s the to vs with news", ""),
+    ("Ukraine vs Russia with news about war", "russia ukraine war"),
 ]
+
+# The key's stopwords exactly as docs/DECISIONS.md › Daily editions for users lists them (the contract with the web app).
+DOCUMENTED_KEY_STOPWORDS = "a about an and at by for from in into of on or over s the to vs with news"
 
 
 @pytest.mark.parametrize("text, key", KEY_VECTORS)
@@ -105,13 +118,21 @@ def _js_twin() -> str:
 
 
 def test_js_twin_in_the_source_is_the_javascript_to_copy():
-    """The docstring is raw, so the source file shows `\\p{M}`, not `\\\\p{M}` (a regex SyntaxError in JavaScript)."""
+    """The docstring is raw, so the source file shows `\\p{L}`, not `\\\\p{L}` (a regex SyntaxError in JavaScript)."""
     src = Path(topics.__file__).read_text(encoding="utf-8")
     twin = _js_twin()
     flat = "\n".join(line.strip() for line in src.splitlines())
     assert twin in flat and "\\\\" not in twin
-    for piece in (r"/\p{Cf}/gu", r"/\p{M}/gu", r"/(?<=\p{L})\.(?=\p{L})/gu", r"/[\p{L}\p{N}]+/gu"):
+    for piece in (r"/\p{Cf}/gu", r"/[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/gu",
+                  r"/(?<=\p{L})\.(?=\p{L})/gu", r"/[\p{L}\p{M}\p{N}]+/gu"):
         assert piece in twin
+    assert r"/\p{M}/gu" not in twin  # not every combining mark is deleted: Indic and Thai vowel signs stay
+
+
+def test_js_twin_folds_the_same_diacritic_blocks():
+    ranges = re.search(r"\.replace\(/\[((?:\\u[0-9a-f]{4}-\\u[0-9a-f]{4})+)\]/gu", _js_twin()).group(1)
+    pairs = re.findall(r"\\u([0-9a-f]{4})-\\u([0-9a-f]{4})", ranges)
+    assert tuple((int(a, 16), int(b, 16)) for a, b in pairs) == topics._DIACRITICS
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -140,6 +161,23 @@ def test_key_stopwords_are_small_and_keep_meaningful_words():
     assert len(topics.KEY_STOPWORDS) <= 25
     for word in ("us", "war", "ai", "not", "no"):
         assert word not in topics.KEY_STOPWORDS
+
+
+def test_key_stopwords_are_the_documented_list_in_python_and_in_the_js_twin():
+    """Runs without node: the JavaScript twin's STOP list is read from the docstring and compared."""
+    documented = frozenset(DOCUMENTED_KEY_STOPWORDS.split())
+    assert topics.KEY_STOPWORDS == documented
+    js_stop = re.search(r'const STOP = new Set\("([^"]*)"\.split\(" "\)\);', topics.request_key.__doc__).group(1)
+    assert js_stop.split(" ") == DOCUMENTED_KEY_STOPWORDS.split(" ")
+    decisions = Path(topics.__file__).resolve().parents[2] / "docs" / "DECISIONS.md"
+    if decisions.exists():  # the repository checkout; an installed package has no docs
+        assert f"drop the stopwords `{DOCUMENTED_KEY_STOPWORDS}`" in decisions.read_text(encoding="utf-8")
+
+
+def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
+    china, chickpea = resolve([{"text": "चीन", "count": 2}, "चना"], existing)
+    assert china["key"] != chickpea["key"] and china["text"] == "चीन" and chickpea["text"] == "चना"
+    assert china["topic_id"] != chickpea["topic_id"]
 
 
 # ---------------------------------------------------------------- validation ----
@@ -188,6 +226,9 @@ def test_key_stopwords_are_small_and_keep_meaningful_words():
         ("\ud800 topic", "contains private-use, unpaired surrogate or unassigned characters", False),
         ("\u0378 topic", "contains private-use, unpaired surrogate or unassigned characters", False),
         ("\u00ad\u200b", "empty", False),  # only format characters
+        # markup in the NFKC form, which the intake matches and derives from
+        ("\uff1cscript\uff1e topic", "contains markup or control characters", False),
+        ("\ufe64b\ufe65 topic", "contains markup or control characters", False),
     ],
 )
 def test_rejections(text, why, withheld):
@@ -353,14 +394,27 @@ def test_same_words_as_a_name_or_slug_is_that_topic(existing):
         ("Zelensky", "russia-ukraine-war", "Zelensky"),
         ("Ukrainian war", "russia-ukraine-war", "Ukrainian"),  # "war" is in the slug, "Ukrainian" is the matching term
         ("export controls", "tariffs-trade-war-china", "export controls"),  # the older of two covering topics wins, as in collection
-        ("AI chips export controls", "ai-regulation-export-controls", "export controls"),  # the older topic lacks "AI chips"
     ],
 )
 def test_a_headline_collected_under_an_existing_topic_maps_to_it(existing, text, topic_id, term):
     (r,) = resolve([text], existing)
     assert (r["status"], r["topic_id"], r["match"]) == ("existing", topic_id, "headline")
     assert repr(term) in r["reason"] and r["terms"] == next(t["terms"] for t in existing if t["id"] == topic_id)
+    assert f"collection gives a headline saying {text!r} to {topic_id} (term {term!r}), the first active topic" in r["reason"]
     assert "every word of the request is in its name, slug or matching terms" in r["reason"]
+    assert "collection order unknown" not in r["reason"]
+
+
+def test_a_covering_topic_that_does_not_get_the_headline_is_needs_review(existing):
+    """collectors/common.py first_topic_match gives "AI chips export controls" to the older tariffs-trade-war-china
+    ("export controls"), although only ai-regulation-export-controls covers "AI chips": the operator chooses."""
+    (r,) = resolve(["AI chips export controls"], existing)
+    assert (r["status"], r["topic_id"], r["match"]) == ("needs_review", "ai-regulation-export-controls", "headline")
+    assert r["reason"] == ("every word of the request is in the name, slug or matching terms of ai-regulation-export-controls "
+                           "(term 'export controls'), but collection gives a headline saying 'AI chips export controls' to "
+                           "tariffs-trade-war-china (term 'export controls'), the first active topic whose terms match it; "
+                           "map the request to one of them")
+    assert topics.rows_sql([r]).count("INSERT") == 0
 
 
 @pytest.mark.parametrize(
@@ -376,29 +430,69 @@ def test_a_headline_collected_under_an_existing_topic_maps_to_it(existing, text,
         ("Ukraine peace talks", "russia-ukraine-war", "Ukraine"),
         ("data centers water use", "ai-regulation-export-controls", "data centers"),
         ("semiconductors in cars", "tariffs-trade-war-china", "semiconductors"),
+        # other wordings and narrower topics of an existing topic (review round 2)
+        ("climate change", "climate-policy", "climate"),
+        ("Russian invasion of Ukraine", "russia-ukraine-war", "Ukraine"),
+        ("Zelensky visit to Washington", "russia-ukraine-war", "Zelensky"),
+        ("tariffs on Canada", "tariffs-trade-war-china", "tariffs"),
+        ("Ukraine drone attacks", "russia-ukraine-war", "Ukraine"),
+        ("ICE raids in Los Angeles", "immigration-southern-border", "ICE raids"),
+        ("AI safety bill California", "ai-regulation-export-controls", "AI safety"),
+        ("deportation flights to Venezuela", "immigration-southern-border", "deportation"),
     ],
 )
 def test_one_shared_term_does_not_make_a_request_existing(existing, text, topic_id, term):
-    """A headline hit maps to that topic only when every word of the request is in its name, slug or matching terms."""
+    """A headline hit maps to that topic only when every word of the request is in its name, slug or matching terms.
+    Otherwise the row would be `new` in name only: collection gives every headline that says the typed words to the
+    older topic, so the request is needs_review, with the proposed row and the older topic to choose from."""
     (r,) = resolve([text], existing)
-    assert (r["status"], r["match"]) == ("new", None) and r["topic_id"] not in {t["id"] for t in existing}
-    assert f"also matches {term!r} of {topic_id}" in r["reason"]
+    assert (r["status"], r["match"]) == ("needs_review", None) and r["topic_id"] not in {t["id"] for t in existing}
+    assert r["reason"].startswith(f"collection gives a headline saying {text!r} to {topic_id} (term {term!r}), the first "
+                                  "active topic whose terms match it, so this row would not receive the headlines")
+    assert f"map the request to {topic_id} or accept the row" in r["reason"]
     assert term.lower() not in {t.lower() for t in r["terms"]} and topic_id in {c["topic_id"] for c in r["conflicts"]}
+    assert r["terms"] and topics.rows_sql([r]).count("INSERT") == 0  # the proposed row is shown, never inserted
+
+
+def test_unknown_collection_order_is_stated_where_two_existing_topics_match(existing):
+    (ordered,) = resolve(["export controls"], existing)
+    (unknown,) = resolve(["export controls"], existing, order_known=False)
+    assert "collection order unknown" not in ordered["reason"] and unknown["status"] == "existing"
+    assert unknown["reason"].endswith("; collection order unknown (created_at not readable, topics taken in the order "
+                                      "returned), so which of tariffs-trade-war-china, ai-regulation-export-controls keeps "
+                                      "such a headline is not certain")
+    (one,) = resolve(["war in Ukraine"], existing, order_known=False)  # one matching topic: the order does not matter
+    assert one["status"] == "existing" and "collection order unknown" not in one["reason"]
+    (both,) = resolve(["AI chips export controls"], existing, order_known=False)
+    assert both["status"] == "needs_review" and "collection order unknown" in both["reason"]
+
+
+def test_model_terms_that_avoid_every_overlap_still_miss_the_headline(existing):
+    """A live proposal for "Ukraine peace talks" may overlap nothing; collection still gives the headline to
+    russia-ukraine-war, and the row would fill with Gaza and trade talks."""
+    (r,) = resolve(["Ukraine peace talks"], existing, propose=model_row(["peace talks", "istanbul talks", "peace deal", "Witkoff"]))
+    assert (r["status"], r["conflicts"], r["source"]) == ("needs_review", [], "model")
+    assert "to russia-ukraine-war (term 'Ukraine')" in r["reason"] and "dropped as overlapping" not in r["reason"]
 
 
 def test_shared_terms_with_new_rows_of_the_batch_do_not_make_requests_existing(existing):
     res = resolve([{"text": "Mars sample return mission", "count": 3}, {"text": "Taylor Swift tour", "count": 3},
                    "Tax return deadline", "Tour de France doping", "Swift banking sanctions"], existing)
     assert [(r["status"], r["topic_id"]) for r in res] == [
-        ("new", "mars-sample-return-mission"), ("new", "taylor-swift-tour"), ("new", "tax-return-deadline"),
-        ("new", "tour-de-france-doping"), ("new", "swift-banking-sanctions")]
-    assert "also matches 'return' of mars-sample-return-mission" in res[2]["reason"]
+        ("new", "mars-sample-return-mission"), ("new", "taylor-swift-tour"), ("needs_review", "tax-return-deadline"),
+        ("needs_review", "tour-de-france-doping"), ("needs_review", "swift-banking-sanctions")]
+    assert all(r["match"] is None for r in res)
+    assert res[2]["reason"].startswith("collection gives a headline saying 'Tax return deadline' to mars-sample-return-mission "
+                                       "(a new row of this batch) (term 'return')")
+    assert "to taylor-swift-tour (a new row of this batch) (term 'swift')" in res[4]["reason"]
     assert "return" not in res[2]["terms"] and "swift" not in res[4]["terms"]
+    assert topics.rows_sql(res).count("INSERT") == 2
 
 
 def test_new_topic_keeps_only_non_overlapping_terms(existing):
     (r,) = resolve(["Ukrainian refugees in Poland"], existing)  # "Ukrainian" is a term of russia-ukraine-war; Poland is not
-    assert r["status"] == "new" and "ukrainian" not in [t.lower() for t in r["terms"]] and "poland" in r["terms"]
+    assert r["status"] == "needs_review" and "to russia-ukraine-war (term 'Ukrainian')" in r["reason"]
+    assert "ukrainian" not in [t.lower() for t in r["terms"]] and "poland" in r["terms"]
     assert ("ukrainian", "russia-ukraine-war", "equal") in {(c["term"], c["topic_id"], c["relation"]) for c in r["conflicts"]}
     (r,) = resolve(["refugee chess tournaments"], existing, propose=lambda t: {"slug": "refugee-chess", "name": "Refugee chess",
                                                                               "terms": ["refugee chess", "asylum seekers", "chess", "border wall art"],
@@ -423,8 +517,19 @@ def test_needs_review_when_the_kept_terms_miss_the_request_itself(existing):
     (r,) = resolve(["China"], existing)
     assert r["status"] == "needs_review" and r["terms"] == ["chinas"]
     assert r["conflicts"] == [{"term": "china", "topic_id": "tariffs-trade-war-china", "topic_term": "china tariffs", "relation": "contained_in"}]
-    assert r["reason"] == ("the terms that would collect a headline saying 'China' ('china') overlap older topics, "
-                           "and none of the kept terms would")
+    assert r["reason"] == ("the overlap dropped terms that the typed words contain: 'china' (contained_in 'china tariffs' of "
+                           "tariffs-trade-war-china); none of the kept terms occurs in a headline saying 'China', so this "
+                           "row would miss its own subject; map the request to tariffs-trade-war-china or accept the row")
+    (r,) = resolve(["China"], existing, propose=model_row(["China", "Beijing"]))  # a model's paraphrase does not help either
+    assert r["status"] == "needs_review" and r["terms"] == ["beijing"]
+
+
+def test_a_typed_word_held_only_inside_a_longer_older_term_keeps_the_row_new(existing):
+    """"china" is dropped (it is contained in "china tariffs"), but a headline saying "China chess" matches no term of
+    tariffs-trade-war-china, and the kept "chess" collects it."""
+    (r,) = resolve(["China chess"], existing)
+    assert r["status"] == "new" and "china" not in r["terms"] and {"china chess", "chess"} <= set(r["terms"])
+    assert {(c["term"], c["relation"]) for c in r["conflicts"]} == {("china", "contained_in")}
 
 
 def model_row(terms, slug=None):
@@ -455,7 +560,32 @@ def test_overlap_that_spares_the_typed_words_still_gives_a_new_row(existing):
     assert r["status"] == "new" and r["terms"] == ["border murals", "frontier murals"]
 
 
-@pytest.mark.parametrize("text", ["us", "it", "who", "May", "WHO", "IS"])
+@pytest.mark.parametrize("text, terms", [("K-pop", ["k-pop", "k-pops"]), ("Wi-Fi", ["wi-fi", "wi-fis"]), ("X-ray", ["x-ray", "x-rays"])])
+def test_a_hyphenated_word_stays_whole(existing, text, terms):
+    """Split at the hyphen, "k pop" would never match a headline saying "K-pop" (collection matches whole words)."""
+    assert topics.derive(text)["terms"] == terms
+    (r,) = resolve([text], existing)
+    assert r["status"] == "new" and r["terms"] == terms
+
+
+def test_hyphenated_parts_are_also_single_terms():
+    terms = topics.derive("Russia-Ukraine talks")["terms"]
+    assert "russia-ukraine talks" in terms and {"russia-ukraine", "russia", "ukraine"} <= set(terms)
+    assert topics.derive("Boeing 737-800")["terms"][:2] == ["boeing 737-800", "boeing 737-800s"]
+    assert topics.derive("Ｋ-pop")["terms"] == ["k-pop", "k-pops"]  # NFKC first: a full-width letter is matched as ASCII
+
+
+@pytest.mark.parametrize("source", topics.DERIVED_SOURCES)
+@pytest.mark.parametrize("text", ["चीन", "ปีใหม่"])
+def test_derived_terms_that_miss_the_typed_words_are_needs_review(existing, text, source):
+    """derive splits words at a vowel sign ("चीन" -> "च न"); such terms would collect nothing on the subject."""
+    (r,) = resolve([text], existing, propose=lambda t: {**topics.derive(t), "source": source})
+    assert (r["status"], r["source"]) == ("needs_review", source) and r["terms"]
+    assert r["reason"].startswith("the derived terms would not match the typed words: none of ")
+    assert topics.rows_sql([r]).count("INSERT") == 0
+
+
+@pytest.mark.parametrize("text", ["us", "it", "who", "May", "WHO", "IS", "F-35"])
 def test_a_row_whose_only_terms_are_too_generic_is_needs_review(existing, text):
     (r,) = resolve([text], existing)
     assert r["status"] == "needs_review" and r["terms"] == [] and r["reason"].startswith("terms too generic to collect: ")
@@ -570,6 +700,36 @@ def test_same_key_is_resolved_once_and_shared(existing):
     assert [r["index"] for r in res] == [0, 1, 2] and [r["count"] for r in res] == [6, 2, 1]
 
 
+@pytest.mark.parametrize("reverse", [False, True])
+def test_a_key_group_resolves_alike_in_either_input_order(existing, reverse):
+    """The key ignores word order and compatibility forms; the headline match and derive do not. Every text of the
+    group is checked as a headline in NFKC form, so the shared result does not depend on which entry came first."""
+    entries = [{"text": "war trade China", "count": 1}, {"text": "China trade war", "count": 50}]
+    res = resolve(entries[::-1] if reverse else entries, existing)
+    assert {(r["status"], r["topic_id"], r["match"]) for r in res} == {("existing", "tariffs-trade-war-china", "headline")}
+    entries = [{"text": "Ｕｋｒａｉｎｅ war", "count": 1}, {"text": "Ukraine war", "count": 9}]
+    res = resolve(entries[::-1] if reverse else entries, existing)
+    assert {(r["status"], r["topic_id"]) for r in res} == {("existing", "russia-ukraine-war")}
+    assert {r["text"] for r in res} == {"Ｕｋｒａｉｎｅ war", "Ukraine war"}  # each entry keeps its text
+    entries = [{"text": "war trade China", "count": 2}, {"text": "China trade war", "count": 2}]  # a tie
+    assert {r["status"] for r in resolve(entries[::-1] if reverse else entries, existing)} == {"existing"}
+
+
+def test_a_new_row_is_proposed_from_the_most_requested_text_in_nfkc_form(existing):
+    calls = []
+
+    def propose(text):
+        calls.append(text)
+        return dry(text)
+
+    full_width = "Ｍａｒｓ ｓａｍｐｌｅ ｒｅｔｕｒｎ"  # Mars sample return
+    res = resolve([{"text": full_width, "count": 1}, {"text": "return sample Mars", "count": 4}], existing, propose=propose)
+    assert calls == ["return sample Mars"] and {r["name"] for r in res} == {"Return Sample Mars"}
+    (r,) = resolve([full_width], existing, propose=propose)
+    assert calls[-1] == "Mars sample return" and r["status"] == "new" and r["name"] == "Mars Sample Return"
+    assert all(t.isascii() for t in r["terms"]) and topics._occurs(r["terms"][0], "Mars sample return delayed again")
+
+
 def test_later_requests_match_new_rows_of_the_batch_and_count_sets_the_order(existing):
     res = resolve([{"text": "measles in Texas", "count": 1}, {"text": "measles outbreak Texas", "count": 6},
                    {"text": "measles vaccine exemptions", "count": 1}], existing)
@@ -577,9 +737,10 @@ def test_later_requests_match_new_rows_of_the_batch_and_count_sets_the_order(exi
     assert second["status"] == "new" and second["order"] == 1
     assert (first["status"], first["topic_id"], first["match"]) == ("existing", "measles-outbreak-texas", "headline")
     assert "a new row of this batch" in first["reason"]
-    # "vaccine exemptions" is in no name, slug or term of the batch row: a row of its own, without the shared "measles"
-    assert (third["status"], third["topic_id"], third["order"]) == ("new", "measles-vaccine-exemptions", 2)
-    assert "measles" not in third["terms"] and "also matches 'measles' of measles-outbreak-texas" in third["reason"]
+    # "vaccine exemptions" is in no name, slug or term of the batch row, but the batch row gets the headline ("measles")
+    assert (third["status"], third["topic_id"], third["order"]) == ("needs_review", "measles-vaccine-exemptions", None)
+    assert "measles" not in third["terms"]
+    assert "to measles-outbreak-texas (a new row of this batch) (term 'measles')" in third["reason"]
 
 
 def test_terms_overlapping_an_earlier_row_of_the_batch_are_dropped(existing):
@@ -788,6 +949,53 @@ def test_cli_reads_zetaris_when_no_file_is_given(tmp_path, monkeypatch):
     out = tmp_path / "out"
     assert topics.main(["--from-requests", _write(tmp_path, "req.json", SAMPLE[:1]), "--out", str(out), "--dry-run"]) == 0
     assert "Zetaris QUORUM_COLLECT.topics" in (out / "report.txt").read_text(encoding="utf-8")
+
+
+def test_cli_states_an_unknown_collection_order_in_the_reason(tmp_path):
+    """The rehearsal registration exposes no created_at: report.txt says so, and so does the reason that depends on it."""
+    code, (m,), _, report = _batch(tmp_path, [{"text": "export controls"}], "--dry-run")
+    assert code == 0 and "created_at not available" in report and "collection order unknown" in m["reason"]
+    dated = [{**r, "created_at": f"2026-10-25T06:0{i}:00+00:00"} for i, r in enumerate(ZETARIS_ROWS)]
+    out = tmp_path / "dated"
+    assert topics.main(["--from-requests", _write(tmp_path, "one.json", [{"text": "export controls"}]), "--out", str(out),
+                        "--dry-run", "--existing", _write(tmp_path, "dated.json", dated)]) == 0
+    (m,) = json.loads((out / "mapping.json").read_text(encoding="utf-8"))
+    assert m["topic_id"] == "tariffs-trade-war-china" and "collection order unknown" not in m["reason"]
+
+
+# The operator's sample batch (ws-intake/sample/requests.json, run through Zetaris on the rehearsal dump): its
+# report.txt must show these statuses.
+SAMPLE_BATCH = [
+    ("war in Ukraine", 7, "existing", "russia-ukraine-war"),
+    ("Russia Ukraine war", 2, "existing", "russia-ukraine-war"),
+    ("immigration", 5, "existing", "immigration-southern-border"),
+    ("tariffs on China", 4, "existing", "tariffs-trade-war-china"),
+    ("Climate policy", 1, "existing", "climate-policy"),
+    ("Mars sample return mission", 3, "new", "mars-sample-return-mission"),
+    ("measles outbreak Texas", 6, "new", "measles-outbreak-texas"),
+    ("Measles outbreak in Texas", 2, "new", "measles-outbreak-texas"),
+    ("measles vaccine exemptions", 1, "needs_review", "measles-vaccine-exemptions"),
+    ("AI", 2, "needs_review", "ai-news"),
+    ("China", 1, "needs_review", "china-news"),
+    ("Gaza ceasefire", 2, "new", "gaza-ceasefire"),
+    ("https://example.com/news", 1, "rejected", None),
+    ("write to someone@example.com", 1, "rejected", None),
+    ("", 1, "rejected", None),
+    ("This is a deliberately long request that keeps going well past the limit of eighty characters so that the "
+     "intake must reject it as too long for a topic name, which it does, twice over.", 1, "rejected", None),
+    ("@elonmusk", 1, "rejected", None),
+    ("Ukraine peace talks", 2, "needs_review", "ukraine-peace-talks"),
+    ("export controls on chips", 1, "needs_review", "export-controls-chips"),
+    ("call 555-123-4567", 1, "rejected", None),
+]
+
+
+def test_cli_sample_batch_on_the_rehearsal_topics(tmp_path):
+    entries = [{"key": topics.request_key(text), "text": text, "count": count} for text, count, _, _ in SAMPLE_BATCH]
+    code, mapping, sql, report = _batch(tmp_path, entries, "--dry-run")
+    assert code == 0 and [(m["status"], m["topic_id"]) for m in mapping] == [(s, t) for _, _, s, t in SAMPLE_BATCH]
+    assert "status:     existing 5, new 4, needs_review 5, rejected 6" in report
+    assert re.findall(r"VALUES \('([^']*)'", sql) == ["measles-outbreak-texas", "mars-sample-return-mission", "gaza-ceasefire"]
 
 
 @pytest.mark.parametrize("payload", ["not json at all", json.dumps({"text": "x"})])

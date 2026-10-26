@@ -47,6 +47,7 @@ NAME_MAX_CHARS = 80
 _TERM_CHARS = re.compile(r"^[^\W_](?:[^\W_]|[ '\-])*[^\W_]$|^[^\W_]$")
 _ACRONYM = re.compile(r"^[A-Z][A-Z0-9]{1,5}$")
 _WORD = re.compile(r"[^\W_]+(?:'[^\W_]+)?")
+_DERIVE_WORD = re.compile(r"[^\W_]+(?:'[^\W_]+)?(?:-[^\W_]+(?:'[^\W_]+)?)*")  # _WORD, hyphenated parts kept together
 
 STOPWORDS = frozenset(
     """a an and are as at be been but by for from has have he her his i if in into is it its me my no nor not of
@@ -154,10 +155,15 @@ def derive(phrase: str) -> dict[str, Any]:
     """The deterministic row for a phrase (the fallback, and the dry-run stand-in's answer).
 
     Terms: the phrase's runs of words between stopwords when they are 2-3 words long ("carbon tax"), their
-    plurals, then its significant single words and their plurals; each one passes `normalize_term`.
+    plurals, then its significant single words and their plurals; each one passes `normalize_term`. The phrase is
+    taken in NFKC form, and a hyphenated word stays whole ("K-pop"), its significant parts added as single words.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): NFKC
+    first, and hyphenated words kept whole. Why: collection matches lowercase whole words with no normalisation, so a
+    full-width term never matches an ASCII headline, and "K-pop" split into "k pop" never matches "K-pop".
     """
-    text = _clean(phrase)
-    words = [re.sub(r"'s$", "", w, flags=re.IGNORECASE) for w in _WORD.findall(text)]  # "Biden's" -> "Biden"
+    text = _clean(unicodedata.normalize("NFKC", _clean(phrase)))
+    words = [re.sub(r"'s$", "", w, flags=re.IGNORECASE) for w in _DERIVE_WORD.findall(text)]  # "Biden's" -> "Biden"
     runs: list[list[str]] = [[]]
     for w in words:
         if w.lower() in STOPWORDS:
@@ -169,8 +175,9 @@ def derive(phrase: str) -> dict[str, Any]:
         if 2 <= len(run) <= 3:
             candidates += [" ".join(run), plural(" ".join(run))]
     for w in words:
-        if _significant(w):
-            candidates += [w, plural(w)]
+        for part in [w, *w.split("-")] if "-" in w else [w]:
+            if _significant(part):
+                candidates += [part, plural(part)]
     terms, _ = clean_terms([c for c in candidates if c])
     if not terms and TERM_MIN_CHARS <= len(text) <= TERM_MAX_CHARS and _TERM_CHARS.match(text):
         # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a phrase with no significant word is kept whole, as
@@ -293,7 +300,8 @@ REQUEST_MAX_CHARS = 80
 KEY_STOPWORDS = frozenset("a about an and at by for from in into of on or over s the to vs with news".split())
 INTAKE_STATUSES = ("existing", "new", "needs_review", "rejected")
 # mapping.json: one object per request entry, every field present (null when it does not apply), in this order.
-# match: name | slug | headline for existing (and for a retired-topic needs_review); source: derive | model |
+# match: name | slug | headline for existing, and for a needs_review that names an existing topic (a retired one, or
+# one that covers the words while collection gives the headline to an older topic); source: derive | model |
 # dry-run stand-in | fallback for a proposed row; order: 1-based insert order of a new row in rows.sql; key_mismatch:
 # the contract's key when the web app sent a different one.
 MAPPING_FIELDS = ("index", "key", "text", "count", "status", "topic_id", "name", "terms", "conflicts", "reason",
@@ -308,33 +316,49 @@ _COLLECTION_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")  # collectors/schema.s
 ID_BASE_MAX = 60  # a new id's base, so that a "-999" suffix still fits collection's 64 characters
 
 
+# The combining-diacritics blocks: Combining Diacritical Marks, … Extended, … Supplement, … for Symbols, Combining Half
+# Marks. Only these are folded by the key; the vowel signs of Indic and Thai scripts (also category M) are kept.
+_DIACRITICS = ((0x0300, 0x036F), (0x1AB0, 0x1AFF), (0x1DC0, 0x1DFF), (0x20D0, 0x20FF), (0xFE20, 0xFE2F))
+
+
+def _diacritic(c: str) -> bool:
+    return any(lo <= ord(c) <= hi for lo, hi in _DIACRITICS)
+
+
 def request_key(text: Any) -> str:
     r"""The normalised request key: the contract shared with the web app (docs/DECISIONS.md › Daily editions for users).
 
     0. delete every format character (general category Cf: soft hyphen, zero-width space, bidi controls, BOM);
-    1. lowercase, Unicode NFKD, drop every combining mark (general category M), lowercase again;
+    1. lowercase, Unicode NFKD, delete the combining diacritics (U+0300-036F, U+1AB0-1AFF, U+1DC0-1DFF, U+20D0-20FF,
+       U+FE20-FE2F), lowercase again;
     2. delete a full stop that stands between two letters ("U.S." -> "us", "e.g." -> "eg");
-    3. tokens = maximal runs of letters and digits (categories L and N); everything else separates tokens;
+    3. tokens = maximal runs of letters, marks and digits (categories L, M and N); everything else separates tokens;
     4. drop KEY_STOPWORDS; 5. the unique tokens, sorted by code point, joined by single spaces.
 
-    "war in Ukraine" and "Ukraine war" give "ukraine war"; "U.S. tariffs on China!" gives "china tariffs us". The same
-    in the web app (JavaScript):
+    "war in Ukraine" and "Ukraine war" give "ukraine war"; "U.S. tariffs on China!" gives "china tariffs us"; "चीन"
+    (China) and "चना" (chickpea) keep their vowel signs and stay apart. The same in the web app (JavaScript):
 
         const STOP = new Set("a about an and at by for from in into of on or over s the to vs with news".split(" "));
         const requestKey = t => [...new Set((String(t ?? "").replace(/\p{Cf}/gu, "").toLowerCase().normalize("NFKD")
-          .replace(/\p{M}/gu, "").toLowerCase().replace(/(?<=\p{L})\.(?=\p{L})/gu, "").match(/[\p{L}\p{N}]+/gu) || [])
+          .replace(/[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/gu, "").toLowerCase()
+          .replace(/(?<=\p{L})\.(?=\p{L})/gu, "").match(/[\p{L}\p{M}\p{N}]+/gu) || [])
           .filter(w => !STOP.has(w)))].sort().join(" ");
 
     (`sort()` compares UTF-16 units, which equals code-point order unless the text has astral-plane letters. The
     docstring is a raw string so that the source shows the JavaScript exactly as it must be copied.)
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): only the
+    combining diacritics are folded, not every combining mark, and marks count as word characters. Why: deleting all
+    of category M removed the vowel signs of Devanagari and Thai, so "चीन" (China) and "चना" (chickpea) shared a key
+    and were resolved as one request; Latin, Greek and Cyrillic accents are all in the folded blocks.
     """
     s = unicodedata.normalize("NFKD", _strip_format(str(text if text is not None else "")).lower())
-    s = "".join(c for c in s if not unicodedata.category(c).startswith("M")).lower()
+    s = "".join(c for c in s if not _diacritic(c)).lower()
     s = "".join(c for i, c in enumerate(s) if not (c == "." and 0 < i < len(s) - 1 and s[i - 1].isalpha() and s[i + 1].isalpha()))
     tokens: set[str] = set()
     cur: list[str] = []
     for c in s + " ":
-        if unicodedata.category(c)[0] in "LN":
+        if unicodedata.category(c)[0] in "LMN":
             cur.append(c)
         elif cur:
             tokens.add("".join(cur))
@@ -376,10 +400,14 @@ def check_request(text: Any) -> tuple[str, bool]:
 
     Format characters (Cf) are deleted first (`_strip_format`), and the personal-data patterns scan the NFKC form, so
     a zero-width space or a full-width "＠" hides nothing. Order: not text, over 25 × REQUEST_MAX_CHARS raw (not
-    scanned, withheld), empty, e-mail, URL, any other "@" (a handle), phone, markup (`<`, `>`) or control characters
-    (C0 but tab, newline and return; DEL; C1), private-use, unpaired-surrogate or unassigned code points (Co, Cs, Cn),
-    over REQUEST_MAX_CHARS code points after collapsing whitespace (JS: `[...text].length`), no letter at all,
-    nothing left after `request_key`.
+    scanned, withheld), empty, e-mail, URL, any other "@" (a handle), phone, markup (`<`, `>`, also in the NFKC form:
+    full-width "＜") or control characters (C0 but tab, newline and return; DEL; C1), private-use, unpaired-surrogate
+    or unassigned code points (Co, Cs, Cn), over REQUEST_MAX_CHARS code points after collapsing whitespace (JS:
+    `[...text].length`), no letter at all, nothing left after `request_key`.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): markup is
+    also looked for in the NFKC form. Why: the intake now matches and derives from the NFKC form of the text
+    (`resolve_requests`), and "＜script＞" would otherwise become a topic named "<Script>".
     """
     if not isinstance(text, str):
         return "not text", False
@@ -396,7 +424,7 @@ def check_request(text: Any) -> tuple[str, bool]:
         return "contains an @handle", True
     if _PHONE_RE.search(scan):
         return "contains a phone number", True
-    if _MARKUP_RE.search(text):
+    if _MARKUP_RE.search(text) or _MARKUP_RE.search(scan):
         return "contains markup or control characters", False
     if any(unicodedata.category(c) in _UNUSABLE for c in cleaned):
         return "contains private-use, unpaired surrogate or unassigned characters", False
@@ -492,6 +520,9 @@ def normalise_topic(row: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+ORDER_KNOWN = "collection order: created_at, id"  # the note of `order_topics` when the order is collection's own
+
+
 def order_topics(topics: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str]:
     """Collection order (created_at, then id) when every row has a readable created_at; the given order otherwise."""
     stamps = []
@@ -504,7 +535,7 @@ def order_topics(topics: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], st
         ordered = [t for _, _, t in sorted(zip(stamps, [t["id"] for t in topics], topics), key=lambda x: (x[0], x[1]))]
     except TypeError:  # naive and aware timestamps mixed
         return topics, "collection order: created_at not comparable, rows taken in the order returned"
-    return ordered, "collection order: created_at, id"
+    return ordered, ORDER_KNOWN
 
 
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): existing topics are read with the widest column list Zetaris
@@ -603,8 +634,44 @@ def _existing(t: dict[str, Any], match: str, reason: str) -> dict[str, Any]:
             "conflicts": [], "reason": reason + (" (a new row of this batch)" if t.get("batch") else "")}
 
 
-def _resolve_one(key: str, text: str, known: list[dict[str, Any]], taken: set[str], propose: Callable[[str], dict[str, Any]] | None) -> dict[str, Any]:
-    """One distinct request against the topics known so far (collection order, this batch's new rows last)."""
+def _tid(t: dict[str, Any]) -> str:
+    return t["id"] + (" (a new row of this batch)" if t.get("batch") else "")
+
+
+def _matching(text: str, known: list[dict[str, Any]]) -> list[tuple[dict[str, Any], list[str]]]:
+    """What collection does with a headline made of `text`: the active known topics whose terms occur in it, each with
+    those terms, in collection order; collectors/common.py `first_topic_match` gives the document to the first one."""
+    out = []
+    for t in known:
+        hits = [term for term in t["terms"] if _occurs(term, text)] if t["active"] else []
+        if hits:
+            out.append((t, hits))
+    return out
+
+
+def _covers(t: dict[str, Any], hits: list[str], words: set[str]) -> bool:
+    """Every word of the request key is in the topic's name, its slug or the terms that matched."""
+    return words <= set(t["name_key"].split()) | set(t["slug_key"].split()) | {w for h in hits for w in request_key(h).split()}
+
+
+def _order_caveat(matching: list[tuple[dict[str, Any], list[str]]], order_known: bool) -> str:
+    """The caveat for a reason that names collection's first match when the order of the existing topics is not known
+    and two of them match: which one is older, and so keeps the headline, is then a guess."""
+    ids = [t["id"] for t, _ in matching if not t.get("batch")]
+    if order_known or len(ids) < 2:
+        return ""
+    return (f"; collection order unknown (created_at not readable, topics taken in the order returned), so which of "
+            f"{', '.join(ids)} keeps such a headline is not certain")
+
+
+DERIVED_SOURCES = ("derive", "dry-run stand-in", "fallback")  # terms that are the phrase's own words (`derive`)
+
+
+def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken: set[str],
+                 propose: Callable[[str], dict[str, Any]] | None, *, order_known: bool = True) -> dict[str, Any]:
+    """One distinct request against the topics known so far (collection order, this batch's new rows last). `texts`
+    are the request's distinct typed texts in NFKC form, most-requested first; each one is checked as a headline, and
+    a new row is proposed from the first."""
     # 1. The same words as a topic's name or slug: that topic (Issue #2 6405180457: match typed text against names first).
     for t in known:
         if key in (t["name_key"], t["slug_key"]):
@@ -613,28 +680,44 @@ def _resolve_one(key: str, text: str, known: list[dict[str, Any]], taken: set[st
                 return _existing(t, how, f"same words as the {how} of {t['id']}")
             return {**_existing(t, how, ""), "status": "needs_review",
                     "reason": f"same words as the {how} of retired topic {t['id']} (active = false); reactivating it is the operator's call"}
-    # 2. A headline saying what the reader typed is collected under an active topic, and every word of the request is in
-    #    that topic's name, slug or matching terms: that topic (the first such topic in collection order).
-    #    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed, to confirm by Yelysei): one shared term alone does
-    #    not make a request `existing`; it falls through to a new row. Why: "nuclear plant shutdown in Germany" shares
-    #    only "shutdown" with federal-budget-shutdown, and mapping it there would show that reader another topic's
-    #    edition; a new row still receives every document that matches its own terms and no older topic's terms.
+    # 2. Collection gives a headline saying what the reader typed to the first active topic whose terms match it; when
+    #    every word of the request is in that topic's name, slug or matching terms: that topic. When only a later
+    #    matching topic covers the words, the operator chooses between the two (needs_review).
+    #    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review rounds 1 and 2, to confirm by Yelysei):
+    #    rule 2 as a whole, the headline match with its coverage condition, checked against collection's own first
+    #    match (supersedes the round-1 comment here, which checked any covering topic). Why: one shared term
+    #    ("shutdown") sent unrelated requests to another topic's edition, and "AI chips export controls" was mapped to
+    #    ai-regulation-export-controls, although collection gives that headline to the older tariffs-trade-war-china.
     words = set(key.split())
-    shared: tuple[str, str] | None = None  # (topic id, term) of the first headline hit that does not cover the request
-    for t in known:
-        hits = [term for term in t["terms"] if _occurs(term, text)] if t["active"] else []
-        if not hits:
+    first: tuple[str, dict[str, Any], list[str], str] | None = None  # (text, first match, its terms, caveat)
+    later: tuple[str, dict[str, Any], list[str], dict[str, Any], list[str], str] | None = None
+    for text in texts:
+        matching = _matching(text, known)
+        if not matching:
             continue
-        covered = set(t["name_key"].split()) | set(t["slug_key"].split()) | {w for h in hits for w in request_key(h).split()}
-        if words <= covered:
-            return _existing(t, "headline", f"a headline saying {text!r} is collected under {t['id']} (term {hits[0]!r}), "
-                             "and every word of the request is in its name, slug or matching terms")
-        shared = shared or (t["id"], hits[0])
+        (winner, hits), caveat = matching[0], _order_caveat(matching, order_known)
+        if _covers(winner, hits, words):
+            return _existing(winner, "headline", f"collection gives a headline saying {text!r} to {winner['id']} (term "
+                             f"{hits[0]!r}), the first active topic whose terms match it, and every word of the request "
+                             "is in its name, slug or matching terms" + caveat)
+        first = first or (text, winner, hits, caveat)
+        cover = next(((t, h) for t, h in matching[1:] if _covers(t, h, words)), None)
+        if later is None and cover is not None:
+            later = (text, winner, hits, cover[0], cover[1], caveat)
+    if later is not None:
+        text, winner, hits, cover, cover_hits, caveat = later
+        return {**_existing(cover, "headline", ""), "status": "needs_review",
+                "reason": f"every word of the request is in the name, slug or matching terms of {_tid(cover)} (term "
+                          f"{cover_hits[0]!r}), but collection gives a headline saying {text!r} to {_tid(winner)} (term "
+                          f"{hits[0]!r}), the first active topic whose terms match it; map the request to one of them" + caveat}
     # 3. A new row: the proposed terms that hold the term rules, minus every term that overlaps an active topic's term.
+    #    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 1, to confirm by Yelysei): one
+    #    shared term alone does not make a request `existing` ("nuclear plant shutdown in Germany" shares only
+    #    "shutdown" with federal-budget-shutdown); since review round 2 such a request is needs_review, not new (below).
     if propose is None:
         return {"status": "needs_review", "match": None, "topic_id": None, "name": None, "terms": [], "conflicts": [],
                 "reason": f"deferred: this batch reached its cap of {MAX_MODEL_CALLS} model calls; run the batch again"}
-    row = propose(text)
+    row = propose(texts[0])
     slug = _free_slug(str(row.get("slug") or ""), taken)
     proposed = [term for term in row.get("terms") or [] if isinstance(term, str) and term.strip()]
     usable: list[str] = []
@@ -656,11 +739,9 @@ def _resolve_one(key: str, text: str, known: list[dict[str, Any]], taken: set[st
             kept.append(term)
     generic_list = ", ".join(repr(g) for g in generic)
     tail = ""
-    if shared:
-        tail += f"; a headline saying it also matches {shared[1]!r} of {shared[0]}, which keeps the documents both match"
     if row.get("source") == "fallback" and row.get("reason"):
         tail += f"; terms from the fallback ({row['reason']})"
-    out = {"match": None, "topic_id": slug, "name": str(row.get("name") or text)[:NAME_MAX_CHARS], "terms": kept,
+    out = {"match": None, "topic_id": slug, "name": str(row.get("name") or texts[0])[:NAME_MAX_CHARS], "terms": kept,
            "conflicts": conflicts, "source": row.get("source")}
     if generic and usable:
         tail = f"; too generic, dropped: {generic_list}" + tail
@@ -675,18 +756,44 @@ def _resolve_one(key: str, text: str, known: list[dict[str, Any]], taken: set[st
                       "another break of the term rules)")
     if not kept:
         return review("every proposed term overlaps a term of an existing topic or of an earlier row of this batch")
-    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed, to confirm by Yelysei): a row whose kept terms would not
-    # collect a headline made of the typed words is needs_review only when the overlap dropped a term that would have
-    # ("China" keeps only "chinas"). Why: a model's English terms for "Wahlen in Deutschland" or a paraphrase ("the Fed
-    # raising rates": "Federal Reserve") never occur in the typed words, and such a row is a good new topic.
-    lost = list(dict.fromkeys(c["term"] for c in conflicts if _occurs(c["term"], text)))
-    if lost and not any(_occurs(term, text) for term in kept):
-        return review(f"the terms that would collect a headline saying {text!r} ({', '.join(repr(x) for x in lost)}) overlap "
-                      "older topics, and none of the kept terms would")
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): a row is
+    # needs_review, not new, (a) when collection gives a headline made of the typed text to an earlier topic, whatever
+    # the proposed terms, or (b) when the overlap dropped a term that the typed text contains and no kept term occurs
+    # in the typed text; the operator maps the request to that topic or accepts the row. Supersedes the round-1 rule,
+    # which was (b) alone. Why: collection gives a shared document to the earlier topic, so under (a) the row never
+    # receives the headlines that say the reader's own words ("Ukraine peace talks" kept "peace" and "talks" and would
+    # fill with Gaza and trade talks). A dropped term that the earlier topic holds only inside a longer term ("china"
+    # in "china tariffs") does not send the headline there, so with a kept term that matches ("China chess": "chess")
+    # the row still collects its subject and stays new.
+    lost: dict[str, dict[str, str]] = {}  # dropped term -> its first conflict, for the terms the typed text contains
+    for c in conflicts:
+        if c["term"] not in lost and any(_occurs(c["term"], t) for t in texts):
+            lost[c["term"]] = c
+    lost_desc = ", ".join(f"{c['term']!r} ({c['relation']} {c['topic_term']!r} of {c['topic_id']})" for c in lost.values())
+    kept_matches = any(_occurs(term, t) for term in kept for t in texts)
+    if first is not None:
+        text, winner, hits, caveat = first
+        return review(f"collection gives a headline saying {text!r} to {_tid(winner)} (term {hits[0]!r}), the first active "
+                      "topic whose terms match it, so this row would not receive the headlines that say the request's "
+                      f"own words; map the request to {winner['id']} or accept the row"
+                      + (f"; dropped as overlapping, though the typed words contain them: {lost_desc}" if lost else "") + caveat)
+    if lost and not kept_matches:
+        ids = list(dict.fromkeys(c["topic_id"] for c in lost.values()))
+        return review(f"the overlap dropped terms that the typed words contain: {lost_desc}; none of the kept terms occurs "
+                      f"in a headline saying {texts[0]!r}, so this row would miss its own subject; map the request to "
+                      f"{' or '.join(ids)} or accept the row")
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): a row whose
+    # terms come from derive (dry run, dry-run stand-in, fallback) needs a kept term that occurs in the typed text, else
+    # needs_review. Why: those terms are the phrase's own words by construction, so none matching means derive split
+    # the words ("चीन" -> "च न": a vowel sign is not a word character) and the row would collect nothing on its subject;
+    # a model's terms may translate or paraphrase the request, so they are exempt.
+    if row.get("source") in DERIVED_SOURCES and not kept_matches:
+        return review(f"the derived terms would not match the typed words: none of {', '.join(repr(k) for k in kept)} "
+                      f"occurs in a headline saying {texts[0]!r}")
     known.append(_view({"id": slug, "name": out["name"], "terms": kept, "active": True, "created_at": None}, batch=True))
     taken.add(slug)
     dropped = len({c["term"] for c in conflicts})
-    return {**out, "status": "new", "reason": f"no existing topic covers these words; {len(kept)} terms"
+    return {**out, "status": "new", "reason": f"no active topic collects a headline saying {texts[0]!r}; {len(kept)} terms"
             + (f", {dropped} overlapping dropped" if dropped else "") + tail}
 
 
@@ -714,16 +821,24 @@ def _entry(index: int, raw: Any) -> dict[str, Any]:
 
 
 def resolve_requests(entries: list[Any], existing: list[dict[str, Any]], *, propose: Callable[[str], dict[str, Any]],
-                     max_proposals: int | None = None) -> list[dict[str, Any]]:
+                     max_proposals: int | None = None, order_known: bool = True) -> list[dict[str, Any]]:
     """The mapping for a batch of typed requests, one result per entry in input order.
 
     Requests with the same key are resolved once (most-requested first, then input order) and share the result;
     each new row joins the known topics, so a later request in the batch can match it. `propose(text)` gives the row
     for a new topic (slug, name, terms, source): `derive` on a dry run, `suggest` live. `max_proposals` caps the calls.
+    `order_known` is false when the existing topics' collection order is unknown (no readable created_at); a reason
+    that names collection's first match then says so when two existing topics match.
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): distinct keys are resolved by total count, highest first, ties in
     input order, and new rows are inserted in that order. Why: collection gives a shared document to the oldest topic,
     so the most-requested topic of a batch should be the one that is inserted first.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): a key's
+    distinct texts are taken in NFKC form, most-requested first (ties in input order); every one is checked as a
+    headline, and a new row is proposed from the first. Why: the key ignores word order and compatibility forms, on
+    which the headline match and derive depend, so resolving the first entry's text made the shared result depend on
+    input order ("war trade China" listed before "China trade war"; "Ｕｋｒａｉｎｅ war" before "Ukraine war").
     """
     infos = [_entry(i, raw) for i, raw in enumerate(entries)]
     groups: dict[str, list[int]] = {}
@@ -744,7 +859,12 @@ def resolve_requests(entries: list[Any], existing: list[dict[str, Any]], *, prop
 
     for key in order:
         allowed = max_proposals is None or calls < max_proposals
-        outcome = _resolve_one(key, infos[groups[key][0]]["text"], known, taken, counted if allowed else None)
+        tally: dict[str, int] = {}
+        for i in groups[key]:
+            text = _clean(unicodedata.normalize("NFKC", infos[i]["text"]))
+            tally[text] = tally.get(text, 0) + infos[i]["count"]
+        texts = sorted(tally, key=lambda t: -tally[t])  # a stable sort: ties keep input order
+        outcome = _resolve_one(key, texts, known, taken, counted if allowed else None, order_known=order_known)
         if outcome["status"] == "new":
             position += 1
             outcome["order"] = position
@@ -869,7 +989,7 @@ def intake(args: argparse.Namespace) -> int:
                 row = {**row, "source": "dry-run stand-in"}
             return row
 
-    results = resolve_requests(entries, existing, propose=propose, max_proposals=cap)
+    results = resolve_requests(entries, existing, propose=propose, max_proposals=cap, order_known=ORDER_KNOWN in source_note)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     try:
         sql = rows_sql(results, header=f"{stamp}, {header}")
