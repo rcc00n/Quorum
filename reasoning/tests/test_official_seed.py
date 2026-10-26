@@ -5,6 +5,7 @@ evidence only. Decision: docs/DECISIONS.md › Sources; code: quorum_reasoning/t
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -591,8 +592,35 @@ def test_fixture_corpus_keeps_every_official_document_as_a_seed(monkeypatch):
     st = initial_state("t", TOPIC, DAY, dry_run=True)  # corpus fixture
     st["documents"] = _day()
     out = plan.run(st)
-    assert "official documents: 3 total, all seed-eligible (fixture corpus: seed rule not applied)" in out["steps"][0]["decision"]
-    assert not any("evidence_only" in d for d in out["documents"])
+    decision = out["steps"][0]["decision"]
+    assert "official documents:" not in decision and "seed" not in decision  # the row reads as before the rule
+    assert "seed rule" not in out["steps"][0]["reason"] and out["errors"] == []
+    assert not any("evidence_only" in d or "seed_match" in d for d in out["documents"])
+
+
+@pytest.mark.parametrize("sample, fixture", [
+    ("snapshot.sample.json", None),
+    ("snapshot.partial.sample.json", None),
+    ("snapshot.empty-day.sample.json", "usecases/quiet_day"),
+])
+def test_fixture_plan_row_still_matches_the_committed_samples(monkeypatch, sample, fixture):
+    """The committed dry-run samples (docs/examples/, the portal's test data) keep their plan row: the seed rule
+    adds nothing to a fixture run, so reasoning/scripts/regenerate_samples.py would not rewrite them."""
+
+    def boom(topic_id):
+        raise AssertionError("the fixture corpus reads no topics row")
+
+    monkeypatch.setattr(corpus, "load_topic_terms", boom)
+    monkeypatch.setenv("QUORUM_DRY_RUN", "1")
+    if fixture:
+        monkeypatch.setenv("QUORUM_FIXTURE", fixture)
+    else:
+        monkeypatch.delenv("QUORUM_FIXTURE", raising=False)
+    committed = json.loads((Path(__file__).resolve().parents[2] / "docs" / "examples" / sample).read_text(encoding="utf-8"))
+    row = committed["trace"][0]
+    assert row["node"] == "plan"
+    out = plan.run(initial_state("t", "russia-ukraine-war", "2026-10-22", dry_run=True))  # corpus fixture
+    assert (out["steps"][0]["decision"], out["steps"][0]["reason"]) == (row["decision"], row["reason"])
 
 
 # --- cluster and research: an evidence-only document may join an event, never start one ------------------------

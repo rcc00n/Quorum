@@ -27,8 +27,9 @@ def apply_seed_rule(docs: list[DocRef], topic_id: str, corpus: str) -> tuple[lis
         # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the fixture corpus keeps the behaviour before the seed
         # rule: every official document may seed an event, and none is marked evidence-only. Why: the fixture days are
         # hand-made, carry no topics row, and their official documents are on-topic by construction; the tests and the
-        # committed dry-run samples rest on them.
-        return docs, f"; official documents: {len(official)} total, all seed-eligible (fixture corpus: seed rule not applied)", "", []
+        # committed dry-run samples rest on them. The plan trace row is unchanged too (no "official documents:"
+        # fragment), so a fixture dry run still reproduces docs/examples/*.sample.json byte for byte apart from timing.
+        return docs, "", "", []
     terms, why, failed = corpus_tools.load_topic_terms(topic_id)
     docs, counts = official_seed_flags(docs, terms)
     seeds = counts["title"] + counts["lead"]
