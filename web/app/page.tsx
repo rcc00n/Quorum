@@ -159,7 +159,7 @@ const JOBS: [string, string][] = [
   ["Zetaris", "Every read of the corpus is SQL through Zetaris: sources, publications, official documents, previous days. The query above is one of them."],
   ["NVIDIA Nemotron", "Nemotron 3.5 Lightning reads, labels and writes. Nemotron 3 Ultra 550B is the blind fact-checker and the third reviewer."],
   ["Meterless", "Nightshift is supported as the primary provider, with an exact model id per lane and a signed receipt per call. The canonical runs so far used NVIDIA’s direct route; the Meterless engine integration is in progress."],
-  ["Development", "Codex and Claude Code, one branch per person, every decision recorded in the repository next to the code it explains."],
+  ["Development", "Codex and Claude Code, an owner branch per block with stacked feature branches, every decision recorded in the repository next to the code it explains."],
 ];
 
 export default function Home() {
@@ -428,15 +428,20 @@ export default function Home() {
             <div>
               <h2 id="limits-title">What it does not do.</h2>
               <ul className="lp-limits-list" role="list">
-                <li>Forty US sources in English. No social networks.</li>
+                <li>Forty sources in English, US outlets with three European agencies and papers. No social networks.</li>
                 <li>Paywalled outlets count by headline and lead. A site that forbids our crawler counts the same way.</li>
                 <li>
-                  One edition per topic per day, prepared after the 05:30 New York cut by the team. A topic you add
-                  today has few documents until feeds accumulate, and the page says so.
+                  One edition per topic per day: the team runs it after the 05:30 New York cut and the deploy owner
+                  installs it on the site; the site itself starts nothing. Topics come from the team&rsquo;s catalog; the site cannot add one. Once the team adds a new topic to collection,
+                  its first documents arrive within about an hour, and until its first edition is installed the site says
+                  no edition is installed for it.
                 </li>
                 <li>Positions on the spectrum come from AllSides, MBFC and Ad Fontes, not from us.</li>
                 <li>No story on a quiet day. On 24 October 2026, the first real day, no event crossed the bar.</li>
-                <li>What the preview shows today is a labelled fictional sample until the first real edition is published.</li>
+                <li>
+                  A signed-in reader today sees the catalog, the waiting state and a labelled fictional sample; real
+                  editions appear behind the login once the judges&rsquo; edition reader is installed.
+                </li>
               </ul>
             </div>
             <aside className="lp-forbidden" aria-labelledby="forbidden-title">
