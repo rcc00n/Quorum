@@ -34,14 +34,16 @@ Status files (the portal's contract, Issue #2 6411408519): <status-dir>/<topic>/
 state (queued | running | published | failed | waiting_for_key), run_id, started_at, updated_at, attempts and reason
 (a string or null), written atomically (temp file + os.replace) and each followed by <date>.json.sha256
 ("<sha256>  <date>.json"), which the portal's install command checks. Only a live invocation writes them; while the
-live store's newest version of the topic-date is another run id's, the file shows that version as published (decisions
-at Statuses.save and Statuses.follow_store). The runner's own record of each topic-date (what set the state, estimates,
-the plan, key names, runs, versions), _summary.json and the lock are in <status-dir>/_runner/<date>/, never installed
-(decision at Statuses). Both hold key variable names, never values, and file names relative to --log-dir, never paths.
-A run without --live writes no status file and never changes a live outcome in a record: it writes its plan beside it
-(decision at Statuses.open). Logs: one per run in <log-dir>/ (<date>_<topic>_run<NN>_<key>.log,
-<date>_<topic>_dry.log, <date>_runner.log); every key and token value the runner knows is replaced by [redacted] before
-a byte reaches a log.
+live store's newest version of the topic-date is another run id's, the file shows that version as published, and a
+rerun that finds its run id published leaves a pair that already says so as it is (decisions at Statuses.save,
+Statuses.follow_store and Statuses.keep_published). The runner's own record of each run id (what set the state,
+estimates, the plan, key names, runs, versions) is <status-dir>/_runner/<date>/<topic>/<attempt>.json, beside
+_summary.json and the lock in <status-dir>/_runner/<date>/, never installed (decision at Statuses). Both hold key
+variable names, never values, and file names relative to --log-dir, never paths. A run without --live writes no status
+file, never touches the record of another run id, and never changes a live outcome in its own run id's record: it
+writes its plan beside it (decisions at Statuses and Statuses.open). Logs: one per run in <log-dir>/
+(<date>_<topic>_run<NN>_<key>.log, <date>_<topic>_dry.log, <date>_runner.log); every key and token value the runner
+knows is replaced by [redacted] before a byte reaches a log.
 
 Exit code: 0 every topic published (or, without --live, every dry check passed and the plan finishes every topic in
 this invocation), 1 a topic failed (a listed id that is not a row, or a row whose id breaks the rule, counts), 3 a
@@ -564,15 +566,21 @@ def runner_dir(status_dir: Path, edition_date: str) -> Path:
     return status_dir / RUNNER_DIR / edition_date
 
 
+def record_file(status_dir: Path, edition_date: str, topic: str, attempt: int) -> Path:
+    """The runner's own record of run id <date>-<topic>-<attempt> (decision at Statuses)."""
+    return runner_dir(status_dir, edition_date) / topic / f"{attempt}.json"
+
+
 class Statuses:
-    """Per topic-date, the portal's status file <status-dir>/<topic>/<date>.json (+ <date>.json.sha256) and the runner's
-    own record <status-dir>/_runner/<date>/<topic>.json. Only the main thread writes them.
+    """Per topic-date, the portal's status file <status-dir>/<topic>/<date>.json (+ <date>.json.sha256); per run id, the
+    runner's own record <status-dir>/_runner/<date>/<topic>/<attempt>.json. Only the main thread writes them.
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the status file holds exactly PUBLIC_FIELDS (`reason` null when
     there is none) at <status-dir>/<topic>/<date>.json, and <date>.json.sha256 beside it holds the sha256sum line of its
     bytes; both are written atomically, the hash after the file. Everything else the runner keeps (`state_mode`, the
     estimates, the plan, key names, `runs`, versions, exit codes) is in its record under <status-dir>/_runner/<date>/,
-    with _summary.json and the lock; the record is what the runner reads back. Why: the contract agreed with the portal
+    with _summary.json and the lock; the record is what the runner reads back (one per run id since closing review
+    round 3: see the next decision). Why: the contract agreed with the portal
     in Issue #2 (6411408519, 6411653104): one folder per topic, the file named by the edition date, these eight fields
     and the five STATES (save refuses any other state before writing), installed by a `reasoning_status --file
     --sha256` command of the same shape as `reasoning_snapshot`; the portal does not ignore unknown fields. `_runner`
@@ -580,35 +588,50 @@ class Statuses:
     no runner folder is named like a topic.
     Between the two writes a reader can see the new file with the old hash: the install refuses it and is retried.
     Supersedes (2026-10-26) the layout <status-dir>/<date>/<topic>.json with every field in one file.
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the runner keeps one record per run id,
+    <status-dir>/_runner/<date>/<topic>/<attempt>.json (record_file), and an invocation reads and writes only its own
+    run id's record (follow_store also reads the shown run id's). Why: one record per topic-date was replaced by any
+    invocation of another run id, plans included: after the README's plan without --attempt (attempt 1) behind a live
+    attempt 2, the next live attempt 2 started `attempts` again at 1 with `started_at` = now, lost its `runs` and appended
+    its second log to run01, and a rerun of an attempt already published rewrote its file with attempts 0 (closing review
+    round 3). Supersedes the layout <status-dir>/_runner/<date>/<topic>.json (closing review round 1); records written in
+    it are not read (a live invocation recovers `attempts` and `started_at` from the status file: decision at open).
 
     `state_mode` in a record says what set its `state`: `live` (a live invocation, or a snapshot of the run id in the
     live store), or `dry` (a plan run)."""
 
-    def __init__(self, status_dir: Path, edition_date: str, redactor: Redactor, mode: str = "live"):
+    def __init__(self, status_dir: Path, edition_date: str, redactor: Redactor, mode: str = "live", attempt: int = 1):
         self.root = status_dir
-        self.dir = runner_dir(status_dir, edition_date)
         self.date = edition_date
+        self.attempt = attempt  # --attempt: the run id is <date>-<topic>-<attempt>
         self.redactor = redactor
         self.mode = mode
         self.docs: dict[str, dict[str, Any]] = {}
         self.kept: set[str] = set()  # dry mode: topics whose record keeps its live outcome (decision at open)
-        self.prior: dict[str, dict[str, Any] | None] = {}  # each topic's record as this invocation found it
-        self.pinned: dict[str, str] = {}  # live mode: topic -> the other run id whose published version the file shows (decision at follow_store)
+        # live mode: topic -> the run id whose published version the file shows and keeps in this invocation (another
+        # run id: decision at follow_store; this one, found published at the start: decision at keep_published)
+        self.pinned: dict[str, str] = {}
 
     def path(self, topic: str) -> Path:
         """The portal's status file of `topic` on this date."""
         return self.root / topic / f"{self.date}.json"
 
-    def record_path(self, topic: str) -> Path:
-        """The runner's own record of `topic` on this date."""
-        return self.dir / f"{topic}.json"
+    def record_path(self, topic: str, attempt: int | None = None) -> Path:
+        """The runner's own record of `topic`'s run id on this date (this invocation's --attempt unless `attempt`)."""
+        return record_file(self.root, self.date, topic, attempt or self.attempt)
 
-    def load(self, topic: str) -> dict[str, Any] | None:
+    def load(self, topic: str, attempt: int | None = None) -> dict[str, Any] | None:
         try:
-            doc = json.loads(self.record_path(topic).read_text(encoding="utf-8"))
+            doc = json.loads(self.record_path(topic, attempt).read_text(encoding="utf-8"))
             return doc if isinstance(doc, dict) else None
         except (OSError, ValueError):
             return None
+
+    def _record_of(self, topic: str, rid: str) -> dict[str, Any] | None:
+        """The runner's record of run id `rid` of `topic` on this date, or None (not a run id the runner names, or none)."""
+        m = re.fullmatch(re.escape(f"{self.date}-{topic}-") + r"([1-9][0-9]{0,8})", rid)
+        doc = self.load(topic, int(m.group(1))) if m else None
+        return doc if doc and doc.get("run_id") == rid else None
 
     def open(self, topic: str, rid: str) -> dict[str, Any]:
         """The topic's document for this invocation: an earlier one of the same run id keeps its history.
@@ -625,9 +648,14 @@ class Statuses:
         invocation first queued it) or the record has a `runs` row; otherwise, a plan run's time included, it becomes
         now. Why: the portal shows `waiting_for_key` as "being prepared since started_at", and a topic that a live
         invocation left waiting without ever starting it kept the plan run's time, hours before the cut (closing review
-        round 2). Supersedes the closing-round-1 decision at _drive that only the first live start replaces it."""
+        round 2). Supersedes the closing-round-1 decision at _drive that only the first live start replaces it.
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a live invocation whose record of its run id holds no live
+        history (no record, or only a plan run's: no `runs` row, `started_mode` not live) while the status file names
+        that run id and its .sha256 matches takes `started_at` and `attempts` from the file (`started_mode` live).
+        Why: only a live invocation writes the file, so it is the run's live history when the record lost it (a record
+        of the layout before closing review round 3, or a deleted _runner folder, perhaps followed by a plan); without
+        it the run would start `attempts` again at 1, date itself now and append its next log to run01."""
         old = self.load(topic)
-        self.prior[topic] = old
         now = now_iso()
         same = bool(old) and old.get("run_id") == rid
         if same and self.mode == "dry" and holds_live_outcome(old):
@@ -638,7 +666,12 @@ class Statuses:
         else:
             doc = {}
         if self.mode == "live" and not doc.get("runs") and doc.get("started_mode") != "live":
-            doc["started_at"], doc["started_mode"] = now, "live"
+            shown, verified = self._read_public(topic)
+            if shown and verified and shown.get("run_id") == rid and isinstance(shown.get("started_at"), str) \
+                    and isinstance(shown.get("attempts"), int) and shown["attempts"] >= 0:
+                doc.update(started_at=shown["started_at"], started_mode="live", attempts=shown["attempts"])
+            else:
+                doc["started_at"], doc["started_mode"] = now, "live"
         doc.setdefault("started_at", now)
         doc.setdefault("started_mode", self.mode)
         doc.setdefault("attempts", 0)
@@ -691,7 +724,7 @@ class Statuses:
             self.pinned[topic] = shown
             return shown
         base: dict[str, Any] = {}
-        for cand in (self.prior.get(topic), on_disk):
+        for cand in (self._record_of(topic, shown), on_disk):  # that run id's own record first (decision at Statuses)
             if isinstance(cand, dict) and cand.get("run_id") == shown and cand.get("state") == "published":
                 base = cand
                 break
@@ -705,6 +738,27 @@ class Statuses:
             "reason": clean_reason(base.get("reason"), self.redactor)})
         self.pinned[topic] = shown
         return shown
+
+    def keep_published(self, topic: str) -> bool:
+        """Live mode, for a run id found already published: True when this invocation leaves the status pair as it is,
+        because it already shows this run id `published` with a matching .sha256 (or another run's newer version:
+        follow_store).
+
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a rerun that finds its run id published ("already published
+        by an earlier run") leaves a status pair that already says so byte-identical, as follow_store does for another
+        run id, and writes its record only; a pair that is missing, says otherwise or fails its hash is written from the
+        record. Why: the rewrite changed `updated_at` and `reason` of a correct file, and after a plan of another
+        attempt had replaced the record it wrote `attempts` 0 and `started_at` = the rerun's time (closing review round 3)."""
+        if self.mode != "live":
+            return False
+        if topic in self.pinned:  # the file shows another run's newer version (follow_store) and stays as it is
+            return True
+        rid = self.docs[topic]["run_id"]
+        on_disk, verified = self._read_public(topic)
+        if on_disk and verified and on_disk.get("state") == "published" and on_disk.get("run_id") == rid:
+            self.pinned[topic] = rid
+            return True
+        return False
 
     def verdict(self, topic: str, state: str, reason: str | None, **more: Any) -> dict[str, Any]:
         """A verdict of this invocation that is not a live run's outcome (not a row, a dry check, the plan): into `state`
@@ -720,7 +774,8 @@ class Statuses:
 
         DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): only a live invocation writes the status file and its hash;
         a plan run (no --live) writes its record only, whatever the run id, and so does a live invocation while the
-        file shows another run's published version (decision at follow_store). Why: for the portal no file and `queued`
+        file shows another run's published version (decision at follow_store) or already shows this run id published
+        (decision at keep_published). Why: for the portal no file and `queued`
         read the same ("Waiting for its first brief"), so a plan has nothing to tell readers, while its writes turned a
         published edition into `queued` (another --attempt, or the README's plan without --attempt after attempt 2)
         and a dry check that failed into `failed` ("Could not be prepared") for an edition nobody had tried to run
@@ -1243,7 +1298,7 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
         ctx.say("note: Zetaris shows no topics.active / created_at: 'all' is every row in no set order, retired topics included")
     for s in skipped:
         ctx.say(f"skipped a topics row {s.get('id')!r}: {s.get('reason')}")
-    statuses = Statuses(ctx.status_dir, ctx.date, ctx.redactor, mode)
+    statuses = Statuses(ctx.status_dir, ctx.date, ctx.redactor, mode, attempt=ctx.attempt)
     usable_keys = [k for k in keys if not k.inject or k.name in ctx.key_values]  # live mode refused unusable ones already
 
     # 1. what is not a row, what is already published, and the dry checks for the rest
@@ -1265,6 +1320,7 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
             continue
         done = published_by(ctx.out, topic, ctx.date, rid)
         if done:  # a snapshot of this run id in the live store is a live outcome, whichever mode found it
+            statuses.keep_published(topic)  # live mode: a pair that already says so stays byte-identical
             final[topic] = statuses.save(topic, state="published", state_mode="live", version=done[0], snapshot_status=done[1],
                                          reason="already published by an earlier run", exit_code=None)
             ctx.say(f"{topic}: already published (version {done[0]}), skipped")
@@ -1453,7 +1509,7 @@ def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, top
 
 def ctx_status(ctx: Ctx, topic: str) -> dict[str, Any]:
     try:
-        doc = json.loads((runner_dir(ctx.status_dir, ctx.date) / f"{topic}.json").read_text(encoding="utf-8"))
+        doc = json.loads(record_file(ctx.status_dir, ctx.date, topic, ctx.attempt).read_text(encoding="utf-8"))
         return doc if isinstance(doc, dict) else {}
     except (OSError, ValueError):
         return {}

@@ -177,6 +177,7 @@ class Env:
         monkeypatch.setenv("MODEL_API_KEY_8", "fake-exported-key-8888")  # an exported extra key: blank in every child too
         monkeypatch.setenv("FAKE_SCENARIO", str(tmp / "scenario.json"))
         monkeypatch.setenv("FAKE_STATUS_DIR", str(self.status))
+        self.attempt = 1  # --attempt of the last invocation: status_of reads that run id's record
         self.scenario({})
 
     def scenario(self, live: dict, dry: dict | None = None, **extra) -> None:
@@ -204,6 +205,7 @@ class Env:
             listed = argv[argv.index("--topics") + 1]
             sc["db_topics"] = [] if listed == "all" else [t.strip() for t in listed.split(",") if t.strip()]
         (self.tmp / "scenario.json").write_text(json.dumps(sc))
+        self.attempt = int(argv[argv.index("--attempt") + 1]) if "--attempt" in argv else 1
         # -I -S: the fakes need only the standard library, and a bare interpreter starts several times faster on Windows
         return re_mod.main(argv, live_cmd=live_cmd or [sys.executable, "-I", "-S", str(self.tmp / "fake_run.py")],
                            dry_cmd=[sys.executable, "-I", "-S", str(self.tmp / "fake_dry.py")])
@@ -221,9 +223,18 @@ class Env:
         """<status-dir>/_runner/<date>/: the runner's records, _summary.json and the lock."""
         return self.status / "_runner" / DATE
 
-    def status_of(self, topic: str) -> dict:
-        """The runner's record of the topic (every field it keeps)."""
-        return json.loads((self.runner / f"{topic}.json").read_text(encoding="utf-8"))
+    def record_path(self, topic: str, attempt: int | None = None) -> Path:
+        """<status-dir>/_runner/<date>/<topic>/<attempt>.json: the runner's record of one run id."""
+        return self.runner / topic / f"{attempt or self.attempt}.json"
+
+    def status_of(self, topic: str, attempt: int | None = None) -> dict:
+        """The runner's record of the topic's run id (every field it keeps): that of `attempt`, or else of the
+        --attempt the last invocation ran."""
+        return json.loads(self.record_path(topic, attempt).read_text(encoding="utf-8"))
+
+    def record_files(self) -> list[str]:
+        """Every JSON file under <status-dir>/_runner/<date>/, relative to it."""
+        return sorted(p.relative_to(self.runner).as_posix() for p in self.runner.rglob("*.json"))
 
     def public_of(self, topic: str, record: bool = True) -> dict:
         """The portal's status file <status-dir>/<topic>/<date>.json, checked against the contract (Issue #2
@@ -248,22 +259,23 @@ class Env:
         path = self.status / topic / f"{DATE}.json"
         return path.read_bytes(), (path.parent / f"{DATE}.json.sha256").read_bytes()
 
-    def age_public(self, topic: str, updated_at: str = "2026-10-20T11:00:00Z") -> tuple[bytes, bytes]:
-        """Rewrites the status file with an old `updated_at` and a matching hash, so any later rewrite changes its
-        bytes even within the same second; returns the new pair."""
+    def age_public(self, topic: str, updated_at: str = "2026-10-20T11:00:00Z", **fields) -> tuple[bytes, bytes]:
+        """Rewrites the status file with an old `updated_at` (and `fields`) and a matching hash, so any later rewrite
+        changes its bytes even within the same second; returns the new pair."""
         path = self.status / topic / f"{DATE}.json"
         doc = json.loads(path.read_text(encoding="utf-8"))
         doc["updated_at"] = updated_at
+        doc.update(fields)
         data = (json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         path.write_bytes(data)
         (path.parent / f"{DATE}.json.sha256").write_bytes(f"{hashlib.sha256(data).hexdigest()}  {DATE}.json\n".encode())
         return self.public_pair(topic)
 
-    def set_record(self, topic: str, **fields) -> None:
+    def set_record(self, topic: str, attempt: int | None = None, **fields) -> None:
         """Changes fields of the runner's record, as if an earlier invocation had written them."""
-        rec = self.status_of(topic)
+        rec = self.status_of(topic, attempt)
         rec.update(fields)
-        (self.runner / f"{topic}.json").write_text(json.dumps(rec), encoding="utf-8")
+        self.record_path(topic, attempt).write_text(json.dumps(rec), encoding="utf-8")
 
     def summary(self) -> dict:
         return json.loads((self.runner / "_summary.json").read_text(encoding="utf-8"))
@@ -502,7 +514,7 @@ def test_status_files_are_saved_through_the_atomic_write(tmp_path: Path, monkeyp
     statuses.open("t1", f"{DATE}-t1-1")
     statuses.save("t1", state="queued")
     paths = (statuses.path("t1"), statuses.path("t1").with_name(f"{DATE}.json.sha256"), statuses.record_path("t1"))
-    assert paths[0] == tmp_path / "status" / "t1" / f"{DATE}.json" and paths[2] == tmp_path / "status" / "_runner" / DATE / "t1.json"
+    assert paths[0] == tmp_path / "status" / "t1" / f"{DATE}.json" and paths[2] == tmp_path / "status" / "_runner" / DATE / "t1" / "1.json"
     before = [p.read_bytes() for p in paths]
 
     def broken_replace(src, dst):
@@ -513,7 +525,7 @@ def test_status_files_are_saved_through_the_atomic_write(tmp_path: Path, monkeyp
         statuses.save("t1", state="running")
     assert [p.read_bytes() for p in paths] == before and json.loads(before[0])["state"] == "queued"
     assert sorted(p.name for p in paths[0].parent.iterdir()) == [f"{DATE}.json", f"{DATE}.json.sha256"]  # no temp file left
-    assert [p.name for p in paths[2].parent.iterdir()] == ["t1.json"]
+    assert [p.name for p in paths[2].parent.iterdir()] == ["1.json"]
 
 
 def test_status_save_refuses_a_state_outside_the_contract(tmp_path: Path):
@@ -781,7 +793,7 @@ def test_topics_all_plans_every_row_and_reports_a_row_it_cannot_run(world: Env):
     runner_log = (world.logs / f"{DATE}_runner.log").read_text(encoding="utf-8")
     assert "'Not A Slug'" in runner_log and "'x/y'" in runner_log
     assert sorted(p.name for p in world.status.iterdir()) == ["_runner"]  # a plan writes no status file
-    assert sorted(p.name for p in world.runner.glob("*.json")) == ["_summary.json", "ai--jobs.json", "alpha-topic.json", "covid-19-.json"]  # none for x/y
+    assert world.record_files() == ["_summary.json", "ai--jobs/1.json", "alpha-topic/1.json", "covid-19-/1.json"]  # none for x/y
 
 
 def test_topics_all_with_live_is_refused_until_zetaris_shows_active_rows(world: Env):
@@ -914,9 +926,9 @@ def test_topics_all_skips_rows_named_after_a_windows_device(world: Env, monkeypa
     for name in ("path", "record_path"):
         real = getattr(re_mod.Statuses, name)
 
-        def guarded(self, topic: str, real=real) -> Path:  # on Windows the real name would block or fail: fail fast instead
+        def guarded(self, topic: str, *more, real=real) -> Path:  # on Windows the real name would block or fail: fail fast instead
             assert not re_mod.WINDOWS_DEVICE.fullmatch(topic), f"{topic!r} reached a status file name"
-            return real(self, topic)
+            return real(self, topic, *more)
 
         monkeypatch.setattr(re_mod.Statuses, name, guarded)
     world.scenario({}, {}, db_topics=["alpha-topic", "con", "nul"])
@@ -925,7 +937,7 @@ def test_topics_all_skips_rows_named_after_a_windows_device(world: Env, monkeypa
     bad = [r for r in world.summary()["topics"] if r.get("skipped_row")]
     assert [r["topic"] for r in bad] == ["con", "nul"] and all(r["state"] == "failed" and "device name" in r["reason"] for r in bad)
     assert sorted(p.name for p in world.status.iterdir()) == ["_runner"]  # a plan writes no status file
-    assert sorted(p.name for p in world.runner.glob("*.json")) == ["_summary.json", "alpha-topic.json"]
+    assert world.record_files() == ["_summary.json", "alpha-topic/1.json"]
     assert world.status_of("alpha-topic")["state"] == "queued"  # the other topics of the date went on
 
 
@@ -978,7 +990,8 @@ def test_status_files_follow_the_portal_contract(world: Env):
     assert sorted(p.name for p in world.status.iterdir()) == ["_runner", "t1", "t2"]
     for topic in ("t1", "t2"):
         assert sorted(p.name for p in (world.status / topic).iterdir()) == [f"{DATE}.json", f"{DATE}.json.sha256"]
-    assert sorted(p.name for p in world.runner.iterdir()) == ["_summary.json", "t1.json", "t2.json"]  # the lock is gone
+    assert sorted(p.name for p in world.runner.iterdir()) == ["_summary.json", "t1", "t2"]  # the lock is gone
+    assert world.record_files() == ["_summary.json", "t1/1.json", "t2/1.json"]  # one record per run id
     record = world.status_of("t1")
     assert record["runs"] and record["calls_estimate"] == 330 and record["state_mode"] == "live" and record["version"] == 1
     world.scenario({}, {"t3": {"fast": 10, "ultra": 0}})
@@ -991,9 +1004,7 @@ def test_started_at_is_the_first_live_start(world: Env):
     does not date it, and a rerun that resumes keeps it."""
     world.scenario({"t1": [{"exit": 3, "fast": 100}, {"exit": 3, "fast": 100}, {"exit": 0}]}, {"t1": {"fast": 300, "ultra": 0}})
     assert world.main(world.argv("t1", live=False)) == 0
-    record = world.status_of("t1")
-    record["started_at"] = "2026-10-20T06:00:00Z"  # the plan ran at 06:00
-    (world.runner / "t1.json").write_text(json.dumps(record), encoding="utf-8")
+    world.set_record("t1", started_at="2026-10-20T06:00:00Z")  # the plan ran at 06:00
     assert world.main(world.argv("t1")) == 3  # both keys drain
     waiting = world.public_of("t1")
     assert waiting["state"] == "waiting_for_key" and waiting["started_at"] > "2026-10-20T06:00:00Z"
@@ -1045,7 +1056,8 @@ def test_a_plan_run_writes_no_status_file(world: Env):
     assert world.main(world.argv("t1", "--attempt", "2")) == 0  # attempt 2 publishes
     assert (world.public_of("t1")["state"], world.public_of("t1")["run_id"]) == ("published", f"{DATE}-t1-2")
     pair = world.age_public("t1")
-    assert world.main(world.argv("t1", live=False)) == 0  # the README's step 1, attempt 1
+    assert world.main(world.argv("t1", live=False)) == 1  # the README's step 1, attempt 1: its own record keeps its live failure
+    assert (world.status_of("t1")["state"], world.status_of("t1")["state_mode"]) == ("failed", "live")
     assert world.main(world.argv("t1", "--attempt", "3", live=False)) == 0
     world.scenario({}, {"t1": {"error": True}})
     assert world.main(world.argv("t1", "--attempt", "3", live=False)) == 1
@@ -1121,6 +1133,98 @@ def test_a_topic_that_waits_without_starting_is_not_dated_by_a_plan_run(world: E
     assert world.main(world.argv("t1", keys="QTEST_KEY_A")) == 0  # a rested key starts and publishes it
     done = world.public_of("t1")
     assert (done["state"], done["attempts"]) == ("published", 1) and done["started_at"] > "2026-10-20T10:00:00Z"
+
+
+def test_a_plan_of_another_attempt_leaves_a_live_run_s_record_alone(world: Env):
+    """One record per run id (decision at Statuses): the README's plan without --attempt (attempt 1) between two live
+    invocations of attempt 2 neither restarts attempt 2's `attempts` nor re-dates it, and its second log is run02."""
+    world.scenario({"t1": [{"exit": 3, "fast": 100}, {"exit": 0}]}, {"t1": {"fast": 300, "ultra": 0}})
+    assert world.main(world.argv("t1", "--attempt", "2", keys="QTEST_KEY_A")) == 3  # its only key drains
+    waiting = world.public_of("t1")
+    assert (waiting["state"], waiting["run_id"], waiting["attempts"]) == ("waiting_for_key", f"{DATE}-t1-2", 1)
+    world.set_record("t1", started_at="2026-10-20T10:00:00Z")  # attempt 2 first started at 10:00
+    assert world.main(world.argv("t1", keys="QTEST_KEY_A", live=False)) == 0  # the README's step 1: attempt 1
+    plan = world.status_of("t1")
+    assert (plan["run_id"], plan["state"], plan["state_mode"]) == (f"{DATE}-t1-1", "queued", "dry")
+    assert world.record_files() == ["_summary.json", "t1/1.json", "t1/2.json"]
+    assert world.main(world.argv("t1", "--attempt", "2", keys="QTEST_KEY_A")) == 0  # the rested key resumes and publishes
+    done = world.public_of("t1")
+    assert (done["state"], done["run_id"], done["attempts"], done["started_at"]) == \
+        ("published", f"{DATE}-t1-2", 2, "2026-10-20T10:00:00Z")
+    assert [r["outcome"] for r in world.status_of("t1")["runs"]] == ["drained", "published"]
+    assert [r["resume"] for r in world.runs()] == [False, True]
+    assert sorted(p.name for p in world.logs.glob("*_run[0-9]*.log")) == [f"{DATE}_t1_run01_QTEST_KEY_A.log", f"{DATE}_t1_run02_QTEST_KEY_A.log"]
+
+
+def test_a_rerun_of_a_published_attempt_after_a_plan_of_another_leaves_the_pair_alone(world: Env):
+    """The README's step 3 ("the same command again") after a plan of another attempt: a run id found published leaves
+    a pair that already says so byte-identical (decision at Statuses.keep_published), whichever attempt it is."""
+    world.scenario({"t1": [{"exit": 1, "publish": False, "say": "boom"}, {"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 1  # attempt 1 fails live
+    assert world.main(world.argv("t1", "--attempt", "2")) == 0  # attempt 2 publishes
+    pair = world.age_public("t1")
+    assert world.main(world.argv("t1", live=False)) == 1  # the README's plan: attempt 1, which failed live
+    assert world.main(world.argv("t1", "--attempt", "2")) == 0  # "already published, skipped"
+    assert world.public_pair("t1") == pair
+    pub = world.public_of("t1", record=False)
+    assert (pub["state"], pub["run_id"], pub["attempts"]) == ("published", f"{DATE}-t1-2", 1)
+    assert world.status_of("t1")["reason"] == "already published by an earlier run" and len(world.runs()) == 2
+
+
+def test_a_rerun_of_attempt_1_after_a_plan_of_attempt_2_leaves_the_pair_alone(world: Env):
+    world.scenario({"t1": [{"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0  # attempt 1 publishes
+    pair = world.age_public("t1")
+    assert world.main(world.argv("t1", "--attempt", "2", live=False)) == 0
+    assert world.main(world.argv("t1")) == 0  # the same live command again: already published
+    assert world.public_pair("t1") == pair and len(world.runs()) == 1
+    assert (world.status_of("t1")["attempts"], world.status_of("t1")["state"]) == (1, "published")
+
+
+def test_a_rerun_of_a_published_run_rewrites_a_pair_whose_hash_is_stale_from_its_record(world: Env):
+    world.scenario({"t1": [{"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0
+    first = world.public_of("t1")
+    (world.status / "t1" / f"{DATE}.json.sha256").write_text("0" * 64 + f"  {DATE}.json\n")
+    assert world.main(world.argv("t1")) == 0  # already published: the pair the install would refuse is written again
+    again = world.public_of("t1")  # the hash matches again, and the file equals the record
+    assert (again["state"], again["run_id"], again["attempts"], again["started_at"]) == ("published", f"{DATE}-t1-1", 1, first["started_at"])
+    assert again["reason"] == "already published by an earlier run"
+
+
+def test_a_live_run_without_its_record_continues_from_its_status_file(world: Env):
+    """A run whose record lost its live history (the layout before one record per run id, or a deleted _runner folder,
+    here followed by a plan) takes `attempts` and `started_at` from a verified status file of its run id (decision at
+    Statuses.open)."""
+    world.scenario({"t1": [{"exit": 3, "fast": 100}, {"exit": 0}]}, {"t1": {"fast": 300, "ultra": 0}})
+    assert world.main(world.argv("t1", "--attempt", "2", keys="QTEST_KEY_A")) == 3
+    world.age_public("t1", started_at="2026-10-20T10:00:00Z")
+    shutil.rmtree(world.status / "_runner")
+    assert world.main(world.argv("t1", "--attempt", "2", keys="QTEST_KEY_A", live=False)) == 0
+    assert (world.status_of("t1")["started_mode"], world.status_of("t1")["runs"]) == ("dry", [])
+    assert world.main(world.argv("t1", "--attempt", "2", keys="QTEST_KEY_A")) == 0
+    done = world.public_of("t1")
+    assert (done["state"], done["attempts"], done["started_at"]) == ("published", 2, "2026-10-20T10:00:00Z")
+    assert sorted(p.name for p in world.logs.glob("*_run[0-9]*.log")) == [f"{DATE}_t1_run01_QTEST_KEY_A.log", f"{DATE}_t1_run02_QTEST_KEY_A.log"]
+    world.age_public("t1", run_id=f"{DATE}-t1-3", state="waiting_for_key", attempts=5)
+    (world.status / "t1" / f"{DATE}.json.sha256").write_text("0" * 64 + f"  {DATE}.json\n")  # a file the install would refuse
+    shutil.rmtree(world.status / "_runner")
+    world.scenario({"t1": [{"exit": 3, "fast": 100}]}, {"t1": {"fast": 300, "ultra": 0}})
+    assert world.main(world.argv("t1", "--attempt", "3", keys="QTEST_KEY_A")) == 3  # an unverified file gives nothing
+    assert (world.status_of("t1")["attempts"], world.status_of("t1")["state"]) == (1, "waiting_for_key")
+
+
+def test_a_later_attempt_takes_the_earlier_run_s_record_when_no_status_file_is_left(world: Env):
+    """follow_store reads the shown run id's own record (decision at Statuses): with the status file gone, attempt 2's
+    failure writes attempt 1's `published` from attempt 1's record, not from the snapshot."""
+    world.scenario({"t1": [{"exit": 0}, {"exit": 1, "publish": False, "say": "boom"}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0
+    world.set_record("t1", started_at="2026-10-20T10:00:00Z")
+    shutil.rmtree(world.status / "t1")
+    assert world.main(world.argv("t1", "--attempt", "2")) == 1
+    pub = world.public_of("t1", record=False)
+    assert (pub["state"], pub["run_id"], pub["started_at"], pub["attempts"]) == ("published", f"{DATE}-t1-1", "2026-10-20T10:00:00Z", 1)
+    assert (world.status_of("t1", 2)["state"], world.status_of("t1", 1)["state"]) == ("failed", "published")
 
 
 def _record_live_popen(monkeypatch: pytest.MonkeyPatch, world: Env, delay_s: float = 0.0, on_live_start=None) -> list[subprocess.Popen]:
