@@ -1,8 +1,9 @@
-/* The Today board (web/components/today-board.tsx): topic sections on warm tints, each with one horizontal row
-   of rounded matte cards. Tokens: web/app/identity.css; roles in web/DESIGN.md. Scoped under .tb.
+/* The Today board (web/components/today-board.tsx): one section per topic on the white page, a hairline above
+   each, with one horizontal row of rounded translucent cards. Tokens: web/app/identity.css; roles in
+   web/DESIGN.md. Scoped under .tb.
    DECISION(2026-10-26, Anastasia/Claude Code): story cards are the one place with 20 px corners and a dark
-   matte ground on the light routes (the prototype's photo cards without the photo); controls keep 2 px. Why:
-   the card is an editorial object, the control is an instrument. */
+   translucent ground on the light routes (the prototype's photo cards, with a slot reserved for the photo);
+   controls keep 2 px. Why: the card is an editorial object, the control is an instrument. */
 .tb {
   display: grid;
   gap: 20px;
@@ -30,7 +31,7 @@
   margin: 0;
 }
 .tb-date {
-  color: var(--umber);
+  color: var(--ink);
   font-weight: 500;
 }
 .tb .tb-status {
@@ -75,24 +76,19 @@
   border-bottom-color: var(--ink);
 }
 
-/* Sections */
+/* Sections: no ground of their own (Anastasia, 2026-10-26: the page stays white, only the cards have weight);
+   a hairline above each topic heading separates them. */
 .tb-section {
-  border-radius: 20px;
-  padding: 24px 24px 20px;
+  border-top: 1px solid var(--rule);
+  padding: 20px 0 8px;
   display: grid;
   gap: 16px;
 }
-.tb-tint-1 {
-  background: #f6f4ef;
-}
-.tb-tint-2 {
-  background: #efeae2;
-}
-.tb-tint-3 {
-  background: #e8e0d5;
-}
+.tb-tint-1,
+.tb-tint-2,
+.tb-tint-3,
 .tb-tint-4 {
-  background: #ebe9e4;
+  background: transparent;
 }
 .tb-section-head {
   display: flex;
@@ -128,13 +124,13 @@
 /* The row: horizontal, snapping, keyboard-reachable through the cards' links */
 .tb-row {
   list-style: none;
-  margin: 0 -24px;
-  padding: 4px 24px 8px;
+  margin: 0;
+  padding: 4px 0 10px;
   display: flex;
-  gap: 14px;
+  gap: 16px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: 24px;
+  scroll-padding-inline: 0;
   scrollbar-width: thin;
   scrollbar-color: var(--rule) transparent;
 }
@@ -147,40 +143,83 @@
 }
 .tb-card {
   flex: 0 0 auto;
-  width: min(340px, 82vw);
+  width: min(320px, 84vw);
   scroll-snap-align: start;
+}
+/* The lead story of a section is the large card; the others are smaller (Anastasia, 2026-10-26). */
+.tb-card-lead {
+  width: min(680px, 92vw);
 }
 .tb .tb-card-link {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  /* The photo slot takes the spare height, so the text sits at the foot of every card in a row, whatever the
+     row's tallest card; the slot is never shorter than its aspect ratio. */
+  grid-template-rows: 1fr auto auto auto auto;
   align-items: start;
-  gap: 10px;
-  min-height: 236px;
+  gap: 8px;
+  min-height: 320px;
   height: 100%;
-  padding: 20px 20px 18px;
+  padding: 0 0 18px;
   border-radius: 20px;
-  background: rgba(20, 20, 20, 0.92);
+  overflow: hidden;
+  /* DECISION(2026-10-26, Anastasia/Claude Code): black at 60 % over the page, blurred, so the paper shows
+     through and white type keeps 5:1. Anastasia asked for about 20 %; at 20 % the card is #d1d1d1 and white
+     type reads at 1.4:1, so 60 % is the most transparent legible value; the bar uses the same. */
+  background: rgba(20, 20, 20, 0.6);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   color: var(--paper);
   box-sizing: border-box;
 }
-.tb .tb-card-link:hover h3 {
-  text-decoration: underline;
-  text-decoration-color: var(--umber-light);
-  text-underline-offset: 4px;
+.tb .tb-card-lead .tb-card-link {
+  min-height: 420px;
 }
-.tb .tb-card-link:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: 3px;
+/* The reserved photo area: the picture of the day with its credit when the snapshot carries a licensed one,
+   otherwise an empty field of the same translucent black, a little lighter. Its minimum height comes from a
+   padding pseudo-element (16:9, 2:1 on the lead), not from `aspect-ratio`: a stretched grid item with an
+   aspect ratio derives its width from the stretched height and widens the column. */
+.tb .tb-card-media {
+  position: relative;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.tb .tb-card-media::before {
+  content: "";
+  display: block;
+  padding-top: 56.25%;
+}
+.tb .tb-card-lead .tb-card-media::before {
+  padding-top: 50%;
+}
+.tb .tb-card-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tb .tb-card-credit {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.tb .tb-card-link > *:not(.tb-card-media) {
+  margin-inline: 20px;
 }
 .tb .tb-card-topic {
+  margin-top: 12px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--umber-light);
+  color: rgba(255, 255, 255, 0.72);
 }
 .tb .tb-card h3 {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 21px;
+  font-size: 20px;
   line-height: 1.2;
   letter-spacing: -0.015em;
   color: inherit;
@@ -190,61 +229,87 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.tb .tb-card-lead h3 {
+  font-size: 30px;
+  -webkit-line-clamp: 3;
+}
 .tb .tb-card p {
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--night-ink-2);
+  color: rgba(255, 255, 255, 0.82);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.tb .tb-card-lead p {
+  font-size: 16px;
+  max-width: 56ch;
+}
+.tb .tb-card-link:hover h3 {
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.6);
+  text-underline-offset: 4px;
+}
+.tb .tb-card-link:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
 .tb .tb-card-meta {
   align-self: end;
   font-size: 12px;
-  color: var(--night-ink-2);
+  color: rgba(255, 255, 255, 0.72);
 }
-/* The roundup card is paper on the tint: the appendix, not a story */
-.tb .tb-card-roundup .tb-card-link {
+/* The roundup, quiet-day and waiting cards are paper with a hairline: appendix and state, not stories. They
+   keep their own height instead of stretching to the row's tallest story card. */
+.tb-card-roundup,
+.tb-card-quiet,
+.tb-card-wait {
+  align-self: flex-start;
+}
+.tb .tb-card-roundup .tb-card-link,
+.tb .tb-card-quiet .tb-card-link,
+.tb .tb-card-wait .tb-card-link {
   background: var(--paper);
   color: var(--ink);
   border: 1px solid var(--rule);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  min-height: 240px;
+  grid-template-rows: auto auto 1fr auto;
 }
-.tb .tb-card-roundup .tb-card-topic {
-  color: var(--umber);
-}
-.tb .tb-card-roundup p,
-.tb .tb-card-roundup .tb-card-meta {
-  color: var(--ink);
-}
-/* Quiet and waiting cards: paper with a hairline, no link */
 .tb .tb-card-quiet .tb-card-link,
 .tb .tb-card-wait .tb-card-link {
-  background: transparent;
-  color: var(--ink);
-  border: 1px dashed var(--rule-2, #cfc8bb);
+  border-style: dashed;
 }
+.tb .tb-card-roundup .tb-card-topic,
 .tb .tb-card-quiet .tb-card-topic,
 .tb .tb-card-wait .tb-card-topic {
-  color: var(--umber);
+  color: var(--ink);
+  margin-top: 18px;
 }
+.tb .tb-card-roundup p,
 .tb .tb-card-quiet p,
 .tb .tb-card-wait p,
+.tb .tb-card-roundup .tb-card-meta,
 .tb .tb-card-quiet .tb-card-meta,
 .tb .tb-card-wait .tb-card-meta {
   color: var(--ink);
 }
+.tb .tb-card-roundup .tb-card-link:hover h3 {
+  text-decoration-color: var(--ink);
+}
 
 @media (max-width: 700px) {
   .tb-section {
-    padding: 18px 16px 14px;
-    border-radius: 16px;
+    padding: 16px 0 6px;
   }
-  .tb-row {
-    margin: 0 -16px;
-    padding: 4px 16px 8px;
-    scroll-padding-inline: 16px;
+  .tb-card-lead {
+    width: 92vw;
+  }
+  .tb .tb-card-lead h3 {
+    font-size: 24px;
   }
   .tb .tb-section-head h2 {
     font-size: 22px;

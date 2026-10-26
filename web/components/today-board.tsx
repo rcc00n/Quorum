@@ -2,18 +2,21 @@
 import Link from "next/link";
 import type { Snapshot, User, Event } from "@/lib/api";
 import type { EditionPresentation } from "@/lib/editorial";
-import { visibleStories, isQuietDay } from "@/lib/editorial";
+import { visibleStories, isQuietDay, licensedPhoto } from "@/lib/editorial";
 import { describeCut, utcLabel } from "@/lib/edition-cut.mjs";
 import "@/app/today.css";
 
-// DECISION(2026-10-26, Anastasia/Claude Code): the daily brief is a board of topic sections, each on its own
-// warm tint, each with one horizontal row of rounded matte cards (the stories above the bar, then the "Also
-// today" roundup, or the quiet-day card, or the waiting card), in the manner of Apple News' Today but on this
-// portal's paper and without photographs (none we may use; the card is made of its text). Everything on a
-// card comes from the published snapshot: title, standfirst, importance label, source count, reading time;
-// nothing is invented, the fictional fixture keeps its DEMO label, a quiet day says so, and a missing
-// edition says when its cut is. Why: Anastasia's brief of 2026-10-26 (the personal page should resemble
-// Apple News: rounded cards, topic headings, sections told apart by tint, the menu at the top).
+// DECISION(2026-10-26, Anastasia/Claude Code): the daily brief is a board of topic sections on the white page,
+// a hairline above each, each with one horizontal row of rounded translucent cards (the stories above the bar,
+// then the "Also today" roundup, or the quiet-day card, or the waiting card), in the manner of Apple News'
+// Today on this portal's paper. The first story of a section is the lead card, wider and taller than the
+// rest. Every card reserves a photo area; it shows a picture only when the snapshot carries one that
+// `licensedPhoto` accepts, with its credit, and stays an empty field otherwise (no stock photography).
+// Everything else on a card comes from the published snapshot: title, standfirst, importance label, source
+// count, reading time; nothing is invented, the fictional fixture keeps its DEMO label, a quiet day says so,
+// and a missing edition says when its cut is. Why: Anastasia's brief of 2026-10-26 (the personal page should
+// resemble Apple News: rounded cards, topic headings, the menu at the top) and her review the same day (no
+// section tints, only the cards carry weight; a photo slot in each card; a larger lead card).
 
 type Props = {
   data: Snapshot | null;
@@ -32,16 +35,27 @@ function roundupCount(edition?: EditionPresentation) {
   return edition ? edition.roundup.reduce((n, g) => n + g.items.length, 0) : 0;
 }
 
-function StoryCard({ event, topicName, day }: { event: Event; topicName: string; day: string }) {
+function StoryCard({ event, topicName, day, lead }: { event: Event; topicName: string; day: string; lead: boolean }) {
   const minutes = event.article?.reading_minutes;
+  const photo = event.article?.photo;
+  const picture = photo && licensedPhoto(photo) ? photo : null;
   const meta = [
     event.importance?.label ?? "Importance not supplied",
     `${event.sources.length} ${event.sources.length === 1 ? "source" : "sources"}`,
     typeof minutes === "number" ? `${minutes} min` : null,
   ].filter(Boolean);
   return (
-    <li className="tb-card">
+    <li className={lead ? "tb-card tb-card-lead" : "tb-card"}>
       <Link href={`/events/${encodeURIComponent(event.id)}?date=${day}`} className="tb-card-link">
+        <div className="tb-card-media" aria-hidden={picture ? undefined : true}>
+          {picture && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={picture.url} alt={picture.caption} />
+              <span className="tb-card-credit">{`Photo: ${picture.credit}`}</span>
+            </>
+          )}
+        </div>
         <span className="tb-card-topic">{topicName}</span>
         <h3>{event.title}</h3>
         <p>{event.summary}</p>
@@ -120,8 +134,8 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
               <p className="tb-section-meta">{meta}</p>
             </div>
             <ul className="tb-row" role="list" aria-label={`${t.name}: stories of the ${day} edition`}>
-              {own.map((e) => (
-                <StoryCard key={e.id} event={e} topicName={t.name} day={day} />
+              {own.map((e, k) => (
+                <StoryCard key={e.id} event={e} topicName={t.name} day={day} lead={k === 0} />
               ))}
               {quiet && (
                 <li className="tb-card tb-card-quiet">

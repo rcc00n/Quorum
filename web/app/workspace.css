@@ -84,10 +84,10 @@ summary:focus-visible {
   gap: 28px;
   min-height: 64px;
   padding: 0 40px;
-  /* DECISION(2026-10-26, Anastasia/Claude Code): the bar is dark, matte and translucent (the page shows
-     through, blurred), with no rule under it; type on it is paper. Why: Anastasia asked for a bar that
+  /* DECISION(2026-10-26, Anastasia/Claude Code): the bar is black at 60 % over the page, blurred (the page shows
+     through), with no rule under it; type on it is paper (5:1 on the blended grey). Why: Anastasia asked for a bar that
      stands out from the paper without a hard edge. */
-  background: rgba(20, 20, 20, 0.82);
+  background: rgba(20, 20, 20, 0.6);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
   backdrop-filter: blur(16px) saturate(120%);
   color: var(--paper);
@@ -99,7 +99,7 @@ summary:focus-visible {
   color: var(--paper);
 }
 .sidebar .brand-dot {
-  color: var(--umber-light);
+  color: rgba(255, 255, 255, 0.72);
 }
 .nav-label,
 .sidebar-topics,
