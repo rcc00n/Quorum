@@ -619,7 +619,7 @@
   letter-spacing: -0.025em;
 }
 .landing .lp-bracket span {
-  color: var(--umber);
+  color: var(--ink-2); /* grey brackets, like the anatomy page's (Anastasia, 2026-10-26) */
   font-weight: 400;
 }
 .landing .lp-truth-answer {

@@ -23,7 +23,7 @@ Light theme only. No dark mode in this phase (the portal has none; add tokens un
 | `--ink` | `#141414` | Headlines, body text, the primary button, the header's underlines. |
 | `--ink-2` | `#5f5a53` | Secondary text, captions, muted labels, eyebrows (6.4:1 on paper). |
 | `--rule` | `#dcd6cc` | Hairlines, borders, table rules. |
-| `--umber` | `#7b5634` | The one accent: the date line, step numbers and markers, the caret, link underlines on hover, the brackets (6.6:1 on paper). Never a fill behind white text smaller than 15 px. |
+| `--umber` | `#7b5634` | The one accent: the typewriter's caret, link underlines on hover, the disclosure marks (+/−), the sponsors' where-lines (6.6:1 on paper). Since 2026-10-26 (Anastasia's review) not on the landing's brackets, step numbers, markers, ledger or limits, which are grey and ink. Never a fill behind white text smaller than 15 px. |
 | `--umber-ink` | `#5a3e25` | Button hover, accent text at small sizes. |
 | `--night` | `#141414` | Ground of the dark theme of the gate screens (sign-in, sign-up, first setup), on by the viewer's switch only; with `--night-field #1f1d1b`, `--night-rule #3a3632`, `--night-ink-2 #b9b2a8`, `--umber-light #c9a27e`. Nowhere else. |
 | `--cohort-left` | `#1d4ed8` | Left cohort, major outlets. Data colour in cohort views only. |
