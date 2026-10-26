@@ -31,6 +31,19 @@
   --measure: 1024px;
   --gutter: 22px;
   --column-gutter: max(var(--gutter), calc((100% - var(--measure)) / 2 + var(--gutter)));
+  /* DECISION(2026-10-26, Anastasia/Claude Code): the landing hero alone sits on a wider measure, 1200 px, so its
+     content starts 88 px outside the header's and the sections' column; corners on the landing are 8 px on
+     containers and 4 px on controls (the 2 px of the morning is superseded for the landing only); the four
+     cohort colours of web/DESIGN.md become tokens for the one place the landing shows them, the bars of the
+     sources spectrum. Why: Anastasia's review of the centred page (the hero should feel wider than what follows;
+     slightly rounded corners page-wide; a little colour by lean on the sources, as data). */
+  --measure-hero: 1200px;
+  --radius: 8px;
+  --radius-s: 4px;
+  --cohort-left: #1d4ed8;
+  --cohort-left-minor: #93c5fd;
+  --cohort-right: #b91c1c;
+  --cohort-right-minor: #fca5a5;
 }
 @media (max-width: 700px) {
   :root {
