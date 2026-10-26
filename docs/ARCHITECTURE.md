@@ -325,7 +325,15 @@ review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-re
   edition follows; Issue #2 holds the hand-over (snapshot + sidecar SHA-256).
 - BLOCKED: the Nightshift route — the Windows runtime binds Windows loopback only, so a run must start from a
   Windows Python venv or after an approved WSL networking change; the Meterless Engine feature — proposal
-  written, go/no-go and a checkout pending.
+  written, go/no-go and a checkout pending *(superseded 2026-10-26 by the H-MEM line below)*.
+- H-MEM source memory, the Meterless Engine feature (2026-10-26, branch `yelysei/meterless-engine`; DECISIONS.md ›
+  Still to clarify, Build rule; hand-over log [2026-10-26-meterless-engine-build.md](reviews/2026-10-26-meterless-engine-build.md)):
+  TESTED (conformance 13/13, exit 0, against `reasoning/memory/sidecar.mjs`; the engine-backed memory tests and the
+  full suite green with `METERLESS_HOME` set) and INTEGRATED on the write path only, in one live check with the flag
+  on and a private `--out` (`frame` → sidecar → reference engine, 3 records persisted). Recall through the engine is
+  TESTED only (real engine, stubbed model and fetch): the live check's recalls came before the store existed and were
+  answered by the sidecar without the engine. Not DEPLOYED: canonical editions keep `[engines] hmem = "off"`.
+  Anastasia's review of the stored DocRef identity is pending (BLOCKED on her).
 - NOT_STARTED: a live eval run (`tests/eval.py --live`, opt-in); the sources-registry load for the coverage
   denominators (`sources_missing` is still `[]`; product decision pending).
 - DEFERRED for the hackathon, stated here so nothing is implied (DECISIONS.md log, 2026-10-24): `server.py`
