@@ -648,6 +648,8 @@ export function Portal({
                               topics={data?.topics || []}
                               followed={user?.topics || []}
                               status={data?.status}
+                              publicationStatus={data?.publication?.status}
+                              today={today()}
                             />
                           );
                         })()

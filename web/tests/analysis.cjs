@@ -193,7 +193,7 @@ const assert = require("node:assert/strict");
       .getByRole("heading", { name: "Also today", exact: true })
       .waitFor();
     for (const [status, title] of [
-      ["pending", "Space for a clearer picture"],
+      ["pending", "No edition for 22 October 2026 is installed on this portal."],
       ["error", "This edition is unavailable"],
       ["partial", "This edition is incomplete"],
       ["stale", "This stored edition is out of date"],
