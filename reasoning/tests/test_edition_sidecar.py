@@ -513,6 +513,112 @@ def test_a_sidecar_that_differs_on_disk_and_cannot_be_removed_is_named(edition, 
     assert "before any hand-over" in left
 
 
+HAND_OVER = ("v1.json.sidecar.json", "v1.json.sidecar.json.sha256", "v1.json.sha256")  # the order of the replaces
+
+
+def _replace_fails_on(monkeypatch, n: int) -> None:
+    real = es.os.replace
+    calls = []
+
+    def replace(src, dst):
+        calls.append(dst)
+        if len(calls) == n:
+            raise PermissionError(13, "Access is denied")
+        real(src, dst)
+
+    monkeypatch.setattr(es.os, "replace", replace)
+
+
+def _assert_no_unmatched_sidecar(path: Path) -> None:
+    """A sidecar on disk always sits beside a .sha256 that matches it, and no temporary file is left."""
+    sidecar = path.with_name("v1.json.sidecar.json")
+    if sidecar.exists():
+        line = path.with_name("v1.json.sidecar.json.sha256").read_text()
+        assert line == f"{hashlib.sha256(sidecar.read_bytes()).hexdigest()}  v1.json.sidecar.json\n"
+    assert not [name for name in files_in(path) if name.endswith(".tmp")]
+
+
+@pytest.mark.parametrize("n", [2, 3])
+def test_a_replace_that_fails_part_way_on_a_first_run_removes_what_it_replaced(edition, producer, capsys,
+                                                                               monkeypatch, n):
+    path = edition()
+    _replace_fails_on(monkeypatch, n)
+    rc, out, err = run_main(capsys, *cli(path, producer))
+    assert rc == 2, (out, err)
+    assert "refused (write_failed)" in err and "Access is denied" in err
+    assert "nothing written" not in err and "earlier run" not in err
+    removed = err.split("the files it wrote were removed: ", 1)[1]
+    for name in HAND_OVER[:n - 1]:
+        assert str(path.with_name(name)) in removed
+    assert files_in(path) == ["v1.json"]
+    _assert_no_unmatched_sidecar(path)
+
+
+@pytest.mark.parametrize("n", [2, 3])
+def test_a_replace_that_fails_part_way_on_a_rerun_names_the_files_left_from_the_earlier_run(edition, producer,
+                                                                                            capsys, monkeypatch, n):
+    path = edition()
+    assert run_main(capsys, *cli(path, producer, "2026-10-26T00:23Z"))[0] == 0
+    before = {name: path.with_name(name).read_bytes() for name in HAND_OVER}
+    _replace_fails_on(monkeypatch, n)
+    rc, out, err = run_main(capsys, *cli(path, producer, "2026-10-26T01:00Z"))
+    assert rc == 2, (out, err)
+    assert "refused (write_failed)" in err and "nothing written" not in err
+    removed, earlier = err.split("the files it wrote were removed: ", 1)[1].split("left from an earlier run", 1)
+    for name in HAND_OVER[:n - 1]:
+        assert str(path.with_name(name)) in removed and not path.with_name(name).exists()
+    for name in HAND_OVER[n - 1:]:
+        assert str(path.with_name(name)) in earlier
+        assert path.with_name(name).read_bytes() == before[name]  # the earlier file is left as it was, and named
+    assert "delete them before any hand-over" in earlier
+    assert files_in(path) == sorted(["v1.json", *HAND_OVER[n - 1:]])
+    _assert_no_unmatched_sidecar(path)
+
+
+def test_a_first_replace_that_fails_leaves_the_earlier_set_intact_and_says_nothing_written(edition, producer, capsys,
+                                                                                         monkeypatch):
+    path = edition()
+    assert run_main(capsys, *cli(path, producer, "2026-10-26T00:23Z"))[0] == 0
+    before = {name: path.with_name(name).read_bytes() for name in HAND_OVER}
+    _replace_fails_on(monkeypatch, 1)
+    rc, out, err = run_main(capsys, *cli(path, producer, "2026-10-26T01:00Z"))
+    assert rc == 2, (out, err)
+    assert "refused (write_failed)" in err and err.rstrip().endswith("; nothing written")
+    assert {name: path.with_name(name).read_bytes() for name in HAND_OVER} == before
+    _assert_no_unmatched_sidecar(path)
+
+
+def test_a_replaced_file_that_cannot_be_removed_after_a_failed_replace_is_named(edition, producer, capsys,
+                                                                                monkeypatch):
+    path = edition()
+    _replace_fails_on(monkeypatch, 3)
+    monkeypatch.setattr(es, "_remove", lambda _: False)
+    rc, out, err = run_main(capsys, *cli(path, producer))
+    assert rc == 2, (out, err)
+    assert "nothing written" not in err and "were removed" not in err
+    left = err.split("delete ", 1)[1]
+    for name in HAND_OVER[:2]:
+        assert str(path.with_name(name)) in left
+    assert "before any hand-over" in left
+
+
+@pytest.mark.skipif(os.name != "nt", reason="replacing onto a read-only file fails on Windows only")
+def test_a_read_only_hash_file_on_a_rerun_is_reported_on_the_real_filesystem(edition, producer, capsys):
+    path = edition()
+    assert run_main(capsys, *cli(path, producer, "2026-10-26T00:23Z"))[0] == 0
+    locked = path.with_name("v1.json.sidecar.json.sha256")
+    os.chmod(locked, stat.S_IREAD)
+    try:
+        rc, out, err = run_main(capsys, *cli(path, producer, "2026-10-26T01:00Z"))
+    finally:
+        os.chmod(locked, stat.S_IREAD | stat.S_IWRITE)
+    assert rc == 2, (out, err)
+    assert "refused (write_failed)" in err and "nothing written" not in err
+    assert str(locked) in err.split("left from an earlier run", 1)[1]
+    assert not path.with_name("v1.json.sidecar.json").exists()
+    _assert_no_unmatched_sidecar(path)
+
+
 # ---------------------------------------------------------------- validate_sidecar: one check each
 
 

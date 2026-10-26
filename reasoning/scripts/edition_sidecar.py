@@ -10,6 +10,10 @@ Writes, next to each other and each atomically (temporary file + replace):
     <out>.sha256          "<sha256>  <sidecar file name>"
     <snapshot>.sha256     "<sha256>  <snapshot file name>"
 
+The three are replaced in one at a time. If a replace fails after another went through, the files this run replaced
+in are removed and the refusal names them and anything left from an earlier run; it says "nothing written" only when
+no file was replaced.
+
 The hand-over for one edition is then the snapshot file, its sidecar, both sha256 values and the producer commit:
 what the portal's read-only `python manage.py reasoning_snapshot --file --sha256 --sidecar --sidecar-sha256
 --producer-commit` validates and `portal_snapshot publish` installs once the gate is open (Issue #2 6411686793,
@@ -1100,8 +1104,11 @@ def _same(a: Path, b: Path) -> bool:
     return os.path.abspath(a).casefold() == os.path.abspath(b).casefold()
 
 
-def write_atomically(files: list[tuple[Path, bytes]]) -> None:
-    """Every file goes to a temporary file in its own directory first; only when all exist are they replaced in."""
+def write_atomically(files: list[tuple[Path, bytes]], replaced: list[Path] | None = None) -> None:
+    """Every file goes to a temporary file in its own directory first; only when all exist are they replaced in,
+    one at a time. Each destination is appended to `replaced` right after its replace, so that the caller knows what
+    a failure part-way left on disk."""
+    replaced = [] if replaced is None else replaced
     temps: list[tuple[str, Path]] = []
     try:
         for path, data in files:
@@ -1113,6 +1120,7 @@ def write_atomically(files: list[tuple[Path, bytes]]) -> None:
                 os.fsync(stream.fileno())
         for tmp, path in temps:
             os.replace(tmp, path)
+            replaced.append(path)
     finally:
         for tmp, _ in temps:
             if os.path.exists(tmp):
@@ -1128,6 +1136,23 @@ def _remove(path: Path) -> bool:
     except OSError:
         return False
     return True
+
+
+def _undo_write(replaced: list[Path], targets: list[Path]) -> str:
+    """Removes the files this run already replaced in and says what is on disk afterwards: what was removed, what
+    could not be removed, and which files of an earlier run are left without the set they belonged to."""
+    removed = [path for path in replaced if _remove(path)]
+    left = [path for path in replaced if path not in removed]
+    earlier = [path for path in targets if path not in replaced and path.exists()]
+    parts = []
+    if removed:
+        parts.append(f"the files it wrote were removed: {', '.join(map(str, removed))}")
+    if left:
+        parts.append(f"delete {', '.join(map(str, left))} before any hand-over")
+    if earlier:
+        parts.append(f"left from an earlier run without the files they belonged to: {', '.join(map(str, earlier))}; "
+                     "delete them before any hand-over")
+    return "; ".join(parts)
 
 
 def hash_line(data: bytes, name: str) -> bytes:
@@ -1159,19 +1184,27 @@ def make(snapshot: Path, corpus_as_of: str, producer_commit: str, out: Path | No
     data = serialize(build_sidecar(raw, p, corpus_as_of_utc, producer_commit, config_sha256))
     hashes = validate_sidecar(data, snapshot, producer_commit, repo)
     _require(read_snapshot_file(snapshot) == raw, "snapshot_changed", f"snapshot {snapshot} changed while it was read")
+    targets = [out, out_hash, snapshot_hash]
+    replaced: list[Path] = []
     try:
-        write_atomically([(out, data), (out_hash, hash_line(data, out.name)), (snapshot_hash, hash_line(raw, snapshot.name))])
+        write_atomically([(out, data), (out_hash, hash_line(data, out.name)), (snapshot_hash, hash_line(raw, snapshot.name))],
+                         replaced)
     except OSError as exc:
-        raise SidecarError("write_failed", f"could not write the sidecar files: {exc.strerror or type(exc).__name__}") from None
+        # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a replace that fails after an earlier one went through
+        # removes the files this run replaced in and names them, any it could not remove and any left from an earlier
+        # run; "nothing written" is said only when no replace happened. Why: the three files are replaced one at a
+        # time (no filesystem replaces a set at once; on Windows a target held open fails), and a new sidecar beside
+        # an old .sha256 must never be reported as an intact set.
+        raise SidecarError("write_failed", f"could not write the sidecar files: {exc.strerror or type(exc).__name__}",
+                           _undo_write(replaced, targets) if replaced else "nothing written") from None
     try:
         on_disk = hashlib.sha256(out.read_bytes()).hexdigest()
     except OSError:
         on_disk = None
     if on_disk != hashes["sidecar_sha256"]:
         # the three files are already replaced in: remove them, so a refusal never leaves a hand-over set behind
-        left = [str(path) for path in (out, out_hash, snapshot_hash) if not _remove(path)]
         raise SidecarError("write_failed", f"sidecar {out} on disk differs from the validated bytes",
-                           f"delete {', '.join(left)} before any hand-over" if left else "the files it wrote were removed")
+                           _undo_write(replaced, targets))
     return {**hashes, "sidecar": out, "sidecar_hash_file": out_hash, "snapshot_hash_file": snapshot_hash,
             "corpus_as_of_utc": corpus_as_of_utc, "note": note}
 
