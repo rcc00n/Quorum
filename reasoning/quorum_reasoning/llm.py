@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 import threading
 import time
@@ -544,20 +545,37 @@ def _hmem_injected(met: dict[str, Any]) -> int | None:
 CACHE_REPLAY_REFUSED = "nightshift cache replay refused: provenance of injected memories unknown"
 
 
+def _flag_shape(flag: Any) -> str:
+    """How a non-boolean `from_cache` is named in a refusal: a number as itself, a string only as "a string" (never its
+    text), anything else by its type (decision at `_cache_refusal`)."""
+    if isinstance(flag, (int, float)):
+        return json.dumps(flag)
+    return "a string" if isinstance(flag, str) else f"a {type(flag).__name__}"
+
+
 def _cache_refusal(met: dict[str, Any]) -> str | None:
-    """Why the reply is refused as a Nightshift cache replay (`CACHE_REPLAY_REFUSED`, with the unreadable value named
-    when `from_cache` is not a boolean or a `cache` block is not an object), or None (decision at `_cache_hit`).
+    """Why the reply is refused as a Nightshift cache replay (`CACHE_REPLAY_REFUSED`, with the unreadable value's shape
+    named when a `from_cache` is not a boolean or a `cache` block is not an object), or None (decision at `_cache_hit`).
 
     DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a `from_cache` that is present, not null and not a JSON boolean
     ("true", "false", 1, 0) is refused as a cache replay (`cache_refused`, reason `CACHE_REPLAY_REFUSED` plus the value),
     not served and not written to `receipt_from_cache`; absent or null means the response does not say. Why: review
     round 7: such a flag beside `cache.status` "miss" was served, while `load_journal` refuses any `receipt_from_cache`
-    other than false; Nightshift 1.2.3 sends `!!result.fromCache`, a boolean, so this refuses nothing it sends today."""
-    flag = met.get("from_cache")
-    if flag is True:
-        return CACHE_REPLAY_REFUSED
-    if flag is not None and not isinstance(flag, bool):
-        return f"{CACHE_REPLAY_REFUSED} (from_cache is {json.dumps(flag) if isinstance(flag, (int, float, str)) else 'a ' + type(flag).__name__}, not a boolean)"
+    other than false; Nightshift 1.2.3 sends `!!result.fromCache`, a boolean, so this refuses nothing it sends today.
+    ("plus the value" superseded 2026-10-25 for strings and copies: decision below.)
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): the same `from_cache` rules (true, or present, non-null and not a
+    boolean) apply to the top-level flag and to every receipt copy (`_receipt_copies`: the unsigned `receipt`, the
+    envelope's `body.receipt` and `receipt`), whatever the other copies or a `cache` block "miss" say; a non-boolean flag
+    is named by `_flag_shape`, so a string is "a string" and its text never reaches the ledger error or the MemoryInjected
+    message. Why: closing review round 1: only the top-level flag was read, so a receipt copy saying `from_cache: true`
+    was served (fail-open against coordinator decision 3), and a string flag was copied into the error row (the
+    coordinator's rule: failure strings report shapes, never values)."""
+    for name, flag in [("from_cache", met.get("from_cache")), *(("a receipt's from_cache", r.get("from_cache")) for r in _receipt_copies(met))]:
+        if flag is True:
+            return CACHE_REPLAY_REFUSED
+        if flag is not None and not isinstance(flag, bool):
+            return f"{CACHE_REPLAY_REFUSED} ({name} is {_flag_shape(flag)}, not a boolean)"
     # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): every `cache` block (top level and each receipt copy) is read
     # through `_json_object`: a JSON string holding an object is decoded and checked; any other present, non-null value
     # that is not an object ("exact", a number, a list, a JSON string holding something else) is refused as a cache replay
@@ -574,8 +592,9 @@ def _cache_refusal(met: dict[str, Any]) -> str | None:
 
 
 def _cache_hit(met: dict[str, Any]) -> bool:
-    """True when the runtime answered from its own answer cache: `from_cache` is true (or not a boolean: decision at
-    `_cache_refusal`), or the top-level `cache` block or any receipt copy's `cache` block has a `status` other than
+    """True when the runtime answered from its own answer cache: the top-level `from_cache` or any receipt copy's
+    `from_cache` is true (or not a boolean: decisions at `_cache_refusal`), or the top-level `cache` block or any receipt
+    copy's `cache` block has a `status` other than
     "miss" (Nightshift writes the hit kind there, "exact" or "semantic"; every live answer says "miss") or is present but
     not an object (decision in `_cache_refusal`).
 
@@ -746,8 +765,18 @@ def control_socket_path() -> str:
     return CONTROL_SOCKET_POSIX
 
 
+def _content_length(value: bytes | str) -> int:
+    """A Content-Length header's value as an int; raises ValueError naming only its shape (decision at
+    `_parse_http_response`)."""
+    text = value.decode("iso-8859-1") if isinstance(value, bytes) else value
+    if not re.fullmatch(r"[0-9]+", text.strip()):
+        raise ValueError("the control plane's response has a Content-Length that is not a non-negative integer")
+    return int(text.strip())
+
+
 def _http_complete(buf: bytes) -> bool:
-    """True once `buf` holds a whole HTTP response (by Content-Length or the last chunk); else read on until close."""
+    """True once `buf` holds a whole HTTP response (by Content-Length or the last chunk); else read on until close.
+    A malformed Content-Length raises ValueError by shape (`_content_length`)."""
     head, sep, body = buf.partition(b"\r\n\r\n")
     if not sep:
         return False
@@ -756,7 +785,7 @@ def _http_complete(buf: bytes) -> bool:
         return body.endswith(b"0\r\n\r\n")
     for line in low.split(b"\r\n"):
         if line.startswith(b"content-length:"):
-            return len(body) >= int(line.split(b":", 1)[1].strip() or b"0")
+            return len(body) >= _content_length(line.split(b":", 1)[1])
     return False
 
 
@@ -1018,12 +1047,20 @@ def _parse_http_response(raw: bytes) -> tuple[int, Any]:
     UNFRAMED_EMPTY, which `disable_hmem_injection` refuses on the first GET. Why: review round 3: a first GET cut off
     after its headers parsed as (200, None), which `disable_hmem_injection` reads as setpoints never written, so the
     check that the POST kept the other setpoints (the privacy floor) was silently skipped; review round 7: the same held
-    for a close-delimited first GET ended by EOF or a reset right after its headers (coordinator decision 6)."""
+    for a close-delimited first GET ended by EOF or a reset right after its headers (coordinator decision 6).
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a status code that is not three digits, a chunk size that is not
+    hexadecimal and a Content-Length that is not a non-negative integer (`_content_length`, also in `_http_complete`)
+    raise ValueError naming only that shape; the daemon's bytes are never repeated in the message. Why: closing review
+    round 1: `int()` raised "invalid literal ... b'<the daemon's bytes>'", which the setter's failure printed (the
+    coordinator's rule: failure strings report shapes, never values)."""
     head, sep, body = raw.partition(b"\r\n\r\n")
     lines = head.decode("iso-8859-1").split("\r\n")
     parts = lines[0].split(" ", 2)
     if not sep or len(parts) < 2 or not parts[0].startswith("HTTP/"):
         raise ValueError("the control plane did not answer with an HTTP response")
+    if not re.fullmatch(r"[0-9]{3}", parts[1]):
+        raise ValueError("the control plane did not answer with an HTTP response (its status code is not three digits)")
     status = int(parts[1])
     headers = {k.strip().lower(): v.strip() for k, _, v in (line.partition(":") for line in lines[1:]) if k.strip()}
     framed = True
@@ -1033,7 +1070,10 @@ def _parse_http_response(raw: bytes) -> tuple[int, Any]:
             size_line, found, rest = body.partition(b"\r\n")
             if not found:
                 raise ValueError("the control plane's chunked response was cut short (no terminating 0-size chunk)")
-            size = int(size_line.split(b";")[0].strip(), 16)
+            size_field = size_line.split(b";")[0].strip()
+            if not re.fullmatch(rb"[0-9A-Fa-f]+", size_field):
+                raise ValueError("the control plane's chunked response has a chunk size that is not hexadecimal")
+            size = int(size_field, 16)
             if size == 0:
                 break
             if len(rest) < size + 2 or rest[size : size + 2] != b"\r\n":
@@ -1042,8 +1082,8 @@ def _parse_http_response(raw: bytes) -> tuple[int, Any]:
             body = rest[size + 2 :]
         body = plain
     elif "content-length" in headers:
-        announced = int(headers["content-length"])
-        if announced < 0 or len(body) < announced:
+        announced = _content_length(headers["content-length"])
+        if len(body) < announced:
             raise ValueError(f"the control plane's response was cut short ({len(body)} of {announced} body bytes)")
         body = body[:announced]
     else:
@@ -1168,18 +1208,29 @@ def disable_hmem_injection() -> str | None:
     if before_doc is None:
         return (f"cannot turn H-MEM injection off: GET /admin/setpoints returned no setpoints document to compare the change "
                 f"against ({shape}); nothing was changed")
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): every failure once the POST may have reached the daemon says so.
+    # A POST that raised (any exception: the seam cannot tell whether its bytes were written, and one deadline covers the
+    # open, the write and the read) or answered a non-2xx status is followed by one best-effort GET /admin/setpoints run
+    # through the same checks as the read-back (`_setpoint_problems`: hmemKnowledge false, other setpoints unchanged),
+    # whose result joins the failure; the failure stands even when that GET shows the POST applied (a retry runs the
+    # setter again). When that GET, or the read-back after a 2xx POST, raises, answers non-2xx or carries no readable
+    # document, the failure ends with `_post_may_have_applied` (the keys of the first GET's document, values never
+    # printed). Why: closing review round 1: such a failure skipped the other-setpoints comparison and never told the
+    # operator that the machine-wide change may have been applied (coordinator decision 6, the privacy floor).
     try:
         status, _ = _control_http("POST", "/admin/setpoints", {HMEM_SETPOINT: False})
     except Exception as exc:  # noqa: BLE001
-        return f"cannot turn H-MEM injection off: POST /admin/setpoints on {where} failed ({type(exc).__name__}: {exc})"
+        return (f"cannot turn H-MEM injection off: POST /admin/setpoints on {where} failed ({type(exc).__name__}: {exc}); "
+                + _readback_after_failed_post(before_doc))
     if not 200 <= status < 300:
-        return f"cannot turn H-MEM injection off: POST /admin/setpoints answered HTTP {status}"
+        return f"cannot turn H-MEM injection off: POST /admin/setpoints answered HTTP {status}; " + _readback_after_failed_post(before_doc)
     try:
         status, body = _control_http("GET", "/admin/setpoints")
     except Exception as exc:  # noqa: BLE001
-        return f"cannot confirm H-MEM injection is off: GET /admin/setpoints on {where} failed ({type(exc).__name__}: {exc})"
+        return (f"cannot confirm H-MEM injection is off: GET /admin/setpoints on {where} failed ({type(exc).__name__}: {exc}); "
+                + _post_may_have_applied(before_doc))
     if not 200 <= status < 300:
-        return f"cannot confirm H-MEM injection is off: GET /admin/setpoints answered HTTP {status}"
+        return f"cannot confirm H-MEM injection is off: GET /admin/setpoints answered HTTP {status}; " + _post_may_have_applied(before_doc)
     # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a read-back with no readable setpoints document (a close-delimited
     # body with no bytes, a body that is not JSON, a framed empty body or JSON null, JSON that is not an object, a wrapper
     # whose `setpoints` is not an object (round 9), or a bare object without the `{"setpoints": ...}` wrapper that lacks
@@ -1188,9 +1239,18 @@ def disable_hmem_injection() -> str | None:
     # only on a readable document (a wrapped one missing the key still reads back as null). Why: review round 8: such a
     # read-back was read as an empty document, so the failure said the setpoint read back as null and that the POST wiped
     # every other machine-wide setpoint, which could send the operator to rewrite setpoints that were never changed.
+    # ("nothing else" superseded 2026-10-25: the failure now ends with `_post_may_have_applied`, keys only, which claims
+    # no change: decision at the POST above.)
     after_doc, shape = _setpoint_doc(body)  # the same reader as the first GET (decision at `_setpoint_doc`)
     if after_doc is None:
-        return f"cannot confirm H-MEM injection is off: GET /admin/setpoints answered no readable setpoints document ({shape})"
+        return (f"cannot confirm H-MEM injection is off: GET /admin/setpoints answered no readable setpoints document ({shape}); "
+                + _post_may_have_applied(before_doc))
+    return "; ".join(_setpoint_problems(before_doc, after_doc)) or None
+
+
+def _setpoint_problems(before_doc: dict[str, Any], after_doc: dict[str, Any]) -> list[str]:
+    """What a readable read-back shows against the first GET's document: hmemKnowledge not JSON false, and other
+    setpoints the POST changed (as JSON, `_same_json`) or removed, named by key only (decisions in `disable_hmem_injection`)."""
     problems = []
     value = after_doc.get(HMEM_SETPOINT)
     if value is not False:
@@ -1199,7 +1259,38 @@ def disable_hmem_injection() -> str | None:
     if lost:
         problems.append(f"POST /admin/setpoints changed or removed other daemon setpoints: {', '.join(lost)} (values not "
                         "printed); they are machine-wide: check and restore them in Nightshift before a live run")
-    return "; ".join(problems) or None
+    return problems
+
+
+def _post_may_have_applied(before_doc: dict[str, Any]) -> str:
+    """The fixed warning when no read-back could be compared after a POST that may have reached the daemon: the keys the
+    first GET held, never their values (decision at the POST in `disable_hmem_injection`)."""
+    others = sorted(k for k in before_doc if k != HMEM_SETPOINT)
+    if not others:
+        return (f"the POST may have been applied: check {HMEM_SETPOINT} in Nightshift before retrying (no other setpoint "
+                "was set before the POST)")
+    return (f"the POST may have been applied: check {HMEM_SETPOINT} and these setpoints in Nightshift before retrying: "
+            f"{', '.join(others)} (values not printed)")
+
+
+def _readback_after_failed_post(before_doc: dict[str, Any]) -> str:
+    """One best-effort GET /admin/setpoints after a POST that failed but may have reached the daemon: what it shows
+    (`_setpoint_problems`, or that the POST was applied), else `_post_may_have_applied` (decision at the POST in
+    `disable_hmem_injection`). Never raises."""
+    try:
+        status, body = _control_http("GET", "/admin/setpoints")
+    except Exception as exc:  # noqa: BLE001 — best effort: any failure is the warning
+        return f"a read-back GET /admin/setpoints failed too ({type(exc).__name__}); " + _post_may_have_applied(before_doc)
+    if not 200 <= status < 300:
+        return f"a read-back GET /admin/setpoints answered HTTP {status}; " + _post_may_have_applied(before_doc)
+    after_doc, shape = _setpoint_doc(body)
+    if after_doc is None:
+        return f"a read-back GET /admin/setpoints answered no readable setpoints document ({shape}); " + _post_may_have_applied(before_doc)
+    problems = _setpoint_problems(before_doc, after_doc)
+    if problems:
+        return "a read-back GET /admin/setpoints shows: " + "; ".join(problems)
+    return (f"a read-back GET /admin/setpoints shows the POST applied ({HMEM_SETPOINT} false, no other setpoint changed); "
+            "retry the run")
 
 
 _last_call_at = 0.0

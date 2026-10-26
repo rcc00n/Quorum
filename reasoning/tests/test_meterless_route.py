@@ -365,20 +365,23 @@ def test_hmem_unparsable_has_no_count_but_is_reported_and_plain_int_accepted(met
     assert bool(llm._hmem_report(met)[1]) is unreadable
 
 
-@pytest.mark.parametrize("flag,shown", [("false", '"false"'), ("true", '"true"'), (1, "1"), (0, "0"), ([], "a list")])
+@pytest.mark.parametrize("flag,shown", [("false", "a string"), ("true", "a string"), (1, "1"), (0, "0"), ([], "a list")])
 def test_from_cache_that_is_not_a_boolean_is_refused_and_not_coerced(live, tmp_path, monkeypatch, flag, shown):
     """Round 7: a non-boolean `from_cache` beside `cache.status` "miss" was served; it is now refused as a cache replay
-    (load_journal already refused any `receipt_from_cache` other than false), and the value is still not coerced."""
+    (load_journal already refused any `receipt_from_cache` other than false), and the value is still not coerced.
+    Closing round 1: a string flag is named "a string", its text never copied into the row or the exception."""
     path = tmp_path / "j.jsonl"
     monkeypatch.setattr(llm, "journal_path", path)
     met = {**_met(LIGHTNING, LIGHTNING, LIGHTNING), "from_cache": flag, "cache": {"status": "miss"}}
     assert llm._cache_hit(met) and llm._hmem_report(met) == (0, None)
     live(_completion(LIGHTNING, met))
-    with pytest.raises(llm.MemoryInjected, match="nightshift cache replay refused"):
+    with pytest.raises(llm.MemoryInjected, match="nightshift cache replay refused") as caught:
         llm.json_task("stance", {"claim": "c"}, dry_run=False)
     row = llm.calls[-1]
     assert row["served"] == "error" and row["cache_refused"] is True and "receipt_from_cache" not in row
     assert row["error"] == f"{llm.CACHE_REPLAY_REFUSED} (from_cache is {shown}, not a boolean)"
+    if isinstance(flag, str):
+        assert f'"{flag}"' not in row["error"] and f'"{flag}"' not in str(caught.value)
     assert llm.cache_refused_count() == 1 and llm.hmem_rejected_count() == 0
     llm.reset_calls()
     assert llm.load_journal(path) == 1 and llm.replay == {}  # not journalled for replay
@@ -852,6 +855,64 @@ def test_cache_block_that_is_not_an_object_is_refused(live, tmp_path, monkeypatc
     assert llm.load_journal(path) == 1 and llm.replay == {}  # not journalled for replay
 
 
+STRING_FLAG = "cache-flag-text-never-copied"  # a string `from_cache`: its text must not reach any failure string
+
+
+def _with_copy_flag(where: str, flag) -> dict:
+    """A clean Ultra receipt (top-level `from_cache` false, every `cache` block "miss") whose one receipt copy at `where`
+    carries `from_cache: flag`."""
+    met = {**_met(ULTRA, ULTRA, ULTRA, hmem=None), "cache": {"status": "miss"}}
+    copy = {"hmem": None, "cache": {"status": "miss"}, "from_cache": flag}
+    if where == "receipt":
+        met["receipt"] = copy
+    elif where == "envelope body.receipt":
+        met["receipt_envelope"] = {"body": {"receipt": copy}}
+    else:  # the envelope's receipt beside its body (dgx-client.js receiptFromEnvelope: `body.receipt || env.receipt`)
+        met["receipt_envelope"] = {"body": {}, "receipt": copy}
+    return met
+
+
+@pytest.mark.parametrize("where", ["receipt", "envelope body.receipt", "envelope receipt"])
+@pytest.mark.parametrize("flag,reason", [
+    (True, llm.CACHE_REPLAY_REFUSED),
+    (STRING_FLAG, f"{llm.CACHE_REPLAY_REFUSED} (a receipt's from_cache is a string, not a boolean)"),
+    ("true", f"{llm.CACHE_REPLAY_REFUSED} (a receipt's from_cache is a string, not a boolean)"),
+    (1, f"{llm.CACHE_REPLAY_REFUSED} (a receipt's from_cache is 1, not a boolean)"),
+])
+def test_from_cache_in_a_receipt_copy_is_refused(live, tmp_path, monkeypatch, where, flag, reason):
+    """Closing round 1: only the top-level `from_cache` was read, so a receipt copy saying true (beside a top-level false
+    and every cache block "miss") was served. Every copy is now held to the same rules, and a string flag is named only
+    by its shape, in the ledger error and the MemoryInjected message alike; probe() and test_connection() refuse it too."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met = _with_copy_flag(where, flag)
+    assert llm._hmem_report(met) == (0, None) and llm._cache_hit(met)
+    live(_completion(ULTRA, met))
+    with pytest.raises(llm.MemoryInjected, match="nightshift cache replay refused") as caught:
+        llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")
+    row = llm.calls[-1]
+    assert row["served"] == "error" and row["cache_refused"] is True and row["error"] == reason
+    assert row["receipt_from_cache"] is False  # the top-level flag is still disclosed as sent
+    assert "hmem_rejected" not in row and "reply_sha256" not in row
+    assert llm.cache_refused_count() == 1 and llm.hmem_rejected_count() == 0
+    with pytest.raises(llm.MemoryInjected) as refused:
+        llm._refuse_injected("connection test on fact_checker", met)  # what probe() and test_connection() call
+    for text in (row["error"], str(caught.value), str(refused.value)):
+        assert reason in text and STRING_FLAG not in text and '"true"' not in text
+    llm.reset_calls()
+    assert llm.load_journal(path) == 1 and llm.replay == {}  # not journalled for replay
+
+
+@pytest.mark.parametrize("where", ["receipt", "envelope body.receipt", "envelope receipt"])
+@pytest.mark.parametrize("flag", [False, None])
+def test_receipt_copy_from_cache_false_or_null_is_served(live, where, flag):
+    met = _with_copy_flag(where, flag)
+    assert not llm._cache_hit(met)
+    live(_completion(ULTRA, met))
+    assert llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")["stance"] == "neutral"
+    assert not llm.calls[-1].get("error") and llm.cache_refused_count() == 0
+
+
 @pytest.mark.parametrize("hmem", [None, {"injected": 0}])
 def test_probe_serves_a_clean_meterless_reply_after_the_setter(live, control, monkeypatch, capsys, hmem):
     """Round 8: null and 0 stay success in probe(): `--probe` exits 0 and prints the reply, after the setter."""
@@ -1130,7 +1191,66 @@ def test_first_get_cut_short_refuses_before_the_post(live, monkeypatch, first):
     assert len(sent) == 1  # refused before the POST
 
 
+DAEMON_BYTES = b"Zq9-daemon-bytes"  # what a malformed field holds; no failure string may repeat it
+MALFORMED = [
+    (b"HTTP/1.1 200 OK\r\nContent-Length: " + DAEMON_BYTES + b"\r\n\r\n{}", "has a Content-Length that is not a non-negative integer"),
+    (b"HTTP/1.1 200 OK\r\nContent-Length: -2\r\n\r\n{}", "has a Content-Length that is not a non-negative integer"),
+    (b"HTTP/1.1 200 OK\r\nContent-Length: \r\n\r\n{}", "has a Content-Length that is not a non-negative integer"),
+    (b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" + DAEMON_BYTES + b"\r\n{}\r\n0\r\n\r\n", "has a chunk size that is not hexadecimal"),
+    (b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n-2\r\n{}\r\n0\r\n\r\n", "has a chunk size that is not hexadecimal"),
+    (b"HTTP/1.1 " + DAEMON_BYTES + b" OK\r\nContent-Length: 2\r\n\r\n{}", "its status code is not three digits"),
+]
+
+
+@pytest.mark.parametrize("raw,shape", MALFORMED)
+def test_malformed_framing_is_reported_by_shape_not_by_the_daemons_bytes(raw, shape):
+    """Closing round 1: `int()` raised "invalid literal ... b'<the daemon's bytes>'", which the setter printed."""
+    with pytest.raises(ValueError) as caught:
+        llm._parse_http_response(raw)
+    assert shape in str(caught.value) and DAEMON_BYTES.decode() not in str(caught.value) and "-2" not in str(caught.value)
+    assert caught.value.__cause__ is None and caught.value.__context__ is None  # nothing chained carries the bytes either
+    if b"Content-Length: " in raw and b"Content-Length: 2" not in raw:  # the reader's completeness check names the shape too
+        with pytest.raises(ValueError, match="Content-Length that is not a non-negative integer") as early:
+            llm._http_complete(raw)
+        assert DAEMON_BYTES.decode() not in str(early.value) and early.value.__context__ is None
+
+
+@pytest.mark.parametrize("raw,shape", MALFORMED)
+@pytest.mark.parametrize("on", ["GET", "POST"])
+def test_malformed_first_get_or_post_answer_names_the_shape_in_the_setter(live, monkeypatch, raw, shape, on):
+    """The same through the setter's real request builder and parser: a malformed first GET refuses before the POST; a
+    malformed POST answer is a POST failure followed by the best-effort read-back. The daemon's bytes appear in neither."""
+    sent: list[bytes] = []
+
+    def exchange(where, request, timeout=llm.CONTROL_TIMEOUT_S):
+        sent.append(request)
+        if request.startswith(on.encode()) and (on == "POST" or len(sent) == 1):
+            return raw
+        return _framed(_MERGED if any(r.startswith(b"POST") for r in sent) else _SNAPSHOT)
+
+    monkeypatch.setattr(llm, "_control_http", _REAL_CONTROL_HTTP)
+    monkeypatch.setattr(llm, "_control_exchange", exchange)
+    problem = llm.disable_hmem_injection() or ""
+    assert shape in problem and DAEMON_BYTES.decode() not in problem
+    if on == "GET":
+        assert problem.startswith("cannot turn H-MEM injection off: the first GET /admin/setpoints") and len(sent) == 1
+    else:
+        assert problem.startswith("cannot turn H-MEM injection off: POST /admin/setpoints") and len(sent) == 3
+        assert problem.endswith("shows the POST applied (hmemKnowledge false, no other setpoint changed); retry the run")
+
+
+def test_malformed_content_length_on_the_pipe_is_reported_by_shape(real_control_exchange, monkeypatch):
+    """Through the real exchange (fake `open`): the reader stops at the malformed Content-Length, naming its shape."""
+    _fake_open(monkeypatch, lambda path: _FakePipe([b"HTTP/1.1 200 OK\r\nContent-Length: " + DAEMON_BYTES + b"\r\n\r\n{}"]))
+    with pytest.raises(ValueError, match="Content-Length that is not a non-negative integer") as caught:
+        llm._control_exchange(FAKE_PIPE, b"GET /admin/setpoints HTTP/1.1\r\n\r\n", timeout=2)
+    assert DAEMON_BYTES.decode() not in str(caught.value)
+
+
 _SNAPSHOT = b'{"setpoints":{"hmemKnowledge":true,"privacyMin":"local-only","hmemTopK":3}}'
+# closing round 1: the warning ending every failure after a POST whose effect no read-back could confirm (keys of _SNAPSHOT)
+MAY_HAVE_APPLIED = ("the POST may have been applied: check hmemKnowledge and these setpoints in Nightshift before retrying: "
+                    "hmemTopK, privacyMin (values not printed)")
 _MERGED = b'{"setpoints":{"hmemKnowledge":false,"privacyMin":"local-only","hmemTopK":3},"engines_notified":1}'
 
 
@@ -1172,8 +1292,10 @@ def test_unreadable_readback_names_itself_and_claims_no_lost_setpoints(live, mon
     exchange = _wire(readback)
     monkeypatch.setattr(llm, "_control_exchange", exchange)
     problem = llm.disable_hmem_injection()
-    assert problem == f"cannot confirm H-MEM injection is off: GET /admin/setpoints answered no readable setpoints document ({shape})"
+    assert problem == (f"cannot confirm H-MEM injection is off: GET /admin/setpoints answered no readable setpoints document "
+                       f"({shape}); {MAY_HAVE_APPLIED}")  # closing round 1: the POST went out, so the operator is told
     assert "other daemon setpoints" not in problem and "read back as" not in problem and len(exchange.sent) == 3
+    assert "local-only" not in problem  # keys only, never values
     monkeypatch.setattr(llm, "_control_exchange", _wire(readback))
     monkeypatch.setattr(graph, "run_local", lambda *a, **k: pytest.fail("the graph must not start"))
     assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
@@ -1191,6 +1313,90 @@ def test_readable_readback_is_still_compared(live, monkeypatch, readback, needle
     monkeypatch.setattr(llm, "_control_exchange", _wire(readback))
     problem = llm.disable_hmem_injection()
     assert (problem is None) if needle is None else (needle in (problem or "") and "no readable setpoints document" not in problem)
+
+
+_BEFORE = {"hmemKnowledge": True, "privacyMin": "local-only", "hmemTopK": 3}  # the keys of MAY_HAVE_APPLIED
+_APPLIED = {"hmemKnowledge": False, "privacyMin": "local-only", "hmemTopK": 3}  # a merging daemon's document after the POST
+_REPLACED = {"hmemKnowledge": False}  # a replacing daemon's: every other key gone
+_LOST = ("changed or removed other daemon setpoints: hmemTopK, privacyMin (values not printed); they are machine-wide: "
+         "check and restore them in Nightshift before a live run")
+
+
+def _scripted(post, readback):
+    """A fake `_control_http`: the first GET answers `_BEFORE`; the POST and the GET after it each answer (status, body)
+    or raise the exception given; `.requests` records every request."""
+    requests: list[tuple[str, str, object]] = []
+
+    def control_http(method, path, body=None):
+        requests.append((method, path, body))
+        answer = {"GET": {"setpoints": dict(_BEFORE)}, "POST": post}[method] if len(requests) <= 2 else readback
+        if isinstance(answer, BaseException):
+            raise answer
+        return answer if isinstance(answer, tuple) else (200, answer)
+
+    control_http.requests = requests
+    return control_http
+
+
+POST_RAISES = TimeoutError("no answer within 3 s")  # the bytes may have been written: one deadline covers the whole exchange
+
+
+@pytest.mark.parametrize("post,needle", [
+    (POST_RAISES, f"cannot turn H-MEM injection off: POST /admin/setpoints on {FAKE_PIPE} failed (TimeoutError: no answer within 3 s); "),
+    ((500, {"error": "engine restart"}), "cannot turn H-MEM injection off: POST /admin/setpoints answered HTTP 500; "),
+])
+@pytest.mark.parametrize("readback,shows", [
+    ({"setpoints": _REPLACED}, f"a read-back GET /admin/setpoints shows: POST /admin/setpoints {_LOST}"),
+    ({"setpoints": dict(_BEFORE)}, "a read-back GET /admin/setpoints shows: H-MEM injection is not off: hmemKnowledge read back as true after POST "
+                                   "/admin/setpoints, not false"),
+    ({"setpoints": _APPLIED}, "a read-back GET /admin/setpoints shows the POST applied (hmemKnowledge false, no other setpoint changed); retry the run"),
+    (BrokenPipeError(32, "Broken pipe"), f"a read-back GET /admin/setpoints failed too (BrokenPipeError); {MAY_HAVE_APPLIED}"),
+    ((503, {"setpoints": _APPLIED}), f"a read-back GET /admin/setpoints answered HTTP 503; {MAY_HAVE_APPLIED}"),
+    ({"ok": True}, f"a read-back GET /admin/setpoints answered no readable setpoints document (JSON with no setpoints wrapper and no hmemKnowledge key); {MAY_HAVE_APPLIED}"),
+])
+def test_failed_post_is_followed_by_one_best_effort_readback(live, monkeypatch, tmp_path, capsys, post, needle, readback, shows):
+    """Closing round 1: a POST that raised (a timeout, a reset, a cut framing: its bytes may have reached the daemon) or
+    answered non-2xx skipped the other-setpoints check and never said the machine-wide change may have been applied. One
+    best-effort GET now runs the same checks; when it cannot, the failure ends with the fixed warning (keys only). The
+    failure stands even when that GET shows the POST applied."""
+    fake = _scripted(post, readback)
+    monkeypatch.setattr(llm, "_control_http", fake)
+    problem = llm.disable_hmem_injection()
+    assert problem == needle + shows
+    assert fake.requests == SETTER_REQUESTS  # exactly one best-effort GET after the POST, nothing more
+    assert "local-only" not in problem and "engine restart" not in problem  # values never printed
+    monkeypatch.setattr(llm, "_control_http", _scripted(post, readback))
+    monkeypatch.setattr(graph, "run_local", lambda *a, **k: pytest.fail("the graph must not start"))
+    assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
+    assert f"refusing to run: {needle}{shows}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("readback,needle", [
+    (BrokenPipeError(32, "Broken pipe"), f"cannot confirm H-MEM injection is off: GET /admin/setpoints on {FAKE_PIPE} failed (BrokenPipeError: [Errno 32] Broken pipe)"),
+    (ValueError("the control plane's response was cut short (3 of 500 body bytes)"), f"cannot confirm H-MEM injection is off: GET /admin/setpoints on {FAKE_PIPE} failed (ValueError: the control plane's response was cut short (3 of 500 body bytes))"),
+    ((404, {"setpoints": _APPLIED}), "cannot confirm H-MEM injection is off: GET /admin/setpoints answered HTTP 404"),
+    ({"setpoints": "garbage"}, "cannot confirm H-MEM injection is off: GET /admin/setpoints answered no readable setpoints document (a setpoints wrapper that is not an object (a str))"),
+])
+def test_failed_readback_after_a_2xx_post_says_the_post_may_have_applied(live, monkeypatch, tmp_path, capsys, readback, needle):
+    """Closing round 1: a read-back that failed after a 2xx POST (an exception, a non-2xx status, no readable document)
+    skipped the comparison and said nothing about the machine-wide change; the failure now ends with the fixed warning
+    naming the first GET's keys (values never printed), and no further request is sent."""
+    fake = _scripted((200, {"setpoints": _APPLIED, "engines_notified": 1}), readback)
+    monkeypatch.setattr(llm, "_control_http", fake)
+    problem = llm.disable_hmem_injection()
+    assert problem == f"{needle}; {MAY_HAVE_APPLIED}"
+    assert fake.requests == SETTER_REQUESTS and "local-only" not in problem and "other daemon setpoints" not in problem
+    monkeypatch.setattr(llm, "_control_http", _scripted((200, {"setpoints": _APPLIED}), readback))
+    monkeypatch.setattr(graph, "run_local", lambda *a, **k: pytest.fail("the graph must not start"))
+    assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
+    assert f"refusing to run: {needle}; {MAY_HAVE_APPLIED}" in capsys.readouterr().err
+
+
+def test_may_have_applied_warning_on_a_never_written_daemon(live, control):
+    """A daemon whose setpoints were never written has no other key to list; the warning still names hmemKnowledge."""
+    control(unwritten="wrapped", raise_on="readback")
+    assert llm.disable_hmem_injection().endswith(
+        "the POST may have been applied: check hmemKnowledge in Nightshift before retrying (no other setpoint was set before the POST)")
 
 
 def test_response_cut_by_a_broken_pipe_after_its_headers_is_not_an_empty_body(real_control_exchange, monkeypatch):
