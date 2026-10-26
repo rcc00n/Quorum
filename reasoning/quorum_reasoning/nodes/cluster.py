@@ -158,8 +158,14 @@ def run(state: RunState) -> dict:
     # Events form only from the edition window's documents, and a supersede chain (one URL re-fetched with a changed
     # hash) is one publication represented by its newest row: superseded versions stay in the state for the trace but
     # are not clustered, counted or listed (DECISIONS.md log 2026-10-24, chain-once rule).
-    docs = [d for d in state["documents"] if not d.get("from_previous_day") and not d.get("superseded")]
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): an official document marked `evidence_only` by plan's seed rule
+    # (no term of the topic in its title or abstract) is not clustered at all: it starts no event and joins none.
+    # Why: the owner's rule (DECISIONS.md › Sources) keeps it as evidence only; as a member of an event it would be
+    # judged in research round 1, give the event claims through extract and appear as a source of its roundup line.
+    # It stays in the state, so research round 2 and the fact-checker can still quote it.
+    docs = [d for d in state["documents"] if not d.get("from_previous_day") and not d.get("superseded") and not d.get("evidence_only")]
     folded = sum(1 for d in state["documents"] if d.get("superseded") and not d.get("from_previous_day"))
+    evidence_only = sum(1 for d in state["documents"] if d.get("evidence_only") and not d.get("from_previous_day"))
     merge_hi = float(config.get("clustering", "key_merge_overlap", 0.75))
     budget = int(config.get("clustering", "merge_questions_max", 80))
     errors: list[StepError] = []
@@ -291,10 +297,11 @@ def run(state: RunState) -> dict:
                 )
             )
         events.sort(key=lambda e: -len(e["document_ids"]))
-        previous = len(state["documents"]) - len(docs) - folded
+        previous = sum(1 for d in state["documents"] if d.get("from_previous_day"))
         s.decision = (
             f"{len(events)} events from {len(docs)} documents"
             + (f" ({previous} earlier-day documents held for evidence only)" if previous else "")
+            + (f" ({evidence_only} official documents held for evidence only by the seed rule; see plan)" if evidence_only else "")
             + (f" ({folded} superseded versions folded into their chains' newest rows)" if folded else "")
             + f"; {merged['auto']} key merges in code, "
             f"model: {asked['pair']} pair / {asked['singleton']} singleton / {asked['chain']} chain questions, "

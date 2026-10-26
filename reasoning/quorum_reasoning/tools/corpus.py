@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 from .. import config
 from ..state import DocRef
+from ..topic_match import parse_query_terms
 
 _FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 
@@ -104,6 +105,38 @@ def sql_pair(topic_id: str, start: str, end: str, db: str | None = None) -> tupl
           AND COALESCE(o.signed_at, o.published_at) < TIMESTAMP '{end}'
     """
     return docs_sql, official_sql
+
+
+def topic_terms_sql(topic_id: str, db: str | None = None) -> str:
+    """The statement that reads one topic's row (collectors/schema.sql `topics`). The slug is validated first: it is
+    the only value spliced into the SQL."""
+    if not _TOPIC_ID.match(topic_id or ""):
+        raise ValueError(f"topic_id must be a slug like russia-ukraine-war, got {topic_id!r}")
+    db = db or _zetaris_db()
+    return f"SELECT id, name, query_terms FROM {db}.topics WHERE id = '{topic_id}'"
+
+
+def load_topic_terms(topic_id: str) -> tuple[list[str] | None, str, bool]:
+    """(terms, why, failed): the run's topic terms as collection reads them (`topics.query_terms`), through Zetaris.
+
+    `terms` is None when they cannot be used: no row for the slug, an empty or unreadable `query_terms`, or a failed
+    lookup (`failed` True: the run records an error). `why` says which, for the plan's trace row; it never carries the
+    terms or the database's message.
+    """
+    sql = topic_terms_sql(topic_id)
+    try:
+        rows = list(_run_sql(sql, limit=5))
+    except Exception as exc:  # noqa: BLE001 — a failed lookup means no official seed; the plan row and an error say so
+        return None, f"topics lookup failed ({type(exc).__name__})", True
+    rows = [r for r in rows if str(r.get("id")) == topic_id]
+    if not rows:
+        return None, f"no topics row for {topic_id}", False
+    terms = parse_query_terms(rows[0].get("query_terms"))
+    if terms is None:
+        return None, "query_terms unreadable", False
+    if not terms:
+        return None, "query_terms empty", False
+    return terms, f"{len(terms)} query terms from {_zetaris_db()}.topics", False
 
 
 def _load_window(topic_id: str, start: str, end: str, *, previous: bool) -> list[DocRef]:

@@ -31,6 +31,8 @@ class DocRef(TypedDict):
     superseded: NotRequired[bool]  # a correction replaced this row: spread and coverage only, never evidence
     from_previous_day: NotRequired[bool]  # loaded from an earlier edition window for research round 2: evidence only, never an event, spread or coverage
     topic_match: NotRequired[str | None]  # title | lead | body — where collection's topic terms matched (documents.topic_match); counted in the trace, never used to filter
+    seed_match: NotRequired[str | None]  # official documents of the edition window, Zetaris corpus: title | lead (the abstract) where a term of the run's topic matched (topic_match.official_seed_match); None: nothing matched
+    evidence_only: NotRequired[bool]  # official document no topic term matched in title or abstract (or the terms were unavailable): evidence for research round 2 and the fact-checker only, never an event or a roundup item (DECISIONS.md › Sources)
     canonical_url: NotRequired[str | None]  # documents.canonical_url (tracking parameters stripped by collection)
     content_hash: NotRequired[str | None]  # documents.content_hash at collection: sha256(title + "\n" + lead + "\n" + body[:2000])
     fetched_at: NotRequired[str | None]  # when collection fetched the row (ISO 8601 UTC); official_docs.fetched_at for official rows
