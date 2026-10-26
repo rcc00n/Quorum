@@ -198,19 +198,208 @@ def test_abstract_is_the_federal_register_summary_paragraph():
     assert not topic_match.matches_topic(a, ["artificial intelligence"])  # a body-only term is not in the abstract
 
 
-def test_abstract_without_summary_starts_after_the_page_header_and_is_capped():
-    a = topic_match.official_abstract(FR_NO_SUMMARY)
-    assert a.startswith("LEGAL SERVICES EXAMPLE Sunshine Act Meetings TIME AND DATE")
-    assert "FR Doc" not in a and "=====" not in a and "-----" not in a
+def test_a_federal_register_document_without_a_summary_has_no_abstract():
+    # the Federal Register API's abstract is null for these documents: they are matched on their title alone
+    assert topic_match.official_abstract(FR_NO_SUMMARY) == ""  # recognised by its page header
+    assert topic_match.official_abstract("TIME AND DATE: Friday.", "federal-register") == ""  # or by its source
+    assert topic_match.official_abstract(FR_NO_SUMMARY, "whitehouse") == ""  # the header wins over a mislabelled source
+    assert topic_match.official_abstract(FR_RULE, "federal-register").startswith("The Office approves rules")
+
+
+def test_other_sources_fall_back_to_the_first_600_characters():
     long = "First Lady secures ceasefire in Oleshky. " + "More words follow here. " * 60
-    b = topic_match.official_abstract(long)
+    b = topic_match.official_abstract(long, "whitehouse")
     assert len(b) == topic_match.LEAD_MAX and b.startswith("First Lady secures ceasefire")
+    bill = "Expressing support for the withdrawal of the United States from the Paris Agreement.\n\nLatest action (2025-04-21): Referred to the House Committee on Foreign Affairs.\n\n"
+    assert topic_match.official_abstract(bill, "congress-gov") == " ".join(bill.split())
     assert topic_match.official_abstract(None) == "" and topic_match.official_abstract("") == ""
 
 
 def test_a_summary_word_inside_a_sentence_is_not_a_heading():
     text = "The report says SUMMARY: nothing here. Ukraine is mentioned in passing."
     assert topic_match.official_abstract(text) == text  # no SUMMARY heading at a line start: the first 600 characters
+
+
+# An executive order as the Federal Register prints it (official_docs 5934, tariffs-trade-war-china): no SUMMARY, and
+# its opening is the enacting clause, which cites "section 301 of title 3" (the President's delegation statute).
+FR_ORDER = """<html><body><pre>
+[Federal Register Volume 91, Number 167 (Monday, August 31, 2026)]
+[Presidential Documents]
+[Pages 55995-55999]
+From the Federal Register Online via the Government Publishing Office [<a href="http://www.gpo.gov">www.gpo.gov</a>]
+[FR Doc No: 2026-17843]
+
+
+
+
+                        Presidential Documents
+
+
+
+Federal Register / Vol. 91 , No. 167 / Monday, August 31, 2026 /
+Presidential Documents
+
+[[Page 55995]]
+
+
+                Executive Order 14421 of August 26, 2026
+
+
+Declaring a National Emergency To Secure the
+                United States Bulk-Power System
+
+                By the authority vested in me as President by the
+                Constitution and the laws of the United States of
+                America, including the International Emergency Economic
+                Powers Act (50 U.S.C. 1701 et seq.) (IEEPA), the
+                National Emergencies Act (50 U.S.C. 1601 et seq.)
+                (NEA), and section 301 of title 3, United States Code,
+                I hereby determine and order:
+
+                Section 1. National Emergency. As President of the
+                United States, my highest duty is protecting the
+                national security of this country.
+</pre></body></html>"""
+
+# The issue's cover page opens a presidential document (official_docs 5942): the titles of the other documents of the
+# same Part, one of them naming a term another topic could carry.
+FR_COVER = """<html><body><pre>
+[Federal Register Volume 91, Number 153 (Tuesday, August 11, 2026)]
+[Presidential Documents]
+[Pages 51975-51987]
+From the Federal Register Online via the Government Publishing Office [<a href="http://www.gpo.gov">www.gpo.gov</a>]
+[FR Doc No: 2026-16400]
+
+
+
+[[Page 51973]]
+
+Vol. 91
+
+Tuesday,
+
+No. 153
+
+August 11, 2026
+
+Part V
+
+
+
+
+
+The President
+
+
+
+
+
+-----------------------------------------------------------------------
+
+
+
+Proclamation 11052--Adjusting Imports of Polysilicon and Its
+Derivatives Into the United States
+
+
+
+Executive Order 14419--Ending Birth Tourism
+
+
+___________________________________________________________________
+
+Title 3--
+The President
+
+[[Page 51975]]
+
+                Proclamation 11052 of August 6, 2026
+
+Adjusting Imports of Polysilicon and Its
+                Derivatives Into the United States
+</pre></body></html>"""
+
+# A Sunshine Act notice (official_docs 6215, federal-budget-shutdown): no SUMMARY, an agenda with meeting dates
+FR_SUNSHINE = FR_NO_SUMMARY.replace("TIME AND DATE: The Board meets on Friday.", "DATES AND TIME: Every second Wednesday through Fiscal \nYear 2027.")
+
+# The same kind of order as a White House release (official_docs 5898): no page header, the enacting clause first
+WH_ORDER = (
+    "Executive Order 14436\n\nBy the authority vested in me as President by the Constitution and the laws of the United States of America, "
+    "including the Lindsey O. Graham Sanctioning Russia and Iran Act of 2026 (22 U.S.C. 10802 et seq . ) (Graham Act), and section 301 "
+    "of title 3, United States Code, I hereby determine and order:\n\nSection 1 . Background . On September 18, 2026, I signed the Graham "
+    "Act into law. The Graham Act provides for duties on goods imported from the Russian Federation.\n"
+)
+
+
+def _doc(title: str, text: str, source: str = "federal-register") -> dict:
+    return {"title": title, "lead": "", "text": text, "source_id": source}
+
+
+@pytest.mark.parametrize("source", ["federal-register", None])
+def test_an_order_printed_in_the_federal_register_is_matched_on_its_title_only(source):
+    title = "Declaring a National Emergency To Secure the United States Bulk-Power System"
+    assert topic_match.official_abstract(FR_ORDER, source) == ""
+    assert topic_match.official_seed_match(_doc(title, FR_ORDER, source), ["section 301"]) is None  # the enacting clause seeds nothing
+    assert topic_match.official_seed_match(_doc(title, FR_ORDER, source), ["bulk-power system"]) == "title"
+
+
+def test_the_cover_page_list_of_other_documents_seeds_nothing():
+    title = "Adjusting Imports of Polysilicon and Its Derivatives Into the United States"
+    assert topic_match.official_seed_match(_doc(title, FR_COVER), ["birth tourism"]) is None  # another document's title
+    assert topic_match.official_seed_match(_doc(title, FR_COVER), ["polysilicon"]) == "title"
+
+
+def test_a_meeting_agenda_without_a_summary_seeds_nothing():
+    assert topic_match.official_seed_match(_doc("Sunshine Act Meetings Notice", FR_SUNSHINE), ["fiscal year"]) is None
+    headerless = "DATES AND TIME: Every second Wednesday through Fiscal Year 2027."  # the row's source alone says Federal Register
+    assert topic_match.official_seed_match(_doc("Sunshine Act Meetings Notice", headerless), ["fiscal year"]) is None
+    assert topic_match.official_seed_match(_doc("Board notice", headerless, "congress-gov"), ["fiscal year"]) == "lead"
+
+
+def test_a_white_house_order_loses_its_enacting_clause_but_keeps_its_text():
+    a = topic_match.official_abstract(WH_ORDER, "whitehouse")
+    assert a.startswith("Executive Order 14436 Section 1 . Background . On September 18, 2026")
+    assert "authority vested" not in a and "title 3" not in a
+    title = "Implementing the Lindsey O. Graham Sanctioning Russia and Iran Act of 2026"
+    assert topic_match.official_seed_match(_doc(title, WH_ORDER, "whitehouse"), ["section 301"]) is None
+    assert topic_match.official_seed_match(_doc(title, WH_ORDER, "whitehouse"), ["Russian Federation"]) == "lead"
+
+
+def test_only_the_enacting_clause_up_to_its_colon_is_dropped():
+    proclaim = ("NOW, THEREFORE, I, the President, by virtue of the authority vested in me by the Constitution and the laws of the "
+                "United States, do hereby proclaim November 2026 as National Ukraine Remembrance Month.")
+    assert topic_match.official_abstract(proclaim, "whitehouse") == proclaim  # a proclamation's operative sentence stays
+    no_colon = "By the authority vested in me as President, I order a review of Ukraine aid.\n\nSection 2. More."
+    assert topic_match.official_abstract(no_colon, "whitehouse") == "By the authority vested in me as President, I order a review of Ukraine aid. Section 2. More."
+
+
+FR_SUMMARY_ACROSS_A_PAGE = """[FR Doc No: 2026-15000]
+
+SUMMARY: FRA proposes that each railroad carrier conducting a
+triennial examination of skill performance, and an annual
+
+[[Page 48346]]
+
+operational monitoring observation, conduct those examinations. FRA
+proposes to codify limitations on operations at the southern border.
+
+DATES: Written comments must be received on or before September 29,
+2026.
+"""
+
+
+def test_a_summary_crossing_a_page_break_is_read_whole():
+    a = topic_match.official_abstract(FR_SUMMARY_ACROSS_A_PAGE, "federal-register")
+    assert "and an annual operational monitoring observation" in a and "[[Page" not in a
+    assert a.endswith("limitations on operations at the southern border.") and "Written comments" not in a
+    title = "Qualification and Certification of Locomotive Engineers and Conductors"
+    assert topic_match.official_seed_match(_doc(title, FR_SUMMARY_ACROSS_A_PAGE), ["southern border"]) == "lead"
+
+
+def test_a_page_break_just_before_the_dates_heading_keeps_dates_out_of_the_abstract():
+    text = "SUMMARY: The rule is short.\n\n[[Page 2]]\n\nDATES: Comments on Ukraine are due in November.\n"
+    assert topic_match.official_abstract(text, "federal-register") == "The rule is short."
+    assert topic_match.official_seed_match(_doc("Example rule", text), ["Ukraine"]) is None
 
 
 # --- the seed flags -----------------------------------------------------------------------------------------
@@ -386,29 +575,111 @@ def test_fixture_corpus_keeps_every_official_document_as_a_seed(monkeypatch):
     assert not any("evidence_only" in d for d in out["documents"])
 
 
-# --- cluster and research: evidence only, never a seed ------------------------------------------------------
+# --- cluster and research: an evidence-only document may join an event, never start one ------------------------
 
 
-def test_evidence_only_official_documents_start_no_event_and_join_none_but_stay_round_2_candidates(monkeypatch):
+def test_an_evidence_only_document_in_no_event_stays_a_round_2_candidate():
     docs, _ = topic_match.official_seed_flags(_day(), TERMS)
     st = _zetaris_state(docs)
-    keyed: list[int] = []
-    real_key = cluster._key_payload
-
-    def spy(doc, *, dry_run):
-        keyed.append(doc["id"])
-        return real_key(doc, dry_run=dry_run)
-
-    monkeypatch.setattr(cluster, "_key_payload", spy)
     out = cluster.run(st)
     off = corpus.OFFICIAL_ID_OFFSET
     members = {i for e in out["events"] for i in e["document_ids"]}
-    assert off + 12 not in members and off + 12 not in keyed, "an evidence-only document is not even keyed"
+    assert off + 12 not in members  # the Ohio notice shares nothing with the day's chip stories: alone, so dropped
     assert off + 13 not in members  # earlier day, as before
     assert {off + 10, off + 11} <= members  # seed-eligible official documents still seed
-    assert "(1 official documents held for evidence only by the seed rule; see plan)" in out["steps"][0]["decision"]
-    assert "(1 earlier-day documents held for evidence only)" in out["steps"][0]["decision"]
+    decision = out["steps"][0]["decision"]
+    assert "(1 official documents evidence only by the seed rule, see plan: 0 joined an event, 1 in no event, 1 group(s) with no seed member dropped)" in decision
+    assert decision.startswith("4 events from 4 documents (1 earlier-day documents held for evidence only)")
     st["events"] = out["events"]
     for e in out["events"]:
         pool = {d["id"] for d in research._candidates(st, e["document_ids"], 2)}
         assert off + 12 in pool, "research round 2 may still quote it"
+
+
+def _key(title: str, *objects: str, action: str = "") -> dict:
+    return {"canonical": title, "actors": [], "action": action, "object": list(objects), "place": [], "date": None, "numbers": []}
+
+
+def _held(doc_id: int, title: str) -> DocRef:
+    d = _official(doc_id, title, "")
+    d["seed_match"], d["evidence_only"] = None, True
+    return d
+
+
+def _fake_model(monkeypatch, keys: dict[int, dict], same: set[frozenset]) -> list[tuple[str, list[str], list[str]]]:
+    """Event keys by document id; a merge question answers yes when a title on one side and one on the other are a
+    pair in `same`. Returns the questions asked as (mode, titles of side a, titles of side b)."""
+    asked: list[tuple[str, list[str], list[str]]] = []
+
+    def fake(task, payload, *, dry_run, which="default"):
+        if task == "event_key":
+            return keys[payload["id"]]
+        assert task == "merge_confirm", task
+        a, b = payload["a"], payload["b"]
+        ta, tb = a.get("member_titles") or [a["title"]], b.get("member_titles") or [b["title"]]
+        asked.append((payload["mode"], ta, tb))
+        return {"same_event": any(frozenset((x, y)) in same for x in ta for y in tb)}
+
+    monkeypatch.setattr(cluster.llm, "json_task", fake)
+    return asked
+
+
+OFF = corpus.OFFICIAL_ID_OFFSET
+
+
+def test_an_evidence_only_document_joins_an_outlet_event_and_a_group_without_a_seed_is_dropped(monkeypatch):
+    rule, ohio, sunshine, nasdaq, nyse, panel = (
+        "Revisions to the Export Administration Regulations", "Ohio Regulatory Program", "Sunshine Act Meetings",
+        "Nasdaq Texas filing", "NYSE Arca notice", "Closed meeting of the review panel",
+    )
+    docs = [
+        _outlet(1, "Commerce adopts chip export rule"),
+        _outlet(2, "Lawmakers question chip rule", source="foxnews"),
+        _held(21, rule), _held(22, ohio), _held(23, sunshine), _held(24, sunshine), _held(25, sunshine),
+        _held(26, nasdaq), _held(27, nyse), _held(28, panel),
+    ]
+    keys = {
+        1: _key("Commerce adopts chip export rule", "commerce", "chip", "export", "rule", action="adopt"),
+        2: _key("Lawmakers question chip rule", "lawmakers", "chip"),
+        OFF + 21: _key(rule, "commerce", "export", "administration", "regulations", "entity", action="adopt"),
+        OFF + 22: _key(ohio, "ohio", "program"),
+        OFF + 23: _key(sunshine, "board", "meeting", "agenda"),
+        OFF + 24: _key(sunshine, "board", "meeting", "agenda"),
+        OFF + 25: _key(sunshine, "board", "meeting", "agenda"),
+        OFF + 26: _key(nasdaq, "nasdaq", "filing", "exchange", "texas"),
+        OFF + 27: _key(nyse, "nyse", "filing", "exchange", "arca", "listing"),
+        OFF + 28: _key(panel, "meeting", "panel", "review", "grant"),
+    }
+    asked = _fake_model(monkeypatch, keys, {frozenset(("Commerce adopts chip export rule", rule))})
+    out = cluster.run(_zetaris_state(docs))
+    groups = sorted(sorted(e["document_ids"]) for e in out["events"])
+    assert groups == [[1, OFF + 21], [2]], "the rule joins the outlet event that reports it; nothing else becomes an event"
+    held_titles = {rule, ohio, sunshine, nasdaq, nyse, panel}
+    assert asked and all(not (set(a) <= held_titles and set(b) <= held_titles) for _, a, b in asked), "no question without a seed side"
+    assert ("pair", ["Commerce adopts chip export rule"], [rule]) in asked
+    decision = out["steps"][0]["decision"]
+    assert decision.startswith("2 events from 3 documents (8 official documents evidence only by the seed rule, see plan: 1 joined an event, "
+                               "7 in no event, 5 group(s) with no seed member dropped)")
+    assert "no seed member on either side (pair 4 / singleton 1 / chain 1)" in decision
+
+
+def test_an_outlet_document_may_join_a_group_of_evidence_only_documents(monkeypatch):
+    sunshine = "Sunshine Act Meetings"
+    docs = [_outlet(3, "Board meeting leak worries staff"), _held(23, sunshine), _held(24, sunshine), _held(25, sunshine)]
+    keys = {3: _key("Board meeting leak worries staff", "board", "meeting", "leak", "staff")}
+    keys.update({OFF + i: _key(sunshine, "board", "meeting", "agenda") for i in (23, 24, 25)})
+    asked = _fake_model(monkeypatch, keys, {frozenset(("Board meeting leak worries staff", sunshine)), frozenset((sunshine, sunshine))})
+    out = cluster.run(_zetaris_state(docs))
+    assert [sorted(e["document_ids"]) for e in out["events"]] == [[3, OFF + 23, OFF + 24, OFF + 25]]
+    assert [m for m, _, _ in asked].count("chain") == 1, "a group with a seed member is still chain-checked"
+    assert "(3 official documents evidence only by the seed rule, see plan: 3 joined an event, 0 in no event)" in out["steps"][0]["decision"]
+
+
+def test_a_window_of_evidence_only_documents_clusters_nothing(monkeypatch):
+    asked = _fake_model(monkeypatch, {}, set())  # any event-key call would raise KeyError
+    out = cluster.run(_zetaris_state([_held(22, "Ohio Regulatory Program"), _held(23, "Sunshine Act Meetings")]))
+    assert out["events"] == [] and asked == [] and out["errors"] == []
+    assert out["steps"][0]["decision"].startswith(
+        "0 events from 0 documents (2 official documents evidence only by the seed rule, see plan: 0 joined an event, 2 in no event; "
+        "no seed document in the window, nothing clustered)"
+    )

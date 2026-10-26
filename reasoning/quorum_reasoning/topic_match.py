@@ -146,30 +146,50 @@ _SUMMARY = re.compile(r"^[ \t]*SUMMARY:[ \t]*(.+?)(?=\n[ \t]*\n|\n[ \t]*[A-Z][A-
 # The Federal Register's page header ends with the "[FR Doc No: ...]" line; separator rules are runs of - or =.
 _FR_HEADER_END = re.compile(r"^\s*\[FR Doc No:[^\]\n]*\]\s*$", re.M)
 _RULE = re.compile(r"[-=]{5,}")
+# The Federal Register's plain text sets every page break, "[[Page N]]", between blank lines, also inside a paragraph:
+# the marker goes together with the blank lines around it, so the paragraph it cut reads on as one.
+_PAGE_BREAK = re.compile(r"\n[ \t]*\n[ \t]*\[\[Page \d+\]\][ \t]*\n(?:[ \t]*\n)*")
+_PAGE_MARK = re.compile(r"\[\[Page \d+\]\]")
+# The enacting clause that opens an executive order or a memorandum ("By the authority vested in me as President by the
+# Constitution and the laws of the United States of America, including ... section 301 of title 3, United States Code,
+# it is hereby ordered:"): statutes cited as authority, not what the order does. Up to its colon, inside one paragraph.
+_AUTHORITY = re.compile(r"\bBy the authority vested in me\b(?:(?!\n[ \t]*\n)[^:]){0,1500}:", re.I)
+FEDERAL_REGISTER = "federal-register"  # collectors/sources.csv id of the Federal Register
 LEAD_MAX = 600  # collection's cap on documents.lead (collectors/common.py LEAD_MAX)
 ABSTRACT_MAX = 4000  # a safety bound on the SUMMARY paragraph; Federal Register summaries run to ~2 000 characters
 
 
-def official_abstract(text: str | None) -> str:
+def official_abstract(text: str | None, source_id: str | None = None) -> str:
     """The abstract of an official document, for the seed rule: its "SUMMARY:" paragraph when it has one (Federal
-    Register rules, proposed rules and notices), else its first LEAD_MAX characters after the Federal Register page
-    header, if any (a presidential document's opening; a bill's title, latest action and the start of its summary; a
-    White House release's opening). Tags are stripped, entities unescaped and whitespace collapsed, as collection's
-    `clean_field` does for a lead, so a term broken over a line still matches.
+    Register rules, proposed rules and notices). A Federal Register document without one (source `federal-register`,
+    or a text carrying the Federal Register page header) has no abstract: "" (presidential documents, Sunshine Act and
+    filing notices). Any other document's abstract is its first LEAD_MAX characters (a bill's title, latest action and
+    the start of its summary; a White House release's opening), an executive order's enacting clause left out. Tags
+    are stripped, entities unescaped, page-break markers removed and whitespace collapsed, as collection's
+    `clean_field` does for a lead, so a term broken over a line or a page still matches.
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): reasoning derives the abstract from `official_docs.full_text`.
     Why: official_docs stores no abstract column and the corpus SQL delivers `lead` empty for official rows; the
     Federal Register API's `abstract` field is the document's SUMMARY paragraph, so the same text is recovered from the
     raw text collection stored. The first-600-characters fallback mirrors collection's lead cap.
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; review round 1): page-break markers are removed with the blank
+    lines around them before the SUMMARY is read; a Federal Register document without a SUMMARY is matched on its title
+    alone; the "By the authority vested in me ...:" clause is dropped from the fallback. Why: a SUMMARY crossing a page
+    break was cut mid-sentence (official_docs 6108 lost "southern border"); the API's abstract is null for those
+    documents, and their first 600 characters are the issue's cover page (titles of the other documents in the same
+    Part), an order's enacting clause ("section 301 of title 3" seeded tariffs-trade-war-china) or a meeting agenda
+    ("Fiscal Year 2027" seeded federal-budget-shutdown). See docs/DECISIONS.md › Sources (official documents: seed rule).
     """
     if not text:
         return ""
     cleaned = html.unescape(_TAGS.sub(" ", _CONTROL.sub("", text)))
+    cleaned = _PAGE_MARK.sub(" ", _PAGE_BREAK.sub("\n", cleaned))
     m = _SUMMARY.search(cleaned)
     if m:
         return " ".join(m.group(1).split())[:ABSTRACT_MAX]
-    header = _FR_HEADER_END.search(cleaned[:2000])
-    body = cleaned[header.end():] if header else cleaned
+    if source_id == FEDERAL_REGISTER or _FR_HEADER_END.search(cleaned[:2000]):
+        return ""
+    body = _AUTHORITY.sub(" ", cleaned)
     return " ".join(_RULE.sub(" ", body).split())[:LEAD_MAX]
 
 
@@ -181,14 +201,16 @@ def official_seed_match(doc: DocRef, terms: list[str] | None) -> str | None:
     neither carries one, or when the topic's terms are unknown (None or empty: nothing can match)."""
     if not terms:
         return None
-    return topic_match_of(doc.get("title") or "", doc.get("lead") or official_abstract(doc.get("text")), terms)
+    lead = doc.get("lead") or official_abstract(doc.get("text"), doc.get("source_id"))
+    return topic_match_of(doc.get("title") or "", lead, terms)
 
 
 def official_seed_flags(docs: list[DocRef], terms: list[str] | None) -> tuple[list[DocRef], dict[str, int]]:
     """The documents with the seed rule applied to every official document of the edition window: `seed_match`
     ('title' | 'lead' | None) and `evidence_only` (True when nothing matched: research round 2 and the fact-checker
-    may still use it, but it starts no event and is never a roundup item by itself). Earlier-day documents are left
-    as they are (never an event anyway). Returns copies, never the caller's dicts, and the counts for the trace."""
+    may still use it, and it may join an event a seed document started, but it starts no event and is never a roundup
+    item by itself; nodes/cluster.py). Earlier-day documents are left as they are (never an event anyway). Returns
+    copies, never the caller's dicts, and the counts for the trace."""
     out: list[DocRef] = []
     counts = {"official": 0, "title": 0, "lead": 0, "evidence_only": 0}
     for d in docs:

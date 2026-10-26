@@ -119,10 +119,13 @@ def test_a_window_of_off_topic_official_documents_only_has_no_event_and_says_why
     assert snap["roundup"]["count"] == 0
     assert "official documents: 2 total, 0 seed-eligible (title 0 / abstract 0), 2 evidence only" in _plan_row(state)["decision"]
     clustered = next(s for s in state["steps"] if s["node"] == "cluster")
-    assert clustered["decision"].startswith("0 events from 0 documents (2 official documents held for evidence only by the seed rule; see plan)")
+    assert clustered["decision"].startswith(
+        "0 events from 0 documents (2 official documents evidence only by the seed rule, see plan: 0 joined an event, 2 in no event; "
+        "no seed document in the window, nothing clustered)"
+    )
 
 
-def test_a_topic_without_a_row_keeps_its_official_documents_as_evidence(monkeypatch):
+def test_a_topic_without_a_row_seeds_no_official_event_but_its_document_may_join_the_outlet_story(monkeypatch):
     docs = [_row(1, "cnn", "Mars sample return mission faces cuts", "NASA weighs options for the sample return.")]
     official = [_official(9, "Mars Sample Return Program Review", "SUMMARY: NASA reviews the Mars sample return program.\n", src="nasa")]
     _fake_zetaris(monkeypatch, topic_row=None, documents=docs, official=official)
@@ -130,7 +133,20 @@ def test_a_topic_without_a_row_keeps_its_official_documents_as_evidence(monkeypa
     row = _plan_row(state)
     assert "1 evidence only (topic terms unavailable: no topics row for mars-sample-return-mission; no official document seeds an event)" in row["decision"]
     assert state["snapshot"]["errors"] == [] and len(state["events"]) == 1
-    assert corpus.OFFICIAL_ID_OFFSET + 9 not in state["events"][0]["document_ids"]
+    assert state["events"][0]["document_ids"] == [1, corpus.OFFICIAL_ID_OFFSET + 9], "the review joins the outlet's event; it starts none"
+    assert state["snapshot"]["roundup"]["count"] == 1
+    cluster_row = next(s for s in state["steps"] if s["node"] == "cluster")
+    assert "(1 official documents evidence only by the seed rule, see plan: 1 joined an event, 0 in no event)" in cluster_row["decision"]
+
+
+def test_an_evidence_only_document_alone_on_its_subject_is_no_roundup_item(monkeypatch):
+    docs = [_row(1, "cnn", "UN climate talks stall over finance", "Negotiators failed to agree on emissions targets.")]
+    official = [_official(9, "Mars Sample Return Program Review", "SUMMARY: NASA reviews the Mars sample return program.\n", src="nasa")]
+    _fake_zetaris(monkeypatch, topic_row={"id": "climate-policy", "name": "Climate policy", "query_terms": "{climate,emissions}"}, documents=docs, official=official)
+    state = _run("climate-policy")
+    assert [e["document_ids"] for e in state["events"]] == [[1]]
+    cited = {s["url"] for i in _roundup_items(state["snapshot"]) for s in i["sources"]}
+    assert cited == {docs[0]["url"]} and state["snapshot"]["roundup"]["count"] == 1
 
 
 def test_a_failed_topics_lookup_makes_the_run_partial_not_a_crash(monkeypatch):
@@ -151,7 +167,7 @@ def test_a_failed_topics_lookup_makes_the_run_partial_not_a_crash(monkeypatch):
     snap = state["snapshot"]
     assert snap["status"] == "partial"
     assert any(e["node"] == "plan" and "topics lookup failed (RuntimeError)" in e["message"] for e in snap["errors"])
-    assert all(corpus.OFFICIAL_ID_OFFSET + 10 not in e["document_ids"] for e in state["events"])
+    assert state["events"] and all(1 in e["document_ids"] for e in state["events"]), "the official document seeds no event of its own"
 
 
 @pytest.mark.parametrize("phrase", ["Mars sample return mission", "Élections en Côte d’Ivoire", "Выборы в Молдове", "北京"])
