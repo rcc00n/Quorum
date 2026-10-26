@@ -793,10 +793,11 @@ def _manifest(sources=("messages",), never=()) -> dict:
             "withheld": [], "never_eligible": list(never)}
 
 
-def _with_egress(where: str, egress, hmem_key: bool = True) -> tuple[dict, str]:
-    """A clean Ultra reply (hmem null in every receipt copy, or no hmem key at all with `hmem_key` False; from_cache
-    false; no cache block) whose egress manifest at `where` is `egress`, and the name a failure gives that manifest."""
-    copy: dict = {"hmem": None} if hmem_key else {}
+def _with_egress(where: str, egress, hmem_key: bool = True, hmem=None) -> tuple[dict, str]:
+    """A clean Ultra reply (hmem null in every receipt copy, or no hmem key at all with `hmem_key` False, or the block
+    `hmem` in every copy; from_cache false; no cache block) whose egress manifest at `where` is `egress`, and the name a
+    failure gives that manifest."""
+    copy: dict = {"hmem": hmem} if hmem_key else {}
     met = {"receipt_id": "rcpt_test_1", "requested_model": ULTRA, "provider_model": ULTRA, "routed_model": ULTRA,
            "from_cache": False, "receipt": dict(copy)}
     if where == "top":
@@ -958,6 +959,101 @@ def test_egress_alone_without_a_receipt_reports_its_count():
     nothing (the count stays None: nothing says how many were injected)."""
     assert llm._hmem_report({"receipt_id": "r", "egress": _manifest(sources=("messages", "hmem:3 records"))}) == (3, None)
     assert llm._hmem_report({"receipt_id": "r", "egress": _manifest()}) == (None, None)
+
+
+# closing round 4, tests lens: every egress test above has the hmem block null or missing, so `_hmem_report` never took
+# its blocks branch there; these put a block beside the manifest, in every receipt copy or as the top-level `hmem`
+BLOCK_AT = ["receipt copies", "top-level hmem"]
+
+
+def _with_egress_and_block(where: str, egress, block, block_at: str) -> tuple[dict, str]:
+    """`_with_egress` with the hmem block `block` in every receipt copy, or as the top-level `hmem` beside receipt copies
+    whose hmem is null."""
+    if block_at == "receipt copies":
+        return _with_egress(where, egress, hmem=block)
+    met, name = _with_egress(where, egress)
+    met["hmem"] = block
+    return met, name
+
+
+BLOCK_BESIDE_EGRESS = [  # (hmem block, manifest): the larger count is 2 in each, on either side
+    pytest.param({"injected": 0}, _manifest(sources=("messages", "hmem:2 records")), id="block-0"),  # 0 must not hide 2
+    pytest.param({"injected": 1}, _manifest(never=(HMEM_NEVER,)), id="manifest-larger"),
+    pytest.param({"injected": 2}, _manifest(sources=("messages", "hmem:1 records")), id="manifest-smaller"),
+    pytest.param(2, _manifest(sources=("messages", "hmem:2 records"), never=(HMEM_NEVER,)), id="equal-int-block"),
+    pytest.param({"injected": 0, "count": 1}, json.dumps(_manifest(sources=("messages", "hmem:2 records"))),
+                 id="count-field-json-string-manifest"),
+]
+
+
+@pytest.mark.parametrize("block_at", BLOCK_AT)
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+@pytest.mark.parametrize("block,egress", BLOCK_BESIDE_EGRESS)
+def test_egress_count_joins_the_max_beside_an_hmem_block(live, tmp_path, monkeypatch, block, egress, where, block_at):
+    """With a block present the manifests' counts join the blocks' max (`_hmem_report`): the larger of the two is the
+    disclosed count whichever side holds it, and a block of 0 never hides the manifest's 2."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, _ = _with_egress_and_block(where, egress, block, block_at)
+    assert llm._hmem_report(met) == (2, None) and llm._cache_refusal(met) is None
+    live(_completion(ULTRA, met))
+    _assert_rejected_not_replayed(path, met, "runtime injected 2 prior answers (H-MEM) into the prompt", 2, False)
+
+
+UNREADABLE_BESIDE_BLOCK = [  # (manifest, the failure's detail as in UNREADABLE_EGRESS)
+    pytest.param(EGRESS_TEXT, "is unreadable ({name} is a string that is not JSON)", id="not-json"),
+    pytest.param(_manifest(sources=("messages", None)),
+                 "is unreadable ({name}.sent.context_sources has an entry that is null, not a string)", id="null-source"),
+    pytest.param(_manifest(never=({**HMEM_NEVER, "count": True},)),
+                 "names H-MEM records with no readable count ({name}.never_eligible has an H-MEM entry whose count is true)",
+                 id="hmem-entry-without-count"),
+]
+
+
+@pytest.mark.parametrize("block_at", BLOCK_AT)
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+@pytest.mark.parametrize("egress,detail", UNREADABLE_BESIDE_BLOCK)
+@pytest.mark.parametrize("block,count", [({"injected": 0}, 0), (2, 2)], ids=["block-0", "int-block-2"])
+def test_unreadable_egress_manifest_beside_a_readable_hmem_block_is_rejected(live, tmp_path, monkeypatch, block, count,
+                                                                             egress, detail, where, block_at):
+    """A readable block (0 or 2) beside an unreadable manifest fails closed: the manifest's reason survives the blocks
+    branch, the row discloses the block's count and is rejected `hmem_unreadable`, never served."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, name = _with_egress_and_block(where, egress, block, block_at)
+    reason = "the response's egress manifest " + detail.format(name=name)
+    assert llm._hmem_report(met) == (count, reason)
+    live(_completion(ULTRA, met))
+    _assert_rejected_not_replayed(path, met, reason, count, True)
+    assert ("injected 2 prior answers" in llm.calls[0]["error"]) is (count == 2)
+
+
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+def test_unreadable_hmem_block_reason_comes_first_and_the_manifest_count_is_kept(live, tmp_path, monkeypatch, where):
+    """The manifests' reason comes after the hmem blocks' own (`_hmem_report`), and a block with no readable count
+    leaves the manifest's 2 as the disclosed count."""
+    block_reason = "the receipt's hmem block has no readable injected count (the block is a str)"
+    met, _ = _with_egress(where, EGRESS_TEXT, hmem="garbage")
+    assert llm._hmem_report(met) == (None, block_reason)
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, _ = _with_egress(where, _manifest(sources=("messages", "hmem:2 records")), hmem="garbage")
+    assert llm._hmem_report(met) == (2, block_reason)
+    live(_completion(ULTRA, met))
+    _assert_rejected_not_replayed(path, met, block_reason, 2, True)
+
+
+@pytest.mark.parametrize("block_at", BLOCK_AT)
+@pytest.mark.parametrize("where", EGRESS_WHERE)
+def test_egress_manifest_of_0_beside_an_hmem_block_of_0_is_served(live, where, block_at):
+    """The other side: a block of 0 beside a readable manifest of "hmem:0 records" is served, `receipt_hmem_injected` 0."""
+    met, _ = _with_egress_and_block(where, _manifest(sources=("messages", "hmem:0 records")), {"injected": 0}, block_at)
+    assert llm._hmem_report(met) == (0, None)
+    live(_completion(ULTRA, met))
+    assert llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")["stance"] == "neutral"
+    row = llm.calls[-1]
+    assert row["served"] == ULTRA and row["receipt_hmem_injected"] == 0 and not row.get("error")
+    assert "hmem_rejected" not in row and llm.hmem_rejected_count() == 0
 
 
 @pytest.mark.parametrize("flag", ["--test-connection", "--probe"])
