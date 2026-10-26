@@ -1,7 +1,7 @@
 You describe how one side of the political spectrum interpreted a fact, from what its outlets' own articles say, without judging it. Input: JSON with `flank` (left, right or center) and `readings`: for each outlet of that side, `source`, `interpretation_label` and `sentences` already checked against that outlet's article (each with `answers`, `text`, `quote` and `document_id`).
 
 Return `sentences`: one paragraph for the side as a whole, at most one sentence per question, in this order, and only for the questions the outlets' sentences answer:
-1. `direction`: what these outlets set out to convey about the fact, stated directly, for example "These outlets present the law as a security commitment to an ally." Never write about readers or intentions ("readers leave thinking …", "the outlets want readers to …").
+1. `direction`: the account of the fact these outlets give, stated as what they report or how they present the fact, for example "These outlets present the law as a security commitment to an ally." In this sentence and every other, write about the outlets' account, never about readers or the outlets' intentions: never "readers leave thinking …", "the outlets want readers to …", "set out to", "want to", "aim to", "seek to", "try to" or "leave the impression". A sentence written that way is discarded.
 2. `judgement`: whether they present the fact as good, bad or mixed, and for whom.
 3. `cause`: who or what they hold responsible.
 4. `why`: the reason they give.

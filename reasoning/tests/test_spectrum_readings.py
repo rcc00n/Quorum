@@ -86,6 +86,7 @@ def validate_readings(readings: object) -> None:
     assert order == sorted(order)  # left, right, center; within a flank its own entry before the outlet entries
     flank_entries = [f for f, outlet in order if not outlet]
     assert len(flank_entries) == len(set(flank_entries))
+    assert all(f in flank_entries for f, outlet in order if outlet)  # an outlet entry never appears without its flank's
 
 
 TEXT_L1 = (
@@ -473,6 +474,18 @@ def test_one_sentence_per_question_known_questions_only_and_text_clipped(monkeyp
     "It leaves its audience with the impression of a harsh rule.",
     "The article leaves you thinking the rule is harsh.",
     "Left One wants you to fear the rule.",
+    # review round 2: intention + framing verb, and "the impression", the phrasings the prompts now name as never
+    "These outlets set out to convey that the law protects an ally.",
+    "The outlet wants to show the rule as cruel.",
+    "Fox News seeks to frame the bill as a cost.",
+    "The outlet aims to paint the rule as cruel.",
+    "CNN tries to cast the law as a commitment.",
+    "The outlet leaves the impression that the rule is cruel.",
+    "The outlet sets out to show that the rule is cruel.",
+    "The goal of the article is to portray the rule as cruel.",
+    "The article is designed to make the rule look cruel.",
+    "The piece gives the impression of a harsh rule.",
+    "The outlet's aim is to present the administration's rule as cruel.",
 ])
 def test_a_sentence_about_readers_is_dropped(monkeypatch, text):
     _flag(monkeypatch, "on")
@@ -485,9 +498,32 @@ def test_a_sentence_about_readers_is_dropped(monkeypatch, text):
     assert {"text": text, "reason": "Left One: written about readers, not stated directly (direction)"} in rec["detail"]
 
 
-def test_a_direct_direction_sentence_passes_the_guard():
-    assert frame._READER_META.search("Left One presents the rule as a risk to families.") is None
-    assert frame._READER_META.search("Officials say the rule aims to make screening faster.") is None  # an aim of the rule, not of the outlet
+@pytest.mark.parametrize("text", [
+    "Left One presents the rule as a risk to families.",
+    "These outlets present the law as a security commitment to an ally.",  # the prompts' own example
+    "Officials say the rule aims to make screening faster.",  # an aim of the rule, not of the outlet
+    "It says the rule is meant to reduce crossings.",
+    "It says the administration wants to cut crossings.",
+    "The rule's aim is to reduce crossings at the border.",
+    "It gives the reason the article states.",  # the dry stand-in's why sentence
+    "Fox News presents the bill as a cost to taxpayers and blames Congress.",
+])
+def test_a_direct_sentence_passes_the_guard(text):
+    assert frame._READER_META.search(text) is None
+
+
+def test_the_prompts_describe_direction_without_the_phrasing_the_guard_drops():
+    """A model that mirrors the field description must not write a sentence the guard drops: the description and its
+    example pass the guard, and the phrasings it drops are named after "never"."""
+    for name, never in (("frame_reading.md", ("sets out to", "wants to", "aims to", "seeks to", "tries to", "leaves the impression")),
+                        ("frame_flank_reading.md", ("set out to", "want to", "aim to", "seek to", "try to", "leave the impression"))):
+        line = next(ln for ln in (PROMPTS / name).read_text(encoding="utf-8").splitlines() if "`direction`:" in ln)
+        description, _, forbidden = line.partition("never about readers")
+        assert forbidden, name
+        assert frame._READER_META.search(description.split("`direction`:", 1)[1]) is None, name
+        assert "set out to convey" not in description and "sets out to convey" not in description
+        for phrase in never:
+            assert f'"{phrase}"' in forbidden, (name, phrase)
 
 
 # --- flanks: the one-outlet rule, the flank call and where outlets differ ---------------------------------------
@@ -575,6 +611,62 @@ def test_outlet_entries_appear_only_where_the_flanks_outlets_differ(monkeypatch)
     assert _entry(framing["readings"], "left", "Left Two")["unanswered"] == ["direction", "cause", "why", "next"]
     assert "(2 outlet entries)" in rec["decision"]
     validate_readings(framing["readings"])
+
+
+@pytest.mark.parametrize("flank_reply, failed", [
+    (RuntimeError("model route returned HTTP 503"), True),  # the flank call fails
+    ({"sentences": [{"answers": "direction", "text": "Left outlets present the rule as a risk.", "quote": "not an input quote at all", "document_id": 1}]}, False),  # nothing survives
+    ({"sentences": []}, False),
+])
+def test_outlet_entries_are_withheld_without_their_flanks_paragraph(monkeypatch, flank_reply, failed):
+    """Review round 2: the outlets differ, but the flank's own paragraph is not published, so the flank publishes
+    nothing (decision at frame.build_readings) and the trace says the outlet readings were withheld."""
+    _flag(monkeypatch, "on")
+    replies = _left_pair_replies(label_b="a cruel step")
+    replies[("flank", "left")] = flank_reply
+    _script(monkeypatch, replies)
+    framing, rec, errors = _run(_state(_left_pair()))
+    assert [(r["flank"], r["source"]) for r in framing["readings"]] == [("right", None)]
+    validate_readings(framing["readings"])
+    assert {"text": "(outlet readings)", "reason": "left flank: no flank paragraph, so its 2 outlet readings are not published"} in rec["detail"]
+    assert "(0 outlet entries)" in rec["decision"]
+    assert bool(errors) is failed
+
+
+@pytest.mark.parametrize("bad", [{"evil": "<script>"}, ["a", "b"], 12345, True], ids=["dict", "list", "int", "true"])
+def test_a_sentence_text_that_is_not_a_string_is_dropped(monkeypatch, bad):
+    """Review round 2: str() used to publish a dict, list, number or bool as its repr; on both paths it now fails
+    closed as that one sentence, and its question goes to unanswered."""
+    _flag(monkeypatch, "on")
+    flank_sentences = [
+        {"answers": "direction", "text": "Left outlets present the rule as a risk to families.", "quote": "the change puts families at risk", "document_id": 1},
+        {"answers": "judgement", "text": bad, "quote": "Critics called it a cruel step that ignores the law", "document_id": 3},
+    ]
+    replies = _left_pair_replies(flank_sentences=flank_sentences)
+    replies[1]["sentences"].append({"answers": "cause", "text": bad, "quote": "The groups blamed the administration for the new limits", "document_id": 1})
+    calls = _script(monkeypatch, replies)
+    framing, rec, errors = _run(_state(_left_pair()))
+    payload = next(c[1] for c in calls if c[0] == "frame_flank_reading")
+    assert [s["answers"] for r in payload["readings"] for s in r["sentences"]] == ["direction", "next", "judgement"]  # Left One's cause never got in
+    left = _entry(framing["readings"], "left")
+    assert [s["answers"] for s in left["sentences"]] == ["direction"]
+    assert left["unanswered"] == ["judgement", "cause", "why", "next"]
+    assert left["text"] == "Left outlets present the rule as a risk to families."
+    detail = rec["detail"]
+    assert {"text": "(not a string)", "reason": "Left One: sentence text is not a string (cause)"} in detail
+    assert {"text": "(not a string)", "reason": "left flank: sentence text is not a string (judgement)"} in detail
+    assert not any(str(bad) in json.dumps(r) for r in framing["readings"]) and errors == []
+
+
+def test_a_missing_sentence_text_is_an_empty_sentence(monkeypatch):
+    _flag(monkeypatch, "on")
+    _script(monkeypatch, {1: {"interpretation_label": "a risk", "sentences": [
+        {"answers": "direction", "quote": "the change puts families at risk", "document_id": 1},
+        {"answers": "cause", "text": "It blames the administration.", "quote": "The groups blamed the administration for the new limits", "document_id": 1},
+    ]}})
+    framing, rec, _ = _run(_state([_doc(1, "Left One", "left", text=TEXT_L1)]))
+    assert [s["answers"] for s in framing["readings"][0]["sentences"]] == ["cause"]
+    assert {"text": "(empty)", "reason": "Left One: empty sentence (direction)"} in rec["detail"]
 
 
 def test_outlets_differ_rule():

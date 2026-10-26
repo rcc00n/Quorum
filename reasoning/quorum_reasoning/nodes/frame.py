@@ -53,10 +53,26 @@ DETAIL_ROWS_MAX = 12  # trace detail rows per step the portal parser accepts (ba
 # wants them to think ("readers leave thinking …", "the outlet wants readers to …", "sets out to convey …") is dropped,
 # whatever question it answers. Why: Yelysei's rule for the direction sentence: a neutral statement written directly;
 # the same phrasing in a later sentence is the same fault, and code can check it where a prompt can only ask.
+# Review round 2: widened to an intention (a verb such as wants/aims/seeks/tries/sets out to, "is designed/meant to",
+# or "the goal/aim/purpose … is") + "to" + a framing verb, and to "leaves/gives/creates the impression". Convey,
+# persuade, convince, portray and depict always count; show, make, present, suggest, frame, paint, cast, position and
+# spin count when "that" follows at once or "as"/"look"/"seem"/"appear"/"sound" within five words, so a rule's or an
+# actor's aim ("the rule aims to make screening faster") still passes. The bare readers/viewers/listeners/audiences
+# match stays broad: narrowing it to grammatical roles would let "Readers of the outlet see …" through, and an
+# over-match costs one sentence, which then counts as unanswered.
+_W = r"[\w'’-]+"
+_INTENT = (
+    r"(?:wants?|wanted|aims?|aimed|seeks?|sought|tries|tried|try|trying|intends?|intended|hopes?|hoped|attempts?|attempted"
+    r"|strives?|strove|sets? out|setting out|(?:is|are|was|were) (?:designed|meant|intended|written)"
+    rf"|(?:goal|aim|purpose|intent|intention|objective)s? (?:{_W} ){{0,4}}?(?:is|are|was|were))"
+)
 _READER_META = re.compile(
     r"\b(?:readers?|viewers?|listeners?|audiences?)\b"
-    r"|\bleaves? (?:\w+ ){0,2}(?:thinking|believing|feeling|with the (?:impression|sense))\b"
-    r"|\b(?:wants?|wanted|aims?|seeks?|sought|tries|tried|intends?|hopes?|sets? out) to (?:convey|persuade|convince|portray)\b"
+    rf"|\bleaves? (?:{_W} ){{0,2}}(?:thinking|believing|feeling|with the (?:impression|sense))\b"
+    rf"|\b(?:leaves?|leaving|left|gives?|gave|giving|creates?|created|creating) (?:{_W} ){{0,2}}?(?:the|an) impression\b"
+    rf"|\b{_INTENT} to (?:convey|persuade|convince|portray|depict)\b"
+    rf"|\b{_INTENT} to (?:show|make|present|suggest|frame|paint|cast|position|spin)\b"
+    rf"(?: that\b| (?:{_W} ){{0,5}}?(?:as|look|looks|seem|seems|appear|appears|sound|sounds)\b)"
     r"|\bwants? (?:you|people|the public)\b",
     re.IGNORECASE,
 )
@@ -171,7 +187,7 @@ def checked_sentences(raw: Any, *, who: str, find: Finder) -> tuple[list[dict], 
     A sentence passes when it answers one of QUESTIONS not answered yet in this reply, is not about readers
     (_READER_META), and its quote passes quote_problem and `find(document_id, quote)`, which returns the document and
     the code-point span [start, end) of the quote in that document's text, or why it failed. The sentence text is model
-    output: whitespace collapsed and clipped to READING_SENTENCE_CAP."""
+    output: a string (anything else fails closed), whitespace collapsed and clipped to READING_SENTENCE_CAP."""
     kept: dict[str, dict] = {}
     notes: list[dict] = []
     for item in raw if isinstance(raw, list) else []:
@@ -179,13 +195,23 @@ def checked_sentences(raw: Any, *, who: str, find: Finder) -> tuple[list[dict], 
             notes.append({"text": "(not an object)", "reason": f"{who}: sentence is not an object"})
             continue
         answers = item.get("answers")
-        text = untrusted.clip(" ".join(str(item.get("text") or "").split()), READING_SENTENCE_CAP)
+        raw_text = item.get("text")
+        if raw_text is None:
+            raw_text = ""  # a missing sentence is an empty one
+        # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; review round 2): a sentence `text` that is not a string is
+        # dropped ("sentence text is not a string"), never turned into one with str(). Why: a dict, list, number or bool
+        # from the model would otherwise be published as its Python repr in a side's paragraph, while every other
+        # malformed field already fails closed.
+        is_text = isinstance(raw_text, str)
+        text = untrusted.clip(" ".join(raw_text.split()), READING_SENTENCE_CAP) if is_text else ""
         label = f" ({answers})" if answers in QUESTIONS else ""
         quote = item.get("quote")
         if answers not in QUESTIONS:
             reason = "answers none of the five questions"
         elif answers in kept:
             reason = "a second sentence for the same question"
+        elif not is_text:
+            reason = "sentence text is not a string"
         elif not text:
             reason = "empty sentence"
         elif _READER_META.search(text):
@@ -198,7 +224,7 @@ def checked_sentences(raw: Any, *, who: str, find: Finder) -> tuple[list[dict], 
             if isinstance(found, str):
                 reason = found
         if reason is not None:
-            notes.append({"text": text or "(empty)", "reason": f"{who}: {reason}{label}"})
+            notes.append({"text": text or ("(empty)" if is_text else "(not a string)"), "reason": f"{who}: {reason}{label}"})
             continue
         doc, (start, end) = found
         kept[answers] = {"answers": answers, "text": text, "quote": quote, "url": doc["url"], "document_id": doc["id"], "char_start": start, "char_end": end}
@@ -287,7 +313,13 @@ def build_readings(outlet_readings: list[dict], *, dry_run: bool, lane: str) -> 
     Per flank (left, right, center): one reading per outlet, the first published one in document order (an outlet may
     run two articles), major outlets first. No reading: no entry. One: it is the flank's reading (source null), no
     call. Two or more: one frame_flank_reading call over their verified sentences. Then the outlet entries, when the
-    outlets differ (outlets_differ)."""
+    outlets differ (outlets_differ) and the flank's own entry was published.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; review round 2): outlet entries are published only under their
+    flank's own entry; when the flank call fails or none of its sentences survive, the flank publishes nothing and a
+    trace note says the outlet readings were withheld. Why: the decision is one paragraph per side with the outlet
+    readings under it, so every outlet entry in spectrum.readings follows its flank's entry and the page never needs
+    a side heading without its paragraph; a failed flank call is already a StepError (status partial)."""
     out: list[dict] = []
     notes: list[dict] = []
     failed: list[str] = []
@@ -302,8 +334,10 @@ def build_readings(outlet_readings: list[dict], *, dry_run: bool, lane: str) -> 
         side.sort(key=lambda r: 0 if r["tier"] == "major" else 1)
         if not side:
             continue
+        published = False
         if len(side) == 1:
             out.append(reading_entry(flank, None, side[0]["sentences"]))
+            published = True
         else:
             calls += 1
             ans: Any = None
@@ -322,10 +356,14 @@ def build_readings(outlet_readings: list[dict], *, dry_run: bool, lane: str) -> 
                 notes += dropped
                 if kept:
                     out.append(reading_entry(flank, None, kept))
+                    published = True
                 else:
                     notes.append({"text": "(flank reading)", "reason": f"{flank} flank: no sentence passed; not published"})
         if outlets_differ(side):
-            out.extend(reading_entry(flank, r["source"], r["sentences"]) for r in side)
+            if published:
+                out.extend(reading_entry(flank, r["source"], r["sentences"]) for r in side)
+            else:
+                notes.append({"text": "(outlet readings)", "reason": f"{flank} flank: no flank paragraph, so its {len(side)} outlet readings are not published"})
     return out, notes, failed, calls
 
 

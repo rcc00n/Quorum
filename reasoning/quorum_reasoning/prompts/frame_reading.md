@@ -6,7 +6,7 @@ Return, in neutral words:
 - `wording`: the characteristic terms the outlet chooses (for example "aid package" vs "open-ended spending").
 - `interpretation_label`: the frame in two to four words, as a noun phrase ("a security commitment", "a cost to taxpayers", "a procedural step"). Reuse a label you would give another outlet with the same frame so labels can be counted.
 - `sentences`: a short paragraph on how this outlet interprets the fact, at most one sentence per question, in this order, and only for the questions this article itself answers:
-  1. `direction`: what the outlet sets out to convey about the fact, stated directly as the article's account, for example "The outlet presents the law as a security commitment to an ally." Never write about readers or intentions ("readers leave thinking …", "the outlet wants readers to …").
+  1. `direction`: the account of the fact this article gives, stated as what it reports or how it presents the fact, for example "The outlet presents the law as a security commitment to an ally." In this sentence and every other, write about the article's account, never about readers or the outlet's intentions: never "readers leave thinking …", "the outlet wants readers to …", "sets out to", "wants to", "aims to", "seeks to", "tries to" or "leaves the impression". A sentence written that way is discarded.
   2. `judgement`: whether the article presents the fact as good, bad or mixed, and for whom.
   3. `cause`: who or what the article holds responsible.
   4. `why`: the reason the article gives.
