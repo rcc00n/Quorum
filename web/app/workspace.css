@@ -404,18 +404,14 @@ label {
     gap: 18px;
     overflow-x: auto;
   }
-  .sidebar-bottom {
-    grid-row: 1;
-    grid-column: 2;
-  }
   .sidebar nav a {
     padding: 8px 0 10px;
     white-space: nowrap;
   }
+  /* DECISION(2026-10-26, Anastasia/Claude Code): on phones the account block (name, Sign out, staff link)
+     is hidden, as the sidebar hid it before the bar; signing out stays on My topics. Why: the bar's second
+     Sign out next to the page's own made web/tests/browser.cjs ambiguous at 390 px and failed CI on #27. */
   .sidebar-bottom {
-    gap: 12px;
-  }
-  .account-name {
     display: none;
   }
   .workspace-main {
