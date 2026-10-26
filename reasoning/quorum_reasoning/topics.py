@@ -303,9 +303,10 @@ INTAKE_STATUSES = ("existing", "new", "needs_review", "rejected")
 # match: name | slug | headline for existing, and for a needs_review that names an existing topic (a retired one, or
 # one that covers the words while collection gives the headline to an older topic); source: derive | model |
 # dry-run stand-in | fallback for a proposed row; order: 1-based insert order of a new row in rows.sql; key_mismatch:
-# the contract's key when the web app sent a different one.
+# the contract's key when the web app sent a different one; caution: for a proposed row whose terms derive built from
+# the phrase (dry run, dry-run stand-in, fallback), why to review it before applying (`_caution`).
 MAPPING_FIELDS = ("index", "key", "text", "count", "status", "topic_id", "name", "terms", "conflicts", "reason",
-                  "match", "source", "order", "key_mismatch")
+                  "match", "source", "order", "key_mismatch", "caution")
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a live batch (no --dry-run, and a model route configured) makes
 # at most this many model calls; the requests beyond it are needs_review with a "deferred" reason and are proposed
 # again on the next batch. Why: one fast-lane call per new topic, and the per-account budget rules (README › Run it)
@@ -371,18 +372,66 @@ def request_key(text: Any) -> str:
 # ending in a common TLD is a URL. Why: "john@localhost" and "janedoe.blog" passed the narrower patterns and became
 # public topic names; a typed topic never needs an "@".
 _EMAIL_RE = re.compile(r"[\w.%+-]+@[\w-]+")
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): host labels
+# are letters and digits of any script, a TLD of 2+ letters in any script counts when a "/" follows it, and the
+# ideographic full stops count as dots (`_scan_form`). Why: "jаnedoe.com/profile" (a Cyrillic "а"), "münchen.de/news",
+# "пример.рф/ivan-petrov" and "example。com/jane" passed the ASCII-only patterns and became public topic names.
+_HOST = r"(?:[^\W_]|-)+(?:\.(?:[^\W_]|-)+)*"
 _URL_RE = re.compile(
-    r"(?i)\b[a-z][a-z0-9+.-]*://|\bwww\.|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\."
+    r"(?i)\b[a-z][a-z0-9+.-]*://|\bwww\.|\b" + _HOST + r"\."
     r"(?:com|org|net|gov|edu|mil|int|io|co|ai|app|dev|info|biz|news|ly|me|tv|us|uk|ru|ua|de|fr|eu|ca|au|cn|jp|in|xyz"
     r"|blog|shop|store|online|site|website|live|top|club|tech|space|cloud|page|link|wiki|media|email|pro|art|life"
     r"|world|today)\b"
-    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/"  # any dotted name followed by a path: "janedoe.foo/post"
+    r"|\b" + _HOST + r"\.[^\W\d_](?:[^\W_]|-)+/"  # any dotted name followed by a path: "janedoe.foo/post", "пример.рф/x"
 )
+_DOTS = {0x3002: ".", 0xFF0E: ".", 0xFF61: "."}  # ideographic, full-width and half-width ideographic full stops
 _PHONE_RE = re.compile(
     r"\+\d[\d\s().-]{6,}\d"  # international: +44 20 7946 0958
     r"|(?<!\d)\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"  # North American: (555) 123-4567, 555.123.4567, 5551234567
     r"|(?<![\d.-])\d{3}[.-]\d{4}(?![\d.-])"  # local: 555-1234 (not "2026-2027", not "100 2026")
 )
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): before the
+# phone patterns run, every dash-like character (category Pd, and U+2212 minus), "/" and "_" become "-", and a run of
+# digits and separators (space . - ( )) that holds 9 or more digits in 2 or more groups is also a phone number. Why:
+# "555‑123‑4567" (a non-breaking hyphen), "555−123−4567", "555/123/4567" and "0170 1234567" passed the ASCII-only,
+# North-American-shaped patterns; "2024-2025" (8 digits) and "Boeing 737-800" stay acceptable.
+_PHONE_RUN = re.compile(r"\d[\d\s().-]*\d")
+PHONE_MIN_DIGITS = 9
+
+
+def _phone_form(scan: str) -> str:
+    return "".join("-" if unicodedata.category(c) == "Pd" or c in "\u2212/_" else c for c in scan)
+
+
+def _has_phone(scan: str) -> bool:
+    form = _phone_form(scan)
+    if _PHONE_RE.search(form):
+        return True
+    for run in _PHONE_RUN.findall(form):
+        groups = re.findall(r"\d+", run)
+        if len(groups) >= 2 and sum(len(g) for g in groups) >= PHONE_MIN_DIGITS:
+            return True
+    return False
+
+
+def _scan_form(cleaned: str) -> str:
+    """The form the personal-data patterns scan: NFKC (a full-width "＠" is "@"), the ideographic full stops as dots."""
+    return unicodedata.normalize("NFKC", cleaned).translate(_DOTS)
+
+
+def _personal_data(scan: str) -> str:
+    """Why `scan` (a `_scan_form`) may carry personal data: an e-mail address, a URL, an "@" (a handle), a phone
+    number; "" when none of them is there."""
+    for pattern, why in ((_EMAIL_RE, "contains an e-mail address"), (_URL_RE, "contains a URL")):
+        if pattern.search(scan):
+            return why
+    if "@" in scan:
+        return "contains an @handle"
+    if _has_phone(scan):
+        return "contains a phone number"
+    return ""
+
+
 _MARKUP_RE = re.compile(r"[<>\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")  # markup, C0 controls but tab/newline/return, DEL, C1
 _UNUSABLE = frozenset(("Co", "Cs", "Cn"))  # private use, unpaired surrogate, unassigned
 
@@ -398,12 +447,14 @@ def check_request(text: Any) -> tuple[str, bool]:
     stores a request, and that the batch repeats. `withheld` is true when the text may carry personal data (an
     e-mail address, a URL, an "@", a phone number), so outputs must not echo it.
 
-    Format characters (Cf) are deleted first (`_strip_format`), and the personal-data patterns scan the NFKC form, so
-    a zero-width space or a full-width "＠" hides nothing. Order: not text, over 25 × REQUEST_MAX_CHARS raw (not
-    scanned, withheld), empty, e-mail, URL, any other "@" (a handle), phone, markup (`<`, `>`, also in the NFKC form:
-    full-width "＜") or control characters (C0 but tab, newline and return; DEL; C1), private-use, unpaired-surrogate
-    or unassigned code points (Co, Cs, Cn), over REQUEST_MAX_CHARS code points after collapsing whitespace (JS:
-    `[...text].length`), no letter at all, nothing left after `request_key`.
+    Format characters (Cf) are deleted first (`_strip_format`), and the personal-data patterns scan the NFKC form with
+    the ideographic full stops as dots (`_scan_form`), so a zero-width space, a full-width "＠" or "example。com" hides
+    nothing; host labels may be in any script, and dash-like characters, "/" and "_" separate phone digits (`_has_phone`).
+    Order: not text, over 25 × REQUEST_MAX_CHARS raw (not scanned, withheld), empty, e-mail, URL, any other "@" (a
+    handle), phone (all four `_personal_data`, so that a text of digits alone is withheld before "no letters"), markup
+    (`<`, `>`, also in the NFKC form: full-width "＜") or control characters (C0 but tab, newline and return; DEL; C1),
+    private-use, unpaired-surrogate or unassigned code points (Co, Cs, Cn), over REQUEST_MAX_CHARS code points after
+    collapsing whitespace (JS: `[...text].length`), no letter at all, nothing left after `request_key`.
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed after review round 2, to confirm by Yelysei): markup is
     also looked for in the NFKC form. Why: the intake now matches and derives from the NFKC form of the text
@@ -416,14 +467,10 @@ def check_request(text: Any) -> tuple[str, bool]:
     cleaned = _clean(text)
     if not cleaned:
         return "empty", False
-    scan = unicodedata.normalize("NFKC", cleaned)
-    for pattern, why in ((_EMAIL_RE, "contains an e-mail address"), (_URL_RE, "contains a URL")):
-        if pattern.search(scan):
-            return why, True
-    if "@" in scan:
-        return "contains an @handle", True
-    if _PHONE_RE.search(scan):
-        return "contains a phone number", True
+    scan = _scan_form(cleaned)
+    personal = _personal_data(scan)
+    if personal:
+        return personal, True
     if _MARKUP_RE.search(text) or _MARKUP_RE.search(scan):
         return "contains markup or control characters", False
     if any(unicodedata.category(c) in _UNUSABLE for c in cleaned):
@@ -548,7 +595,14 @@ TOPIC_READ_LIMIT = 1000
 
 def read_topics(run_sql: Callable[[str, int], list[dict[str, Any]]] | None = None) -> tuple[list[dict[str, Any]], str]:
     """(topics in collection order, note): the existing rows of collection's `topics` table through Zetaris
-    (`<ZETARIS_COLLECTION_DB>.topics`, read-only SQL). Raises RuntimeError when no query succeeds."""
+    (`<ZETARIS_COLLECTION_DB>.topics`, read-only SQL). Raises RuntimeError when no query gives a topic with an id.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): a query that
+    succeeds but yields no row with an id counts as failed (the next, narrower query is tried, then RuntimeError: exit 2,
+    nothing written), and rows dropped for a missing id are counted in the note. Why: collection always holds its seed
+    topic (`ensure_topic` runs on every pass), so zero topics means a misread (an empty or stale registration, a wrong
+    ZETARIS_COLLECTION_DB, unnamed `col0..colN` columns), and resolving against it turned rewordings of seeded topics
+    into new rows: the two-corpora problem the intake exists to prevent. An explicit `--existing` file may be empty."""
     from .tools import corpus
 
     runner = run_sql or corpus._run_sql
@@ -560,12 +614,19 @@ def read_topics(run_sql: Callable[[str, int], list[dict[str, Any]]] | None = Non
         except Exception as exc:  # an HTTP 400 for a column Zetaris does not expose, a missing route, …
             errors.append(f"[{cols}] {type(exc).__name__}: {str(exc)[:120]}")
             continue
-        topics = [t for t in (normalise_topic(r) for r in rows or []) if t is not None]
+        rows = list(rows or [])
+        topics = [t for t in (normalise_topic(r) for r in rows) if t is not None]
+        if not topics:
+            errors.append(f"[{cols}] {len(rows)} rows, none with an id (an empty or stale registration, a wrong "
+                          "ZETARIS_COLLECTION_DB, or unnamed columns); collection always holds its seed topic")
+            continue
         topics, order_note = order_topics(topics)
         notes = [f"Zetaris {table} ({cols})", order_note]
+        if len(topics) < len(rows):
+            notes.append(f"WARNING: {len(rows) - len(topics)} of {len(rows)} rows dropped, no id")
         if "active" not in cols:
             notes.append("`active` not exposed: every topic taken as active")
-        if len(rows or []) >= TOPIC_READ_LIMIT:
+        if len(rows) >= TOPIC_READ_LIMIT:
             notes.append(f"WARNING: {TOPIC_READ_LIMIT} rows returned, the table may hold more")
         if errors:
             notes.append("wider queries failed: " + "; ".join(errors))
@@ -665,6 +726,63 @@ def _order_caveat(matching: list[tuple[dict[str, Any], list[str]]], order_known:
 
 
 DERIVED_SOURCES = ("derive", "dry-run stand-in", "fallback")  # terms that are the phrase's own words (`derive`)
+REVIEW_BEFORE_APPLYING = "DO NOT APPLY WITHOUT REVIEW"
+
+
+def _caution(source: Any, kept: list[str], text: str) -> str | None:
+    """mapping.json `caution` of a proposed row whose terms come from derive (dry run, dry-run stand-in, fallback): it
+    says so, and names the single-word terms that a phrase of two or more words gave; None for a model's row, and for
+    a row that kept no term (nothing to review: it is needs_review anyway).
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): such a row
+    keeps its status and terms, but is marked here, in report.txt and in rows.sql (a REVIEW_BEFORE_APPLYING header and
+    a note on the row). Why: a single word of a longer phrase collects every headline that says it ("texas" of
+    "measles outbreak Texas": 19 rehearsal titles and leads, none about measles; "TODAY" of "THE NEWS TODAY"), and
+    derive's term list is Yelysei's decision of 2026-10-25, so dropping or gating those words is his call."""
+    if source not in DERIVED_SOURCES or not kept:
+        return None
+    note = f"terms derived from the phrase's own words ({source}), not chosen by a model: review them before applying"
+    singles = [k for k in kept if " " not in k] if len(_DERIVE_WORD.findall(text)) > 1 else []
+    if singles:
+        note += ("; single words of a longer phrase collect every headline that says them: "
+                 + ", ".join(repr(s) for s in singles))
+    return note
+
+
+def _other_numbers(word: str) -> list[str]:
+    """The word in its other grammatical number, naively: `plural`, and the word with a final "s", "es" or "ies"→"y"
+    removed. Only for a word that ends in an ASCII letter and is neither a stopword nor an acronym."""
+    low = word.lower()
+    if low in STOPWORDS or _ACRONYM.match(word) or not re.search(r"[a-z]$", low):
+        return []
+    forms = [plural(word) or ""]
+    if re.search(r"[^aeiou]ies$", low):
+        forms.append(word[:-3] + "y")
+    if low.endswith("es"):
+        forms.append(word[:-2])
+    if low.endswith("s") and not low.endswith("ss"):
+        forms.append(word[:-1])
+    return [f for f in dict.fromkeys(forms) if f and f.lower() != low and any(c.isalpha() for c in f)]
+
+
+def _number_variant_match(texts: list[str], known: list[dict[str, Any]], order_known: bool):
+    """The first headline made of a typed text with one word in its other number that collection gives to a known
+    topic: (variant, word, form, first match, its terms, caveat), or None.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): matching rule
+    (3) also checks the typed text with each word, one at a time, in its other number (`_other_numbers`); a match makes
+    the row needs_review naming that topic. Why: collection matches whole words with no stemming, so "ICE raid" next to
+    immigration-southern-border's "ICE raids", "Government shutdowns" next to "government shutdown" and "Semiconductor"
+    next to "semiconductors" became new rows, and the subject's documents would split between two topics."""
+    for text in texts:
+        for m in _DERIVE_WORD.finditer(text):
+            for form in _other_numbers(m.group(0)):
+                variant = text[: m.start()] + form + text[m.end():]
+                matching = _matching(variant, known)
+                if matching:
+                    winner, hits = matching[0]
+                    return variant, m.group(0), form, winner, hits, _order_caveat(matching, order_known)
+    return None
 
 
 def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken: set[str],
@@ -742,7 +860,7 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
     if row.get("source") == "fallback" and row.get("reason"):
         tail += f"; terms from the fallback ({row['reason']})"
     out = {"match": None, "topic_id": slug, "name": str(row.get("name") or texts[0])[:NAME_MAX_CHARS], "terms": kept,
-           "conflicts": conflicts, "source": row.get("source")}
+           "conflicts": conflicts, "source": row.get("source"), "caution": _caution(row.get("source"), kept, texts[0])}
     if generic and usable:
         tail = f"; too generic, dropped: {generic_list}" + tail
 
@@ -777,6 +895,13 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
                       "topic whose terms match it, so this row would not receive the headlines that say the request's "
                       f"own words; map the request to {winner['id']} or accept the row"
                       + (f"; dropped as overlapping, though the typed words contain them: {lost_desc}" if lost else "") + caveat)
+    variant = _number_variant_match(texts, known, order_known)
+    if variant is not None:
+        text, word, form, winner, hits, caveat = variant
+        return review(f"collection gives a headline saying {text!r} (the typed {word!r} as {form!r}) to {_tid(winner)} "
+                      f"(term {hits[0]!r}), the first active topic whose terms match it; collection does not stem, so "
+                      f"this row and {winner['id']} would split the documents on the request's subject; map the request "
+                      f"to {winner['id']} or accept the row" + caveat)
     if lost and not kept_matches:
         ids = list(dict.fromkeys(c["topic_id"] for c in lost.values()))
         return review(f"the overlap dropped terms that the typed words contain: {lost_desc}; none of the kept terms occurs "
@@ -797,6 +922,20 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
             + (f", {dropped} overlapping dropped" if dropped else "") + tail}
 
 
+def _key_withheld(web_key: str) -> bool:
+    """True when the key the web app sent may carry personal data (`_personal_data` on it) or is longer than a typed
+    topic may be; only a key that differs from the contract's key of an accepted text is scanned, since that one is
+    built from text that passed `check_request`.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): such a key is
+    written as WITHHELD in mapping.json and report.txt; `key_mismatch` still gives the contract's key. Why: the web
+    app's key is not checked by anyone else, and "john.doe@example.com +1 555 123 4567" was echoed verbatim."""
+    if len(web_key) > 25 * REQUEST_MAX_CHARS:  # not scanned at all, as in check_request
+        return True
+    cleaned = _clean(web_key)
+    return len(cleaned) > REQUEST_MAX_CHARS or bool(_personal_data(_scan_form(cleaned)))
+
+
 def _entry(index: int, raw: Any) -> dict[str, Any]:
     entry = raw if isinstance(raw, dict) else {}
     text = entry.get("text")
@@ -809,6 +948,8 @@ def _entry(index: int, raw: Any) -> dict[str, Any]:
     key = "" if why else request_key(_clean(text))
     base: dict[str, Any] = {"index": index, "key": _echo(web_key) if web_key is not None else key,
                             "text": _echo(_clean(text)) if isinstance(text, str) else None, "count": count}
+    if web_key is not None and web_key != key and _key_withheld(web_key):
+        base["key"] = WITHHELD
     if withheld:
         # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): text and key that may carry personal data are never echoed
         # into mapping.json or report.txt. Why: those files leave the web app's database; `index` still joins the entry.
@@ -898,10 +1039,19 @@ def rows_sql(results: list[dict[str, Any]], *, header: str = "") -> str:
         "-- that also matches an older topic stays with the older one (collectors/README.md › Topics).",
         "-- ON CONFLICT (id) DO NOTHING RETURNING id: an id that already exists is left untouched and returns no row.",
     ]
+    derived = [r for r in new.values() if r.get("caution")]
+    if derived:  # the DECISION at `_caution`
+        lines += [
+            f"-- {REVIEW_BEFORE_APPLYING}: {len(derived)} of {len(new)} rows below have terms derived from the phrase's own",
+            "-- words (dry run, dry-run stand-in or model fallback), not chosen by a model; a single word of a longer phrase",
+            "-- collects every headline that says it. Check each marked row's terms first (mapping.json `caution`).",
+        ]
     if not new:
         lines.append("-- no new topics in this batch")
     for n, r in enumerate(new.values(), 1):
         lines.append(f"-- {n}. {r['name']} (requests: {sum(x['count'] for x in results if x.get('topic_id') == r['topic_id'] and x['status'] == 'new')})")
+        if r.get("caution"):
+            lines.append(f"--    review: {r['caution']}")
         lines.append(to_sql({"slug": r["topic_id"], "name": r["name"], "terms": r["terms"]}))
     return "\n".join(lines) + "\n"
 
@@ -934,6 +1084,8 @@ def report_text(results: list[dict[str, Any]], *, source_note: str, mode: str, e
         lines.append(f"      {r['reason']}")
         if r["status"] in ("new", "needs_review") and r.get("terms"):
             lines.append("      terms: " + ", ".join(r["terms"]))
+        if r.get("caution"):
+            lines.append(f"      caution: {r['caution']}")
         for c in r.get("conflicts") or []:
             lines.append(f"      overlap: {c['term']!r} {c['relation']} {c['topic_term']!r} of {c['topic_id']}")
         if r.get("key_mismatch") is not None:

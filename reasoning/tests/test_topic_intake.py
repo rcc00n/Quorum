@@ -229,6 +229,27 @@ def test_indic_words_that_differ_by_vowel_sign_are_different_requests(existing):
         # markup in the NFKC form, which the intake matches and derives from
         ("\uff1cscript\uff1e topic", "contains markup or control characters", False),
         ("\ufe64b\ufe65 topic", "contains markup or control characters", False),
+        # host labels in any script, a TLD in any script before "/", ideographic full stops (closing round 1)
+        ("j\u0430nedoe.com/profile", "contains a URL", True),  # a Cyrillic "a"
+        ("m\u00fcnchen.de/news", "contains a URL", True),
+        ("b\u00fccher.de/jane-doe", "contains a URL", True),
+        ("m\u00fcnchen.de", "contains a URL", True),
+        ("\u043f\u0440\u0438\u043c\u0435\u0440.\u0440\u0444/ivan-petrov", "contains a URL", True),
+        ("example\u3002com/jane", "contains a URL", True),
+        ("example\uff0ecom/jane", "contains a URL", True),
+        ("example\uff61com/jane", "contains a URL", True),
+        ("x.xn--p1ai/path", "contains a URL", True),
+        # dash-like separators, "/" and "_" between phone digits; 9+ digits in 2+ groups
+        ("call 555\u2011123\u20114567", "contains a phone number", True),  # non-breaking hyphen (NFKC: U+2010)
+        ("Jane Doe 555\u2010123\u20104567", "contains a phone number", True),
+        ("call 555\u2212123\u22124567", "contains a phone number", True),  # minus sign
+        ("call 555\u2013123\u20134567", "contains a phone number", True),  # en dash
+        ("call 555/123/4567", "contains a phone number", True),
+        ("call 555_123_4567", "contains a phone number", True),
+        ("call 0170 1234567", "contains a phone number", True),
+        ("+49\u2011170\u20111234567", "contains a phone number", True),
+        ("555\u2011123\u20114567", "contains a phone number", True),  # digits alone: withheld, not "no letters"
+        ("dial 555\u20101234", "contains a phone number", True),
     ],
 )
 def test_rejections(text, why, withheld):
@@ -239,7 +260,10 @@ def test_rejections(text, why, withheld):
     "text",
     ["war in Ukraine", "fiscal year 2026-2027", "Top 100 2026", "Boeing 737-800", "Node.js security flaw", "AT&T merger",
      "A.I. regulation", "S&P 500 crash", "U.S.-China trade", "Війна в Україні", "x" * 80, "COVID-19 in 2026",
-     "Ukr\u00adaine war", "\u202eevil topic", "x" * 80 + "\u00ad\u200b"],
+     "Ukr\u00adaine war", "\u202eevil topic", "x" * 80 + "\u00ad\u200b",
+     # closing round 1: years, fractions and big numbers are no phone numbers; a non-ASCII word or full stop is no URL
+     "2024-2025 season", "2024\u20132025 budget", "24/7 news", "9/11 anniversary", "1 000 000 dollars",
+     "St. Louis floods", "\u6771\u4eac\u3002\u9078\u6319", "M\u00fcnchen Oktoberfest", "version 1.25 release"],
 )
 def test_acceptable_requests(text):
     assert topics.check_request(text) == ("", False)
@@ -256,6 +280,45 @@ def test_format_characters_are_deleted_before_keying_and_naming(existing):
 def test_huge_input_is_not_scanned_and_is_withheld():
     why, withheld = topics.check_request("a " * 5000)
     assert why.startswith("longer than 80 characters") and withheld
+
+
+def test_unicode_personal_data_never_becomes_a_row(existing):
+    """Before closing round 1 these became `new` rows named "Jane Doe 555‐123‐4567" or "Jаnedoe.com/profile"."""
+    texts = ["jаnedoe.com/profile", "Jane Doe 555‐123‐4567", "555‑123‑4567",
+             "пример.рф/ivan-petrov", "example。com/jane"]
+    res = resolve(texts, existing)
+    assert [r["status"] for r in res] == ["rejected"] * len(texts)
+    assert all(r["text"] == r["key"] == topics.WITHHELD for r in res)
+    assert topics.rows_sql(res).count("INSERT") == 0
+
+
+@pytest.mark.parametrize(
+    "web_key, text, status",
+    [
+        ("john.doe@example.com +1 555 123 4567", "Iran", "new"),
+        ("call 555-123-4567 john@x.org", "", "rejected"),
+        ("jane doe 0170 1234567", "Iran", "new"),
+        ("jаnedoe.com/profile", "Iran", "new"),
+        ("k" * 5000, "Iran", "new"),
+        ("k" * 81, "Iran", "new"),
+    ],
+)
+def test_a_web_key_that_may_carry_personal_data_is_withheld(existing, web_key, text, status):
+    (r,) = topics.resolve_requests([{"key": web_key, "text": text, "count": 1}], existing, propose=dry)
+    assert r["status"] == status and r["key"] == topics.WITHHELD
+    assert r["key_mismatch"] == ("iran" if text else None)  # the contract's key is still shown
+
+
+def test_a_web_key_equal_to_the_contract_key_is_not_scanned(existing):
+    """The contract's key of an accepted text is built from text that passed check_request; its sorted tokens may
+    put digits side by side ("100 2026 2027") without being a phone number."""
+    text = "budget 2026 plan 2027 vote 100"
+    key = topics.request_key(text)
+    assert key == "100 2026 2027 budget plan vote" and topics.check_request(text) == ("", False)
+    (r,) = topics.resolve_requests([{"key": key, "text": text, "count": 1}], existing, propose=dry)
+    assert r["key"] == key and r["key_mismatch"] is None
+    (other,) = topics.resolve_requests([{"key": "ceasefire gaza now", "text": "Gaza ceasefire", "count": 1}], existing, propose=dry)
+    assert other["key"] == "ceasefire gaza now" and other["key_mismatch"] == "ceasefire gaza"  # a harmless key is echoed
 
 
 # ----------------------------------------------------------- existing topics ----
@@ -352,6 +415,41 @@ def test_read_topics_uses_the_corpus_route_by_default(monkeypatch):
     monkeypatch.setattr(corpus, "_run_sql", lambda sql, limit: ZETARIS_ROWS[:1])
     found, _ = topics.read_topics()
     assert found[0]["id"] == "russia-ukraine-war"
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [],  # an empty or stale registration, a wrong ZETARIS_COLLECTION_DB
+        [{"col0": "russia-ukraine-war", "col1": "Russia", "col2": "{Ukraine}"}],  # tools_zetaris without column names
+        [{"id": "", "name": "no id", "query_terms": "{x}"}],
+        None,
+    ],
+)
+def test_read_topics_refuses_a_read_that_yields_no_topic(rows):
+    """Collection always holds its seed topic, so zero topics is a misread, never an empty table (DECISION at read_topics)."""
+    seen = []
+
+    def runner(sql, limit):
+        seen.append(sql)
+        return rows
+
+    with pytest.raises(RuntimeError, match="none with an id") as exc:
+        topics.read_topics(runner)
+    assert len(seen) == len(topics._TOPIC_COLUMNS) and "cannot read existing topics" in str(exc.value)
+
+
+def test_read_topics_takes_a_narrower_query_when_a_wider_one_yields_no_topic():
+    found, note = topics.read_topics(lambda sql, limit: [] if "active" in sql else ZETARIS_ROWS)
+    assert [t["id"] for t in found] == [r["id"] for r in ZETARIS_ROWS]
+    assert "wider queries failed" in note and "0 rows, none with an id" in note
+
+
+def test_read_topics_counts_rows_dropped_without_an_id():
+    found, note = topics.read_topics(lambda sql, limit: [ZETARIS_ROWS[0], {"name": "no id", "query_terms": "{x}"}])
+    assert [t["id"] for t in found] == ["russia-ukraine-war"] and "WARNING: 1 of 2 rows dropped, no id" in note
+    _, clean = topics.read_topics(lambda sql, limit: ZETARIS_ROWS)
+    assert "dropped" not in clean
 
 
 # ---------------------------------------------------------------- overlap ----
@@ -532,6 +630,49 @@ def test_a_typed_word_held_only_inside_a_longer_older_term_keeps_the_row_new(exi
     assert {(c["term"], c["relation"]) for c in r["conflicts"]} == {("china", "contained_in")}
 
 
+@pytest.mark.parametrize(
+    "text, topic_id, variant, term",
+    [
+        ("ICE raid", "immigration-southern-border", "ICE raids", "ICE raids"),
+        ("Government shutdowns", "federal-budget-shutdown", "Government shutdown", "government shutdown"),
+        ("Semiconductor", "tariffs-trade-war-china", "Semiconductors", "semiconductors"),  # the older of two
+        ("Immigrant", "immigration-southern-border", "Immigrants", "immigrants"),
+        ("Emission", "climate-policy", "Emissions", "emissions"),
+        ("data center", "ai-regulation-export-controls", "data centers", "data centers"),
+        ("AI chip", "ai-regulation-export-controls", "AI chips", "AI chips"),
+        ("border walls", "immigration-southern-border", "border wall", "border wall"),
+        ("debt ceilings", "federal-budget-shutdown", "debt ceiling", "debt ceiling"),
+        ("continuing resolutions", "federal-budget-shutdown", "continuing resolution", "continuing resolution"),
+        ("Migrant caravan", "immigration-southern-border", "Migrants caravan", "migrants"),
+        ("Ukrainians", "russia-ukraine-war", "Ukrainian", "Ukrainian"),
+    ],
+)
+def test_a_typed_word_in_its_other_number_is_needs_review(existing, text, topic_id, variant, term):
+    """Collection does not stem: a headline saying the other number of a typed word goes to the older topic, so a new
+    row would split the subject's documents with it (closing round 1; before, every one of these was `new`)."""
+    (r,) = resolve([text], existing)
+    assert (r["status"], r["match"]) == ("needs_review", None) and r["topic_id"] not in {t["id"] for t in existing}
+    assert r["reason"].startswith(f"collection gives a headline saying {variant!r} (the typed ")
+    assert f"to {topic_id} (term {term!r}), the first active topic whose terms match it" in r["reason"]
+    assert f"map the request to {topic_id} or accept the row" in r["reason"]
+    assert topics.rows_sql([r]).count("INSERT") == 0
+
+
+def test_a_model_row_for_the_other_number_is_needs_review_too(existing):
+    (r,) = resolve(["ICE raid"], existing, propose=model_row(["ICE raid", "workplace raid"]))
+    assert (r["status"], r["source"], r["conflicts"], r["terms"]) == ("needs_review", "model", [], ["ICE raid", "workplace raid"])
+    assert "saying 'ICE raids' (the typed 'raid' as 'raids') to immigration-southern-border" in r["reason"]
+
+
+def test_number_variants_of_a_word():
+    assert topics._other_numbers("raid") == ["raids"]
+    assert topics._other_numbers("shutdowns") == ["shutdown"]
+    assert topics._other_numbers("ceilings") == ["ceiling"]
+    assert topics._other_numbers("policies") == ["policy", "polici", "policie"]
+    assert topics._other_numbers("taxes") == ["tax", "taxe"]
+    assert topics._other_numbers("ICE") == [] and topics._other_numbers("the") == [] and topics._other_numbers("café") == []
+
+
 def model_row(terms, slug=None):
     """A live-shaped proposal: what `suggest` returns for a validated model reply."""
     return lambda text: {"slug": slug or topics.slug_for(text), "name": text, "terms": list(terms), "source": "model"}
@@ -575,7 +716,15 @@ def test_hyphenated_parts_are_also_single_terms():
     assert topics.derive("Ｋ-pop")["terms"] == ["k-pop", "k-pops"]  # NFKC first: a full-width letter is matched as ASCII
 
 
-@pytest.mark.parametrize("source", topics.DERIVED_SOURCES)
+# A literal, not topics.DERIVED_SOURCES: removing a source from the constant must fail these cases, not drop them.
+DERIVED = ("derive", "dry-run stand-in", "fallback")
+
+
+def test_derived_sources_are_the_three_derive_paths():
+    assert topics.DERIVED_SOURCES == DERIVED
+
+
+@pytest.mark.parametrize("source", DERIVED)
 @pytest.mark.parametrize("text", ["चीन", "ปีใหม่"])
 def test_derived_terms_that_miss_the_typed_words_are_needs_review(existing, text, source):
     """derive splits words at a vowel sign ("चीन" -> "च न"); such terms would collect nothing on the subject."""
@@ -681,7 +830,9 @@ def test_taken_slug_gets_a_suffix(existing):
     (r,) = resolve(["measles during winter"], taken)
     assert topics.request_key("measles during winter") != topics.request_key("measles-winter")
     assert r["status"] == "new" and r["topic_id"] == "measles-winter-2"
-    res = resolve(["measles cases", "measles case counts"], existing,
+    # not "measles case counts": a headline saying "measles cases counts" (one word in its other number) goes to the
+    # first row, so that request is needs_review (test_a_typed_word_in_its_other_number_is_needs_review)
+    res = resolve(["measles cases", "measles in schools"], existing,
                   propose=lambda t: {"slug": "measles-cases", "name": t, "terms": [t.lower()]})
     assert [(x["status"], x["topic_id"]) for x in res] == [("new", "measles-cases"), ("new", "measles-cases-2")]
 
@@ -899,6 +1050,8 @@ def test_cli_batch_in_a_dry_environment_says_so(tmp_path, monkeypatch):
     code, (m,), sql, report = _batch(tmp_path, SAMPLE[2:3])
     assert code == 0 and calls == [("topic_terms", "Mars sample return mission", True)]
     assert m["status"] == "new" and m["source"] == "dry-run stand-in"
+    assert m["caution"].startswith("terms derived from the phrase's own words (dry-run stand-in)")
+    assert f"-- {topics.REVIEW_BEFORE_APPLYING}: 1 of 1 rows below" in sql
     assert f"mode:       {topics.MODE_DRY_ENV}" in report and "live" not in report.splitlines()[2]
     assert "dry environment, stand-in terms" in sql.splitlines()[0] and ", live)" not in sql
 
@@ -910,6 +1063,8 @@ def test_cli_batch_keeps_the_fallback_reason(tmp_path, monkeypatch):
     assert code == 0 and len(calls) == 1
     assert m["status"] == "new" and m["source"] == "fallback" and m["topic_id"] == "mars-sample-return-mission"
     assert "terms from the fallback (model call failed: RuntimeError: route down)" in m["reason"]
+    assert m["caution"].startswith("terms derived from the phrase's own words (fallback), not chosen by a model")
+    assert "'mission'" in m["caution"]
 
 
 def test_cli_live_batch_is_capped(tmp_path, monkeypatch):
@@ -930,6 +1085,79 @@ def test_cli_dry_environment_has_no_cap(tmp_path, monkeypatch):
     code, mapping, _, _ = _batch(tmp_path, [{"text": "Mars sample return mission", "count": 3}, {"text": "Gaza ceasefire", "count": 2}])
     assert code == 0 and len(calls) == 2 and all(c[2] is True for c in calls)
     assert [m["status"] for m in mapping] == ["new", "new"] and {m["source"] for m in mapping} == {"dry-run stand-in"}
+
+
+def test_cli_dry_environment_stand_in_for_a_phrase_derive_splits(tmp_path, monkeypatch):
+    """No fake json_task: QUORUM_DRY_RUN=1 makes the real dry-run stand-in answer (dryrun.topic_terms -> derive). A live
+    path would need llm._route, which fails the test here (pytest.fail is not caught by suggest)."""
+    monkeypatch.setenv("QUORUM_DRY_RUN", "1")
+    monkeypatch.setattr(llm, "_route", lambda *a, **k: pytest.fail("a model route was resolved", pytrace=False))
+    code, (m,), sql, report = _batch(tmp_path, [{"text": "चीन", "count": 1}])
+    assert code == 0 and (m["status"], m["source"]) == ("needs_review", "dry-run stand-in") and m["terms"]
+    assert m["reason"].startswith("the derived terms would not match the typed words: none of ")
+    assert "INSERT" not in sql and f"mode:       {topics.MODE_DRY_ENV}" in report
+
+
+def test_cli_fallback_for_a_phrase_derive_splits(tmp_path, monkeypatch):
+    calls = _recording_json_task(monkeypatch, RuntimeError("route down"))
+    _route(monkeypatch, live=True)
+    code, (m,), sql, _ = _batch(tmp_path, [{"text": "चीन", "count": 1}])
+    assert code == 0 and len(calls) == 1 and (m["status"], m["source"]) == ("needs_review", "fallback")
+    assert m["reason"].startswith("the derived terms would not match the typed words: none of ") and "INSERT" not in sql
+
+
+def test_cli_rows_with_derived_terms_are_marked_for_review(tmp_path):
+    """Derived single words of a longer phrase collect every headline that says them ("texas": 19 rehearsal titles and
+    leads, none about measles; "TODAY"); the rows keep their status, and every output says to review them."""
+    entries = [{"text": "measles outbreak Texas", "count": 3}, {"text": "THE NEWS TODAY", "count": 2}, {"text": "Ebola", "count": 1},
+               {"text": "AI", "count": 1}]
+    code, mapping, sql, report = _batch(tmp_path, entries, "--dry-run")
+    measles, today, ebola, ai = mapping
+    assert code == 0 and [m["status"] for m in mapping] == ["new", "new", "new", "needs_review"] and today["terms"] == ["TODAY"]
+    assert ai["terms"] == [] and ai["caution"] is None  # no kept term, nothing to review
+    prefix = "terms derived from the phrase's own words (derive), not chosen by a model: review them before applying"
+    assert measles["caution"] == (prefix + "; single words of a longer phrase collect every headline that says them: "
+                                  "'measles', 'outbreak', 'outbreaks', 'texas'")
+    assert today["caution"] == prefix + "; single words of a longer phrase collect every headline that says them: 'TODAY'"
+    assert ebola["caution"] == prefix  # a one-word phrase: its word is the topic
+    assert f"-- {topics.REVIEW_BEFORE_APPLYING}: 3 of 3 rows below" in sql and sql.count("--    review: ") == 3
+    review_lines = [line for line in sql.splitlines() if line.startswith("--    review: ")]
+    assert "'texas'" in review_lines[0] and "'TODAY'" in review_lines[1]
+    assert report.count("      caution: ") == 3
+
+
+def test_cli_model_rows_carry_no_caution(tmp_path, monkeypatch):
+    _recording_json_task(monkeypatch, MARS_REPLY)
+    _route(monkeypatch, live=True)
+    code, (m,), sql, report = _batch(tmp_path, SAMPLE[2:3])
+    assert code == 0 and m["source"] == "model" and m["caution"] is None
+    assert topics.REVIEW_BEFORE_APPLYING not in sql and "caution:" not in report
+    assert topics.resolve_requests([{"text": "Me Too"}], [], propose=dry)[0]["caution"] == (
+        "terms derived from the phrase's own words (derive), not chosen by a model: review them before applying")
+
+
+def test_cli_an_empty_zetaris_read_writes_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(corpus, "_run_sql", lambda sql, limit: [])
+    out = tmp_path / "out"
+    assert topics.main(["--from-requests", _write(tmp_path, "req.json", SAMPLE), "--out", str(out), "--dry-run"]) == 2
+    assert not out.exists() and "none with an id" in capsys.readouterr().err
+
+
+def test_cli_an_explicit_empty_existing_file_is_allowed(tmp_path):
+    out = tmp_path / "out"
+    assert topics.main(["--from-requests", _write(tmp_path, "req.json", SAMPLE[2:3]), "--out", str(out), "--dry-run",
+                        "--existing", _write(tmp_path, "t.json", [])]) == 0
+    assert "existing:   0 topics" in (out / "report.txt").read_text(encoding="utf-8")
+
+
+def test_cli_never_echoes_a_web_key_with_personal_data(tmp_path):
+    entries = [{"key": "john.doe@example.com +1 555 123 4567", "text": "Iran", "count": 1},
+               {"key": "call 555-123-4567 john@x.org", "text": "", "count": 1}]
+    code, mapping, _, report = _batch(tmp_path, entries, "--dry-run")
+    assert code == 0 and [m["key"] for m in mapping] == [topics.WITHHELD, topics.WITHHELD]
+    assert mapping[0]["key_mismatch"] == "iran" and f"the web sent {topics.WITHHELD!r}, the contract gives 'iran'" in report
+    for leaked in ("john", "example.com", "555"):
+        assert leaked not in report and leaked not in json.dumps(mapping)
 
 
 def test_cli_text_that_utf8_cannot_encode_is_rejected_and_echoed_safely(tmp_path):
