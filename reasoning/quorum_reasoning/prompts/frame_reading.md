@@ -12,7 +12,7 @@ Return, in neutral words:
   4. `why`: the reason the article gives.
   5. `next`: what the article says should happen next.
 
-  Each sentence is an object: `answers` (one of "direction", "judgement", "cause", "why", "next"), `text` (the sentence, at most 40 words), `quote` (3 to 40 words copied exactly, character for character, from the document's `text`, or from its `title` or `lead` when `text` is empty, that show the article says this) and `document_id` (the document's `id`). Leave out a question the article does not answer: never guess and never fill a gap from other coverage or general knowledge. A sentence whose quote is not found exactly in the article is discarded.
+  Each sentence is an object: `answers` (one of "direction", "judgement", "cause", "why", "next"), `text` (the sentence, at most 40 words; it carries no quotation marks: the article's words go in `quote`, never in `text`), `quote` (3 to 40 words copied exactly, character for character, from the document's `text`, or from its `title` or `lead` when `text` is empty, that show the article says this) and `document_id` (the document's `id`). Leave out a question the article does not answer: never guess and never fill a gap from other coverage or general knowledge. A sentence whose quote is not found exactly in the article is discarded.
 
 No adjectives of judgment, no "bias", no "spin". Describe, do not evaluate: the judgement sentence reports the article's own verdict, not yours.
 

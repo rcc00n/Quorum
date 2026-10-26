@@ -526,6 +526,99 @@ def test_the_prompts_describe_direction_without_the_phrasing_the_guard_drops():
             assert f'"{phrase}"' in forbidden, (name, phrase)
 
 
+def test_the_flank_prompt_never_asks_for_a_second_outlets_position():
+    """Review round 3: a flank sentence carries one quote, so it may describe only the outlet whose quote it carries, or
+    what all the outlets share; the old instruction to name the disagreeing outlets in one sentence is gone."""
+    text = (PROMPTS / "frame_flank_reading.md").read_text(encoding="utf-8")
+    assert "say so in that sentence and name them" not in text and "rather than picking one" not in text
+    assert "names or describes only the outlet whose quote it carries, or what all the given outlets share" in text
+    assert "never states another outlet's position" in text
+    assert "write that question's sentence about the quoted outlet alone, naming it, or leave the question out" in text
+
+
+def test_both_reading_prompts_keep_quotation_marks_out_of_the_sentence_text():
+    for name, words in (("frame_reading.md", "the article's words"), ("frame_flank_reading.md", "the outlets' words")):
+        text = (PROMPTS / name).read_text(encoding="utf-8")
+        assert f"it carries no quotation marks: {words} go in `quote`, never in `text`" in text, name
+
+
+# --- quotation marks inside a sentence (review round 3) ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("text, expected", [
+    ('It calls the rule "a cruel step" and presents it as bad.', ["a cruel step"]),
+    ("It calls it “a cruel step” and «unlawful».", ["a cruel step", "unlawful"]),
+    ("It calls it „grausam“ and „hart”.", ["grausam", "hart"]),
+    ("It calls it 'a cruel step' in the country's words.", ["a cruel step"]),
+    ("It calls it ‘the country’s cruel step’.", ["the country’s cruel step"]),  # an apostrophe inside never ends it
+    ("'the families' cruel betrayal'", ["the families' cruel betrayal"]),  # a closing-like apostrophe inside: the whole run is checked
+    ("The outlets' view and the agents' plan.", []),  # plural possessives are not quotation marks
+    ("It's the administration's rule.", []),
+    ("A plain sentence.", []),
+    ('It says "a cruel', None),  # unpaired
+    ("It calls it “a cruel step“.", None),
+    ("«a “cruel betrayal” b»", None),  # a nested double mark is unpaired: the inner words are never skipped
+    ("It calls it 'a cruel step", None),
+    ("It calls it ‹cruel›.", None),  # a mark code does not pair
+    ("It cites the ’90s.", None),
+])
+def test_quotations_finds_every_quoted_run_or_reports_an_unpaired_mark(text, expected):
+    assert frame.quotations(text) == expected
+
+
+@pytest.mark.parametrize("words, ok", [
+    ("a cruel step", True), ("a cruel step.", True), ("the law,", True), ("U.S.", True), ("costs", True),
+    ("A cruel step", False),  # case changed
+    ("cruel st", False), ("cost", False),  # inside a longer word
+    ("a cruel step that", True), ("a cruel betrayal", False), ("", False), ("...", False),
+])
+def test_verbatim_words_needs_the_exact_words(words, ok):
+    assert frame.verbatim_words("Critics called it a cruel step that ignores the law, said U.S. groups. The plan costs more.", words) is ok
+
+
+@pytest.mark.parametrize("text, kept", [
+    ('Left One calls the rule "a cruel betrayal of every family" and presents it as bad.', False),  # the round-3 probe
+    ("Left One calls the rule “a cruel betrayal” and presents it as bad.", False),
+    ("Left One calls the rule 'a cruel betrayal' and presents it as bad.", False),
+    ('Left One presents the rule as bad: it "puts families at risk".', True),  # inside the sentence's own quote
+    ('Left One presents the rule as bad and reports "longer waits for families".', True),  # elsewhere in the article
+    ('Left One presents the rule as bad and reports "Longer waits for families".', False),  # case changed
+    ('Left One presents the rule as "bad.', False),  # unpaired
+])
+def test_an_outlet_sentence_quoting_words_not_in_its_article_is_dropped(monkeypatch, text, kept):
+    _flag(monkeypatch, "on")
+    _script(monkeypatch, {1: _reply(1, "a risk",
+        ("direction", "Left One presents the rule as a risk to families.", "The rule tightens asylum screening at the southern border"),
+        ("judgement", text, "the change puts families at risk"))})
+    framing, rec, errors = _run(_state([_doc(1, "Left One", "left", text=TEXT_L1)]))
+    (r,) = framing["readings"]
+    assert ("judgement" in [s["answers"] for s in r["sentences"]]) is kept
+    reasons = [row["reason"] for row in rec.get("detail") or []]
+    if kept:
+        assert r["sentences"][1]["text"] == text and reasons == []
+    else:
+        why = "unpaired quotation mark in the sentence" if text.count('"') % 2 else "quotation in the sentence not found verbatim"
+        assert reasons == [f"Left One: {why} (judgement)"] and "judgement" in r["unanswered"]
+        assert "betrayal" not in json.dumps(framing["readings"])
+    assert errors == []
+
+
+def test_quotation_marks_are_checked_in_the_clipped_text_that_is_published(monkeypatch):
+    """A quotation the clip cuts open is unpaired in the published text, so the sentence is dropped, although the
+    unclipped reply paired it around verbatim words."""
+    _flag(monkeypatch, "on")
+    text = "Left One presents the rule as bad " + "and grave " * 25 + 'and calls it "the change puts families at risk".'
+    assert len(text) > frame.READING_SENTENCE_CAP and text.index('"') < frame.READING_SENTENCE_CAP - 2 < text.rindex('"')
+    _script(monkeypatch, {1: _reply(1, "a risk",
+        ("direction", "Left One presents the rule as a risk to families.", "The rule tightens asylum screening at the southern border"),
+        ("judgement", text, "the change puts families at risk"))})
+    framing, rec, _ = _run(_state([_doc(1, "Left One", "left", text=TEXT_L1)]))
+    (r,) = framing["readings"]
+    assert [s["answers"] for s in r["sentences"]] == ["direction"]
+    (row,) = rec["detail"]
+    assert row["reason"] == "Left One: unpaired quotation mark in the sentence (judgement)" and row["text"].endswith(" …")
+
+
 # --- flanks: the one-outlet rule, the flank call and where outlets differ ---------------------------------------
 
 
@@ -575,6 +668,35 @@ def test_the_flank_call_reuses_only_verified_input_quotes(monkeypatch):
     assert left["unanswered"] == ["judgement", "cause", "why", "next"]
     flank_reasons = [row["reason"] for row in rec["detail"] if row["reason"].startswith("left flank")]
     assert flank_reasons == [f"left flank: quote is not one of this flank's verified outlet quotes ({q})" for q in ("judgement", "cause", "why", "next")]
+
+
+def test_a_flank_sentence_quoting_another_outlets_words_is_dropped(monkeypatch):
+    """Review round 3: a flank sentence that reuses Left One's quote but puts Left Two's words (verbatim in Left Two's
+    article, not in Left One's) in quotation marks is dropped; words from the cited document itself pass."""
+    _flag(monkeypatch, "on")
+    flank_sentences = [
+        {"answers": "direction", "text": 'Left One presents the rule as a risk while Left Two calls it "a cruel step".', "quote": "the change puts families at risk", "document_id": 1},
+        {"answers": "judgement", "text": "Left Two presents the rule as bad, calling it “a cruel step”.", "quote": "Critics called it a cruel step that ignores the law", "document_id": 3},
+        {"answers": "next", "text": "Left One reports that lawyers will go to 'federal court'.", "quote": "Lawyers plan to challenge the rule in federal court", "document_id": 1},
+    ]
+    _script(monkeypatch, _left_pair_replies(flank_sentences=flank_sentences))
+    framing, rec, errors = _run(_state(_left_pair()))
+    left = _entry(framing["readings"], "left")
+    assert [s["answers"] for s in left["sentences"]] == ["judgement", "next"] and left["unanswered"][0] == "direction"
+    assert {"text": flank_sentences[0]["text"], "reason": "left flank: quotation in the sentence not found verbatim (direction)"} in rec["detail"]
+    assert "Left Two calls it" not in json.dumps(framing["readings"]) and errors == []
+
+
+def test_the_dry_flank_stand_in_names_the_side_only_when_its_outlets_share_a_label():
+    def payload(label_b):
+        return {"flank": "left", "readings": [
+            {"source": "Left One", "interpretation_label": "a risk", "sentences": [{"answers": "direction", "text": "x", "quote": "q one two", "document_id": 1}]},
+            {"source": "Left Two", "interpretation_label": label_b, "sentences": [{"answers": "judgement", "text": "It presents it as bad.", "quote": "q three four", "document_id": 3}]},
+        ]}
+    assert dryrun.frame_flank_reading(payload("A risk"))["sentences"][0]["text"] == "Left outlets present the story as a risk."
+    differ = dryrun.frame_flank_reading(payload("a cruel step"))["sentences"]
+    assert differ[0]["text"] == "Left One presents the story as a risk." and differ[0]["document_id"] == 1  # the quoted outlet alone
+    assert differ[1] == {"answers": "judgement", "text": "It presents it as bad.", "quote": "q three four", "document_id": 3}
 
 
 def test_a_flank_quote_no_longer_verbatim_in_its_document_is_dropped(monkeypatch):

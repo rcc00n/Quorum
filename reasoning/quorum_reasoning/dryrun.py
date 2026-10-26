@@ -261,16 +261,25 @@ def frame_reading(p: dict[str, Any]) -> dict[str, Any]:
 
 def frame_flank_reading(p: dict[str, Any]) -> dict[str, Any]:
     """Twin of the flank paragraph: per question, the first input sentence answering it (outlets in input order),
-    its quote and document id reused unchanged; the direction sentence names the side and the first outlet's label."""
+    its quote and document id reused unchanged. The direction sentence names the side when its outlets share one label,
+    and otherwise only the outlet whose quote it carries (the prompt's rule: a sentence never states another outlet's
+    position)."""
     flank = str(p.get("flank") or "center")
     readings = [r for r in (p.get("readings") or []) if isinstance(r, dict)]
+    shared = len({str(r.get("interpretation_label") or "").strip().casefold() for r in readings} - {""}) <= 1
     out: list[dict[str, Any]] = []
     for q in _READING_QUESTIONS:
         hit = next(((r, s) for r in readings for s in (r.get("sentences") or []) if isinstance(s, dict) and s.get("answers") == q), None)
         if hit is None:
             continue
         r, s = hit
-        line = f"{flank.capitalize()} outlets present the story as {r.get('interpretation_label') or 'a report'}." if q == "direction" else s.get("text", "")
+        label = r.get("interpretation_label") or "a report"
+        if q != "direction":
+            line = s.get("text", "")
+        elif shared:
+            line = f"{flank.capitalize()} outlets present the story as {label}."
+        else:
+            line = f"{r.get('source') or 'One outlet'} presents the story as {label}."
         out.append({"answers": q, "text": line, "quote": s.get("quote"), "document_id": s.get("document_id")})
     return {"sentences": out}
 

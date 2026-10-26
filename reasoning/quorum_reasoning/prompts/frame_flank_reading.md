@@ -7,7 +7,7 @@ Return `sentences`: one paragraph for the side as a whole, at most one sentence 
 4. `why`: the reason they give.
 5. `next`: what they say should happen next.
 
-Each sentence is an object: `answers` (one of "direction", "judgement", "cause", "why", "next"), `text` (the sentence, at most 40 words), and `quote` and `document_id` copied exactly from one input sentence that supports it, from any of the outlets. Do not write new quotes and do not edit them: a sentence whose quote and document_id are not those of an input sentence is discarded. Where the outlets disagree on a question, say so in that sentence and name them, rather than picking one. Leave out a question no input sentence answers: never guess.
+Each sentence is an object: `answers` (one of "direction", "judgement", "cause", "why", "next"), `text` (the sentence, at most 40 words; it carries no quotation marks: the outlets' words go in `quote`, never in `text`), and `quote` and `document_id` copied exactly from one input sentence that supports it, from any of the outlets. Do not write new quotes and do not edit them: a sentence whose quote and document_id are not those of an input sentence is discarded. A sentence states only what its own quote shows: it names or describes only the outlet whose quote it carries, or what all the given outlets share, and never states another outlet's position. Where the outlets differ on a question, write that question's sentence about the quoted outlet alone, naming it, or leave the question out: the outlet paragraphs published under this one show where they differ. Leave out a question no input sentence answers: never guess.
 
 No adjectives of judgment, no "bias", no "spin". Describe, do not evaluate.
 

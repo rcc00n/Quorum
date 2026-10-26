@@ -150,11 +150,11 @@
           {
             "flank": "right",
             "source": null,
-            "text": "Right outlets present the story as a cost. It presents the outcome as bad. It reports what is expected to happen next.",
+            "text": "Fox News presents the story as a cost. It presents the outcome as bad. It reports what is expected to happen next.",
             "sentences": [
               {
                 "answers": "direction",
-                "text": "Right outlets present the story as a cost.",
+                "text": "Fox News presents the story as a cost.",
                 "quote": "Ukraine aid bill signed into law after Senate and House votes.",
                 "url": "https://www.foxnews.com/politics/ukraine-aid-bill-signed",
                 "document_id": 104,

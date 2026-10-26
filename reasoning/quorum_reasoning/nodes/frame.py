@@ -10,11 +10,12 @@ snapshot.
 Readings (flag `[frame] readings` in config/reasoning.toml; DECISIONS.md › Stories as articles, "Across the
 spectrum"): with the flag on, the one call per outlet becomes `frame_reading`. It returns the same four labels plus
 sentences on how the outlet interpreted the fact (direction, judgement, cause, why, next), each with a verbatim quote
-that code finds in the text the run read for that document (tools.fetch_text.fetch_result); a sentence whose quote
-fails is dropped and its question is listed as unanswered. A flank with two or more outlet readings gets one
-`frame_flank_reading` call, whose sentences may only reuse those quotes. The result is the optional
-`spectrum.readings` list; every other spectrum field keeps its shape. With the flag off the node makes the same
-calls (task, prompt, payload) and writes the same output as before the feature.
+that code finds in the text the run read for that document (tools.fetch_text.fetch_result), as it finds any words the
+sentence itself puts in quotation marks; a sentence whose quote or quotation fails is dropped and its question is
+listed as unanswered. A flank with two or more outlet readings gets one `frame_flank_reading` call, whose sentences
+may only reuse those quotes and describe only the outlet whose quote each carries, or what the outlets share. The
+result is the optional `spectrum.readings` list; every other spectrum field keeps its shape. With the flag off the
+node makes the same calls (task, prompt, payload) and writes the same output as before the feature.
 """
 
 from __future__ import annotations
@@ -178,16 +179,77 @@ def quote_problem(quote: Any) -> str | None:
     return None
 
 
-Finder = Callable[[int | None, str], "tuple[DocRef, tuple[int, int]] | str"]
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; review round 3): words a reading sentence's `text` puts in quotation
+# marks must be the article's own: each quotation must be found verbatim, as whole words (find_quote's exact match, not
+# inside a longer word), in the text the run read for the sentence's cited document, which contains the sentence's own
+# `quote`; otherwise the sentence is dropped ("quotation in the sentence not found verbatim"), and so is a sentence with
+# a quotation mark code cannot pair ("unpaired quotation mark in the sentence"). Double marks pair as "…", ＂…＂, “…”,
+# ‟…”, „…“, „…”, «…», »…« and ”…”, with no double mark inside (a nested double mark is unpaired); a single quotation
+# opens with ‘, or with ' or ’ not preceded by a letter or digit and followed by a non-space, and runs to the last ' or ’
+# not followed by a letter or digit before the next opening one, so an apostrophe inside ("the country's plan") never
+# ends it early and a plural possessive after it can only lengthen what is checked. A comma or period just inside the
+# closing mark is not part of the words (the American convention); a quotation without a letter or digit fails. Why:
+# only `quote` was checked, so a sentence could put invented words in quotation marks and attribute them to a named
+# outlet, and the page would publish them as that outlet's words; both prompts now also say `text` carries no quotation
+# marks, so a dropped sentence costs one question (unanswered), never a misquote.
+_NOT_DOUBLE = '[^"＂“”„‟«»]*'
+_SINGLE_OPEN = r"(?:‘|(?<!\w)['’](?=\S))"
+_QUOTATION = re.compile(
+    "|".join(
+        [
+            f'"({_NOT_DOUBLE})"',
+            f"＂({_NOT_DOUBLE})＂",
+            f"[“‟]({_NOT_DOUBLE})”",
+            f"„({_NOT_DOUBLE})[“”]",
+            f"«({_NOT_DOUBLE})»",
+            f"»({_NOT_DOUBLE})«",
+            f"”({_NOT_DOUBLE})”",
+            rf"{_SINGLE_OPEN}((?:(?!{_SINGLE_OPEN}).)*)['’](?!\w)",
+        ]
+    ),
+    re.DOTALL,
+)
+_STRAY_MARK = re.compile(
+    '["＂“”„‟«»‘‚‛‹›「」『』〝〞〟]'
+    + f"|{_SINGLE_OPEN}"
+)
+
+
+def quotations(text: str) -> list[str] | None:
+    """The words `text` puts in quotation marks, in order, or None when a quotation mark is left unpaired (decision
+    above). Matched quotations are blanked with NUL before the stray-mark search, which keeps every other position
+    and makes a mark right after a quotation count as preceded by a non-letter."""
+    found: list[str] = []
+    rest = list(text)
+    for m in _QUOTATION.finditer(text):
+        found.append(next(g for g in m.groups() if g is not None))
+        rest[m.start() : m.end()] = "\0" * (m.end() - m.start())
+    return None if _STRAY_MARK.search("".join(rest)) else found
+
+
+def verbatim_words(haystack: str, words: str) -> bool:
+    """True when the quoted `words` occur in `haystack` exactly, not as part of a longer word (decision above)."""
+    words = words.strip()
+    if words.endswith((",", ".")) and not words.endswith(".."):
+        words = words[:-1].rstrip()
+    if not _WORD.search(words):
+        return False
+    pattern = ("(?<!\\w)" if re.match(r"\w", words) else "") + re.escape(words) + ("(?!\\w)" if re.search(r"\w$", words) else "")
+    return re.search(pattern, haystack) is not None
+
+
+Finder = Callable[[int | None, str], "tuple[DocRef, tuple[int, int], str] | str"]
 
 
 def checked_sentences(raw: Any, *, who: str, find: Finder) -> tuple[list[dict], list[dict]]:
     """(sentences that passed, in QUESTIONS order; dropped notes as trace detail rows {text, reason}).
 
     A sentence passes when it answers one of QUESTIONS not answered yet in this reply, is not about readers
-    (_READER_META), and its quote passes quote_problem and `find(document_id, quote)`, which returns the document and
-    the code-point span [start, end) of the quote in that document's text, or why it failed. The sentence text is model
-    output: a string (anything else fails closed), whitespace collapsed and clipped to READING_SENTENCE_CAP."""
+    (_READER_META), pairs every quotation mark it uses (quotations), its quote passes quote_problem and
+    `find(document_id, quote)`, which returns the document, the code-point span [start, end) of the quote in that
+    document's text and that text, or why it failed, and every quotation in it is verbatim in that text
+    (verbatim_words). The sentence text is model output: a string (anything else fails closed), whitespace collapsed
+    and clipped to READING_SENTENCE_CAP, and the checks run on the clipped text, the one that is published."""
     kept: dict[str, dict] = {}
     notes: list[dict] = []
     for item in raw if isinstance(raw, list) else []:
@@ -216,6 +278,8 @@ def checked_sentences(raw: Any, *, who: str, find: Finder) -> tuple[list[dict], 
             reason = "empty sentence"
         elif _READER_META.search(text):
             reason = "written about readers, not stated directly"
+        elif (quoted := quotations(text)) is None:
+            reason = "unpaired quotation mark in the sentence"
         else:
             reason = quote_problem(quote)
         found: Any = None
@@ -223,10 +287,12 @@ def checked_sentences(raw: Any, *, who: str, find: Finder) -> tuple[list[dict], 
             found = find(_doc_id(item.get("document_id")), quote)
             if isinstance(found, str):
                 reason = found
+            elif not all(verbatim_words(found[2], words) for words in quoted):
+                reason = "quotation in the sentence not found verbatim"
         if reason is not None:
             notes.append({"text": text or ("(empty)" if is_text else "(not a string)"), "reason": f"{who}: {reason}{label}"})
             continue
-        doc, (start, end) = found
+        doc, (start, end), _ = found
         kept[answers] = {"answers": answers, "text": text, "quote": quote, "url": doc["url"], "document_id": doc["id"], "char_start": start, "char_end": end}
     return [kept[q] for q in QUESTIONS if q in kept], notes
 
@@ -239,7 +305,7 @@ def outlet_finder(d: DocRef, fetched: FetchResult) -> Finder:
         if doc_id != d["id"]:
             return "quote cited from another document than this outlet's"
         span = find_quote(fetched.quote_text, quote)
-        return (d, span) if span else "quote not found verbatim in the text the run read"
+        return (d, span, fetched.quote_text) if span else "quote not found verbatim in the text the run read"
 
     return find
 
@@ -257,7 +323,7 @@ def flank_finder(inputs: dict[tuple[int, str], DocRef], *, dry_run: bool) -> Fin
         except Exception as exc:  # noqa: BLE001 — a failed re-read drops this sentence, not the frame step
             return f"its document's text could not be read again ({untrusted.public_failure(exc)})"
         span = find_quote(fetched.quote_text, quote) if fetched is not None else None
-        return (doc, span) if span else "quote no longer verbatim in its document's text"
+        return (doc, span, fetched.quote_text) if span else "quote no longer verbatim in its document's text"
 
     return find
 
