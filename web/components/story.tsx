@@ -22,6 +22,7 @@ const KEY_LINE =
 const SAYS = "says";
 const STATUS_WORDS: Record<string, string> = { disputed: "disputed", unknown: "unknown" };
 const RUN_IN = "Not confirmed.";
+const APPENDIX_KICKER = "Appendix";
 const APPENDIX_TITLE = "Across the spectrum";
 const APPENDIX_TAIL = " · Evidence and investigation";
 const APPENDIX_SUB = "How the outlets told this story, every claim with its evidence, and the trace of the investigation.";
@@ -306,8 +307,8 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
           </p>
         ))}
       </article>
-      <hr className="story-end" />
       <div className="story-appendix">
+        <p className="story-appendix-kicker">{APPENDIX_KICKER}</p>
         <h2 className="story-appendix-title">
           {APPENDIX_TITLE}
           <span className="story-appendix-tail">{APPENDIX_TAIL}</span>

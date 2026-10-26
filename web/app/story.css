@@ -222,41 +222,52 @@
   border-radius: var(--radius-s);
 }
 
-/* The end of the article and the appendix head */
-.story-end {
-  width: 100%;
-  max-width: var(--story-measure);
-  margin: 96px auto 48px;
-  border: 0;
-  border-top: 1px solid var(--rule);
+/* The appendix: a threshold on the full column, a 2 px ink rule on top (the mark of a sheet of the product), the
+   title at 40 px with its tail beneath, then the numbered contents. No hairline after the article: the air and
+   the rule do the separating (Anastasia, 2026-10-26). */
+.story-page {
+  counter-reset: story-part;
 }
 .story-appendix {
-  max-width: var(--story-measure);
-  margin-inline: auto;
+  margin-top: 128px;
+  padding-top: 32px;
+  border-top: 2px solid var(--ink);
+}
+.story-page .story-appendix-kicker {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
 }
 .story-page .story-appendix-title {
-  margin: 0;
-  font-size: 28px;
-  line-height: 1.15;
+  margin: 12px 0 0;
+  font-size: clamp(32px, 3.4vw, 40px);
+  line-height: 1.08;
   font-weight: 500;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
   color: var(--ink);
+  max-width: 20ch;
 }
 .story-appendix-tail {
-  font-size: 15px;
+  display: block;
+  margin-top: 10px;
+  font-size: 20px;
+  line-height: 1.45;
   font-weight: 400;
   letter-spacing: 0;
   color: var(--ink-2);
-  white-space: nowrap;
+  white-space: normal;
 }
 .story-page .story-appendix-sub {
-  margin-top: 12px;
-  font-size: 15px;
-  line-height: 1.55;
+  margin-top: 20px;
+  font-size: 17px;
+  line-height: 1.6;
   color: var(--ink-2);
+  max-width: 60ch;
 }
 .story-page .story-appendix-data {
-  margin-top: 8px;
+  margin-top: 12px;
   font-size: 13px;
   line-height: 1.5;
   color: var(--ink-2);
@@ -267,22 +278,23 @@
   font-size: 15px;
   line-height: 1.55;
   color: var(--ink-2);
+  max-width: 60ch;
 }
 .story-page .story-appendix-bar strong {
   font-weight: 500;
   color: var(--ink);
 }
 
-/* The workspace sections under the appendix: the contents line and the heads on the measure, eyebrows and
-   icons hidden by CSS; ids, headings, rows and controls are Vadim's and unchanged. */
+/* The contents line and the three sections: each section one object on the full column, a hairline above its
+   head, the head and the body on the same left edge, a part number before the title; 96 px of air between. */
 .story-page .analysis-navigation {
-  max-width: var(--story-measure);
-  margin: 24px auto 0;
+  margin: 32px 0 0;
   padding: 0;
   border-top: 0;
   border-bottom: 0;
-  gap: 24px;
+  gap: 32px;
   flex-wrap: wrap;
+  counter-reset: story-nav;
 }
 .story-page .analysis-navigation a {
   font-size: 15px;
@@ -291,6 +303,13 @@
   color: var(--ink);
   min-height: 24px;
   text-decoration: none;
+  counter-increment: story-nav;
+}
+.story-page .analysis-navigation a::before {
+  content: counter(story-nav, decimal-leading-zero) " ";
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
 }
 .story-page .analysis-navigation a:hover {
   text-decoration: underline;
@@ -301,44 +320,59 @@
   display: none;
 }
 .story-page .analysis-navigation + .analysis-block {
-  margin-top: 64px;
+  margin-top: 96px;
 }
 .story-page .analysis-block {
-  padding-top: 0;
   margin-top: 96px;
+  padding-top: 32px;
+  border-top: 1px solid var(--rule);
   scroll-margin-top: 88px;
+  counter-increment: story-part;
 }
 .story-page .analysis-block-heading {
-  max-width: var(--story-measure);
-  margin: 0 auto 32px;
+  max-width: none;
+  margin: 0 0 28px;
 }
 .story-page .analysis-block-heading .eyebrow {
   display: none;
 }
 .story-page .analysis-block-heading h2 {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.2;
+  font-size: 28px;
+  line-height: 1.15;
   font-weight: 500;
   letter-spacing: -0.015em;
 }
-.story-page .analysis-block-heading > p:last-child {
-  margin-top: 8px;
-  font-size: 15px;
-  line-height: 1.55;
+.story-page .analysis-block-heading h2::before {
+  content: counter(story-part, decimal-leading-zero);
+  display: inline-block;
+  margin-right: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   color: var(--ink-2);
-  max-width: none;
+  vertical-align: 0.4em;
+  font-variant-numeric: tabular-nums;
+}
+.story-page .analysis-block-heading > p:last-child {
+  margin-top: 10px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+.story-page .analysis-block-heading + .claim-detail {
+  border-top: 0;
 }
 .story-page .revision-section {
   margin-top: 96px;
-  padding-top: 0;
-  border-top: 0;
+  padding-top: 32px;
+  border-top: 1px solid var(--rule);
 }
 .story-page .revision-section > h2 {
-  max-width: var(--story-measure);
-  margin: 0 auto 24px;
-  font-size: 24px;
-  line-height: 1.2;
+  margin: 0 0 24px;
+  font-size: 28px;
+  line-height: 1.15;
 }
 .story-page .claim-detail {
   scroll-margin-top: 88px;
@@ -366,26 +400,28 @@
     font-size: 17px;
     line-height: 1.6;
   }
-  .story-end {
-    margin: 64px auto 32px;
+  .story-appendix {
+    margin-top: 80px;
+    padding-top: 24px;
   }
   .story-page .story-appendix-title {
-    font-size: 24px;
+    font-size: 30px;
   }
   .story-appendix-tail {
-    display: block;
-    white-space: normal;
+    font-size: 18px;
+  }
+  .story-page .analysis-navigation {
+    gap: 16px 24px;
   }
   .story-page .analysis-block-heading h2,
   .story-page .revision-section > h2 {
-    font-size: 22px;
+    font-size: 24px;
   }
   .story-page .analysis-block,
-  .story-page .revision-section {
-    margin-top: 64px;
-  }
+  .story-page .revision-section,
   .story-page .analysis-navigation + .analysis-block {
-    margin-top: 48px;
+    margin-top: 64px;
+    padding-top: 24px;
   }
   .story-page .analysis-block,
   .story-page .claim-detail {
