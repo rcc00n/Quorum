@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import type { Snapshot, User, Event } from "@/lib/api";
+import type { Snapshot, Topic, User, Event } from "@/lib/api";
 import type { EditionPresentation } from "@/lib/editorial";
 import { visibleStories, isQuietDay, licensedPhoto } from "@/lib/editorial";
 import { describeCut, utcLabel } from "@/lib/edition-cut.mjs";
@@ -66,12 +66,24 @@ function StoryCard({ event, topicName, day, lead }: { event: Event; topicName: s
 }
 
 export function TodayBoard({ data, user, day, today, onDay }: Props) {
-  const followedIds = user?.topics ?? [];
-  const topics = (data?.topics ?? []).filter((t) => followedIds.includes(t.id));
+  // DECISION(2026-10-26, Anastasia/Claude Code; Yelysei's review of PR #27): sections come from the user's own
+  // topics, not from data.topics ∩ user.topics, so a followed topic missing from the snapshot's list and a
+  // `requested:<key>` entry still get a section ("Waiting for its first brief"); the legacy id `ukraine-aid` maps
+  // to `russia-ukraine-war` (DECISIONS › User account and interface item 2).
+  const followedIds = Array.from(new Set((user?.topics ?? []).map((id) => (id === "ukraine-aid" ? "russia-ukraine-war" : id))));
+  const catalog = new Map((data?.topics ?? []).map((t) => [t.id, t]));
+  const topics = followedIds.map((id) => {
+    const known = catalog.get(id);
+    if (known) return { topic: known, waitingFirst: false };
+    const requested = id.startsWith("requested:");
+    return { topic: { id, name: requested ? id.slice("requested:".length) : id } as Topic, waitingFirst: true };
+  });
   const stories = visibleStories(data?.events ?? [], day, "", followedIds);
   const status = data?.status ?? "pending";
+  const noEdition = data?.publication?.status === "pending"; // per date: nothing installed for this day
   const { cut, passed, hoursUntil } = describeCut(day);
   const isToday = day === today;
+  const isPast = day < today;
   const n = topics.length;
 
   return (
@@ -82,12 +94,12 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
             {isToday ? "Today" : "Edition"}, <span className="tb-date">{longDate(day)}</span>
           </h1>
           <p className="tb-count">{`${n} ${n === 1 ? "topic" : "topics"} in your brief`}</p>
-          {status === "pending" && (
+          {noEdition && (
             <p className="tb-status">
-              No editions have been published to this portal yet. No published events are available for this edition.
+              {`No edition for ${longDate(day)} is installed on this portal. No published events are available for this edition.`}
             </p>
           )}
-          {status !== "pending" && status !== "demo" && stories.length === 0 && (
+          {!noEdition && status !== "demo" && stories.length === 0 && (
             <p className="tb-status">No published events are available for this edition.</p>
           )}
         </div>
@@ -113,18 +125,22 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
         </section>
       )}
 
-      {topics.map((t, i) => {
+      {topics.map(({ topic: t, waitingFirst }, i) => {
         const own = stories.filter((e) => e.topic_id === t.id);
         const edition = data?.editions?.find((e) => e.topic_id === t.id && e.date === day);
         const quiet = !!(data && edition && isQuietDay(data, edition));
         const below = roundupCount(edition);
-        const meta = quiet
-          ? "No story crossed the bar today"
-          : own.length
-            ? `${own.length} ${own.length === 1 ? "story" : "stories"} today`
-            : passed
-              ? "Waiting for the edition"
-              : `Cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
+        const meta = waitingFirst
+          ? "Waiting for its first brief"
+          : quiet
+            ? "No story crossed the bar today"
+            : own.length
+              ? `${own.length} ${own.length === 1 ? "story" : "stories"} today`
+              : isPast && noEdition
+                ? "No edition installed for this date"
+                : passed
+                  ? "Waiting for the edition"
+                  : `Cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
         return (
           <section key={t.id} className={`tb-section tb-tint-${(i % 4) + 1}`} aria-labelledby={`tb-${t.id}`}>
             <div className="tb-section-head">

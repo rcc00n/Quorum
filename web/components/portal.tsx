@@ -371,7 +371,7 @@ export function Portal({
                   findings.
                 </p>
               )}
-              {view !== "dashboard" && <PublicationNotice publication={data?.publication} />}
+              <PublicationNotice publication={data?.publication} />
               {message && (
                 <p className="message" role="status">
                   {message}
@@ -453,7 +453,28 @@ export function Portal({
               ) : view === "onboarding" ? (
                 topicsPanel
               ) : view === "dashboard" ? (
-                <TodayBoard data={data} user={user} day={day} today={today()} onDay={(d) => setDay(d)} />
+                // DECISION(2026-10-26, Anastasia/Claude Code; Yelysei's review of PR #27): the board keeps the honest
+                // empty states and the edition notes of the brief view; a failed, stale or partial edition never
+                // reads as "waiting" (DECISIONS › User account and interface, Guards).
+                data?.status === "error" || data?.publication?.status === "error" ? (
+                  <Empty title="This edition is unavailable">
+                    A data or processing failure prevented this edition from loading. No completed quiet day is
+                    inferred.
+                  </Empty>
+                ) : data?.publication?.status === "stale" ? (
+                  <Empty title="This stored edition is out of date">
+                    No stories are available in this stored edition. A current result has not been supplied.
+                  </Empty>
+                ) : data?.publication?.status === "partial" ? (
+                  <Empty title="This edition is incomplete">
+                    No completed major-story selection was supplied. Further results may still be missing.
+                  </Empty>
+                ) : (
+                  <>
+                    <TodayBoard data={data} user={user} day={day} today={today()} onDay={(d) => setDay(d)} />
+                    {data && <EditionNotes snapshot={data} day={day} topic="" followed={user?.topics || []} />}
+                  </>
+                )
               ) : view === "event" ? (
                 (() => {
                   const event = data?.events.find((e) => e.id === id);
