@@ -348,6 +348,10 @@ review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-re
 
   Whether this already counts as 'Build rule met' is Yelysei's decision, asked 2026-10-26. Not DEPLOYED: canonical
   editions keep `[engines] hmem = "off"`.
+  Launch environment: the engine-backed tests ran again at 7d7a3f1, with the allowlisted sidecar environment
+  (`tools/memory._SIDECAR_ENV`) and `METERLESS_HOME` set (2026-10-26 21:56Z: 16 passed, 2 symlink skips, exit
+  0); the live check ran before that change, with the inherited environment, and has not been repeated
+  (hand-over log › Status).
 - NOT_STARTED: a live eval run (`tests/eval.py --live`, opt-in); the sources-registry load for the coverage
   denominators (`sources_missing` is still `[]`; product decision pending).
 - DEFERRED for the hackathon, stated here so nothing is implied (DECISIONS.md log, 2026-10-24): `server.py`
