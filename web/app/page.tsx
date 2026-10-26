@@ -505,17 +505,15 @@ export default function Home() {
               const group = GROUP_OF_NODE[r.node] ?? "";
               const head = group !== lastGroup;
               lastGroup = group;
-              const loop = loopByFrom.get(r.node);
-              const loops_back = loop && /back to/.test(r.reason);
+              // A loop row: the node is a loop's origin and its reason says "back to"; it gets an ink edge, no second
+              // label, because the reason already names where the run went back to.
+              const loops_back = loopByFrom.has(r.node) && /back to/.test(r.reason);
               return (
                 <Fragment key={i}>
                   {head && <h3 className="lp-group-head">{group}</h3>}
                   <div className={loops_back ? "lp-ledger-row lp-ledger-loop" : "lp-ledger-row"}>
                     <span className="lp-ledger-step">{STEP_OF_NODE[r.node] ?? ""}</span>
-                    <span className="lp-ledger-node">
-                      {r.iteration > 1 ? `${r.node} ·${r.iteration}` : r.node}
-                      {loops_back && <span className="lp-ledger-back">{`↺ back to ${loop.to}`}</span>}
-                    </span>
+                    <span className="lp-ledger-node">{r.iteration > 1 ? `${r.node} ·${r.iteration}` : r.node}</span>
                     <span className="lp-ledger-text">
                       <span className="lp-ledger-decision">{r.decision}</span>
                       <span className="lp-ledger-reason">{r.reason}</span>
