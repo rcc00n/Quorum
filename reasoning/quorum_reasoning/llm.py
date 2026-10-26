@@ -555,7 +555,8 @@ def _flag_shape(flag: Any) -> str:
 
 def _cache_refusal(met: dict[str, Any]) -> str | None:
     """Why the reply is refused as a Nightshift cache replay (`CACHE_REPLAY_REFUSED`, with the unreadable value's shape
-    named when a `from_cache` is not a boolean or a `cache` block is not an object), or None (decision at `_cache_hit`).
+    named when a `from_cache` is not a boolean, a `cache` block is not an object or a `cache` object has no readable
+    `status`), or None (decision at `_cache_hit`).
 
     DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a `from_cache` that is present, not null and not a JSON boolean
     ("true", "false", 1, 0) is refused as a cache replay (`cache_refused`, reason `CACHE_REPLAY_REFUSED` plus the value),
@@ -582,11 +583,29 @@ def _cache_refusal(met: dict[str, Any]) -> str | None:
     # naming its shape (same MemoryInjected, same `cache_refused`). Why: review round 8: such a block was skipped and the
     # reply served, the one fail-open field left in the cache verdict (coordinator decisions 3 and 4); Nightshift 1.2.3
     # always sends an object there (openai.mjs: `cache: result.receipt?.cache || {status: ...}`).
+    # DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a present `cache` object (top level or a receipt copy, a JSON
+    # string holding one included) is served only when its `status` is exactly the string "miss"; a status that is
+    # absent or null is refused naming that shape, one that is not a string is refused naming it by `_flag_shape` (a
+    # number or boolean as itself, a list or object by its type; no text of the block is copied), and any other string is
+    # a hit kind, refused with the plain reason as before. `cache: null` and an absent
+    # block still say nothing and are served. Why: closing review round 3: an object without a readable status
+    # ({}, {"status": null}, {"hit": true}) was served, the one unreadable cache verdict not refused (coordinator
+    # decision 3, as `_hmem_report` rejects an hmem block with no readable count); Nightshift 1.2.3 writes a status on
+    # every receipt cache block it builds (orchestrator.js recordReceipt: `input.cache || {status: 'miss'}`, a live
+    # answer `{status: 'miss', ...}`, a hit `{status: hit.kind, ...}`; openai.mjs falls back to `{status: hit/miss}`),
+    # so this refuses nothing it sends today and would cost one passage per such reply.
     for name, raw in [("cache", met.get("cache")), *(("a receipt's cache", r.get("cache")) for r in _receipt_copies(met))]:
         block, shape = _json_object(raw)
         if shape:
             return f"{CACHE_REPLAY_REFUSED} ({name} is {shape}, not an object)"
-        if block is not None and block.get("status") is not None and block.get("status") != "miss":
+        if block is None:
+            continue
+        status = block.get("status")
+        if status is None:
+            return f"{CACHE_REPLAY_REFUSED} ({name} has no readable status: absent or null)"
+        if not isinstance(status, str):
+            return f"{CACHE_REPLAY_REFUSED} ({name} has no readable status: {_flag_shape(status)}, not a string)"
+        if status != "miss":
             return CACHE_REPLAY_REFUSED
     return None
 
@@ -594,9 +613,10 @@ def _cache_refusal(met: dict[str, Any]) -> str | None:
 def _cache_hit(met: dict[str, Any]) -> bool:
     """True when the runtime answered from its own answer cache: the top-level `from_cache` or any receipt copy's
     `from_cache` is true (or not a boolean: decisions at `_cache_refusal`), or the top-level `cache` block or any receipt
-    copy's `cache` block has a `status` other than
-    "miss" (Nightshift writes the hit kind there, "exact" or "semantic"; every live answer says "miss") or is present but
-    not an object (decision in `_cache_refusal`).
+    copy's `cache` block is an object whose `status` is not exactly the string "miss" (Nightshift writes the hit kind
+    there, "exact" or "semantic"; every live answer says "miss"; a status that is absent, null or not a string is
+    unreadable and refused too) or is present but not an object (decisions in `_cache_refusal`); `cache: null` and an
+    absent block say nothing.
 
     DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): on the Meterless route a cache hit is refused like an injected
     reply: an error row (`cache_refused: true`, `cache_refused_count()`, counted apart from `hmem_rejected`), the reply

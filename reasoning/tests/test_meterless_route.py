@@ -855,6 +855,76 @@ def test_cache_block_that_is_not_an_object_is_refused(live, tmp_path, monkeypatc
     assert llm.load_journal(path) == 1 and llm.replay == {}  # not journalled for replay
 
 
+CACHE_TEXT = "cache-text-never-copied"  # text inside an unreadable cache object: it must not reach any failure string
+
+
+def _with_cache_block(where: str, cache) -> tuple[dict, str]:
+    """A clean Ultra receipt whose `cache` block at `where` is `cache` (every other block present says "miss"), and the
+    name the refusal gives that block."""
+    met = _met(ULTRA, ULTRA, ULTRA, hmem=None)
+    if where == "top":
+        met["cache"] = cache
+        return met, "cache"
+    met["cache"] = {"status": "miss"}
+    copy = {"hmem": None, "cache": cache}
+    if where == "receipt":
+        met["receipt"] = copy
+    elif where == "envelope body.receipt":
+        met["receipt_envelope"] = {"body": {"receipt": copy}}
+    else:  # the envelope's receipt beside its body
+        met["receipt_envelope"] = {"body": {}, "receipt": copy}
+    return met, "a receipt's cache"
+
+
+@pytest.mark.parametrize("where", ["top", "receipt", "envelope body.receipt", "envelope receipt"])
+@pytest.mark.parametrize("cache,shape", [
+    ({}, "absent or null"),
+    ({"status": None}, "absent or null"),
+    ({"hit": True}, "absent or null"),
+    ({"kind": "exact", "note": CACHE_TEXT}, "absent or null"),
+    (json.dumps({"source": CACHE_TEXT}), "absent or null"),  # a JSON string holding an object without a status
+    ({"status": 1}, "1, not a string"),
+    ({"status": True}, "true, not a string"),
+    ({"status": ["miss"]}, "a list, not a string"),
+    ({"status": {"kind": CACHE_TEXT}}, "a dict, not a string"),
+])
+def test_cache_object_without_a_readable_status_is_refused(live, tmp_path, monkeypatch, where, cache, shape):
+    """Closing round 3: a `cache` object whose status was absent, null or not a string ({}, {"status": null},
+    {"hit": true}, {"kind": "exact"}) was served, at the top level and in every receipt copy, while an hmem block with no
+    readable count was rejected. It is now refused as a cache replay naming the shape only (no text of the block copied),
+    in the ledger error and the MemoryInjected message alike; probe() and test_connection() refuse it too."""
+    path = tmp_path / "j.jsonl"
+    monkeypatch.setattr(llm, "journal_path", path)
+    met, name = _with_cache_block(where, cache)
+    reason = f"{llm.CACHE_REPLAY_REFUSED} ({name} has no readable status: {shape})"
+    assert llm._hmem_report(met) == (0, None) and llm._cache_refusal(met) == reason and llm._cache_hit(met)
+    live(_completion(ULTRA, met))
+    with pytest.raises(llm.MemoryInjected, match="nightshift cache replay refused") as caught:
+        llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")
+    row = llm.calls[-1]
+    assert row["served"] == "error" and row["cache_refused"] is True and row["error"] == reason
+    assert "hmem_rejected" not in row and "reply_sha256" not in row
+    assert llm.cache_refused_count() == 1 and llm.hmem_rejected_count() == 0
+    with pytest.raises(llm.MemoryInjected) as refused:
+        llm._refuse_injected("connection test on fact_checker", met)  # what probe() and test_connection() call
+    for text in (row["error"], str(caught.value), str(refused.value)):
+        assert reason in text and CACHE_TEXT not in text and '"miss"' not in text
+    llm.reset_calls()
+    assert llm.load_journal(path) == 1 and llm.replay == {}  # not journalled for replay
+
+
+@pytest.mark.parametrize("where", ["top", "receipt", "envelope body.receipt", "envelope receipt"])
+@pytest.mark.parametrize("cache", [None, {"status": "miss", "losers_reclaimed": 0}, json.dumps({"status": "miss"})])
+def test_cache_null_or_miss_object_in_any_copy_is_served(live, where, cache):
+    """Closing round 3: the readable-status rule refuses only present objects; `cache: null` (says nothing) and an
+    object whose status is exactly "miss" are still served at the top level and in every receipt copy."""
+    met, _ = _with_cache_block(where, cache)
+    assert llm._cache_refusal(met) is None
+    live(_completion(ULTRA, met))
+    assert llm.json_task("stance", {"claim": "c"}, dry_run=False, which="fact_checker")["stance"] == "neutral"
+    assert not llm.calls[-1].get("error") and llm.cache_refused_count() == 0
+
+
 STRING_FLAG = "cache-flag-text-never-copied"  # a string `from_cache`: its text must not reach any failure string
 
 
