@@ -4,8 +4,9 @@ that turns H-MEM injection off before the first call, and `--test-connection` ou
 
 No network and no credits: the client is a fake returning SimpleNamespace completions shaped like the SDK's, and the
 daemon's control plane is a fake `llm._control_http` or `llm._control_exchange`. The real pipe is never opened: the
-suite-wide autouse guard in tests/conftest.py fails any test that reaches `llm._control_exchange` unfaked or hands the
-daemon's real pipe name to `llm._open_pipe` or `llm._wait_named_pipe` (proved by
+suite-wide guard in tests/conftest.py (per test, and for the whole session: imports and fixtures of every scope) fails
+any test that reaches `llm._control_exchange` unfaked or hands the daemon's real pipe name to `llm._open_pipe` or
+`llm._wait_named_pipe` (proved by
 test_suite_guard_fails_a_test_that_forgets_the_stub), and the `_control_exchange` tests ask for its
 `real_control_exchange` fixture and replace `open` inside llm.
 """
@@ -25,9 +26,9 @@ import pytest
 
 from quorum_reasoning import graph, ids, llm, run
 
-# captured at import, before any fixture replaces them
+# captured at import, before any fixture replaces it (the three guarded seams come from the unguarded_control_seams
+# fixture: the session guard in tests/conftest.py replaces them before this module is imported)
 _REAL_CONTROL_HTTP = llm._control_http
-_REAL_CONTROL_EXCHANGE, _REAL_OPEN_PIPE, _REAL_WAIT_NAMED_PIPE = llm._control_exchange, llm._open_pipe, llm._wait_named_pipe
 LIGHTNING = "nvidia/nemotron-3.5-lightning-30b-a3b"
 ULTRA = "nvidia/nemotron-3-ultra-550b-a55b"
 ENV_NAMES = ("MODEL_BASE_URL", "MODEL_API_KEY", "METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN", "METERLESS_TOKEN",
@@ -2040,24 +2041,44 @@ def test_control_responses_shorter_than_announced_are_refused(raw):
 # The suite-wide guard (tests/conftest.py), proved with a mutant ------------------------------------------------------
 
 FORGETFUL_TEST = '''
+import pytest
+
 from quorum_reasoning import graph, llm, run
 
 NAMES = %r
 
 
-def test_forgets_the_stub(monkeypatch, tmp_path):
+def _forgetful_live_run(mp, out):
     """A live run on the Meterless route that stubs neither run.live_guard nor the control plane."""
-    monkeypatch.setattr(llm, "_loaded", True)  # never the real .env
+    mp.setattr(llm, "_loaded", True)  # never the real .env
     for name in NAMES:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("METERLESS_TOKEN", "test-token-not-real")
+        mp.delenv(name, raising=False)
+    mp.setenv("METERLESS_TOKEN", "test-token-not-real")
 
     def abort(*a, **k):
         raise llm.RateLimitAbort("m", 2)
 
-    monkeypatch.setattr(graph, "run_local", abort)
-    monkeypatch.setattr(llm, "current_run_id", None)
-    assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 3
+    mp.setattr(graph, "run_local", abort)
+    mp.setattr(llm, "current_run_id", None)
+    return run.main(["--model", "live", "--quiet", "--out", str(out)])
+
+
+def test_forgets_the_stub(monkeypatch, tmp_path):
+    assert _forgetful_live_run(monkeypatch, tmp_path) == 3
+
+
+@pytest.fixture(scope="module")
+def forgetful_module_fixture(tmp_path_factory):
+    """The same run from a module-scoped fixture, which runs before any function-scoped fixture of its test."""
+    mp = pytest.MonkeyPatch()
+    try:
+        yield _forgetful_live_run(mp, tmp_path_factory.mktemp("out"))
+    finally:
+        mp.undo()
+
+
+def test_forgets_the_stub_in_a_module_fixture(forgetful_module_fixture):
+    assert forgetful_module_fixture == 3
 ''' % (ENV_NAMES,)
 
 
@@ -2088,6 +2109,58 @@ def test_open_pipe_on_the_derived_name(monkeypatch):
 def test_wait_named_pipe_on_the_derived_name(monkeypatch):
     monkeypatch.delenv("METERLESS_CONTROL_SOCKET")
     llm._wait_named_pipe(llm.control_socket_path(), 50)
+"""
+
+
+# the session guard's layers, outside any test function: at the module's import and in module-scoped fixtures
+GUARD_LAYERS_OUTSIDE_TESTS = """
+import pytest
+
+from quorum_reasoning import llm
+
+try:  # at import, while pytest collects this module: only the session guard is in place
+    llm._control_exchange(llm.control_socket_path(), b"GET /admin/import HTTP/1.1\\r\\n\\r\\n")
+except BaseException:
+    pass
+
+
+@pytest.fixture(scope="module")
+def swallowed():
+    try:
+        llm._control_exchange(llm.control_socket_path(), b"GET /admin/module HTTP/1.1\\r\\n\\r\\n")
+    except BaseException:
+        pass
+
+
+def _on_the_derived_name(call):
+    mp = pytest.MonkeyPatch()
+    try:
+        mp.delenv("METERLESS_CONTROL_SOCKET")
+        call(llm.control_socket_path())
+    finally:
+        mp.undo()
+
+
+@pytest.fixture(scope="module")
+def opened():
+    _on_the_derived_name(llm._open_pipe)
+
+
+@pytest.fixture(scope="module")
+def waited():
+    _on_the_derived_name(lambda where: llm._wait_named_pipe(where, 50))
+
+
+def test_after_a_module_fixture_that_swallowed_the_failure(swallowed):
+    pass
+
+
+def test_module_fixture_opens_the_derived_name(opened):
+    pass
+
+
+def test_module_fixture_waits_on_the_derived_name(waited):
+    pass
 """
 
 
@@ -2135,15 +2208,18 @@ def _inner_session(root: Path, files: dict[str, str]) -> _InnerSession:
     return session
 
 
-def test_suite_guard_fails_a_test_that_forgets_the_stub(tmp_path, monkeypatch):
-    """Coordinator decision 2 (round 3) and review round 4. Inner sessions run in this process (`_inner_session`) with a
-    fake profile, so even the derived pipe name is one that does not exist, and a sentinel `open` inside llm stands in
-    for the pipe in all of them: the real daemon is never touched.
+def test_suite_guard_fails_a_test_that_forgets_the_stub(tmp_path, monkeypatch, unguarded_control_seams):
+    """Coordinator decision 2 (round 3), review round 4 and final review round 2. Inner sessions run in this process
+    (`_inner_session`) with a fake profile, so even the derived pipe name is one that does not exist, and a sentinel
+    `open` inside llm stands in for the pipe in all of them: the real daemon is never touched.
 
-    Without tests/conftest.py (the mutant) the forgetful test reaches the derived name. With it, the forgetful test fails
-    before anything is opened, and each guard layer fails its own test: the teardown re-check (a test that swallows the
-    stub's failure), the real-name refusal of `real_control_exchange`, and the real-name refusals of `_open_pipe` and
-    `_wait_named_pipe`; removing any one of them makes this test fail."""
+    Without tests/conftest.py (the mutant) the forgetful test and the forgetful module-scoped fixture each reach the
+    derived name. With it, both fail before anything is opened, and each guard layer fails its own test: the teardown
+    re-check (a test that swallows the stub's failure), the real-name refusal of `real_control_exchange`, and the
+    real-name refusals of `_open_pipe` and `_wait_named_pipe`; outside any test function the session guard does the same
+    (the stub in a module-scoped fixture, the refusals of `_open_pipe` and `_wait_named_pipe` there, and the re-check at
+    the session's end of what a module's import and a module-scoped fixture swallowed); removing any one of them makes
+    this test fail."""
     import socket
 
     reached: list[str] = []
@@ -2170,21 +2246,35 @@ def test_suite_guard_fails_a_test_that_forgets_the_stub(tmp_path, monkeypatch):
     else:
         assert expected == llm.CONTROL_SOCKET_POSIX
     # the unguarded originals, as in a session without the guard (the guarded session's conftest captures these)
-    monkeypatch.setattr(llm, "_control_exchange", _REAL_CONTROL_EXCHANGE)
-    monkeypatch.setattr(llm, "_open_pipe", _REAL_OPEN_PIPE)
-    monkeypatch.setattr(llm, "_wait_named_pipe", _REAL_WAIT_NAMED_PIPE)
+    for seam, real in unguarded_control_seams.items():
+        assert (real.__module__, real.__qualname__) == (llm.__name__, seam) and not hasattr(real, "__wrapped__"), seam
+        monkeypatch.setattr(llm, seam, real)
 
     mutant = _inner_session(tmp_path / "mutant", {"test_forgetful.py": FORGETFUL_TEST})  # no conftest: the guard removed
     assert mutant.phase("test_forgets_the_stub").failed
-    assert reached == [expected], "without the guard the forgetful test reaches the derived control pipe"
+    assert mutant.phase("test_forgets_the_stub_in_a_module_fixture").failed
+    assert reached == [expected, expected], "without the guard the forgetful test and fixture reach the derived pipe"
 
     reached.clear()
     conftest = Path(__file__).with_name("conftest.py").read_text(encoding="utf-8")
     guarded = _inner_session(tmp_path / "guarded", {"conftest.py": conftest, "test_forgetful.py": FORGETFUL_TEST,
-                                                    "test_guard_layers.py": GUARD_LAYER_TESTS})
+                                                    "test_guard_layers.py": GUARD_LAYER_TESTS,
+                                                    "test_guard_layers_outside_tests.py": GUARD_LAYERS_OUTSIDE_TESTS})
     forgetful = guarded.phase("test_forgets_the_stub")
     assert forgetful.failed and ("a test reached the Meterless control plane unfaked: GET /admin/setpoints HTTP/1.1 on "
                                  + FAKE_PIPE) in forgetful.longreprtext
+    outside = "code outside a test function (a test module's import or a session-, module- or class-scoped fixture)"
+    in_fixture = guarded.phase("test_forgets_the_stub_in_a_module_fixture", "setup")
+    assert in_fixture.failed and (f"{outside} reached the Meterless control plane unfaked: GET /admin/setpoints "
+                                  f"HTTP/1.1 on {FAKE_PIPE}") in in_fixture.longreprtext
+    for test, seam in (("opens", "_open_pipe"), ("waits_on", "_wait_named_pipe")):
+        report = guarded.phase(f"test_module_fixture_{test}_the_derived_name", "setup")
+        assert report.failed and f"{outside} reached the daemon's real control pipe or socket through llm.{seam}: {expected}" in report.longreprtext
+    assert guarded.phase("test_after_a_module_fixture_that_swallowed_the_failure").passed
+    at_the_end = [r for r in guarded.reports if r.when == "teardown" and r.failed and f"{outside} reached" in r.longreprtext]
+    assert len(at_the_end) == 1, "the session's end re-checks what code outside a test function swallowed"
+    for swallowed_line in ("GET /admin/import HTTP/1.1", "GET /admin/module HTTP/1.1"):
+        assert f"{swallowed_line} on {FAKE_PIPE}" in at_the_end[0].longreprtext
     swallowed = guarded.phase("test_swallows_the_failure")
     teardown = guarded.phase("test_swallows_the_failure", "teardown")
     assert swallowed.passed and teardown.failed  # the teardown re-check
