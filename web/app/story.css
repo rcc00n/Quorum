@@ -284,12 +284,92 @@
   font-weight: 500;
   color: var(--ink);
 }
+/* The spectrum body: two columns of the writer's own words, then the interpretations, the note, a silent cohort,
+   and the two links that lead to the numbers. */
+.story-spectrum {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+.story-spectrum-one {
+  grid-template-columns: minmax(0, 1fr);
+}
+.story-page .story-spectrum-side h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+}
+.story-spectrum-side dl {
+  margin: 0;
+}
+.story-spectrum-side dt {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.story-spectrum-side dd {
+  margin: 2px 0 12px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.story-spectrum-example {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+.story-spectrum-example:hover {
+  text-decoration-color: var(--umber);
+}
+.story-page .story-appendix-read,
+.story-page .story-appendix-note {
+  margin-top: 20px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+.story-page .story-appendix-silence {
+  margin-top: 20px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--ink);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 12px 0;
+  max-width: 60ch;
+}
+.story-page .story-appendix-links {
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.story-page .story-appendix-links a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+.story-page .story-appendix-links a:hover {
+  text-decoration-color: var(--umber);
+}
 
 /* The contents line and the three sections: each section one panel on the full column with its own paper
    (Anastasia, 2026-10-26: the sections must stand apart as objects): 01 on --paper-2, 02 on paper in a hairline
    frame, 03 on --paper-3; 8 px corners, the head and the body inside on one left edge, a part number before the
    title; 32 px between panels. */
 .story-page .analysis-navigation {
+  display: none; /* the appendix's own two links lead to the panels */
   margin: 32px 0 0;
   padding: 0;
   border-top: 0;
@@ -422,8 +502,9 @@
   .story-appendix-tail {
     font-size: 18px;
   }
-  .story-page .analysis-navigation {
-    gap: 16px 24px;
+  .story-spectrum {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
   }
   .story-page .analysis-block-heading h2,
   .story-page .revision-section > h2 {
