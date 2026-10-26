@@ -998,8 +998,11 @@ def test_setter_puts_exactly_hmem_false_on_the_wire(live, monkeypatch):
     ({"readback": True}, "read back as true"),
     ({"readback": None}, "read back as null"),  # an explicit JSON null in the document
     ({"readback": ABSENT}, "read back as null"),  # the key missing from the document
-    ({"readback": "false"}, 'read back as "false"'),  # the string, not the JSON literal
+    ({"readback": "false"}, "read back as a string"),  # the string, not the JSON literal; closing round 2: named by shape
+    ({"readback": {"note": "x"}}, "read back as an object"),
+    ({"readback": ["x"]}, "read back as an array"),
     ({"readback": 0}, "read back as 0"),
+    ({"readback": 1.5}, "read back as 1.5"),
     ({"readback_status": 404}, "cannot confirm H-MEM injection is off: GET /admin/setpoints answered HTTP 404"),
     ({"get_status": 404}, "the first GET /admin/setpoints answered HTTP 404"),
     ({"post_status": 400}, "POST /admin/setpoints answered HTTP 400"),
@@ -1014,6 +1017,50 @@ def test_failed_readback_is_a_live_start_failure(live, control, monkeypatch, tmp
     assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
     err = capsys.readouterr().err
     assert "refusing to run:" in err and needle in err
+
+
+DAEMON_TEXT = "Zq9-daemon-private-text"  # closing round 2: text a daemon could put in hmemKnowledge; never printed
+
+
+@pytest.mark.parametrize("value,shape", [
+    (DAEMON_TEXT, "a string"),
+    ("false", "a string"),
+    ({DAEMON_TEXT: DAEMON_TEXT}, "an object"),  # neither its key nor its value is printed
+    ({}, "an object"),
+    ([DAEMON_TEXT], "an array"),
+])
+def test_readback_value_is_named_by_shape_never_echoed(live, control, monkeypatch, tmp_path, capsys, value, shape):
+    """Closing round 2: `json.dumps(value)` copied the daemon's string or whole object into the failure and onto stderr;
+    a read-back hmemKnowledge is named by shape only, on the read-back after a 2xx POST and on the best-effort read-back
+    after a failed POST (the coordinator's rule: failure strings report shapes, never values)."""
+    needle = f"H-MEM injection is not off: hmemKnowledge read back as {shape} after POST /admin/setpoints, not false"
+    assert llm._setpoint_problems({}, {"hmemKnowledge": value}) == [needle]
+    control(readback=value)
+    problem = llm.disable_hmem_injection() or ""
+    assert problem == needle and DAEMON_TEXT not in problem
+    monkeypatch.setattr(graph, "run_local", lambda *a, **k: pytest.fail("the graph must not start"))
+    control(readback=value)
+    assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
+    err = capsys.readouterr().err
+    assert f"refusing to run: {needle}" in err and DAEMON_TEXT not in err
+    for post in (POST_RAISES, (500, {"error": "engine restart"})):  # the best-effort read-back after a failed POST
+        monkeypatch.setattr(llm, "_control_http", _scripted(post, {"setpoints": {**_BEFORE, "hmemKnowledge": value}}))
+        problem = llm.disable_hmem_injection() or ""
+        assert f"a read-back GET /admin/setpoints shows: {needle}" in problem and DAEMON_TEXT not in problem
+        monkeypatch.setattr(llm, "_control_http", _scripted(post, {"setpoints": {**_BEFORE, "hmemKnowledge": value}}))
+        assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
+        err = capsys.readouterr().err
+        assert needle in err and DAEMON_TEXT not in err
+
+
+@pytest.mark.parametrize("value,literal", [(True, "true"), (None, "null"), (0, "0"), (3, "3"), (1.5, "1.5")])
+def test_readback_literals_stay_json_literals(value, literal):
+    """True, null (an absent key too) and numbers are JSON literals, as `_flag_shape` names them (closing round 2)."""
+    assert llm._readback_shape(value) == literal
+    assert llm._setpoint_problems({}, {"hmemKnowledge": value}) == [
+        f"H-MEM injection is not off: hmemKnowledge read back as {literal} after POST /admin/setpoints, not false"]
+    assert llm._setpoint_problems({}, {}) == [
+        "H-MEM injection is not off: hmemKnowledge read back as null after POST /admin/setpoints, not false"]
 
 
 def test_setter_fails_when_the_post_dropped_or_changed_other_setpoints(live, control, monkeypatch, tmp_path, capsys):
@@ -1322,14 +1369,14 @@ _LOST = ("changed or removed other daemon setpoints: hmemTopK, privacyMin (value
          "check and restore them in Nightshift before a live run")
 
 
-def _scripted(post, readback):
-    """A fake `_control_http`: the first GET answers `_BEFORE`; the POST and the GET after it each answer (status, body)
+def _scripted(post, readback, before=_BEFORE):
+    """A fake `_control_http`: the first GET answers `before`; the POST and the GET after it each answer (status, body)
     or raise the exception given; `.requests` records every request."""
     requests: list[tuple[str, str, object]] = []
 
     def control_http(method, path, body=None):
         requests.append((method, path, body))
-        answer = {"GET": {"setpoints": dict(_BEFORE)}, "POST": post}[method] if len(requests) <= 2 else readback
+        answer = {"GET": {"setpoints": dict(before)}, "POST": post}[method] if len(requests) <= 2 else readback
         if isinstance(answer, BaseException):
             raise answer
         return answer if isinstance(answer, tuple) else (200, answer)
@@ -1339,26 +1386,37 @@ def _scripted(post, readback):
 
 
 POST_RAISES = TimeoutError("no answer within 3 s")  # the bytes may have been written: one deadline covers the whole exchange
+# closing round 2: the warning after a POST that timed out (its worker thread is still alive with the bytes written)
+MAY_STILL_APPLY = ("the POST may still be applied (it timed out and the daemon may apply it later): check hmemKnowledge and "
+                   "these setpoints in Nightshift before retrying: hmemTopK, privacyMin (values not printed)")
 
 
-@pytest.mark.parametrize("post,needle", [
-    (POST_RAISES, f"cannot turn H-MEM injection off: POST /admin/setpoints on {FAKE_PIPE} failed (TimeoutError: no answer within 3 s); "),
-    ((500, {"error": "engine restart"}), "cannot turn H-MEM injection off: POST /admin/setpoints answered HTTP 500; "),
+@pytest.mark.parametrize("post,needle,warning,raised", [
+    (POST_RAISES, f"cannot turn H-MEM injection off: POST /admin/setpoints on {FAKE_PIPE} failed (TimeoutError: no answer within 3 s); ",
+     MAY_STILL_APPLY, True),
+    (BrokenPipeError(32, "Broken pipe"), f"cannot turn H-MEM injection off: POST /admin/setpoints on {FAKE_PIPE} failed "
+     "(BrokenPipeError: [Errno 32] Broken pipe); ", MAY_HAVE_APPLIED, True),
+    ((500, {"error": "engine restart"}), "cannot turn H-MEM injection off: POST /admin/setpoints answered HTTP 500; ",
+     MAY_HAVE_APPLIED, False),
 ])
 @pytest.mark.parametrize("readback,shows", [
-    ({"setpoints": _REPLACED}, f"a read-back GET /admin/setpoints shows: POST /admin/setpoints {_LOST}"),
+    # {tail}: after a POST that raised, the problems are followed by the warning (closing round 2); not after a non-2xx
+    ({"setpoints": _REPLACED}, f"a read-back GET /admin/setpoints shows: POST /admin/setpoints {_LOST}{{tail}}"),
     ({"setpoints": dict(_BEFORE)}, "a read-back GET /admin/setpoints shows: H-MEM injection is not off: hmemKnowledge read back as true after POST "
-                                   "/admin/setpoints, not false"),
+                                   "/admin/setpoints, not false{tail}"),
     ({"setpoints": _APPLIED}, "a read-back GET /admin/setpoints shows the POST applied (hmemKnowledge false, no other setpoint changed); retry the run"),
-    (BrokenPipeError(32, "Broken pipe"), f"a read-back GET /admin/setpoints failed too (BrokenPipeError); {MAY_HAVE_APPLIED}"),
-    ((503, {"setpoints": _APPLIED}), f"a read-back GET /admin/setpoints answered HTTP 503; {MAY_HAVE_APPLIED}"),
-    ({"ok": True}, f"a read-back GET /admin/setpoints answered no readable setpoints document (JSON with no setpoints wrapper and no hmemKnowledge key); {MAY_HAVE_APPLIED}"),
+    (BrokenPipeError(32, "Broken pipe"), "a read-back GET /admin/setpoints failed too (BrokenPipeError); {warning}"),
+    ((503, {"setpoints": _APPLIED}), "a read-back GET /admin/setpoints answered HTTP 503; {warning}"),
+    ({"ok": True}, "a read-back GET /admin/setpoints answered no readable setpoints document (JSON with no setpoints wrapper and no hmemKnowledge key); {warning}"),
 ])
-def test_failed_post_is_followed_by_one_best_effort_readback(live, monkeypatch, tmp_path, capsys, post, needle, readback, shows):
+def test_failed_post_is_followed_by_one_best_effort_readback(live, monkeypatch, tmp_path, capsys, post, needle, warning, raised,
+                                                              readback, shows):
     """Closing round 1: a POST that raised (a timeout, a reset, a cut framing: its bytes may have reached the daemon) or
     answered non-2xx skipped the other-setpoints check and never said the machine-wide change may have been applied. One
     best-effort GET now runs the same checks; when it cannot, the failure ends with the fixed warning (keys only). The
-    failure stands even when that GET shows the POST applied."""
+    failure stands even when that GET shows the POST applied. Closing round 2: after a POST that raised, a read-back
+    showing problems ends with the warning too, and after a timeout the warning says the POST may still be applied."""
+    shows = shows.format(tail=f"; {warning}" if raised else "", warning=warning)
     fake = _scripted(post, readback)
     monkeypatch.setattr(llm, "_control_http", fake)
     problem = llm.disable_hmem_injection()
@@ -1369,6 +1427,85 @@ def test_failed_post_is_followed_by_one_best_effort_readback(live, monkeypatch, 
     monkeypatch.setattr(graph, "run_local", lambda *a, **k: pytest.fail("the graph must not start"))
     assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
     assert f"refusing to run: {needle}{shows}" in capsys.readouterr().err
+
+
+_ALREADY_OFF = {"hmemKnowledge": False, "privacyMin": "local-only", "hmemTopK": 3}  # a daemon an earlier run switched off
+
+
+@pytest.mark.parametrize("post,needle,warning", [
+    (POST_RAISES, f"cannot turn H-MEM injection off: POST /admin/setpoints on {FAKE_PIPE} failed (TimeoutError: no answer within 3 s); ",
+     MAY_STILL_APPLY),
+    (BrokenPipeError(32, "Broken pipe"), f"cannot turn H-MEM injection off: POST /admin/setpoints on {FAKE_PIPE} failed "
+     "(BrokenPipeError: [Errno 32] Broken pipe); ", MAY_HAVE_APPLIED),
+])
+def test_unchanged_readback_on_an_already_off_daemon_does_not_show_a_raised_post_applied(live, monkeypatch, tmp_path, capsys,
+                                                                                         post, needle, warning):
+    """Closing round 2: when the first GET already held hmemKnowledge false, a read-back showing the same document looks
+    the same with or without the POST, so after a POST that raised (a timed-out one may still land and replace the
+    document) the failure ends with the warning instead of "retry the run". After a non-2xx answer the daemon has
+    finished with the POST, and the same read-back still reads as applied."""
+    expected = needle + ("a read-back GET /admin/setpoints shows hmemKnowledge false and no other setpoint changed, but "
+                         f"hmemKnowledge was already false before the POST, so it does not show the POST applied; {warning}")
+    fake = _scripted(post, {"setpoints": dict(_ALREADY_OFF)}, before=_ALREADY_OFF)
+    monkeypatch.setattr(llm, "_control_http", fake)
+    assert llm.disable_hmem_injection() == expected and fake.requests == SETTER_REQUESTS
+    monkeypatch.setattr(llm, "_control_http", _scripted(post, {"setpoints": dict(_ALREADY_OFF)}, before=_ALREADY_OFF))
+    monkeypatch.setattr(graph, "run_local", lambda *a, **k: pytest.fail("the graph must not start"))
+    assert run.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 2
+    assert f"refusing to run: {expected}" in capsys.readouterr().err
+    monkeypatch.setattr(llm, "_control_http", _scripted((500, {}), {"setpoints": dict(_ALREADY_OFF)}, before=_ALREADY_OFF))
+    assert llm.disable_hmem_injection() == ("cannot turn H-MEM injection off: POST /admin/setpoints answered HTTP 500; a read-back "
+                                            "GET /admin/setpoints shows the POST applied (hmemKnowledge false, no other setpoint "
+                                            "changed); retry the run")
+
+
+def test_post_that_times_out_and_lands_late_is_reported_as_possibly_still_applied(live, real_control_exchange, monkeypatch):
+    """Closing round 2 probe, kept as a test: the real request builder, parser and pipe exchange (a fake `open`, nothing
+    real opened, a 0.6 s deadline in place of 3 s). The daemon takes the POST's bytes, answers the read-back GET with
+    the document unchanged, and only then applies the POST as a replace (privacyMin and hmemTopK gone). The failure
+    must say the POST may still be applied and name the setpoints to check; it used to say only "read back as true"."""
+    state = {"hmemKnowledge": True, "privacyMin": "local-only", "hmemTopK": 3}
+    release, applied = threading.Event(), threading.Event()
+
+    class SlowDaemon:
+        def __init__(self):
+            self.written, self.answered = b"", False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def write(self, data):
+            self.written += data
+            return len(data)
+
+        def read(self, n):
+            if self.written.startswith(b"POST"):
+                release.wait(5)  # slow with the POST: applied as a replace after the setter has given up on it
+                state.clear()
+                state["hmemKnowledge"] = False
+                applied.set()
+                return b""
+            if self.answered:
+                return b""
+            self.answered = True
+            return _framed(json.dumps({"setpoints": state}).encode())
+
+    monkeypatch.setattr(llm, "_control_http", _REAL_CONTROL_HTTP)
+    exchange = llm._control_exchange  # the real exchange behind the conftest guard (real_control_exchange)
+    monkeypatch.setattr(llm, "_control_exchange", lambda where, request, timeout=None: exchange(where, request, timeout=0.6))
+    opened = _fake_open(monkeypatch, lambda path: SlowDaemon())
+    try:
+        problem = llm.disable_hmem_injection() or ""
+    finally:
+        release.set()
+    assert applied.wait(5) and state == {"hmemKnowledge": False}  # the late POST wiped the other setpoints
+    assert problem == (f"cannot turn H-MEM injection off: POST /admin/setpoints on {FAKE_PIPE} failed (TimeoutError: no answer "
+                       "within 1 s); a read-back GET /admin/setpoints shows: H-MEM injection is not off: hmemKnowledge read "
+                       f"back as true after POST /admin/setpoints, not false; {MAY_STILL_APPLY}")
+    assert [path for path, *_ in opened] == [FAKE_PIPE] * 3 and "local-only" not in problem
 
 
 @pytest.mark.parametrize("readback,needle", [

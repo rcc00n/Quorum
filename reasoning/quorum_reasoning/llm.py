@@ -1217,11 +1217,13 @@ def disable_hmem_injection() -> str | None:
     # document, the failure ends with `_post_may_have_applied` (the keys of the first GET's document, values never
     # printed). Why: closing review round 1: such a failure skipped the other-setpoints comparison and never told the
     # operator that the machine-wide change may have been applied (coordinator decision 6, the privacy floor).
+    # ("whose result joins the failure" superseded in part 2026-10-25 for a POST that raised: such a failure also ends
+    # with the warning unless that GET shows the POST applied; decision at `_readback_after_failed_post`.)
     try:
         status, _ = _control_http("POST", "/admin/setpoints", {HMEM_SETPOINT: False})
     except Exception as exc:  # noqa: BLE001
         return (f"cannot turn H-MEM injection off: POST /admin/setpoints on {where} failed ({type(exc).__name__}: {exc}); "
-                + _readback_after_failed_post(before_doc))
+                + _readback_after_failed_post(before_doc, exc))
     if not 200 <= status < 300:
         return f"cannot turn H-MEM injection off: POST /admin/setpoints answered HTTP {status}; " + _readback_after_failed_post(before_doc)
     try:
@@ -1248,13 +1250,31 @@ def disable_hmem_injection() -> str | None:
     return "; ".join(_setpoint_problems(before_doc, after_doc)) or None
 
 
+def _readback_shape(value: Any) -> str:
+    """How a read-back hmemKnowledge that is not JSON false is named: null (also for an absent key), true and a number as
+    JSON literals, anything else by its shape only, never its text (decision at `_setpoint_problems`)."""
+    if value is None:
+        return "null"
+    if isinstance(value, dict):
+        return "an object"
+    if isinstance(value, list):
+        return "an array"
+    return _flag_shape(value)  # true and a number as themselves, a string as "a string"
+
+
 def _setpoint_problems(before_doc: dict[str, Any], after_doc: dict[str, Any]) -> list[str]:
     """What a readable read-back shows against the first GET's document: hmemKnowledge not JSON false, and other
-    setpoints the POST changed (as JSON, `_same_json`) or removed, named by key only (decisions in `disable_hmem_injection`)."""
+    setpoints the POST changed (as JSON, `_same_json`) or removed, named by key only (decisions in `disable_hmem_injection`).
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): a read-back hmemKnowledge that is not JSON false is named by
+    `_readback_shape`: true, null (also for an absent key) and a number as JSON literals, a string as "a string", an
+    object as "an object", an array as "an array"; the daemon's text never reaches the failure. Why: closing review
+    round 2: `json.dumps(value)` copied a string or a whole object from the daemon into the failure and onto stderr (the
+    coordinator's rule: failure strings report shapes, never values), the one daemon text left after `_flag_shape`."""
     problems = []
     value = after_doc.get(HMEM_SETPOINT)
     if value is not False:
-        problems.append(f"H-MEM injection is not off: {HMEM_SETPOINT} read back as {json.dumps(value)} after POST /admin/setpoints, not false")
+        problems.append(f"H-MEM injection is not off: {HMEM_SETPOINT} read back as {_readback_shape(value)} after POST /admin/setpoints, not false")
     lost = sorted(k for k in before_doc if k != HMEM_SETPOINT and (k not in after_doc or not _same_json(after_doc[k], before_doc[k])))
     if lost:
         problems.append(f"POST /admin/setpoints changed or removed other daemon setpoints: {', '.join(lost)} (values not "
@@ -1262,33 +1282,51 @@ def _setpoint_problems(before_doc: dict[str, Any], after_doc: dict[str, Any]) ->
     return problems
 
 
-def _post_may_have_applied(before_doc: dict[str, Any]) -> str:
+def _post_may_have_applied(before_doc: dict[str, Any], pending: bool = False) -> str:
     """The fixed warning when no read-back could be compared after a POST that may have reached the daemon: the keys the
-    first GET held, never their values (decision at the POST in `disable_hmem_injection`)."""
+    first GET held, never their values (decision at the POST in `disable_hmem_injection`). `pending`: the POST timed
+    out, so it may still be applied after this answer (decision at `_readback_after_failed_post`)."""
+    lead = ("the POST may still be applied (it timed out and the daemon may apply it later)" if pending
+            else "the POST may have been applied")
     others = sorted(k for k in before_doc if k != HMEM_SETPOINT)
     if not others:
-        return (f"the POST may have been applied: check {HMEM_SETPOINT} in Nightshift before retrying (no other setpoint "
-                "was set before the POST)")
-    return (f"the POST may have been applied: check {HMEM_SETPOINT} and these setpoints in Nightshift before retrying: "
-            f"{', '.join(others)} (values not printed)")
+        return f"{lead}: check {HMEM_SETPOINT} in Nightshift before retrying (no other setpoint was set before the POST)"
+    return f"{lead}: check {HMEM_SETPOINT} and these setpoints in Nightshift before retrying: {', '.join(others)} (values not printed)"
 
 
-def _readback_after_failed_post(before_doc: dict[str, Any]) -> str:
-    """One best-effort GET /admin/setpoints after a POST that failed but may have reached the daemon: what it shows
-    (`_setpoint_problems`, or that the POST was applied), else `_post_may_have_applied` (decision at the POST in
-    `disable_hmem_injection`). Never raises."""
+def _readback_after_failed_post(before_doc: dict[str, Any], post_exc: BaseException | None = None) -> str:
+    """One best-effort GET /admin/setpoints after a POST that failed (`post_exc`: the exception it raised, None for a
+    non-2xx answer) but may have reached the daemon: what it shows (`_setpoint_problems`, or that the POST was
+    applied), with `_post_may_have_applied` whenever it cannot show the POST applied after a POST that raised, else
+    `_post_may_have_applied` alone (decision at the POST in `disable_hmem_injection`). Never raises.
+
+    DECISION(2026-10-25, Yelysei Shkirpan/Claude Code): after a POST that raised (any exception: unlike a non-2xx
+    answer, it does not show the daemon has finished with the request), the failure ends with `_post_may_have_applied`
+    unless this GET shows the POST applied: after the problems it shows, and also when it shows hmemKnowledge false
+    and no other setpoint changed while the first GET already held hmemKnowledge false (the document is the same with
+    or without the POST). After a TimeoutError the warning says the POST may still be applied (the pipe exchange's
+    worker thread outlives the deadline with the POST's bytes written). Why: closing review round 2: a timed-out POST
+    that the daemon applied as a replace after this GET was reported as only "read back as true", and a retry then
+    snapshotted the wiped document and passed, so the loss of the machine-wide privacy floor was never reported."""
+    pending = isinstance(post_exc, TimeoutError)
     try:
         status, body = _control_http("GET", "/admin/setpoints")
     except Exception as exc:  # noqa: BLE001 — best effort: any failure is the warning
-        return f"a read-back GET /admin/setpoints failed too ({type(exc).__name__}); " + _post_may_have_applied(before_doc)
+        return f"a read-back GET /admin/setpoints failed too ({type(exc).__name__}); " + _post_may_have_applied(before_doc, pending)
     if not 200 <= status < 300:
-        return f"a read-back GET /admin/setpoints answered HTTP {status}; " + _post_may_have_applied(before_doc)
+        return f"a read-back GET /admin/setpoints answered HTTP {status}; " + _post_may_have_applied(before_doc, pending)
     after_doc, shape = _setpoint_doc(body)
     if after_doc is None:
-        return f"a read-back GET /admin/setpoints answered no readable setpoints document ({shape}); " + _post_may_have_applied(before_doc)
+        return (f"a read-back GET /admin/setpoints answered no readable setpoints document ({shape}); "
+                + _post_may_have_applied(before_doc, pending))
     problems = _setpoint_problems(before_doc, after_doc)
     if problems:
-        return "a read-back GET /admin/setpoints shows: " + "; ".join(problems)
+        shows = "a read-back GET /admin/setpoints shows: " + "; ".join(problems)
+        return shows if post_exc is None else f"{shows}; {_post_may_have_applied(before_doc, pending)}"
+    if post_exc is not None and before_doc.get(HMEM_SETPOINT) is False:
+        return (f"a read-back GET /admin/setpoints shows {HMEM_SETPOINT} false and no other setpoint changed, but "
+                f"{HMEM_SETPOINT} was already false before the POST, so it does not show the POST applied; "
+                + _post_may_have_applied(before_doc, pending))
     return (f"a read-back GET /admin/setpoints shows the POST applied ({HMEM_SETPOINT} false, no other setpoint changed); "
             "retry the run")
 
