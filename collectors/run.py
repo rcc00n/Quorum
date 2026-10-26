@@ -5,7 +5,7 @@ Usage:
     python3 -m collectors.run                # all collectors, all topics
     python3 -m collectors.run --only rss     # one collector: rss | guardian | federal_register | congress
     python3 -m collectors.run --loop 900     # repeat every 15 minutes
-    python3 -m collectors.run --topic <slug> # one pass for one topic only (COLL-DEMO-01, about 10 minutes)
+    python3 -m collectors.run --topic <slug> # one on-demand pass for one topic (COLL-DEMO-01, ~10 min; exit 2 on an unknown slug)
 
 Schedule it with cron or `--loop`; no daemon framework yet (see collectors/README.md › Decisions).
 """
@@ -72,37 +72,46 @@ def run_once(only: str | None = None, topic_id: str | None = None) -> dict:
 
     for seed_id, spec in TOPICS.items():
         ensure_topic(conn, seed_id, spec["name"], spec["query_terms"])
-    topics = load_topics(conn)
+    all_topics = load_topics(conn)  # collection order; the first matching topic owns a document (README › Topics)
+    topics = all_topics
+    older: dict[str, list[dict]] = {}
     if topic_id is not None:
-        # DECISION(2026-10-26, Anastasia/Claude Code; asked by Yelysei, Issue #2 6405714186 item 3, COLL-DEMO-01): an
-        # on-demand pass for one topic, run by hand on the collector machine when a judge or user types a new topic,
-        # so its first documents arrive in about 10 minutes instead of waiting for the loop (45–75 min with six
-        # topics). Only the named topic is matched in this pass; the loop's collection order and ownership rule are
-        # unchanged, so a document the pass stores under this topic is one the older topics would not have claimed
-        # only if their terms do not match it — the next loop pass does not move rows. Why: the demo lets judges type
-        # their own topics and expects a brief during judging.
-        topics = [t for t in topics if t["id"] == topic_id]
+        # DECISION(2026-10-26, Anastasia/Claude Code; asked by Yelysei, Issue #2 6405714186 item 3, COLL-DEMO-01;
+        # ownership rule from the PR #28 review): an on-demand pass for one topic, run by hand on the collector
+        # machine when a judge or user types a new topic, so its first documents arrive in about 10 minutes instead
+        # of 45–75 with the loop. The loop's ownership rule holds: RSS and official feeds are matched against the full
+        # ordered list and only the requested topic's wins are stored (`store_only`); the per-topic API collectors
+        # skip results an older topic's terms match (`older_topics`). Nothing is re-owned, so the next loop pass finds
+        # the same rows it would have written itself. Why: the demo lets judges type topics and expects a brief
+        # during judging; moving shared items or edited versions of older rows would break per-topic supersede chains.
+        topics = [t for t in all_topics if t["id"] == topic_id]
         if not topics:
             log.error("topic %r is not an active topic with query terms; nothing collected", topic_id)
+            conn.close()
+            report["_errors"] = 1
+            report["_unknown_topic"] = topic_id
+            return report
+        older[topic_id] = all_topics[: [t["id"] for t in all_topics].index(topic_id)]
     log.info("topics: %s", ", ".join(f"{t['id']} ({len(t['query_terms'])} terms)" for t in topics) or "none active")
     if only in (None, "rss"):
         # Feeds are walked once per pass for all topics (first_topic_match in common.py; decision: README › Decisions,
         # 2026-10-25); the per-source stats carry `by_topic`, so these keys need no topic prefix.
-        if not topics:
+        if not all_topics:
             log.info("no active topics: RSS and official feeds skipped, nothing to match")
         else:
             for source in rss_sources:
-                step(f"rss/{source['id']}", rss.collect_source, conn, fetcher, source, topics)
+                step(f"rss/{source['id']}", rss.collect_source, conn, fetcher, source, all_topics, topic_id)
             for source in official_feeds:
-                step(f"official/{source['id']}", rss.collect_official_feed, conn, fetcher, source, topics)
+                step(f"official/{source['id']}", rss.collect_official_feed, conn, fetcher, source, all_topics, topic_id)
     for topic in topics:
         t = topic["id"]  # API collectors query per topic; the key carries it so N topics do not overwrite each other
+        kw = {"older_topics": older.get(t)}
         if only in (None, "guardian"):
-            step(f"{t}/guardian", guardian.collect, conn, fetcher, topic)
+            step(f"{t}/guardian", lambda *a: guardian.collect(*a, **kw), conn, fetcher, topic)
         if only in (None, "federal_register"):
-            step(f"{t}/federal_register", federal_register.collect, conn, fetcher, topic)
+            step(f"{t}/federal_register", lambda *a: federal_register.collect(*a, **kw), conn, fetcher, topic)
         if only in (None, "congress"):
-            step(f"{t}/congress", congress.collect, conn, fetcher, topic)
+            step(f"{t}/congress", lambda *a: congress.collect(*a, **kw), conn, fetcher, topic)
     conn.close()
     report["_errors"] = errors
     return report
@@ -115,12 +124,16 @@ def main() -> int:
     parser.add_argument("--topic", metavar="SLUG", help="collect only this active topic in this pass (COLL-DEMO-01)")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
+    if args.topic and args.loop:
+        parser.error("--topic is a single on-demand pass; it cannot be combined with --loop (the loop container keeps running)")
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(name)s %(message)s")
     # httpx logs every request URL, including api-key query parameters; keep those out of terminals and screenshots.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     while True:
         report = run_once(args.only, args.topic)
         errors = report.pop("_errors", 0)
+        if report.pop("_unknown_topic", None):
+            return 2  # --topic with a slug that is not an active topic with terms: nothing collected, non-zero exit
         total = sum(r.get("inserted", 0) for r in report.values())
         log.info("pass complete: %d new rows, %d collector errors", total, errors)
         if not args.loop:

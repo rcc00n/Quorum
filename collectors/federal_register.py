@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import logging
 
-from collectors.common import Fetcher, parse_dt, upsert_official_doc
+import re
+
+from collectors.common import Fetcher, claimed_by_older, parse_dt, upsert_official_doc
 
 log = logging.getLogger("collectors.federal_register")
 API = "https://www.federalregister.gov/api/v1/documents.json"
@@ -34,18 +36,21 @@ def fr_term_query(query_terms: list[str]) -> str:
     with both words anywhere. Why: live check 2026-10-26 on the AI topic's 13 terms: 19–23 October 65 documents
     unquoted vs 13 quoted, 25–26 October 12 vs 3; the unquoted extras (SNAP card security, NIH meetings) carried no
     topic term in their titles and two were final rules, which reasoning reads as establishing documents. Applies to
-    rows collected from now on; earlier rows stay (reasoning filters official documents by a title/abstract match).
+    rows collected from now on; earlier rows stay (on the reasoning side an official document whose title or abstract
+    has no topic term starts no event but stays available as evidence).
     """
     parts = []
     for term in query_terms:
         t = term.strip().replace('"', "")
         if not t:
             continue
-        parts.append(f'"{t}"' if " " in t else t)
+        # Quote any term with a character outside [0-9A-Za-z]: a space, an apostrophe ("children's": 14 results
+        # unquoted vs 2 quoted on 2026-10-26), a hyphen. Plain words stay bare.
+        parts.append(f'"{t}"' if re.search(r"[^0-9A-Za-z]", t) else t)
     return " | ".join(parts)
 
 
-def collect(conn, fetcher: Fetcher, topic: dict, *, per_page: int = 50) -> dict:
+def collect(conn, fetcher: Fetcher, topic: dict, *, per_page: int = 50, older_topics: list[dict] | None = None) -> dict:
     stats = {"seen": 0, "inserted": 0}
     term = fr_term_query(topic["query_terms"])
     resp = fetcher.get(
@@ -58,6 +63,9 @@ def collect(conn, fetcher: Fetcher, topic: dict, *, per_page: int = 50) -> dict:
         return stats
     for item in resp.json().get("results", []):
         stats["seen"] += 1
+        if claimed_by_older(item["title"], item.get("abstract"), older_topics):
+            stats["older_topic"] = stats.get("older_topic", 0) + 1  # run.py --topic: an older topic owns it
+            continue
         raw = item.get("raw_text_url")
         if raw:
             body = fetcher.get(raw, respect_robots=False)
