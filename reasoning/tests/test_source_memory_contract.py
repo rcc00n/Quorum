@@ -279,3 +279,60 @@ def test_sidecar_io_is_utf8_and_the_store_stays_outside_the_repository(monkeypat
     with patch.object(memory.subprocess, "run", side_effect=AssertionError("ran with a store inside the repository")), pytest.raises(ValueError):
         memory._call(s, "recall", query="TEST")
     assert not repo_store.exists()
+
+
+FAKE_SECRETS = {
+    "MODEL_API_KEY": "TEST-model-key", "NVIDIA_API_KEY": "TEST-nvidia-key", "METERLESS_TOKEN": "TEST-meterless-token",
+    "METERLESS_RUNTIME_TOKEN": "TEST-runtime-token", "ZETARIS_PASSWORD": "TEST-zetaris-password",
+    "DATABASE_URL": "postgresql://TEST:TEST-db-password@localhost/TEST", "TEST_CLIENT_SECRET": "TEST-client-secret",
+    "NODE_OPTIONS": "--require TEST-preload.js",
+}
+SIDECAR_NAMES = {name.upper() for name in (*memory._SIDECAR_ENV, "METERLESS_HOME", "QUORUM_DRY_RUN", "QUORUM_HMEM_DIR")}
+
+
+def _environment_with_fake_secrets(monkeypatch, tmp_path):
+    for name, value in FAKE_SECRETS.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("TEST_UNLISTED", "TEST-unlisted")
+    monkeypatch.setenv("QUORUM_DRY_RUN", "0")
+    monkeypatch.setenv("QUORUM_HMEM_DIR", str(tmp_path / "TEST-store"))
+    monkeypatch.setenv("METERLESS_HOME", str(tmp_path / "TEST-checkout"))
+
+
+def _assert_only_the_allowlist(env, tmp_path):
+    upper = {name.upper(): value for name, value in env.items()}
+    assert set(upper) <= SIDECAR_NAMES
+    assert not any(memory._NEVER_TO_SIDECAR.fullmatch(name) for name in env)
+    assert not [secret for secret in FAKE_SECRETS.values() if any(secret in value for value in env.values())]
+    assert "TEST-unlisted" not in env.values()
+    assert upper["QUORUM_HMEM_DIR"] == str(memory.Path(str(tmp_path / "TEST-store")).expanduser())
+    assert upper["METERLESS_HOME"] == str(memory.Path(str(tmp_path / "TEST-checkout")))
+    assert upper["QUORUM_DRY_RUN"] == "0"
+    for name in memory._SIDECAR_ENV:
+        if name in memory.os.environ:
+            assert upper[name.upper()] == memory.os.environ[name]
+
+
+def test_the_sidecar_gets_an_allowlisted_environment_without_any_secret(monkeypatch, tmp_path):
+    _environment_with_fake_secrets(monkeypatch, tmp_path)
+    monkeypatch.setattr(memory, "_launcher", lambda home: ["TEST-node", "TEST-cli"])
+    seen = {}
+
+    def run(argv, **kw):
+        seen.update(kw)
+        return type("Done", (), {"stdout": '{"rows": [], "count": 0, "ledger_entries": 0}'})()
+
+    with patch.object(memory.subprocess, "run", side_effect=run):
+        memory._call(state(), "recall", query="TEST")
+    assert seen.get("env") is not None  # None would inherit Python's whole environment
+    _assert_only_the_allowlist(seen["env"], tmp_path)
+
+
+def test_a_real_node_child_sees_only_the_allowlisted_environment(monkeypatch, tmp_path):
+    node = memory.shutil.which("node")
+    if not node:
+        pytest.skip("Node is not installed; the stand-in test above still covers the environment")
+    _environment_with_fake_secrets(monkeypatch, tmp_path)
+    probe = "process.stdout.write(JSON.stringify({rows: [], count: 0, ledger_entries: 0, env: process.env}))"
+    monkeypatch.setattr(memory, "_launcher", lambda home: [node, "-e", probe])  # no engine code runs
+    _assert_only_the_allowlist(memory._call(state(), "recall", query="TEST")["env"], tmp_path)

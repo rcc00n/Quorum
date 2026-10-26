@@ -333,7 +333,21 @@ review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-re
   on and a private `--out` (`frame` → sidecar → reference engine, 3 records persisted). Recall through the engine is
   TESTED only (real engine, stubbed model and fetch): the live check's recalls came before the store existed and were
   answered by the sidecar without the engine. Not DEPLOYED: canonical editions keep `[engines] hmem = "off"`.
-  Anastasia's review of the stored DocRef identity is pending (BLOCKED on her).
+  Anastasia's review of the stored DocRef identity is pending (BLOCKED on her). *(superseded 2026-10-26 by the next
+  line; its "exit 0" is held by neither kept conformance scorecard, see the hand-over log › Status)*
+- H-MEM source memory, status until Yelysei decides (2026-10-26, conservative wording chosen by the review
+  coordinator; the same in DECISIONS.md › Still to clarify and its log row): H-MEM source memory: TESTED (conformance
+  13/13 against the sidecar; engine-backed tests with the real reference engine, stubbed model and fetch) and
+  INTEGRATED live on the WRITE path only (one live check, climate-policy 2026-10-26, Meterless route: frame → sidecar
+  → reference HMEM, 3 records). A live recall through the engine has not run yet: the store directory did not exist
+  when research round 2 ran, so the sidecar answered all 26 recall requests itself before opening the engine. That is
+  expected from the next live run with hmem on. Still open:
+  - docs/RELEASE_CHECKLIST.md › H-MEM acceptance (Anastasia's DocRef approval, then a genuine recall and fresh source
+    re-verification);
+  - the challenge-page acceptance check.
+
+  Whether this already counts as 'Build rule met' is Yelysei's decision, asked 2026-10-26. Not DEPLOYED: canonical
+  editions keep `[engines] hmem = "off"`.
 - NOT_STARTED: a live eval run (`tests/eval.py --live`, opt-in); the sources-registry load for the coverage
   denominators (`sources_missing` is still `[]`; product decision pending).
 - DEFERRED for the hackathon, stated here so nothing is implied (DECISIONS.md log, 2026-10-24): `server.py`

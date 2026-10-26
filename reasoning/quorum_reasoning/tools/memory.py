@@ -36,6 +36,24 @@ def _launcher(home):
     return [node, str(cli)]
 
 
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the sidecar's Node process gets an allowlisted environment,
+# never Python's whole one: these names when set (PATHEXT added because tsx's cross-spawn reads it on Windows; no
+# COMSPEC, Node is spawned directly), plus METERLESS_HOME, QUORUM_DRY_RUN and QUORUM_HMEM_DIR as checked in _call;
+# never NODE_OPTIONS, DATABASE_URL or a name ending in _KEY, _TOKEN, _PASSWORD or _SECRET. Why: the sidecar runs a
+# downloaded engine that needs no credential, and inheriting the environment handed it every key in .env.
+_SIDECAR_ENV = ('PATH', 'PATHEXT', 'SYSTEMROOT', 'SystemDrive', 'WINDIR', 'TEMP', 'TMP', 'USERPROFILE', 'HOME',
+                'LOCALAPPDATA', 'APPDATA')
+_NEVER_TO_SIDECAR = re.compile(r'NODE_OPTIONS|DATABASE_URL|.*_(KEY|TOKEN|PASSWORD|SECRET)', re.IGNORECASE)
+
+
+def _sidecar_env(home, directory):
+    env = {name: os.environ[name] for name in _SIDECAR_ENV if name in os.environ}
+    if 'QUORUM_DRY_RUN' in os.environ:
+        env['QUORUM_DRY_RUN'] = os.environ['QUORUM_DRY_RUN']
+    env.update(METERLESS_HOME=str(home), QUORUM_HMEM_DIR=str(directory))
+    return {name: value for name, value in env.items() if not _NEVER_TO_SIDECAR.fullmatch(name)}
+
+
 def _call(state, action, **payload):
     repo=Path(__file__).resolve().parents[3]
     directory=Path(os.environ['QUORUM_HMEM_DIR']).expanduser()
@@ -48,7 +66,8 @@ def _call(state, action, **payload):
     # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the sidecar's stdin and stdout are UTF-8 explicitly, not
     # the locale's code page. Why: on Windows text=True decodes with cp1252 outside `python -X utf8`, while Node writes
     # UTF-8: a recalled record with a non-ASCII quote or label would be garbled or fail to decode.
-    result=subprocess.run(launcher + [str(repo/'reasoning/memory/sidecar.mjs')],input=data,encoding='utf-8',capture_output=True,timeout=20,check=True)
+    result=subprocess.run(launcher + [str(repo/'reasoning/memory/sidecar.mjs')],input=data,encoding='utf-8',capture_output=True,timeout=20,check=True,
+                          env=_sidecar_env(home,directory))  # decision at _SIDECAR_ENV
     if len(result.stdout.encode())>2*1024*1024:raise ValueError('Memory response too large')
     return json.loads(result.stdout)
 
