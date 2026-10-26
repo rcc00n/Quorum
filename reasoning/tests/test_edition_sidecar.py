@@ -21,6 +21,7 @@ import stat
 import subprocess
 import symtable
 import sys
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,6 +50,18 @@ es = _load_script()
 
 WINDOW = ("2026-10-25T09:30:00Z", "2026-10-26T09:30:00Z")  # 05:30 to 05:30 America/New_York (EDT)
 GENERATED = "2026-10-26T11:02:13Z"
+
+
+def _python_rejects_hour_24() -> bool:
+    """Python 3.10 (the production portal) rejects T24:00; Python 3.14 reads it as next-day midnight."""
+    try:
+        datetime.fromisoformat("2026-10-25T24:00+00:00")
+    except ValueError:
+        return True
+    return False
+
+
+PYTHON_REJECTS_HOUR_24 = _python_rejects_hour_24()
 
 
 def base_snapshot() -> dict:
@@ -311,6 +324,24 @@ def test_refuses_a_corpus_time_after_generated_at(edition, producer, capsys):
 def test_refuses_a_corpus_time_in_another_format(edition, producer, capsys, corpus):
     path = edition()
     refused(capsys, cli(path, producer, corpus=corpus), "invalid_sidecar", path)
+
+
+@pytest.mark.parametrize("corpus", ["2026-10-25T24:00Z", "2026-10-25T24:00:00Z"])
+def test_refuses_hour_24_inside_the_window_whatever_this_python_accepts(edition, producer, capsys, corpus):
+    """T24:00 on 25 Oct is 26 Oct 00:00, inside the window; Python 3.14 parses it, the portal's Python 3.10 does not."""
+    path = edition()
+    err = refused(capsys, cli(path, producer, corpus=corpus), "invalid_sidecar", path)
+    assert "has hour 24" in err and "YYYY-MM-DDT00:00Z" in err
+    with pytest.raises(es.SidecarError) as caught:
+        es.capture_time(corpus)
+    assert caught.value.code == "invalid_sidecar"
+
+
+def test_next_day_midnight_written_canonically_is_kept(edition, producer, capsys):
+    path = edition()
+    rc, _, err = run_main(capsys, *cli(path, producer, corpus="2026-10-26T00:00Z"))
+    assert rc == 0 and err == ""
+    assert json.loads(path.with_name("v1.json.sidecar.json").read_bytes())["corpus_as_of_utc"] == "2026-10-26T00:00Z"
 
 
 # ---------------------------------------------------------------- refusals: genuine output, commit, config, files
@@ -662,6 +693,9 @@ SIDECAR_MUTATIONS = [
     ("capture-local", _set(("corpus_as_of_utc",), "2026-10-22T03:53-06:00"), "invalid_sidecar", True),
     ("capture-fraction", _set(("corpus_as_of_utc",), "2026-10-26T00:23:00.5Z"), "invalid_sidecar", True),
     ("capture-impossible-date", _set(("corpus_as_of_utc",), "2026-02-30T03:53Z"), "invalid_sidecar", True),
+    # inside the window as next-day midnight; the binding rejects it only on a Python whose fromisoformat does (the
+    # production portal's 3.10 does, 3.14 does not), so the expectation follows the interpreter running the binding here
+    ("capture-hour-24", _set(("corpus_as_of_utc",), "2026-10-25T24:00Z"), "invalid_sidecar", PYTHON_REJECTS_HOUR_24),
     ("capture-not-text", _set(("corpus_as_of_utc",), 1761436800), "invalid_sidecar", True),
     ("capture-missing", _drop(("corpus_as_of_utc",)), "invalid_sidecar", True),
     ("capture-before-start", _set(("corpus_as_of_utc",), "2026-10-25T09:29Z"), "sidecar_capture_outside_window", True),

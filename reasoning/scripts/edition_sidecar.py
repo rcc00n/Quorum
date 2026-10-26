@@ -925,6 +925,13 @@ def capture_time(value: Any) -> datetime:
     """The sidecar's capture format, `YYYY-MM-DDTHH:MM[:SS]Z`, as the portal parses it."""
     _require(isinstance(value, str) and CAPTURE.fullmatch(value), "invalid_sidecar",
              f"corpus time {value!r} is not YYYY-MM-DDTHH:MM[:SS]Z")
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): an hour above 23 (T24:00) is refused here, whatever this
+    # interpreter accepts. Why: Python 3.14's fromisoformat reads T24:00 as next-day midnight, but the production portal
+    # runs Python 3.10, which rejects it (invalid_sidecar); refusing keeps the hand-over independent of the Python
+    # that writes it.
+    _require(int(value[11:13]) <= 23, "invalid_sidecar",
+             f"corpus time {value!r} has hour {value[11:13]}, which the portal (Python 3.10) rejects: "
+             "write next-day midnight as YYYY-MM-DDT00:00Z")
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
