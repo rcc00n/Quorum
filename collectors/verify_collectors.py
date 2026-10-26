@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -171,27 +172,26 @@ def check_invariants(cur) -> None:
     else:
         cur.execute("SELECT topic_match, count(*) FROM documents WHERE topic_id IS NOT NULL GROUP BY 1 ORDER BY 1")
         emit("PASS", "topic_match", "set on all topic-tagged documents: " + ", ".join(f"{k}={v}" for k, v in cur.fetchall()))
-    # Invariant 3: every topic id in the data is one run.py collects (N topics allowed since 2026-10-25; a topic just
-    # added may have no rows yet). DECISION(2026-10-25, Anastasia/Claude Code): the check is "data ⊆ run.py's TOPICS and
-    # at least one topic has rows", not "exactly one topic". Why: the demo adds topics as dictionary entries (Issue #2,
-    # Yelysei 2026-10-25); an unknown id in the data would still mean a rename went wrong on one side.
+    # Invariant 3: the topics TABLE is the source of truth (schema.sql DECISION 2026-10-25). Every topic id in the data
+    # is a row of that table (the FK guarantees it; the check reports it), at least one active topic exists and at
+    # least one topic has rows; active topics without rows yet are listed, not failed (a topic just added by the web
+    # app has none until the next pass). A row with a bad slug or no terms is a FAIL: the collector skips it silently
+    # otherwise (common.load_topics warns in the log only).
     cur.execute(
         "SELECT topic_id, count(*) FROM (SELECT topic_id FROM documents UNION ALL SELECT topic_id FROM official_docs) t "
         "WHERE topic_id IS NOT NULL GROUP BY topic_id ORDER BY topic_id"
     )
     counts = {row[0]: row[1] for row in cur.fetchall()}
-    try:
-        from collectors.run import TOPICS  # type: ignore
-        expected = set(TOPICS)
-    except Exception:
-        expected = None
-    unknown = sorted(set(counts) - expected) if expected is not None else []
-    if not counts or unknown:
-        emit("FAIL", "topic ids", f"rows per topic {counts}; run.py collects {sorted(expected) if expected else '?'}; unknown in data: {unknown}")
+    cur.execute("SELECT id, active, cardinality(query_terms) FROM topics ORDER BY created_at, id")
+    topics = cur.fetchall()
+    active = [t[0] for t in topics if t[1]]
+    bad = [t[0] for t in topics if t[1] and (t[2] == 0 or not re.match(r"^[a-z0-9][a-z0-9-]{0,63}$", t[0]))]
+    if not counts or not active or bad:
+        emit("FAIL", "topic ids", f"rows per topic {counts}; active topics {active}; rows with a bad slug or no terms: {bad}")
     else:
-        empty = sorted(expected - set(counts)) if expected is not None else []
-        emit("PASS", "topic ids", "rows per topic " + ", ".join(f"{k}={v}" for k, v in counts.items())
-             + (f"; no rows yet for {empty}" if empty else ""))
+        empty = [t for t in active if t not in counts]
+        emit("PASS", "topic ids", f"{len(active)} active topic(s) in the table; rows per topic "
+             + ", ".join(f"{k}={v}" for k, v in counts.items()) + (f"; no rows yet for {empty}" if empty else ""))
 
 def main() -> int:
     load_env()

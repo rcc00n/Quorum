@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one collection pass for every topic in collectors/topics.yaml-free config below.
+"""Run one collection pass over every active topic in the `topics` table, oldest first (README › Topics).
 
 Usage:
     python3 -m collectors.run                # all collectors, all topics
@@ -19,10 +19,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors import congress, federal_register, guardian, rss  # noqa: E402
-from collectors.common import Fetcher, connect, ensure_topic, load_sources_csv  # noqa: E402
+from collectors.common import Fetcher, connect, ensure_topic, load_sources_csv, load_topics  # noqa: E402
 
 # DECISION(2026-10-22, Anastasia/Claude): topics are a small dict in code until the portal exists; the demo event
 # gets added here by the team. Why: the portal (topic picker) is not built yet and a YAML file is one more format.
+# -- superseded 2026-10-25: the `topics` TABLE is the source of truth (free-text topics typed by the user, Issue #2,
+# Yelysei 2026-10-25); this dict is only the seed, inserted if missing (ensure_topic) and never overwriting the table.
 # DECISION(2026-10-23, Anastasia/Claude Code): topic id is `russia-ukraine-war`, not `ukraine-aid`. Why: reasoning's
 # README, CLI and its 28-claim evaluation set already use `russia-ukraine-war`; the id is shared across blocks and
 # the collector is the cheaper side to rename. Rows collected under `ukraine-aid` are re-keyed by one UPDATE.
@@ -69,18 +71,26 @@ def run_once(only: str | None = None) -> dict:
 
     for topic_id, spec in TOPICS.items():
         ensure_topic(conn, topic_id, spec["name"], spec["query_terms"])
-        topic = {"id": topic_id, **spec}
-        if only in (None, "rss"):
+    topics = load_topics(conn)
+    log.info("topics: %s", ", ".join(f"{t['id']} ({len(t['query_terms'])} terms)" for t in topics) or "none active")
+    if only in (None, "rss"):
+        # Feeds are walked once per pass for all topics (first_topic_match in common.py; decision: README › Decisions,
+        # 2026-10-25); the per-source stats carry `by_topic`, so these keys need no topic prefix.
+        if not topics:
+            log.info("no active topics: RSS and official feeds skipped, nothing to match")
+        else:
             for source in rss_sources:
-                step(f"rss/{source['id']}", rss.collect_source, conn, fetcher, source, topic)
+                step(f"rss/{source['id']}", rss.collect_source, conn, fetcher, source, topics)
             for source in official_feeds:
-                step(f"official/{source['id']}", rss.collect_official_feed, conn, fetcher, source, topic)
+                step(f"official/{source['id']}", rss.collect_official_feed, conn, fetcher, source, topics)
+    for topic in topics:
+        t = topic["id"]  # API collectors query per topic; the key carries it so N topics do not overwrite each other
         if only in (None, "guardian"):
-            step("guardian", guardian.collect, conn, fetcher, topic)
+            step(f"{t}/guardian", guardian.collect, conn, fetcher, topic)
         if only in (None, "federal_register"):
-            step("federal_register", federal_register.collect, conn, fetcher, topic)
+            step(f"{t}/federal_register", federal_register.collect, conn, fetcher, topic)
         if only in (None, "congress"):
-            step("congress", congress.collect, conn, fetcher, topic)
+            step(f"{t}/congress", congress.collect, conn, fetcher, topic)
     conn.close()
     report["_errors"] = errors
     return report

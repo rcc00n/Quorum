@@ -70,7 +70,7 @@ def run(state: RunState) -> dict:
                             dry_run=state["dry_run"],
                         )
                     except Exception as exc:  # noqa: BLE001 — one outlet unlabelled, the others keep their labels
-                        failed.append(f"{d['source_name']}: {type(exc).__name__}")
+                        failed.append(f"{d['source_name']}: {untrusted.public_failure(exc)}")
                         continue
                     if not isinstance(ans, dict):
                         failed.append(f"{d['source_name']}: no object")
@@ -117,6 +117,6 @@ def run(state: RunState) -> dict:
                 errors.append(StepError(node="frame", event_id=e["id"], message=str(exc)[:300]))
                 e["framing"] = {"rating_mode": "average", "coverage": coverage(state["documents"], e["document_ids"]), "interpretations": [], "outlets": outlets}
                 s.decision = "failed; coverage counts only"
-                s.reason = str(exc)[:200]
+                s.reason = untrusted.public_failure(exc)
         steps.append(finish(state, s))
     return {"events": events, "steps": steps, "errors": errors}

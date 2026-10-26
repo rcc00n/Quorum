@@ -479,7 +479,13 @@ def test_seed_journal_loads_replay_without_a_checkpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(llm, "journal_loaded_for", None)  # main() sets it; restore so no later test keeps a stale ledger
     monkeypatch.setattr(llm, "current_run_id", None)
     monkeypatch.setattr(llm, "journal_path", None)
-    monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None, raising=False)
+    # DECISION(2026-10-24, rcc00n/Codex): stub route discovery for this journal-only test.
+    # Why: graph execution is already stubbed; replay regression must not require real credentials.
+    monkeypatch.setattr(llm, "route_configured", lambda: True)
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): stub run.live_guard here as well as route discovery (merge of
+    # master into the H-MEM guard). Why: master dropped the earlier no-op live_guard stub; with the guard the 127.0.0.1:9
+    # route is Meterless, so the real live_guard would send the H-MEM setpoint request and the suite's pipe guard fails it.
+    monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None)
     monkeypatch.setenv("QUORUM_DRY_RUN", "0")
     # pin a model route so the test does not depend on the developer's .env (it failed on a clean integration checkout)
     monkeypatch.setenv("MODEL_BASE_URL", "http://127.0.0.1:9/v1")

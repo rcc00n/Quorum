@@ -5,7 +5,7 @@
   "run_id": "2026-10-22-russia-ukraine-war-1",
   "version": 1,
   "status": "empty",
-  "generated_at": "2026-10-25T03:19:25Z",
+  "generated_at": "2026-10-25T19:42:08Z",
   "published_at": null,
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
@@ -98,7 +98,7 @@
       "decision": "4 documents from 3 sources, 0 official; research budget 2 rounds per event",
       "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
       "model": null,
-      "duration_ms": 3
+      "duration_ms": 0
     },
     {
       "node": "cluster",
@@ -107,7 +107,7 @@
       "decision": "3 events from 4 documents; 1 key merges in code, model: 0 pair / 0 singleton / 0 chain questions, 0 merged, 0 split, 0 kept unconfirmed",
       "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
       "model": "stand-ins",
-      "duration_ms": 9
+      "duration_ms": 0
     },
     {
       "node": "score_importance",
@@ -224,7 +224,7 @@
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims; topic-frequent exclusion off (4 documents)",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "research",
@@ -233,7 +233,7 @@
       "decision": "round 2: 0 passages with a stance for 1 claims",
       "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims; topic-frequent exclusion off (4 documents)",
       "model": "stand-ins",
-      "duration_ms": 1
+      "duration_ms": 0
     },
     {
       "node": "verify",

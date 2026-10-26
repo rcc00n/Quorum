@@ -83,6 +83,6 @@ def run(state: RunState) -> dict:
             except Exception as exc:  # noqa: BLE001 — one event's extraction must not kill the run; the trace shows it
                 errors.append(StepError(node="extract_claims", event_id=e["id"], message=str(exc)[:300]))
                 s.decision = f"failed after {n} claims"
-                s.reason = str(exc)[:200]
+                s.reason = untrusted.public_failure(exc)
         steps.append(finish(state, s))
     return {"claims": claims, "steps": steps, "errors": errors}

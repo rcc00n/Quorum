@@ -46,3 +46,5 @@ All reproducible regression/HTTP/browser/preview commands and environment names 
 Canonical reasoning 1.0 **FICTIONAL local preview** and exact sample pin: [integration handoff](../docs/PORTAL_INTEGRATION.md#reasoning-10-fictional-development-preview). Start with `node web/tests/boundary.cjs --reasoning --serve` after the external Next build; this isolates local test auth and keeps the production publisher unused. `--reasoning` without `--serve` runs the real HTTP/browser acceptance suite. Neither command accesses production credentials.
 
 Collected-corpus experiment labels follow [backend/README.md → Decisions](../backend/README.md#decisions). Producer declarations never authorize publication; fixture previews retain their fictional label.
+
+2026-10-25 · rcc00n / Codex · TypeScript handoff verification includes current `docs/examples/snapshot*.json` as well as pinned historical portal fixtures. Why: upstream regeneration must be tested against actual web models, including partial-error projection; historical fixtures alone can hide interface drift. See `web/tests/contract.cjs`.

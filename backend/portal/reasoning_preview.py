@@ -22,6 +22,16 @@ SAMPLE = Path(__file__).parent / "fixtures/reasoning-demo/snapshot.sample.json"
 HISTORICAL_V3_SHA256 = "c223bc156b7d80049db24483140f45a1ee065f20106062d69bb249171fa07a30"
 GENUINE_V4_SIDECAR_SHA256 = "f55c3304afd92b9f763ddb04357f3ec0c7a8860e9ee3ddcf63b69a4bcff7c6d0"
 GENUINE_V4_SHA256 = "ef231a4f0797c1128869ed5bd69d4d2869771766f634e754aa02dbf375756d79"
+# DECISION(2026-10-25, rcc00n/Codex): closed historical metadata binds exact original pairs only.
+# Why: accepting a display sidecar must not attest execution, inherited ledger rows or publication.
+CLOSED_SIDECAR_PAIRS = {
+    GENUINE_V4_SIDECAR_SHA256: GENUINE_V4_SHA256,
+    "9831d4adc537a5297f54c25ac51e50a8df2ee46c5506024213bac7de9721f6b5":
+        "8704f1c66285e66bde5e804aad28bd26f81ed8d04a5cebf4f2f153866ae0da15",
+    "90805ac0311fcc56841a9f1efe6d7a1d13ac892b676dac8c903aba981a507e1f":
+        "b376ec698a42d24491b85c876078956c29e0fdbeb05fafe8e93ae9ba7650af39",
+}
+
 
 
 def artifact_review_issues(sha256, run_id=None):
@@ -31,6 +41,23 @@ def artifact_review_issues(sha256, run_id=None):
 
 
 def artifact_review_notices(sha256, run_id=None):
+    # DECISION(2026-10-25, rcc00n/Codex): inherited ledger rows are not current-attempt spend.
+    # Why: v5/v6 owner attestations explicitly include replayed, unused and earlier error rows.
+    later = {"2026-10-24-russia-ukraine-war-6": 5, "2026-10-24-russia-ukraine-war-7": 6}
+    version = later.get(run_id)
+    if version is None:
+        later_hashes = list(CLOSED_SIDECAR_PAIRS.values())[1:]
+        version = 5 + later_hashes.index(sha256) if sha256 in later_hashes else None
+    if version is not None:
+        return [
+            "Ledger scope: recorded calls include seeded, replayed and unused rows from earlier attempts. "
+            "Reported model/error totals are not this attempt's spending or failure totals. "
+            "Execution, replay consumption and source-text verification remain separate checks.",
+            ("Edition review: Historical v5 is superseded by the owner's v6 handover; preserve these original bytes."
+             if version == 5 else
+             "Edition review: Current owner v6 handover. The owner D5 report discloses unresolved roundup-label, "
+             "claim/event relevance and rubric-repair limitations; producer labels are not independent acceptance."),
+        ]
     if not artifact_review_issues(sha256, run_id):
         return []
     return [
@@ -736,11 +763,10 @@ def load_preview(path=None):
     return result
 
 
-def bind_closed_v4_sidecar(raw, snapshot_raw, result, sidecar):
-    # DECISION(2026-10-25, rcc00n/Codex): support only the pinned historical closed-v4 sidecar bytes.
-    # Why: this producer format omits full config hashes; display binding must not imply full acceptance.
-    fail(hashlib.sha256(raw).hexdigest() == GENUINE_V4_SIDECAR_SHA256, "unsupported_closed_sidecar")
-    fail(hashlib.sha256(snapshot_raw).hexdigest() == GENUINE_V4_SHA256, "sidecar_snapshot_mismatch")
+def bind_closed_sidecar(raw, snapshot_raw, result, sidecar):
+    expected = CLOSED_SIDECAR_PAIRS.get(hashlib.sha256(raw).hexdigest())
+    fail(expected is not None, "unsupported_closed_sidecar")
+    fail(hashlib.sha256(snapshot_raw).hexdigest() == expected, "sidecar_snapshot_mismatch")
     binding, run, p = sidecar['snapshot'], sidecar['run'], result['reasoning']
     fail(binding['sha256_file_bytes'] == result['preview']['sha256'], 'sidecar_snapshot_mismatch')
     fail(type(binding['size_bytes']) is int and binding['size_bytes'] == len(snapshot_raw), 'sidecar_size_mismatch')
@@ -762,7 +788,7 @@ def bind_preview_sidecar(raw, snapshot_raw, result):
         sidecar = parse_preview_json(raw)
         fail(isinstance(sidecar, dict), "invalid_sidecar")
         if isinstance(sidecar.get('snapshot'), dict) and 'sha256_file_bytes' in sidecar['snapshot']:
-            return bind_closed_v4_sidecar(raw, snapshot_raw, result, sidecar)
+            return bind_closed_sidecar(raw, snapshot_raw, result, sidecar)
         binding = sidecar["snapshot"]
         fail(isinstance(binding, dict), "invalid_sidecar")
         fail(binding["sha256"] == result["preview"]["sha256"], "sidecar_snapshot_mismatch")

@@ -4,7 +4,7 @@ Start with [Web Integration: Start Here](TEAM_HANDOFF.md). Owner: Vadim (@rcc00n
 
 ## Inspected contracts and evidence states
 
-Read-only review pins:
+Historical read-only review pins (superseded for current implementation status by the daily-editions update below):
 
 - Reasoning `origin/yelysei/agents@6ea82434d0f06cefb51f5536732ceac68e9780ef`: **canonical reasoning 1.0**, [ARCHITECTURE §8](https://github.com/rcc00n/Quorum/blob/6ea82434d0f06cefb51f5536732ceac68e9780ef/docs/ARCHITECTURE.md#8-output-contract-for-the-portal), `reasoning/quorum_reasoning/{nodes/publish.py,tools/corpus.py,tools/fetch_text.py,state.py}`, three `docs/examples/snapshot.*.json` samples. Fetch before integrating a later revision.
 - Collection `origin/data-collection@18fb009b4b36e995e765563203edbf742475a20b`: `collectors/schema.sql`, `common.py`, `run.py`, `README.md`, `sources.csv`, `zetaris/01_register_postgres.sql`.
@@ -29,7 +29,7 @@ Next.js owns reading/navigation, responsive UI and view models. Django owns auth
 
 `GET /api/feed/?date=YYYY-MM-DD&topic=id&revision=id` requires a Django session. Missing date uses server day; missing topic is `""`. Invalid date/revision is 400; unauthenticated is 401; writes are 405. The response is a `Snapshot`, `Cache-Control: no-store`. Configured read failures remain ERROR. `GET /api/events/<id>/?date=...&revision=...` resolves stable event/revision links; without date it finds the latest indexed event. Absent results are never fabricated.
 
-`backend/portal/integration.py` defines `DataAdapter.snapshot(day: str = "", topic: str = "", revision: str | None = None) -> PortalSnapshot`. Preferences/Control also call `snapshot()` for catalogs. The default `PublishedAdapter` uses `CatalogAdapter` while snapshot storage is unconfigured. `CatalogAdapter` reads an explicitly reviewed external export, **not live Zetaris**. No tenant/user is passed into the adapter; UI topic selection is not authorization. Preference-to-processing scheduling is undecided.
+`backend/portal/integration.py` defines `DataAdapter.snapshot(day: str = "", topic: str = "", revision: str | None = None) -> PortalSnapshot`. Preferences/Control also call `snapshot()` for catalogs. The default `PublishedAdapter` uses `CatalogAdapter` while snapshot storage is unconfigured. `CatalogAdapter` reads an explicitly reviewed external export, **not live Zetaris**. No tenant/user is passed into the adapter; UI topic selection is not authorization. Daily-edition semantics are now approved in [DECISIONS.md → Daily editions for users](DECISIONS.md#daily-editions-for-users-topics-delivery-time-where-runs-execute); delivery-time storage/release gating and a safe topic-write bridge are not implemented.
 
 Same-origin Nginx routes `/` to Next.js, `/api/` and `/staff/` to Django, static staff assets separately. `GET /api/session/` supplies `{user, csrfToken}`; all POSTs, including login/register/logout, send cookies plus `X-CSRFToken`. Login rotates the token. Production cookies are Secure/HttpOnly; no JWT/localStorage. GETs require sessions but no CSRF header. [Backend endpoint inventory](../backend/README.md#web-api) is canonical. Machine authorization is separate and unapproved; never reuse human admin sessions to publish.
 
@@ -117,9 +117,11 @@ Preview commands and three-fixture acceptance: [verification](PORTAL_VERIFICATIO
 
 Reasoning `empty` with completed `roundup.empty_day` is a quiet selection, not no run. Preview labels it a **fictional recorded completion**, never live publication. Normal feed continues honest pending/error/stale behavior. Explicit revision links must not silently load different results.
 
-Reasoning versions are immutable reruns; current publisher code initializes version1 pending its store. Its document supersedes_id filtering is implemented, but a claim-level correction/retraction/alias record is not exported. Portal internal revisions/parents/corrections/rollback are already tested; no automatic conversion of reasoning version to portal revision is agreed. Reasoning event hashes include cluster document membership, so do not promise unchanged IDs after reclustering. Public trace must contain only reviewed node/iteration/event/decision/reason/model/duration fields: never prompts, private chain-of-thought, internal conversations, credentials or raw failure logs. No fabricated review times.
+Reasoning versions are immutable reruns; the integrated file store assigns the next per-topic/day version and publication timestamp. Its document supersedes_id filtering is implemented, but a claim-level correction/retraction/alias record is not exported. Portal internal revisions/parents/corrections/rollback are already tested; no automatic conversion of reasoning version to portal revision is agreed. Reasoning event hashes include cluster document membership, so do not promise unchanged IDs after reclustering. Public trace must contain only reviewed node/iteration/event/decision/reason/model/duration fields: never prompts, private chain-of-thought, internal conversations, credentials or raw failure logs. No fabricated review times.
 
-## Remaining production handoff
+## Historical contract audit — retained, superseded by current gates below
+
+This table records the old inspected pins, not new requests to the owners. IDs, quote bindings, catalog ratings and the canonical topic slug have since been integrated; do not repeat completed work from this historical inventory.
 
 | Exact requirement | Actual supplied state | Responsible owner / next action |
 | --- | --- | --- |
@@ -134,9 +136,9 @@ Reasoning versions are immutable reruns; current publisher code initializes vers
 | generated/published/expires, time zone/window | **Now supplied**; published_at null until a store publishes. UTC validation/expiry display tested | No longer a missing-envelope blocker; production bridge must verify actual publication and retain expiry |
 | transport, scoped auth, bridge, retention, preference scheduling | Proposed only; no endpoint/service credential or production bridge operational | All three approve before Vadim activates anything |
 
-### Transport proposal — not implemented or approved
+### Historical transport proposal — endpoint deferred
 
-Reasoning §8 proposes bearer-protected GET `/snapshots/{topic_id}/{edition_date}` and `/latest` over an SSH tunnel bound to loopback, cached by version. The portal's earlier staged SSH/SFTP plus local publisher is an **alternative proposal**, not a second active transport. Choose one together, define size/time limits, replay/version/freshness/error policy, secret rotation and narrow OS access. Never expose PostgreSQL or unauthenticated ingestion, reuse user passwords, write Django auth data or allow upload identities to alter head/code/private config. Vadim alone handles approved portal deployment. No machine credentials or transport are created by this milestone.
+Historical transport proposal, superseded for the hackathon by the private immutable file + full SHA-256 + producer-commit handover agreed in DECISIONS.md (2026-10-24): bearer-protected GET `/snapshots/{topic_id}/{edition_date}` and `/latest` over an SSH tunnel bound to loopback, cached by version. The portal's earlier staged SSH/SFTP plus local publisher is also historical. Any future production bridge still requires agreement on size/time limits, replay/version/freshness/error policy, secret rotation and narrow OS access. Never expose PostgreSQL or unauthenticated ingestion, reuse user passwords, write Django auth data or allow upload identities to alter head/code/private config. Vadim alone handles approved portal deployment. No machine credentials or transport are created by this milestone.
 
 ### Minimal real end-to-end acceptance
 
@@ -165,3 +167,27 @@ This uses existing production validation/projection, no publisher/auth writes/in
 ### Collected-corpus local experiment compatibility
 
 The same gated, authenticated development preview accepts producer-declared `fictional: false` snapshots while keeping `published: false`. Its labels distinguish collected-corpus declarations, deterministic stand-ins and recorded model output; none grants publication authority. Current canonical 0224ca6 optional source/document identities, nullable quote offsets/hash/access/fetch bindings, third-review declarations, `summary_source`, `by_headline`, `line_source` and bounded extraction audit `detail` are retained. These are producer declarations; source text is absent, so this preview does not independently verify quote binding. See [backend decisions](../backend/README.md#decisions). A false headline-only flag does not prove successful body extraction. Real corpus stand-in browser acceptance proves the data path and presentation only; an aborted live graph has no snapshot to display.
+
+## Daily-editions integration update — 2026-10-25
+
+Canonical product decision: [Daily editions for users](DECISIONS.md#daily-editions-for-users-topics-delivery-time-where-runs-execute). This section records implementation boundaries, not another product decision.
+
+- Collection PRs #12/#14/#15 are integrated. Active rows in the collection `topics` table are authoritative; seed insertion never overwrites them, retirement uses `active = false`, and rows are never deleted. Exact schema/term/order semantics remain in `collectors/README.md › Topics` and `collectors/schema.sql`.
+- Current Django preferences select from the reviewed catalog export. They do not create collection topics, store a delivery time, or start processing. The portal auth database remains separate from collection data. A new topic-write bridge needs scoped authorization and an agreed transport; do not expose Postgres or put collection/model credentials on the public web host.
+- Reasoning's `topic_terms` is an owner-machine function/CLI. Its suggestions need visible user curation; the public web application must not invoke a paid model or reasoning subprocess. PR #16 contains later topic normalization fixes and night reasoning rules, explicitly held for owner confirmation.
+- The owner reports six live topics and a measured approximately 29-minute collection pass / 45-minute cycle. The 15-minute sleep is not a pickup guarantee. New-topic copy must disclose that the first full edition needs accumulated coverage; no deadline or completed edition may be promised merely from topic creation.
+- Delivery time means local display time for an already-produced edition, not a processing trigger. Timezone storage, same-day/history behavior, and the safe topic-write bridge remain implementation/integration work; no scheduler or publisher was enabled by this update.
+- Latest owner handoff is v6, superseding v5. Both original-file bundles and the separate v4 execution/impact attestation are absent from the inspected local handoff directories at this checkpoint. Their reported existence is not independent acceptance. Retain the original historical v4 publication hold until the separate evidence is available and reviewed.
+
+Follow-up evidence and exact tests belong in Issue #2 and PORTAL_VERIFICATION.md.
+
+### Current production gates
+
+| Boundary | Current evidence / exact remaining dependency |
+| --- | --- |
+| Contract and catalog | Snapshot §8, canonical topic slug, source/document identity namespaces, quote offsets/hash/access fields and sourced four-mode registry are implemented and locally tested. Existing collection work is accepted; no duplicate export/collection task is requested. |
+| New editions | The owner reports v6 as current. Original bytes, sidecar, separate attestation and D5 must be available locally before independent acceptance; no retrospective rewriting of historical files. |
+| Public failure privacy | PR #9 implements the owner findings and regenerated examples; outstanding CHANGES_REQUESTED review must be rechecked before merge. |
+| Reasoning night decisions | PR #16 has green offline tests but an explicit owner-confirmation hold. Route receipts do not resolve Nightshift prior-answer injection into blind verification. |
+| Topic writes and delivery | Product semantics are decided; scoped topic-write transport, suggestion curation and local delivery-time implementation remain unbuilt. Current web preferences select an exported catalog only. |
+| Production release | No public publisher/ingest is enabled. Approved bridge/auth, target-host security/restore/rollback and explicit release authorization remain necessary. A code checkpoint on master does not certify production or sponsor acceptance. |

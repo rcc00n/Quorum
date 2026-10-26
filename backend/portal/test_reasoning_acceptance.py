@@ -81,3 +81,45 @@ class ReasoningAcceptanceTests(SimpleTestCase):
                    return_value=['impact_score_review_required']) as review:
             self.run_report(blocked=True)
         review.assert_called_once_with(self.options['sha256'], json.loads(self.raw)['run_id'])
+
+
+    def closed_producer(self, config=b'TEST\nconfig\n', **changes):
+        sidecar = json.loads(self.sidecar)
+        sidecar['producer'] = dict(commit_of_the_publishing_process='aaaaaaa',
+            config_sha256_git_blob_lf=hashlib.sha256(config).hexdigest(),
+            config_sha256_working_copy_crlf=hashlib.sha256(config.replace(b'\n', b'\r\n')).hexdigest()) | changes
+        raw = json.dumps(sidecar).encode()
+        (self.root/'sidecar.json').write_bytes(raw)
+        self.options['sidecar_sha256'] = hashlib.sha256(raw).hexdigest()
+        return config
+
+    def test_complete_closed_config_metadata_never_proves_execution(self):
+        config = self.closed_producer()
+        report = self.run_report(config=config)
+        self.assertTrue(report['metadata_valid'])
+        self.assertEqual(report['issues'], [])
+        with patch('portal.management.commands.reasoning_snapshot.artifact_review_issues',
+                   return_value=['impact_score_review_required']):
+            report = self.run_report(config=config, blocked=True)
+        self.assertTrue(report['metadata_valid'])
+        self.assertEqual(report['issues'], ['impact_score_review_required'])
+
+    def test_closed_config_needs_both_full_matching_hashes(self):
+        for field in ('config_sha256_git_blob_lf', 'config_sha256_working_copy_crlf'):
+            for bad, issue in [('short', 'producer_config_hash_incomplete'),
+                               ('0'*64, 'producer_config_mismatch'),
+                               (True, 'producer_config_hash_incomplete')]:
+                with self.subTest(field=field, value=type(bad).__name__):
+                    config = self.closed_producer(**{field: bad})
+                    report = self.run_report(config=config, blocked=True)
+                    self.assertFalse(report['metadata_valid'])
+                    self.assertEqual(report['issues'], [issue])
+
+
+    def test_closed_producer_prefix_must_be_a_real_commit_reference(self):
+        for value in ('', 'aaaaaa', 'a'*41, True, 123, 'aaaaaaa:private'):
+            with self.subTest(value=type(value).__name__):
+                config = self.closed_producer(commit_of_the_publishing_process=value)
+                report = self.run_report(config=config, blocked=True)
+                self.assertFalse(report['metadata_valid'])
+                self.assertEqual(report['issues'], ['producer_commit_mismatch'])
