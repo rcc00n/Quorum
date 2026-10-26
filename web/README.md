@@ -23,6 +23,16 @@ The canonical cross-workstream handoff is [PORTAL_INTEGRATION.md](../docs/PORTAL
 
 `fixtures/demo.ts` is a fictional view-model test fixture, never imported by production pages or the live adapter. Browser tests explicitly label demo responses; screenshots of the shipped empty workspace show actual pending state.
 
+## Seeing the Today board with stories on your machine
+
+The board shows story cards only for a published edition, and the portal has none until the agents publish one. To look at the cards before that, publish the repository's labelled fictional fixture to a scratch snapshot store on your own machine; nothing of this touches the server, and the page carries the DEMO banner the whole time.
+
+1. Copy `backend/portal/fixtures/analysis-demo.json` to a scratch folder outside the repository and edit the copy: `edition` = today, `generated_at` = now, `expires_at` = tomorrow, `mode` = `demo`, `revision` of your own; keep every title and summary labelled DEMO. The feed's topic list comes from the published snapshot, so list your local catalog's topics in it too, and add the fixture's topic ids to your local catalog file so they can be followed.
+2. With `DJANGO_DEBUG=1`, a scratch `QUORUM_PORTAL_DATA`, your `QUORUM_CATALOG_PATH`, a stable `DJANGO_SECRET_KEY` (without one, every restart signs everyone out) and `QUORUM_SNAPSHOT_ROOT` pointing at a new folder with mode 700 outside the repository and the data folder: `portal_snapshot validate --file <copy>`, then with `QUORUM_ENABLE_SNAPSHOT_PUBLICATION=1`: `portal_snapshot prepare`, copy the file into `<root>/staging/`, `portal_snapshot publish --file <root>/staging/<copy> --sha256 <its sha256> --allow-demo`.
+3. Start `runserver` with the same environment, follow the DEMO topics under My topics, and open Today. A card's photo area stays empty unless an event carries a licensed photo; the roundup card needs `editions`, which the published feed does not supply today, so only story cards and the waiting cards appear.
+
+`portal_snapshot` and its flags are documented in [backend/README.md](../backend/README.md); this is a local viewing recipe, not a publication path (DECISIONS › Daily editions).
+
 ## Decisions
 
 2026-10-24 · rcc00n / Codex · Roundup verdicts are producer-attributed; exact event-scoped skipped-check trace rows show “not double-checked”, while absent claim evidence establishes no independent verification. Preserve original status/grouping and show all partial errors behind a counted disclosure. Why: below-bar cost gating must not silently weaken verification claims or bury the reading journey under diagnostics.
