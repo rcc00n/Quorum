@@ -1,0 +1,363 @@
+/* The night screens: sign-in, sign-up and first setup (the prototype's dark screen), and the topic picker,
+   which also appears on the light settings page. Tokens: web/app/identity.css, roles in web/DESIGN.md. Scoped
+   under .night and .tp; the colour-setting selectors carry the scope because globals.css sets colour on
+   p, label, input, .button and .message. */
+.night {
+  min-height: 100svh;
+  background: var(--night);
+  color: var(--paper);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+.night a {
+  color: inherit;
+  text-decoration: none;
+}
+.night :is(a, button, input, summary):focus-visible {
+  outline: 3px solid var(--paper);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.night-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 72px;
+  padding: 0 6%;
+  border-bottom: 1px solid var(--night-rule);
+}
+.night-masthead {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.night-link {
+  font-size: 15px;
+  font-weight: 500;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+.night-link:hover {
+  border-bottom-color: var(--paper);
+}
+.night-body {
+  width: 100%;
+  max-width: 1120px;
+  padding: 64px 6% 96px;
+  justify-self: start;
+}
+.night .night-kicker {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--night-ink-2);
+  margin: 0 0 12px;
+}
+.night h1,
+.night h2 {
+  font-family: var(--display);
+  font-weight: 500;
+  color: var(--paper);
+  margin: 0;
+}
+.night h1 {
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  max-width: 16ch;
+  margin-bottom: 20px;
+}
+.night h2 {
+  font-size: 20px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.night p {
+  margin: 0;
+  color: var(--paper);
+}
+.night .night-lead {
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--night-ink-2);
+  max-width: 44ch;
+}
+.night form {
+  display: grid;
+  gap: 20px;
+  margin-top: 36px;
+  max-width: 440px;
+}
+.night label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--night-ink-2);
+}
+.night input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--night-rule);
+  border-radius: 2px;
+  padding: 10px 14px;
+  background: var(--night-field);
+  color: var(--paper);
+  font: inherit;
+  font-size: 17px;
+}
+.night input::placeholder {
+  color: var(--night-ink-2);
+  opacity: 1;
+}
+.night input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  accent-color: var(--paper);
+}
+.night .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--paper);
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: 15px;
+  justify-self: start;
+  transition: background 0.18s ease-out;
+}
+.night .button:hover {
+  background: var(--paper-2);
+  border-color: var(--paper-2);
+  transform: none;
+}
+.night .button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.night .help,
+.night .tp-hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--night-ink-2);
+}
+.night .message {
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  background: var(--night-field);
+  border-left: 2px solid var(--umber-light);
+  color: var(--paper);
+  font-size: 15px;
+  max-width: 60ch;
+}
+.night .message.error {
+  border-left-color: var(--umber-light);
+}
+.night-error {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+  margin-top: 24px;
+}
+
+/* Sign-in and sign-up */
+.night-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 64px;
+  align-items: start;
+}
+.night .night-form h2 {
+  font-size: 28px;
+  letter-spacing: -0.015em;
+  margin-bottom: 8px;
+}
+.night .night-form > p {
+  color: var(--night-ink-2);
+  font-size: 15px;
+  max-width: 40ch;
+}
+.night .night-switch {
+  margin-top: 28px;
+  font-size: 15px;
+  color: var(--night-ink-2);
+}
+.night .night-switch a {
+  color: var(--paper);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* Topic picker (light defaults for the settings page, night overrides below) */
+.tp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+.tp-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.tp .tp-lead {
+  margin: 10px 0 0;
+  max-width: 48ch;
+}
+.tp-search {
+  margin-top: 24px;
+}
+.tp .tp-hint {
+  margin-top: 8px;
+}
+.tp-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+}
+.tp-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  padding: 7px 8px 7px 14px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.tp-chips button {
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.tp .topic-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 20px 0 0;
+  border-top: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+}
+.tp .topic-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 0;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tp .topic-option:has(input:checked) {
+  background: var(--paper-2);
+}
+.tp .tp-none {
+  margin-top: 18px;
+  padding-left: 14px;
+  border-left: 2px solid var(--umber);
+  font-size: 15px;
+  max-width: 56ch;
+}
+.tp .tp-foot {
+  margin-top: 24px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.tp .tp-button {
+  margin-top: 20px;
+}
+.tp .tp-notice {
+  margin-top: 20px;
+  display: grid;
+  gap: 4px;
+}
+
+.night .tp-head {
+  border-top: 1px solid var(--night-rule);
+  padding-top: 14px;
+  margin-top: 40px;
+}
+.night .tp-count,
+.night .tp-foot,
+.night .tp-none,
+.night .tp-lead,
+.night .tp-notice p {
+  color: var(--night-ink-2);
+}
+.night .tp .topic-options {
+  border-color: var(--night-rule);
+}
+.night .tp .topic-option {
+  background: var(--night);
+  border-color: var(--night-rule);
+  color: var(--paper);
+}
+.night .tp .topic-option:has(input:checked) {
+  background: var(--night-field);
+}
+.night .tp .tp-none {
+  border-left-color: var(--umber-light);
+}
+.night .tp-chips li {
+  border-color: var(--paper);
+}
+
+@media (max-width: 900px) {
+  .night-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+@media (max-width: 700px) {
+  .night {
+    font-size: 16px;
+  }
+  .night-head {
+    padding-inline: 16px;
+  }
+  .night-body {
+    padding: 40px 16px 64px;
+  }
+  .night h1 {
+    font-size: clamp(32px, 9.5vw, 40px);
+  }
+  .tp .topic-options {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .night .button {
+    transition: none;
+  }
+}

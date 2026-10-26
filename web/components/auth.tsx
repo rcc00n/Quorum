@@ -2,9 +2,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
-import { Brand } from "./brand";
 import { api, User } from "@/lib/api";
+import "@/app/night.css";
+
+// DECISION(2026-10-26, Anastasia/Claude Code): sign-in and sign-up share one night screen (the prototype's
+// dark first screen) in the portal's identity: one grotesque, square corners, paper-on-ink button; the field
+// names, labels and button texts stay exactly as the smoke test and the backend expect (username, password,
+// "Create account", "Sign in"). Why: WEB-UX-02 asked for a proper form; the API and its contract are Vadim's.
 export function Auth({ register = false }: { register?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -27,74 +31,58 @@ export function Auth({ register = false }: { register?: boolean }) {
     }
   }
   return (
-    <main id="main" className="auth-page">
-      <div className="auth-story">
-        <Brand />
-        <div>
-          <p className="eyebrow">A CLEARER DAILY PERSPECTIVE</p>
-          <h1>
-            Stay curious.
-            <br />
-            <em>Stay informed.</em>
-          </h1>
-          <p>Understand the evidence behind the headlines.</p>
-        </div>
-        <span>QUORUM / EDITORIAL INTELLIGENCE</span>
-      </div>
-      <div className="auth-form">
-        <Link className="back" href="/">
-          ← Back to Quorum
+    <main id="main" className="night auth">
+      <header className="night-head">
+        <Link href="/" className="night-masthead" aria-label="Quorum home">
+          Quorum
         </Link>
-        <p className="eyebrow">
-          {register ? "YOUR PERSPECTIVE STARTS HERE" : "WELCOME BACK"}
-        </p>
-        <h2>{register ? "Create your account" : "Sign in to Quorum"}</h2>
-        <p>
-          {register
-            ? "A thoughtful brief starts with your interests."
-            : "Your topics, evidence and daily perspective."}
-        </p>
-        <form onSubmit={submit}>
-          <label>
-            Username
-            <input
-              name="username"
-              autoComplete="username"
-              required
-              maxLength={150}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              type="password"
-              name="password"
-              autoComplete={register ? "new-password" : "current-password"}
-              required
-              minLength={register ? 8 : 1}
-            />
-          </label>
-          {register && (
-            <p className="help">
-              Use at least 8 characters and avoid common passwords.
-            </p>
-          )}
-          {error && (
-            <p className="message error" role="alert">
-              {error}
-            </p>
-          )}
-          <button disabled={busy} className="button">
-            {busy ? "Please wait…" : register ? "Create account" : "Sign in"}
-            <ArrowRight size={16} />
-          </button>
-        </form>
-        <p className="auth-switch">
-          {register ? "Already have an account?" : "New to Quorum?"}{" "}
-          <Link href={register ? "/login" : "/register"}>
-            {register ? "Sign in" : "Create account"}
-          </Link>
-        </p>
+        <Link href={register ? "/login" : "/register"} className="night-link">
+          {register ? "Sign in" : "Create account"}
+        </Link>
+      </header>
+      <div className="night-body night-grid">
+        <div className="night-story">
+          <p className="night-kicker">{register ? "Sign up" : "Sign in"}</p>
+          <h1>{register ? "Choose your topics. Read the working." : "Welcome back."}</h1>
+          <p className="night-lead">
+            {register
+              ? "A login and a password, then the topics you follow. One edition per topic per day, prepared after the 05:30 New York cut; nothing is sold and nothing is shared."
+              : "Your topics, the day's edition and the evidence under every line."}
+          </p>
+        </div>
+        <div className="night-form">
+          <h2>{register ? "Create your account" : "Sign in to Quorum"}</h2>
+          <p>{register ? "Free, no subscription. Pick a username; no email is required." : "Use the username you registered with."}</p>
+          <form onSubmit={submit}>
+            <label>
+              Username
+              <input name="username" autoComplete="username" required maxLength={150} />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                name="password"
+                autoComplete={register ? "new-password" : "current-password"}
+                required
+                minLength={register ? 8 : 1}
+              />
+            </label>
+            {register && <p className="help">At least 8 characters; common passwords are refused.</p>}
+            {error && (
+              <p className="message error" role="alert">
+                {error}
+              </p>
+            )}
+            <button disabled={busy} className="button">
+              {busy ? "Please wait…" : register ? "Create account" : "Sign in"}
+            </button>
+          </form>
+          <p className="night-switch">
+            {register ? "Already have an account?" : "New to Quorum?"}{" "}
+            <Link href={register ? "/login" : "/register"}>{register ? "Sign in" : "Create account"}</Link>
+          </p>
+        </div>
       </div>
     </main>
   );

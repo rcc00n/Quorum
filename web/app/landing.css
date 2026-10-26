@@ -2,23 +2,7 @@
    routes keep their current look until WEB-UX-04 restyles them. Selectors that set colour on links,
    paragraphs or headings carry the .landing prefix: `.landing a { color: inherit }`, `.landing p` and
    `.landing h2` outrank bare .lp-* classes (DECISION 2026-10-26 at .landing .lp-button). */
-:root {
-  --paper: #ffffff;
-  --paper-2: #f4f1eb;
-  --paper-3: #ebe6dd;
-  --ink: #141414;
-  --ink-2: #5f5a53;
-  --rule: #dcd6cc;
-  --umber: #7b5634;
-  --umber-ink: #5a3e25;
-  --focus: #141414;
-  /* DECISION(2026-10-26, Anastasia/Claude Code): one grotesque drawn for a news group for display and body on
-     the landing, weights 400/500/700, headlines at 500; the rounded display face is not used here (DECISIONS
-     item 9, amended 2026-10-26). Why: Anastasia asked for the strictness of a well-known news agency. */
-  --display: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
-  --body: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-}
+/* Tokens: web/app/identity.css (imported in app/layout.tsx). */
 .landing {
   background: var(--paper);
   color: var(--ink);

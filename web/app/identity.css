@@ -1,0 +1,26 @@
+/* Design tokens of the portal's identity. Values and roles: web/DESIGN.md. Imported once in app/layout.tsx so
+   every route can use the names; the routes themselves adopt them one by one (landing, sign-up and first setup
+   today; the rest at WEB-UX-04). Names do not collide with globals.css (--bg, --text, --muted, --accent, --border). */
+:root {
+  --paper: #ffffff;
+  --paper-2: #f4f1eb;
+  --paper-3: #ebe6dd;
+  --ink: #141414;
+  --ink-2: #5f5a53;
+  --rule: #dcd6cc;
+  --umber: #7b5634;
+  --umber-ink: #5a3e25;
+  --focus: #141414;
+  /* The dark sign-up and first-setup screens (the prototype's night screen). Nowhere else. */
+  --night: #141414;
+  --night-field: #1f1d1b;
+  --night-rule: #3a3632;
+  --night-ink-2: #b9b2a8;
+  --umber-light: #c9a27e;
+  /* DECISION(2026-10-26, Anastasia/Claude Code): one grotesque drawn for a news group for display and body,
+     weights 400/500/700, headlines at 500; the rounded display face is not used on the restyled routes
+     (DECISIONS item 9, amended 2026-10-26). Why: Anastasia asked for the strictness of a well-known news agency. */
+  --display: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
+  --body: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
