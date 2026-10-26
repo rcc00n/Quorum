@@ -432,9 +432,9 @@ export default function Home() {
                 <li>Paywalled outlets count by headline and lead. A site that forbids our crawler counts the same way.</li>
                 <li>
                   One edition per topic per day: the team runs it after the 05:30 New York cut and the deploy owner
-                  installs it on the site; the site itself starts nothing. A topic outside the catalog is a request:
-                  once the team adds it to collection, its first documents arrive within about an hour, and its page
-                  says &ldquo;Waiting for its first brief&rdquo; until its first edition is installed.
+                  installs it on the site; the site itself starts nothing. Topics come from the team&rsquo;s catalog; the site cannot add one. Once the team adds a new topic to collection,
+                  its first documents arrive within about an hour, and until its first edition is installed the site says
+                  no edition is installed for it.
                 </li>
                 <li>Positions on the spectrum come from AllSides, MBFC and Ad Fontes, not from us.</li>
                 <li>No story on a quiet day. On 24 October 2026, the first real day, no event crossed the bar.</li>
