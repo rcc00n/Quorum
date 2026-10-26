@@ -33,11 +33,13 @@ account), so --max-calls-per-key bounds what one invocation starts there.
 Status files (the portal's contract, Issue #2 6411408519): <status-dir>/<topic>/<date>.json with exactly topic, date,
 state (queued | running | published | failed | waiting_for_key), run_id, started_at, updated_at, attempts and reason
 (a string or null), written atomically (temp file + os.replace) and each followed by <date>.json.sha256
-("<sha256>  <date>.json"), which the portal's install command checks. The runner's own record of each topic-date (what
-set the state, estimates, the plan, key names, runs, versions), _summary.json and the lock are in
-<status-dir>/_runner/<date>/, never installed (decision at Statuses). Both hold key variable names, never values, and
-file names relative to --log-dir, never paths. A run without --live never changes a live outcome there: it writes its
-plan beside it (decision at Statuses.open). Logs: one per run in <log-dir>/ (<date>_<topic>_run<NN>_<key>.log,
+("<sha256>  <date>.json"), which the portal's install command checks. Only a live invocation writes them; while the
+live store's newest version of the topic-date is another run id's, the file shows that version as published (decisions
+at Statuses.save and Statuses.follow_store). The runner's own record of each topic-date (what set the state, estimates,
+the plan, key names, runs, versions), _summary.json and the lock are in <status-dir>/_runner/<date>/, never installed
+(decision at Statuses). Both hold key variable names, never values, and file names relative to --log-dir, never paths.
+A run without --live writes no status file and never changes a live outcome in a record: it writes its plan beside it
+(decision at Statuses.open). Logs: one per run in <log-dir>/ (<date>_<topic>_run<NN>_<key>.log,
 <date>_<topic>_dry.log, <date>_runner.log); every key and token value the runner knows is replaced by [redacted] before
 a byte reaches a log.
 
@@ -294,6 +296,20 @@ def latest_version(out: Path, topic: str, edition_date: str) -> int:
 
     found = store.versions(out, topic, edition_date)
     return found[-1] if found else 0
+
+
+def latest_snapshot(out: Path, topic: str, edition_date: str) -> tuple[int, dict[str, Any]] | None:
+    """(version, snapshot) of the newest readable stored version of the topic-date, what latest.json serves, or None."""
+    from quorum_reasoning import store
+
+    for v in reversed(store.versions(out, topic, edition_date)):
+        try:
+            snap = store.load(out, topic, edition_date, v)
+        except (OSError, ValueError):
+            continue
+        if isinstance(snap, dict):
+            return v, snap
+    return None
 
 
 def _overlaps(a: Path, b: Path) -> bool:
@@ -575,7 +591,9 @@ class Statuses:
         self.redactor = redactor
         self.mode = mode
         self.docs: dict[str, dict[str, Any]] = {}
-        self.kept: set[str] = set()  # dry mode: topics whose file keeps its live outcome (decision at open)
+        self.kept: set[str] = set()  # dry mode: topics whose record keeps its live outcome (decision at open)
+        self.prior: dict[str, dict[str, Any] | None] = {}  # each topic's record as this invocation found it
+        self.pinned: dict[str, str] = {}  # live mode: topic -> the other run id whose published version the file shows (decision at follow_store)
 
     def path(self, topic: str) -> Path:
         """The portal's status file of `topic` on this date."""
@@ -601,23 +619,92 @@ class Statuses:
         its exit code counts the kept state (failed -> 1; waiting_for_key, queued or running -> 3). Why: the README says
         to run the plan any time into the same --status-dir; it turned a live `failed` (exit 7) or `waiting_for_key`
         into `queued` with exit 0, so neither the file, _summary.json nor the exit code showed the failure or the wait.
-        A state an earlier plan run set (`state_mode` dry) is replaced as before; a live run replaces everything."""
+        A state an earlier plan run set (`state_mode` dry) is replaced as before; a live run replaces everything.
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): in a live invocation a record's `started_at` is kept only when
+        a live invocation set it (`started_mode` live: the run id's first live start, or, before one, when a live
+        invocation first queued it) or the record has a `runs` row; otherwise, a plan run's time included, it becomes
+        now. Why: the portal shows `waiting_for_key` as "being prepared since started_at", and a topic that a live
+        invocation left waiting without ever starting it kept the plan run's time, hours before the cut (closing review
+        round 2). Supersedes the closing-round-1 decision at _drive that only the first live start replaces it."""
         old = self.load(topic)
+        self.prior[topic] = old
         now = now_iso()
         same = bool(old) and old.get("run_id") == rid
         if same and self.mode == "dry" and holds_live_outcome(old):
             doc = dict(old)
             self.kept.add(topic)
         elif same:
-            doc = {k: v for k, v in old.items() if k in ("started_at", "attempts", "runs")}
+            doc = {k: v for k, v in old.items() if k in ("started_at", "started_mode", "attempts", "runs")}
         else:
             doc = {}
+        if self.mode == "live" and not doc.get("runs") and doc.get("started_mode") != "live":
+            doc["started_at"], doc["started_mode"] = now, "live"
         doc.setdefault("started_at", now)
+        doc.setdefault("started_mode", self.mode)
         doc.setdefault("attempts", 0)
         doc.setdefault("runs", [])
         doc.update({"topic": topic, "date": self.date, "run_id": rid})
         self.docs[topic] = doc
         return doc
+
+    def _read_public(self, topic: str) -> tuple[dict[str, Any] | None, bool]:
+        """The status file's document (None when it is missing or unreadable) and whether its .sha256 matches it."""
+        path = self.path(topic)
+        try:
+            data = path.read_bytes()
+            doc = json.loads(data.decode("utf-8"))
+        except (OSError, ValueError):
+            return None, False
+        try:
+            ok = path.with_name(path.name + ".sha256").read_bytes() == sha256_line(path.name, data)
+        except OSError:
+            ok = False
+        return (doc, ok) if isinstance(doc, dict) else (None, False)
+
+    def _write_public(self, topic: str, doc: dict[str, Any]) -> None:
+        data = json_bytes({k: doc.get(k) for k in PUBLIC_FIELDS})  # decision at Statuses
+        path = self.path(topic)
+        write_bytes_atomic(path, data)
+        write_bytes_atomic(path.with_name(path.name + ".sha256"), sha256_line(path.name, data))
+
+    def follow_store(self, topic: str, latest: tuple[int, dict[str, Any]] | None) -> str | None:
+        """Live mode: points the topic's status file at the store's newest version (`latest`, from latest_snapshot).
+        Returns the other run id while the file shows that run's published version, else None.
+
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): while the live store's newest version of the topic-date
+        belongs to another run id (an earlier --attempt, or one run outside the runner), the status file shows it:
+        `published` with that run id, left byte-identical when it already says so and its .sha256 matches, else
+        written once (started_at, attempts and reason from the runner's record or the status file of that run id, else
+        the snapshot's published_at, 0 and null); this invocation's states go to its record only, until its own run
+        publishes a newer version. Why: there is one status file per topic and date, and readers are served the newest
+        version (latest.json); a later attempt turned a published topic into `queued` ("Waiting for its first brief") or
+        `failed` ("Could not be prepared") next to the edition they were reading (closing review round 2)."""
+        if self.mode != "live":
+            return None
+        rid = self.docs[topic]["run_id"]
+        shown = latest[1].get("run_id") if latest else None
+        if not isinstance(shown, str) or shown == rid:
+            self.pinned.pop(topic, None)
+            return None
+        on_disk, verified = self._read_public(topic)
+        if on_disk and verified and on_disk.get("state") == "published" and on_disk.get("run_id") == shown:
+            self.pinned[topic] = shown
+            return shown
+        base: dict[str, Any] = {}
+        for cand in (self.prior.get(topic), on_disk):
+            if isinstance(cand, dict) and cand.get("run_id") == shown and cand.get("state") == "published":
+                base = cand
+                break
+        published_at = latest[1].get("published_at") if latest else None
+        attempts = base.get("attempts")
+        started = base.get("started_at")
+        self._write_public(topic, {
+            "topic": topic, "date": self.date, "state": "published", "run_id": shown,
+            "started_at": started if isinstance(started, str) else (published_at if isinstance(published_at, str) else now_iso()),
+            "updated_at": now_iso(), "attempts": attempts if isinstance(attempts, int) else 0,
+            "reason": clean_reason(base.get("reason"), self.redactor)})
+        self.pinned[topic] = shown
+        return shown
 
     def verdict(self, topic: str, state: str, reason: str | None, **more: Any) -> dict[str, Any]:
         """A verdict of this invocation that is not a live run's outcome (not a row, a dry check, the plan): into `state`
@@ -628,7 +715,17 @@ class Statuses:
         return self.save(topic, state=state, reason=reason, **more)
 
     def save(self, topic: str, **changes: Any) -> dict[str, Any]:
-        """Applies `changes` (None removes a field), then writes the record and the status file with its hash."""
+        """Applies `changes` (None removes a field), then writes the record and, in a live invocation, the status file
+        with its hash.
+
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): only a live invocation writes the status file and its hash;
+        a plan run (no --live) writes its record only, whatever the run id, and so does a live invocation while the
+        file shows another run's published version (decision at follow_store). Why: for the portal no file and `queued`
+        read the same ("Waiting for its first brief"), so a plan has nothing to tell readers, while its writes turned a
+        published edition into `queued` (another --attempt, or the README's plan without --attempt after attempt 2)
+        and a dry check that failed into `failed` ("Could not be prepared") for an edition nobody had tried to run
+        (closing review round 2). Supersedes, for the status file, the review-round-2 decision at open (a plan run kept
+        only a live outcome of the same run id); the record still follows it."""
         doc = self.docs[topic]
         if (changes.get("state") or doc.get("state")) not in STATES:  # decision at Statuses: nothing else is written
             raise ValueError(f"status state {changes.get('state') or doc.get('state')!r} is not one of {', '.join(STATES)}")
@@ -652,10 +749,8 @@ class Statuses:
         ordered = {k: doc[k] for k in ("topic", "date", "state", "state_mode", "run_id", "started_at", "updated_at", "attempts") if k in doc}
         ordered.update({k: v for k, v in doc.items() if k not in ordered})
         write_json_atomic(self.record_path(topic), ordered)
-        data = json_bytes({k: ordered.get(k) for k in PUBLIC_FIELDS})  # decision at Statuses
-        path = self.path(topic)
-        write_bytes_atomic(path, data)
-        write_bytes_atomic(path.with_name(path.name + ".sha256"), sha256_line(path.name, data))
+        if self.mode == "live" and topic not in self.pinned:  # decision above
+            self._write_public(topic, ordered)
         return ordered
 
 
@@ -1157,6 +1252,10 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
     for topic in topics:
         rid = run_id(topic, ctx.date, ctx.attempt)
         statuses.open(topic, rid)
+        shown = statuses.follow_store(topic, latest_snapshot(ctx.out, topic, ctx.date))  # live mode only
+        if shown:
+            ctx.say(f"{topic}: its status file keeps the published version of run {shown} until run {rid} publishes; "
+                    "this run's states go to the runner's record")
         if topic in statuses.kept:
             ctx.say(f"{topic}: its status keeps the live outcome {statuses.docs[topic].get('state')!r}; the plan goes to plan / plan_outcome")
         if topic in not_rows:
@@ -1239,7 +1338,9 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
                 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): `started_at` is the first live start of the run
                 # id; until then it is when its status was first written. Why: the portal shows `running` and
                 # `waiting_for_key` as "being prepared since started_at"; a plan run hours earlier must not date it.
-                first = {"started_at": now_iso()} if n == 1 and not doc.get("runs") else {}
+                # (superseded 2026-10-26, closing review round 2: "until then" is when a live invocation first queued
+                # the run id, never a plan run's time; decision at Statuses.open)
+                first = {"started_at": now_iso(), "started_mode": "live"} if n == 1 and not doc.get("runs") else {}
                 statuses.save(item.topic, state="running", attempts=n, key=key.name, log=log_name, reason=None,
                               reserved={"fast": res[0], "ultra": res[1]}, **first)
                 ctx.say(f"start {item.topic} on {key.name}{' (resume)' if resume else ''}, reserved {res[0]}/{res[1]}, log {log_name}")
@@ -1299,6 +1400,7 @@ def _record(ctx: Ctx, statuses: Statuses, planner: Planner, final: dict[str, dic
     common = {"runs": runs, "reserved": None, "calls_done": {"fast": item.done_fast, "ultra": item.done_ultra}}
     if outcome == "published":
         version, snap_status = result.published  # type: ignore[misc]
+        statuses.follow_store(item.topic, latest_snapshot(ctx.out, item.topic, ctx.date))  # its own version is the newest now
         partial = result.exit_code == 2 or snap_status == "partial"
         final[item.topic] = statuses.save(item.topic, state="published", version=version, snapshot_status=snap_status,
                                           reason="published as partial: a node recorded an error (see the snapshot's errors)" if partial else None, **common)

@@ -225,10 +225,10 @@ class Env:
         """The runner's record of the topic (every field it keeps)."""
         return json.loads((self.runner / f"{topic}.json").read_text(encoding="utf-8"))
 
-    def public_of(self, topic: str) -> dict:
+    def public_of(self, topic: str, record: bool = True) -> dict:
         """The portal's status file <status-dir>/<topic>/<date>.json, checked against the contract (Issue #2
-        6411408519): exactly the eight fields, a known state, the sha256 file beside it matching its bytes, and the same
-        values as the runner's record."""
+        6411408519): exactly the eight fields, a known state, the sha256 file beside it matching its bytes, and, with
+        `record`, the same values as the runner's record (not so while it shows another run's published version)."""
         path = self.status / topic / f"{DATE}.json"
         data = path.read_bytes()
         doc = json.loads(data.decode("utf-8"))
@@ -238,9 +238,32 @@ class Env:
         assert doc["reason"] is None or isinstance(doc["reason"], str)
         sha = (path.parent / f"{DATE}.json.sha256").read_bytes()
         assert sha == f"{hashlib.sha256(data).hexdigest()}  {DATE}.json\n".encode(), sha
-        record = self.status_of(topic)
-        assert doc == {k: record.get(k) for k in PUBLIC_FIELDS}, (doc, record)
+        if record:
+            rec = self.status_of(topic)
+            assert doc == {k: rec.get(k) for k in PUBLIC_FIELDS}, (doc, rec)
         return doc
+
+    def public_pair(self, topic: str) -> tuple[bytes, bytes]:
+        """The bytes of the status file and its .sha256."""
+        path = self.status / topic / f"{DATE}.json"
+        return path.read_bytes(), (path.parent / f"{DATE}.json.sha256").read_bytes()
+
+    def age_public(self, topic: str, updated_at: str = "2026-10-20T11:00:00Z") -> tuple[bytes, bytes]:
+        """Rewrites the status file with an old `updated_at` and a matching hash, so any later rewrite changes its
+        bytes even within the same second; returns the new pair."""
+        path = self.status / topic / f"{DATE}.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["updated_at"] = updated_at
+        data = (json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        path.write_bytes(data)
+        (path.parent / f"{DATE}.json.sha256").write_bytes(f"{hashlib.sha256(data).hexdigest()}  {DATE}.json\n".encode())
+        return self.public_pair(topic)
+
+    def set_record(self, topic: str, **fields) -> None:
+        """Changes fields of the runner's record, as if an earlier invocation had written them."""
+        rec = self.status_of(topic)
+        rec.update(fields)
+        (self.runner / f"{topic}.json").write_text(json.dumps(rec), encoding="utf-8")
 
     def summary(self) -> dict:
         return json.loads((self.runner / "_summary.json").read_text(encoding="utf-8"))
@@ -757,7 +780,8 @@ def test_topics_all_plans_every_row_and_reports_a_row_it_cannot_run(world: Env):
     assert [r["topic"] for r in bad] == ["x/y", "Not A Slug"] and all(r["state"] == "failed" for r in bad)
     runner_log = (world.logs / f"{DATE}_runner.log").read_text(encoding="utf-8")
     assert "'Not A Slug'" in runner_log and "'x/y'" in runner_log
-    assert sorted(p.name for p in world.status.iterdir()) == ["_runner", "ai--jobs", "alpha-topic", "covid-19-"]  # none for x/y
+    assert sorted(p.name for p in world.status.iterdir()) == ["_runner"]  # a plan writes no status file
+    assert sorted(p.name for p in world.runner.glob("*.json")) == ["_summary.json", "ai--jobs.json", "alpha-topic.json", "covid-19-.json"]  # none for x/y
 
 
 def test_topics_all_with_live_is_refused_until_zetaris_shows_active_rows(world: Env):
@@ -900,7 +924,7 @@ def test_topics_all_skips_rows_named_after_a_windows_device(world: Env, monkeypa
     assert [d["topic"] for d in world.dry_runs()] == ["alpha-topic"]
     bad = [r for r in world.summary()["topics"] if r.get("skipped_row")]
     assert [r["topic"] for r in bad] == ["con", "nul"] and all(r["state"] == "failed" and "device name" in r["reason"] for r in bad)
-    assert sorted(p.name for p in world.status.iterdir()) == ["_runner", "alpha-topic"]
+    assert sorted(p.name for p in world.status.iterdir()) == ["_runner"]  # a plan writes no status file
     assert sorted(p.name for p in world.runner.glob("*.json")) == ["_summary.json", "alpha-topic.json"]
     assert world.status_of("alpha-topic")["state"] == "queued"  # the other topics of the date went on
 
@@ -945,7 +969,7 @@ def test_ctrl_c_stops_the_children_keeps_their_checkpoints_and_releases_the_lock
 def test_status_files_follow_the_portal_contract(world: Env):
     """Issue #2 6411408519 / 6411653104: <status-dir>/<topic>/<date>.json with exactly the eight fields (public_of checks
     them, the state, the sha256 file beside it and the match with the record), nothing else beside the topic folders
-    but the runner's own `_runner` folder, which keeps every other field."""
+    but the runner's own `_runner` folder, which keeps every other field; a plan run writes its record only."""
     world.scenario({"t1": [{"exit": 3, "fast": 200}, {"exit": 0, "fast": 50}], "t2": [{"crash": True}]}, {"t1": {"fast": 300, "ultra": 30}})
     assert world.main(world.argv("t1,t2")) == 1
     t1, t2 = world.public_of("t1"), world.public_of("t2")
@@ -958,8 +982,8 @@ def test_status_files_follow_the_portal_contract(world: Env):
     record = world.status_of("t1")
     assert record["runs"] and record["calls_estimate"] == 330 and record["state_mode"] == "live" and record["version"] == 1
     world.scenario({}, {"t3": {"fast": 10, "ultra": 0}})
-    assert world.main(world.argv("t3", live=False)) == 0  # a plan run writes the same contract
-    assert world.public_of("t3")["state"] == "queued"
+    assert world.main(world.argv("t3", live=False)) == 0  # for the portal no file reads as queued
+    assert not (world.status / "t3").exists() and world.status_of("t3")["state"] == "queued"
 
 
 def test_started_at_is_the_first_live_start(world: Env):
@@ -984,10 +1008,11 @@ def test_a_plan_run_after_a_publish_the_plan_predicted_to_wait_exits_0(world: En
     assert world.main(world.argv("t1", keys="QTEST_KEY_A")) == 0  # 1 000 > 650: the plan said waiting_for_key
     st = world.status_of("t1")
     assert st["state"] == "published" and not set(re_mod.PLAN_FIELDS) & set(st)
+    pair = world.age_public("t1")  # any rewrite changes its bytes
     assert world.main(world.argv("t1", keys="QTEST_KEY_A", live=False)) == 0
     row, = world.summary()["topics"]
     assert (row["state"], row["plan_outcome"]) == ("published", None)
-    assert world.public_of("t1")["state"] == "published"
+    assert world.public_pair("t1") == pair and world.public_of("t1", record=False)["state"] == "published"
 
 
 def test_attempt_reaches_run_py_and_names_the_run_id(world: Env):
@@ -1005,6 +1030,97 @@ def test_attempt_reaches_run_py_and_names_the_run_id(world: Env):
     st = world.public_of("t1")
     assert (st["state"], st["run_id"], st["reason"]) == ("published", f"{DATE}-t1-2", None)
     assert world.status_of("t1")["version"] == 2
+
+
+def test_a_plan_run_writes_no_status_file(world: Env):
+    """Only a live invocation writes <topic>/<date>.json (decision at Statuses.save): a plan whose dry check fails is no
+    edition anyone tried to run, and a plan of another attempt, or the README's plan without --attempt after a later
+    attempt published, leaves the published file byte-identical."""
+    world.scenario({}, {"t1": {"error": True}})
+    assert world.main(world.argv("t1", live=False)) == 1
+    assert not (world.status / "t1").exists()
+    assert (world.status_of("t1")["state"], world.status_of("t1")["state_mode"]) == ("failed", "dry")
+    world.scenario({"t1": [{"exit": 1, "publish": False, "say": "boom"}, {"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 1  # attempt 1 fails live
+    assert world.main(world.argv("t1", "--attempt", "2")) == 0  # attempt 2 publishes
+    assert (world.public_of("t1")["state"], world.public_of("t1")["run_id"]) == ("published", f"{DATE}-t1-2")
+    pair = world.age_public("t1")
+    assert world.main(world.argv("t1", live=False)) == 0  # the README's step 1, attempt 1
+    assert world.main(world.argv("t1", "--attempt", "3", live=False)) == 0
+    world.scenario({}, {"t1": {"error": True}})
+    assert world.main(world.argv("t1", "--attempt", "3", live=False)) == 1
+    assert world.public_pair("t1") == pair
+    assert len(world.runs()) == 2  # the plans started nothing
+
+
+def test_a_later_attempt_keeps_the_published_status_until_it_publishes(world: Env):
+    """One status file per topic and date: while the store's newest version is attempt 1's, attempt 2's plan, start and
+    failure go to the runner's record only; once attempt 2 publishes, the file shows it (decision at follow_store)."""
+    world.scenario({"t1": [{"exit": 0}, {"exit": 1, "publish": False, "say": "boom"}, {"exit": 0}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0
+    first = world.public_of("t1")
+    assert (first["state"], first["run_id"], first["attempts"]) == ("published", f"{DATE}-t1-1", 1)
+    pair = world.age_public("t1")  # any rewrite changes its bytes
+    assert world.main(world.argv("t1", "--attempt", "2", live=False)) == 0
+    assert world.main(world.argv("t1", "--attempt", "2")) == 1  # attempt 2 fails live
+    assert world.public_pair("t1") == pair  # readers still read attempt 1's version
+    rec = world.status_of("t1")
+    assert (rec["state"], rec["run_id"], rec["attempts"]) == ("failed", f"{DATE}-t1-2", 1) and "boom" in rec["reason"]
+    assert world.main(world.argv("t1", "--attempt", "2")) == 0  # its rerun publishes version 2
+    done = world.public_of("t1")
+    assert (done["state"], done["run_id"], done["attempts"]) == ("published", f"{DATE}-t1-2", 2)
+    assert [r["status_seen"] for r in world.runs()] == ["running", "published", "published"]  # what the portal saw meanwhile
+
+
+def test_a_later_attempt_rewrites_a_published_status_file_whose_hash_is_stale(world: Env):
+    """A pair the install would refuse (its .sha256 does not match) is written again for the earlier run id, with
+    started_at and attempts from the runner's record of that run."""
+    world.scenario({"t1": [{"exit": 0}, {"exit": 1, "publish": False, "say": "boom"}]}, {"t1": {"fast": 100, "ultra": 0}})
+    assert world.main(world.argv("t1")) == 0
+    first = world.public_of("t1")
+    (world.status / "t1" / f"{DATE}.json.sha256").write_text("0" * 64 + f"  {DATE}.json\n")
+    assert world.main(world.argv("t1", "--attempt", "2")) == 1
+    pub = world.public_of("t1", record=False)  # the hash matches again
+    assert (pub["state"], pub["run_id"], pub["started_at"], pub["attempts"], pub["reason"]) == \
+        ("published", f"{DATE}-t1-1", first["started_at"], 1, None)
+    assert world.status_of("t1")["state"] == "failed"
+
+
+def test_a_later_attempt_shows_a_version_published_outside_the_runner(world: Env):
+    """No status file yet and attempt 1 published by run.py itself: attempt 2's failure leaves the file `published`
+    with attempt 1's run id, dated by its snapshot."""
+    d = world.out / "t1" / DATE
+    d.mkdir(parents=True)
+    old = {"run_id": f"{DATE}-t1-1", "topic_id": "t1", "edition_date": DATE, "status": "ok", "version": 1,
+           "published_at": "2026-10-20T10:00:00Z"}
+    (d / "v1.json").write_text(json.dumps(old))
+    (d / "latest.json").write_text(json.dumps(old))
+    world.scenario({"t1": [{"exit": 1, "publish": False, "say": "boom"}]})
+    assert world.main(world.argv("t1", "--attempt", "2")) == 1
+    pub = world.public_of("t1", record=False)
+    assert pub == {"topic": "t1", "date": DATE, "state": "published", "run_id": f"{DATE}-t1-1", "started_at": "2026-10-20T10:00:00Z",
+                   "updated_at": pub["updated_at"], "attempts": 0, "reason": None}
+    assert (world.status_of("t1")["state"], world.status_of("t1")["run_id"]) == ("failed", f"{DATE}-t1-2")
+    assert [r["status_seen"] for r in world.runs()] == ["published"]
+
+
+def test_a_topic_that_waits_without_starting_is_not_dated_by_a_plan_run(world: Env):
+    """`started_at` is the first live start, or, before one, when a live invocation first queued the run id; a plan
+    run's time never reaches it (decision at Statuses.open)."""
+    world.scenario({"t1": [{"exit": 0}]}, {"t1": {"fast": 300, "ultra": 30}})
+    small = "QTEST_KEY_A=10/10"  # less than MIN_SEGMENT_CALLS of room: the topic waits without a start
+    assert world.main(world.argv("t1", keys=small, live=False)) == 3
+    world.set_record("t1", started_at="2026-10-20T06:00:00Z")  # the plan ran at 06:00
+    assert world.main(world.argv("t1", keys=small)) == 3
+    waiting = world.public_of("t1")
+    assert (waiting["state"], waiting["attempts"]) == ("waiting_for_key", 0) and world.runs() == []
+    assert waiting["started_at"] > "2026-10-20T06:00:00Z"
+    world.set_record("t1", started_at="2026-10-20T10:00:00Z")  # the first live invocation queued it at 10:00
+    assert world.main(world.argv("t1", keys=small)) == 3
+    assert world.public_of("t1")["started_at"] == "2026-10-20T10:00:00Z"  # a later live invocation keeps it
+    assert world.main(world.argv("t1", keys="QTEST_KEY_A")) == 0  # a rested key starts and publishes it
+    done = world.public_of("t1")
+    assert (done["state"], done["attempts"]) == ("published", 1) and done["started_at"] > "2026-10-20T10:00:00Z"
 
 
 def _record_live_popen(monkeypatch: pytest.MonkeyPatch, world: Env, delay_s: float = 0.0, on_live_start=None) -> list[subprocess.Popen]:
@@ -1092,14 +1208,15 @@ def test_a_child_that_starts_while_the_runner_stops_is_killed_at_once(world: Env
     world.scenario({"t1": [{"exit": 0, "sleep": 8}], "t2": [{"exit": 0, "sleep": 8}]})
     live = _record_live_popen(monkeypatch, world, delay_s=1.0)
     _failing_save(monkeypatch, "t2", "running")
-    t0 = time.monotonic()
     try:
         with pytest.raises(OSError, match="status disk went away"):
             world.main(world.argv("t1,t2"))
         assert len(live) == 1 and live[0].poll() is not None
     finally:
         _kill_alive(live)
-    assert world.runs() == [] and time.monotonic() - t0 < 8  # killed before its sleep ended
+    # the fake writes its record only after its 8 s sleep: none means it was killed before (no wall-clock bound, which
+    # failed under load)
+    assert world.runs() == []
     assert world.status_of("t1")["state"] == "failed" and "interrupted" in world.status_of("t1")["reason"]
 
 
@@ -1313,8 +1430,9 @@ sc = json.loads(Path(os.environ["FAKE_SCENARIO"]).read_text())
 rec = Path(sc["records"])
 n = len(rec.read_text().splitlines()) if rec.exists() else 0
 codes = sc["codes"]
-# what run.py does first: llm._env() loads the repo .env with load_dotenv(override=False)
-for line in Path(sc["env_file"]).read_text().splitlines():
+# what run.py does first: llm._env() loads the repo .env with load_dotenv(override=False) (child_env_file: when the
+# script's --env-file is another file than the one the run loads)
+for line in Path(sc.get("child_env_file") or sc["env_file"]).read_text().splitlines():
     if "=" in line and not line.startswith("#"):
         k, v = line.split("=", 1)
         if k not in os.environ:
@@ -1341,7 +1459,7 @@ def argv_holders(value):
     return ",".join(hits)
 
 # the listed names, an exported MODEL_API_KEY_6 and the env file's MODEL_API_KEY_7 must all reach this process blank
-row = {"argv": args, "key": sc["values"].get(key, "?"), "dry_env": os.environ.get("QUORUM_DRY_RUN"),
+row = {"argv": args, "key": sc["values"].get(key, "?"), "dry_env": os.environ.get("QUORUM_DRY_RUN"), "base_url": os.environ.get("MODEL_BASE_URL"),
        "blank_ok": all(os.environ.get(n, "") == "" for n in ("QTEST_KEY_A", "QTEST_KEY_B", "MODEL_API_KEY_6", "MODEL_API_KEY_7"))}
 if sc.get("scan"):
     row["holders"] = argv_holders(key)
@@ -1358,9 +1476,11 @@ DIRECT_URL = "https://integrate.api.nvidia.com/v1"
 
 def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str], scan: bool = False, topic: str = "climate-policy",
                        flags: tuple[str, ...] = (), extra: tuple[str, ...] = ("--quiet",), file_base_url: str | None = DIRECT_URL,
-                       exported_base_url: str = "") -> tuple[subprocess.CompletedProcess, list[dict], str]:
+                       exported_base_url: str | None = "", child_env: str | None = None) -> tuple[subprocess.CompletedProcess, list[dict], str]:
     """`flags` go before `--`, `extra` after it (run.py arguments); MODEL_BASE_URL is `file_base_url` in the env file
-    (None: not there) and `exported_base_url` in the environment (blank: the env file's counts)."""
+    (None: not there) and `exported_base_url` in the environment (blank: the env file's counts; None: not in the
+    environment at all); `child_env` is the text of the .env the run itself loads, as llm._env loads the repository's
+    (None: the script's env file)."""
     pkg = tmp_path / "work" / "quorum_reasoning"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text("")
@@ -1368,8 +1488,13 @@ def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str]
     env_file = tmp_path / ".env"
     env_file.write_text(f"QTEST_KEY_A={values[0]}\nQTEST_KEY_B={values[1]}\nMODEL_API_KEY_7=fake-env-file-key-7777\n"
                         + (f"MODEL_BASE_URL={file_base_url}\n" if file_base_url is not None else ""))
+    child_env_file = None
+    if child_env is not None:
+        child_env_file = tmp_path / "repo.env"
+        child_env_file.write_text(child_env)
     records = tmp_path / "records.jsonl"
     (tmp_path / "scenario.json").write_text(json.dumps({"records": str(records), "codes": codes, "env_file": str(env_file), "scan": scan,
+                                                        "child_env_file": str(child_env_file) if child_env_file else None,
                                                         "values": {values[0]: "QTEST_KEY_A", values[1]: "QTEST_KEY_B"}}))
     log = tmp_path / "run.log"
     env = {k: v for k, v in os.environ.items() if not k.startswith("QTEST_")}
@@ -1380,7 +1505,10 @@ def _run_resume_script(tmp_path: Path, codes: list[int], values: tuple[str, str]
     env["QUORUM_DRY_RUN"] = "1"
     for name in ("METERLESS_TOKEN", "METERLESS_RUNTIME_TOKEN", "MODEL_BASE_URL"):
         env[name] = ""
-    env["MODEL_BASE_URL"] = exported_base_url
+    if exported_base_url is None:
+        del env["MODEL_BASE_URL"]  # the run's own load_dotenv may fill it in (QUORUM_DRY_RUN=1 still guards the real run.py)
+    else:
+        env["MODEL_BASE_URL"] = exported_base_url
     proc = subprocess.run([_git_bash(), str(SCRIPTS / "resume_with_next_key.sh"), "--topic", topic, "--date", DATE,
                            "--attempt", "2", "--out", str(tmp_path / "store"), "--log", str(log), "--keys", "QTEST_KEY_A,QTEST_KEY_B",
                            "--env-file", str(env_file), "--python", sys.executable, "--workdir", str(tmp_path / "work"), *flags, "--", *extra],
@@ -1457,6 +1585,17 @@ def test_resume_with_next_key_takes_an_exported_direct_url_over_the_env_file(tmp
     proc, rows, text = _run_resume_script(tmp_path, [0], (VALUE_A, VALUE_B), file_base_url="http://127.0.0.1:8088/v1", exported_base_url=DIRECT_URL)
     assert proc.returncode == 0, text
     assert [r["key"] for r in rows] == ["QTEST_KEY_A"]
+
+
+@pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")
+def test_resume_with_next_key_hands_the_checked_url_to_the_run(tmp_path: Path):
+    """--env-file names another file than the one the run loads itself (llm._env: the repository's .env, override=False)
+    and MODEL_BASE_URL is not exported: every run gets the URL the route check passed, not its own .env's Meterless URL,
+    so no NVIDIA key goes to the Meterless daemon (decision in the script header)."""
+    proc, rows, text = _run_resume_script(tmp_path, [3, 0], (VALUE_A, VALUE_B), exported_base_url=None,
+                                          child_env="MODEL_BASE_URL=http://127.0.0.1:8088/v1\n")
+    assert proc.returncode == 0, text
+    assert [(r["key"], r["base_url"]) for r in rows] == [("QTEST_KEY_A", DIRECT_URL), ("QTEST_KEY_B", DIRECT_URL)]
 
 
 @pytest.mark.skipif(_git_bash() is None, reason="needs Git Bash (or a POSIX bash), not the WSL launcher")

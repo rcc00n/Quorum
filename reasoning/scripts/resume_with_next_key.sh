@@ -13,9 +13,10 @@
 #        --resume --keys MODEL_API_KEY_2,MODEL_API_KEY_3
 #
 # --keys lists environment variable NAMES; each value is read at the moment of its run, exported first, else from the
-# repo-level .env (python-dotenv, as llm._env reads it). The child gets MODEL_API_KEY = that value and every other key
-# variable blank, so one process holds one key; nothing from .env is printed, and the child's output passes through a
-# filter that replaces the key value with [redacted] before it reaches the log. The script runs the child itself and
+# repo-level .env (python-dotenv, as llm._env reads it), or --env-file. The child gets MODEL_API_KEY = that value,
+# MODEL_BASE_URL = the URL the route check passed, and every other key variable blank, so one process holds one key;
+# nothing from .env is printed, and the child's output passes through a filter that replaces the key value with
+# [redacted] before it reaches the log. The script runs the child itself and
 # reads its exit code directly. Exit 0 when a run published, 3 when every listed key drained, 2 a refusal (also when
 # MODEL_BASE_URL is not NVIDIA's direct route), the run's code otherwise.
 #
@@ -39,6 +40,11 @@
 # each key to the run as MODEL_API_KEY, which only that route uses (the runner refuses the same in run_editions.main); on
 # the Meterless route the first exit 3 sent MODEL_API_KEY_2, an NVIDIA key, as the bearer to the Meterless daemon, and
 # Meterless drains per account, not per key, so rotating there gains nothing.
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the URL that passed the check is exported as MODEL_BASE_URL in
+# each run's subshell, next to MODEL_API_KEY. Why: the run's llm._env loads the repository's .env with
+# load_dotenv(override=False), so with --env-file naming another file the check read that file's NVIDIA URL while the
+# run took the repository's Meterless URL and sent each NVIDIA key as the bearer to the Meterless daemon (closing
+# review round 2); an exported value is one load_dotenv never replaces.
 set -u
 
 usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -112,8 +118,10 @@ sys.stdout.write((dotenv_values(sys.argv[1]).get(sys.argv[2]) or "").strip())' "
   printf '%s' "$v"
 }
 
-# the direct NVIDIA route only (decision at the top); the URL reaches Python through its environment
-QUORUM_CHECK_BASE_URL="$(key_value MODEL_BASE_URL)" "$PY" -c 'import os, sys
+# the direct NVIDIA route only (decision at the top); the URL reaches Python through its environment, and each run gets
+# this same URL exported (decision at the top)
+BASE_URL="$(key_value MODEL_BASE_URL)"
+QUORUM_CHECK_BASE_URL="$BASE_URL" "$PY" -c 'import os, sys
 sys.path.insert(0, sys.argv[1])
 from quorum_reasoning import llm
 base = os.environ.get("QUORUM_CHECK_BASE_URL", "").strip()
@@ -159,7 +167,7 @@ for name in "${KEY_NAMES[@]}"; do
   # builtins only between the key and Python: nothing carries the value on a command line (decision at the top)
   ( cd "$WORKDIR" || exit 1
     for n in "${BLANK_NAMES[@]}"; do export "$n="; done
-    export MODEL_API_KEY="$key" PYTHONUNBUFFERED=1
+    export MODEL_API_KEY="$key" MODEL_BASE_URL="$BASE_URL" PYTHONUNBUFFERED=1
     exec "$PY" -X utf8 -m quorum_reasoning.run \
       --topic "$TOPIC" --date "$DATE" --model live --corpus zetaris --out "$OUT" --attempt "$ATTEMPT" --verbose \
       ${flag[@]+"${flag[@]}"} ${EXTRA[@]+"${EXTRA[@]}"} 2>&1 ) | QUORUM_REDACT_VALUE="$key" "$PY" -c "$REDACT" >> "$LOG"
