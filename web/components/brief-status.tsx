@@ -21,6 +21,10 @@ type Props = {
   topics: Topic[];
   followed: string[];
   status?: string;
+  /** publication.status of the viewed date: "pending" = no edition installed for that date (per-date, not portal-wide). */
+  publicationStatus?: string;
+  /** Today's date (YYYY-MM-DD) to tell a past date, for which no run will be started, from today's. */
+  today?: string;
   now?: Date;
 };
 
@@ -29,40 +33,51 @@ function longDate(iso: string) {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-export function BriefStatus({ day, topic, topics, followed, status, now }: Props) {
+export function BriefStatus({ day, topic, topics, followed, status, publicationStatus, today, now }: Props) {
   const { cut, passed, hoursUntil } = describeCut(day, now);
   const local = localLabel(cut);
   const waiting = (topics as TopicProgress[]).filter((t) => (topic ? t.id === topic : followed.includes(t.id)));
   const date = longDate(day);
+  // DECISION(2026-10-26, Anastasia/Claude Code; Yelysei's review of PR #25): the next-step copy is shown only when
+  // no edition is installed for the viewed date (publication.status "pending" is per date, never portal-wide); an
+  // installed edition with no stories for the topic says so; a past date without an edition promises no run.
+  const installed = publicationStatus !== undefined && publicationStatus !== "pending";
+  const past = !!today && day < today;
+  const heading = installed
+    ? `The ${date} edition is installed, with no stories for ${topic ? "this topic" : "your topics"}.`
+    : past
+      ? `No edition for ${date} is installed on this portal.`
+      : passed
+        ? `The ${date} edition is not published yet.`
+        : `The ${date} edition has not been cut yet.`;
+  const nextStep = !installed && !past;
+  void status;
   return (
     <section className="bs" aria-labelledby="bs-title">
       <p className="bs-kicker">{`Edition ${day} · ${topic ? "one topic" : `${waiting.length} ${waiting.length === 1 ? "topic" : "topics"} in your brief`}`}</p>
-      <h3 id="bs-title">{passed ? `The ${date} edition is not published yet.` : `The ${date} edition has not been cut yet.`}</h3>
+      <h3 id="bs-title">{heading}</h3>
       <p className="bs-lead">No published events are available for this edition.</p>
-      <dl className="bs-facts">
-        <dt>Edition cut</dt>
-        <dd>
-          {`05:30 New York · ${utcLabel(cut)}${local ? ` · ${local} on your clock` : ""} · ${passed ? "passed" : `in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}`}
-        </dd>
-        <dt>Then</dt>
-        <dd>
-          The team starts one run per topic after the cut. The edition appears here when it is published; nothing
-          is started from this page.
-        </dd>
-        {status === "pending" && (
-          <>
-            <dt>This portal</dt>
-            <dd>No editions have been published to it yet.</dd>
-          </>
-        )}
-      </dl>
+      {nextStep && (
+        <dl className="bs-facts">
+          <dt>Edition cut</dt>
+          <dd>
+            {`05:30 New York · ${utcLabel(cut)}${local ? ` · ${local} on your clock` : ""} · ${passed ? "passed" : `in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}`}
+          </dd>
+          <dt>Then</dt>
+          <dd>
+            After the cut, the team starts one run for each topic it prepares that day, on its own machine. When a
+            run is finished, the deploy owner installs its edition on this site and it appears here. Nothing is
+            started from this page, so it cannot say when that will be.
+          </dd>
+        </dl>
+      )}
       {waiting.length === 0 && !topic && (
         <p className="bs-none">
-          You follow no topics yet. <Link href="/onboarding">Choose your topics</Link> and the next edition will be
-          prepared for them.
+          You follow no topics yet. <Link href="/onboarding">Choose your topics</Link>; their briefs appear here once
+          an installed edition covers them.
         </p>
       )}
-      {waiting.length > 0 && (
+      {nextStep && waiting.length > 0 && (
         <ul className="bs-topics" role="list" aria-label="Topics waiting for this edition">
           {waiting.map((t) => (
             <li key={t.id}>
