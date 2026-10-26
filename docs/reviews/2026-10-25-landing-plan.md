@@ -22,6 +22,8 @@ What this changes in the plan: the page is laid out as a front page (masthead, d
 
 **Review of the first build (Anastasia, 2026-10-26):** the style is approved; the red accent goes (it read as a mobile-carrier line) in favour of a newspaper palette of black, white, warm greys and brown, recorded in DECISIONS item 9 and `web/DESIGN.md`; the hero topic should be a lighter one than the war, climate policy if a real artefact for it exists, otherwise the text change waits for the next PR.
 
+**Second review (Anastasia, 2026-10-26):** the palette stays; the typography becomes stricter, "like a well-known news agency" (5pm.fr named again); a palette or blurred photo on the background; spatial text filling the canvas as in the spread and the text-figure references. Resolved by a design panel (four directions, three judges, a critic; verdict and grafts recorded in `web/DESIGN.md › Decisions`): Schibsted Grotesk at 400/500/700, the hero as a front page with a wire line, the day's tally blurred into the field, the registry grid with its real gaps, kicker rows with source files, loop limits and word lists from tested copies of `reasoning.toml`. DECISIONS item 9 amended for the landing.
+
 ## Who it is for, what it must do
 
 Two readers: a judge who has four minutes and wants to know whether this is an agent system with real verification loops, and a visitor who wants to know what they would get. One page answers both: the product in one sentence, a real artifact up front, the loop structure with its limits, each sponsor named by the job it does, the limits said plainly, the team. Primary action: create an account and choose topics. Secondary: read how one day is checked.

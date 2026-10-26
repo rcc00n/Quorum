@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/inter";
-import "@fontsource-variable/nunito";
+import "@fontsource-variable/schibsted-grotesk";
 import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "Quorum — The news, with its working shown", template: "%s · Quorum" },
