@@ -380,14 +380,19 @@ _DOTS = {0x3002: ".", 0xFF0E: ".", 0xFF61: "."}  # ideographic, full-width and h
 _PHONE_RE = re.compile(
     r"\+\d[\d\s().-]{6,}\d"  # international: +44 20 7946 0958
     r"|(?<!\d)\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"  # North American: (555) 123-4567, 555.123.4567, 5551234567
-    r"|(?<!\d)\d{3}[.-]\d{4}(?!\d)"  # local: 555-1234 (not "2026-2027", not "100 2026")
+    # local: 555-1234, 555.1234; not "2026-2027" (4 and 4 digits), not "100 2026" (a space). It does match "100-2026",
+    # so derive's slug ("top-100-2026" of "Top 100 2026") is scanned with its hyphens read as spaces: the closing-round-5
+    # DECISION at `_slug_personal_data`
+    r"|(?<!\d)\d{3}[.-]\d{4}(?!\d)"
 )
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 4, to confirm by Yelysei): a local number
 # is 3 and 4 digits joined by "-" or "." and not inside a longer run of digits; what stands next to it otherwise (a
 # word, a separator, the end of the text) does not matter. Why: the old guard refused any "-" or "." next to it, so
 # "jane-555-1234", "jane.555-1234", "jane/555-1234", "jane_555-1234" (both turned into "-" by `_phone_form`),
 # "555-1234-jane", "call 555-1234." and "call 1-555-1234" passed and became public topic names; dates ("2026-10-26"),
-# years, "H.R. 4521", "Section 301" and "Area 51" have no 3-and-4-digit pair and stay acceptable.
+# years, "H.R. 4521", "Section 301" and "Area 51" have no 3-and-4-digit pair and stay acceptable. (Why 3 and 4 digits
+# with a space between them are no local number, and how a slug is scanned: the closing-round-5 DECISION at
+# `_slug_personal_data`.)
 # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 1, to confirm by Yelysei): before the
 # phone patterns run, every dash-like character (category Pd, and U+2212 minus), "/" and "_" become "-", and a run of
 # digits and separators (space . - ( )) that holds 9 or more digits in 2 or more groups (this group condition superseded
@@ -429,6 +434,25 @@ def _personal_data(scan: str) -> str:
     if _has_phone(scan):
         return "contains a phone number"
     return ""
+
+
+def _slug_personal_data(slug: str, *, derived: bool) -> str:
+    """`_personal_data` for a proposed id. `derived`: the slug is derive's slug of a typed text that passed
+    `check_request`, and is scanned with its hyphens read as spaces; any other slug (a model's) is scanned as it is.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code; proposed in closing round 5, to confirm by Yelysei): (1) 3 and 4
+    digits typed with a space between them ("555 1234") are not a phone number, in the typed text, the name and the id
+    alike: they cannot be told apart from "Fortune 500 2026", "Section 230 2026" or "Boeing 737 2026". (2) Derive's slug
+    of the typed text joins its words with "-", where the text had a space, a dash or a dropped word, so it is scanned
+    with every hyphen read as a space, the way `check_request` read those characters; the 9-digit run still counts
+    ("2026 and 2027 and 100 plans" -> "2026-2027-100-plans": 11 digits, `topic-<hash>`). (3) A slug that differs from
+    derive's (a model's) is scanned as it is, a hyphen counting as a phone separator ("call-jane-555-1234",
+    "555-1234-jane"); when it is flagged, its replacement, derive's slug, is checked as in (2). Supersedes the
+    "as it is" scan of every proposed slug in (b) of the closing-round-3 DECISION in `_resolve_one`. Why: closing round
+    4 widened the local-number pattern, and the as-is scan of derive's slug then read "500-2026" as a phone number:
+    "Fortune 500 2026", "Top 100 2026" and "Section 230 2026" lost their readable ids for `topic-<hash>` with a reason
+    saying the slug held a phone number, while "Jane Doe 555 1234" kept its digits in the name but not in the id."""
+    return _personal_data(_scan_form(slug.replace("-", " ") if derived else slug))
 
 
 _MARKUP_RE = re.compile(r"[<>\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")  # markup, C0 controls but tab/newline/return, DEL, C1
@@ -877,10 +901,11 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
     # proposed row (a model's reply on the live path, derive's otherwise) puts into a public output passes the
     # personal-data checks of the typed text. (a) The name passes `check_request`, else derive's name of the typed text
     # replaces it. (b) The id: the proposed slug is scanned with `_personal_data` as it is (a hyphen counts as a phone
-    # separator, so "call-jane-555-1234567" is a phone number; reading the hyphens as spaces finds nothing more); when
-    # it is flagged, or (a) replaced the name, derive's slug of the typed text is the id, and `topic-<8 hex>` when that
-    # is flagged too. (c) A proposed term that `_personal_data` flags is withheld (above). The reason says what was
-    # replaced and how many terms were withheld, never their text. Why: `validate` rebuilds an invalid model slug from
+    # separator, so "call-jane-555-1234567" is a phone number; reading the hyphens as spaces finds nothing more; the
+    # "as it is" scan of derive's own slug superseded 2026-10-26 in closing round 5 by the DECISION at
+    # `_slug_personal_data`); when it is flagged, or (a) replaced the name, derive's slug of the typed text is the id,
+    # and `topic-<8 hex>` when that is flagged too. (c) A proposed term that `_personal_data` flags is withheld (above).
+    # The reason says what was replaced and how many terms were withheld, never their text. Why: `validate` rebuilds an invalid model slug from
     # the model's own name (the common case: 3 of 4 first live replies), and a valid one was never checked, so a name
     # replaced for an e-mail address or a phone number still gave the public id ("jane-doe-example-org",
     # "call-jane-5551234567"), and a term "call jane 5551234567" went into query_terms, mapping.json and report.txt.
@@ -888,11 +913,12 @@ def _resolve_one(key: str, texts: list[str], known: list[dict[str, Any]], taken:
     if name_why:
         name = derive(texts[0])["name"]
         tail += f"; model name replaced: {name_why}"
+    derived_slug = derive(texts[0])["slug"]
     base = str(row.get("slug") or "")
-    slug_why = _personal_data(_scan_form(base))
+    slug_why = _slug_personal_data(base, derived=base == derived_slug)
     if name_why or slug_why:
-        base = derive(texts[0])["slug"]
-        if _personal_data(_scan_form(base)):
+        base = derived_slug
+        if _slug_personal_data(base, derived=True):
             base = "topic-" + hashlib.sha256(texts[0].encode("utf-8")).hexdigest()[:8]
         tail += (f"; {'model' if row.get('source') == 'model' else 'derived'} slug replaced: "
                  f"{slug_why or 'it may be built from the replaced name'}")

@@ -1325,6 +1325,62 @@ def test_a_derived_slug_that_looks_like_a_phone_number_becomes_a_hashed_id(exist
     assert clean["reason"].endswith("; derived slug replaced: contains a phone number")
 
 
+@pytest.mark.parametrize(
+    "text, slug",
+    [
+        ("Fortune 500 2026", "fortune-500-2026"), ("Section 230 2026", "section-230-2026"),
+        ("Boeing 737 2026", "boeing-737-2026"), ("Top 100 2026", "top-100-2026"),
+        ("Section 230 2026 repeal", "section-230-2026-repeal"), ("S&P 500 2026 outlook", "s-p-500-2026"),
+        ("MH370 2025 search", "mh370-2025-search"), ("Microsoft 365 2026 outage", "microsoft-365-2026-outage"),
+        ("Interstate 405 2026 closure", "interstate-405-2026-closure"), ("Ford F-150 2026 recall", "ford-f-150-2026"),
+        ("Route 128 in 2025", "route-128-2025"), ("Airbus A380 2026", "airbus-a380-2026"),
+    ],
+)
+def test_a_derived_slug_reads_its_hyphens_as_the_typed_spaces(existing, text, slug):
+    """Closing round 5: derive's slug joins the typed words with "-", and the as-is scan read "500-2026" as a local
+    phone number, so these accepted texts got `topic-<8 hex>` and a reason saying the slug held a phone number."""
+    assert topics.check_request(text) == ("", False) and topics.derive(text)["slug"] == slug
+    (r,) = resolve([text], existing)
+    assert r["status"] == "new" and r["topic_id"] == slug
+    assert "slug replaced" not in r["reason"] and "phone" not in r["reason"]
+
+
+def test_cli_a_dry_run_keeps_readable_ids_for_numbered_topics(tmp_path):
+    """The rehearsal dry run of closing round 4 wrote INSERT … ('topic-6075d419', 'Fortune 500 2026', …)."""
+    code, res, sql, _ = _batch(tmp_path, [{"key": topics.request_key(t), "text": t, "count": 1}
+                                          for t in ("Fortune 500 2026", "Section 230 2026")], "--dry-run")
+    assert code == 0 and [(r["status"], r["topic_id"]) for r in res] == [("new", "fortune-500-2026"), ("new", "section-230-2026")]
+    assert "VALUES ('fortune-500-2026', 'Fortune 500 2026'," in sql and "VALUES ('section-230-2026', 'Section 230 2026'," in sql
+    assert "topic-" not in sql
+
+
+def test_three_and_four_digits_typed_with_a_space_count_alike_in_the_name_and_the_id(existing):
+    """The closing-round-5 DECISION at `_slug_personal_data`, (1): "555 1234" typed with a space is not a phone number
+    (it cannot be told apart from "Fortune 500 2026"), so the name and the id keep the same digits; before, the name
+    kept them and the id was `topic-<8 hex>` with a reason saying the slug held a phone number."""
+    for text, slug in (("Jane Doe 555 1234", "jane-doe-555-1234"), ("call jane 555 1234", "call-jane-555-1234")):
+        assert topics.check_request(text) == ("", False)
+        (r,) = resolve([text], existing)
+        assert (r["status"], r["name"], r["topic_id"]) == ("new", topics.derive(text)["name"], slug)
+        assert "slug replaced" not in r["reason"]
+
+
+@pytest.mark.parametrize("model_slug", ["fortune-500-2026-list", "fortune-500-2026s"])
+def test_a_flagged_model_slug_falls_back_to_the_derived_slug_read_the_derive_way(existing, model_slug):
+    """A model's slug is scanned as it is ("500-2026" counts), and its replacement, derive's slug of the typed text, is
+    checked with its hyphens read as spaces, so the id stays readable instead of `topic-<8 hex>`."""
+    (r,) = resolve(["Fortune 500 2026"], existing, propose=model_row(["Fortune 500"], slug=model_slug))
+    assert r["status"] == "new" and r["topic_id"] == "fortune-500-2026"
+    assert r["reason"].endswith("; model slug replaced: contains a phone number")
+
+
+def test_a_model_slug_equal_to_the_derived_slug_is_read_the_derive_way(existing):
+    (r,) = resolve(["Fortune 500 2026"], existing, propose=model_row(["Fortune 500"], slug="fortune-500-2026"))
+    assert (r["status"], r["topic_id"], r["source"]) == ("new", "fortune-500-2026", "model") and "replaced" not in r["reason"]
+    (jane,) = resolve(["Mars sample return"], existing, propose=model_row(["Mars sample return"], slug="jane-doe-555-1234"))
+    assert jane["topic_id"] == "mars-sample-return" and jane["reason"].endswith("; model slug replaced: contains a phone number")
+
+
 def test_cli_an_empty_zetaris_read_writes_nothing(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(corpus, "_run_sql", lambda sql, limit: [])
     out = tmp_path / "out"
