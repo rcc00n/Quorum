@@ -654,9 +654,11 @@ def _held(doc_id: int, title: str) -> DocRef:
     return d
 
 
-def _fake_model(monkeypatch, keys: dict[int, dict], same: set[frozenset]) -> list[tuple[str, list[str], list[str]]]:
-    """Event keys by document id; a merge question answers yes when a title on one side and one on the other are a
-    pair in `same`. Returns the questions asked as (mode, titles of side a, titles of side b)."""
+def _fake_model(monkeypatch, keys: dict[int, dict], same: set[frozenset], yes_modes: tuple[str, ...] = ("pair", "singleton", "chain")
+                ) -> list[tuple[str, list[str], list[str]]]:
+    """Event keys by document id; a merge question answers yes when its mode is in `yes_modes` and a title on one side
+    and one on the other are a pair in `same`, else no. Returns the questions asked as (mode, titles of side a, titles
+    of side b)."""
     asked: list[tuple[str, list[str], list[str]]] = []
 
     def fake(task, payload, *, dry_run, which="default"):
@@ -666,7 +668,7 @@ def _fake_model(monkeypatch, keys: dict[int, dict], same: set[frozenset]) -> lis
         a, b = payload["a"], payload["b"]
         ta, tb = a.get("member_titles") or [a["title"]], b.get("member_titles") or [b["title"]]
         asked.append((payload["mode"], ta, tb))
-        return {"same_event": any(frozenset((x, y)) in same for x in ta for y in tb)}
+        return {"same_event": payload["mode"] in yes_modes and any(frozenset((x, y)) in same for x in ta for y in tb)}
 
     monkeypatch.setattr(cluster.llm, "json_task", fake)
     return asked
@@ -721,6 +723,46 @@ def test_an_outlet_document_may_join_a_group_of_evidence_only_documents(monkeypa
     assert [sorted(e["document_ids"]) for e in out["events"]] == [[3, OFF + 23, OFF + 24, OFF + 25]]
     assert [m for m, _, _ in asked].count("chain") == 1, "a group with a seed member is still chain-checked"
     assert "(3 official documents evidence only by the seed rule, see plan: 3 joined an event, 0 in no event)" in out["steps"][0]["decision"]
+
+
+# The two tests above reach their joins through the pair pass. The singleton pass (a lone document offered to each
+# multi-document group) is a second way in, and the only one left once the pair pass hits its reserve: these two pin it
+# in both directions, with every pair question answered no.
+
+
+def test_an_evidence_only_document_may_join_an_outlet_event_through_the_singleton_pass(monkeypatch):
+    rule, cnn, fox = "Revisions to the Export Administration Regulations", "Commerce adopts chip export rule", "Commerce chip export rule draws praise"
+    docs = [_outlet(1, cnn), _outlet(2, fox, source="foxnews"), _held(21, rule)]
+    keys = {
+        1: _key(cnn, "commerce", "chip", "export", "rule"),
+        2: _key(fox, "commerce", "chip", "export", "rule"),  # the outlet pair merges in code
+        OFF + 21: _key(rule, "export", "administration", "regulations", "entity"),
+    }
+    same = {frozenset((cnn, rule)), frozenset((fox, rule)), frozenset((cnn, fox))}
+    asked = _fake_model(monkeypatch, keys, same, yes_modes=("singleton", "chain"))
+    out = cluster.run(_zetaris_state(docs))
+    assert [m for m, _, _ in asked] == ["pair", "pair", "singleton", "chain"], "both pair questions said no"
+    assert ("singleton", [rule], [cnn, fox]) in asked, "the lone evidence-only rule is offered to the outlet event"
+    assert [sorted(e["document_ids"]) for e in out["events"]] == [[1, 2, OFF + 21]]
+    decision = out["steps"][0]["decision"]
+    assert "(1 official documents evidence only by the seed rule, see plan: 1 joined an event, 0 in no event)" in decision
+    assert "no seed member" not in decision
+
+
+def test_an_outlet_document_may_join_a_group_of_evidence_only_documents_through_the_singleton_pass(monkeypatch):
+    sunshine, leak = "Sunshine Act Meetings", "Board meeting leak worries staff"
+    docs = [_outlet(3, leak), _held(23, sunshine), _held(24, sunshine), _held(25, sunshine)]
+    keys = {3: _key(leak, "board", "meeting", "leak", "staff")}
+    keys.update({OFF + i: _key(sunshine, "board", "meeting", "agenda") for i in (23, 24, 25)})  # a held-only group merged in code
+    asked = _fake_model(monkeypatch, keys, {frozenset((leak, sunshine))}, yes_modes=("singleton", "chain"))
+    out = cluster.run(_zetaris_state(docs))
+    assert [m for m, _, _ in asked] == ["pair", "pair", "pair", "singleton", "chain"], "every pair question said no"
+    assert ("singleton", [leak], [sunshine, sunshine, sunshine]) in asked, "the lone outlet document is offered to the held-only group"
+    assert [sorted(e["document_ids"]) for e in out["events"]] == [[3, OFF + 23, OFF + 24, OFF + 25]]
+    decision = out["steps"][0]["decision"]
+    assert "(3 official documents evidence only by the seed rule, see plan: 3 joined an event, 0 in no event)" in decision
+    # The outlet side holds a seed member, so its singleton question is never counted as not asked (no counter at all here).
+    assert "question(s) not asked, no seed member" not in decision
 
 
 def test_a_window_of_evidence_only_documents_clusters_nothing(monkeypatch):
