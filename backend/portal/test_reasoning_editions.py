@@ -154,10 +154,39 @@ class ReasoningEditionsTests(TestCase):
         self.assertTrue((self.root / "russia-ukraine-war/2026-10-22/v1.json").is_file())
         self.assertEqual((self.root / "russia-ukraine-war/2026-10-22/v1.json").stat().st_mode & 0o777, 0o600)
         self.client.force_login(self.reader)
-        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        with override_settings(DEBUG=True):
+            data = self.client.get("/api/feed/?date=2026-10-22").json()
         self.assertEqual(data["status"], "demo")
         self.assertEqual(data["publication"]["mode"], "demo")
         self.assertEqual(len(data["events"]), len(sample["stories"]))
+        with override_settings(DEBUG=False):
+            data = self.client.get("/api/feed/?date=2026-10-22").json()
+        self.assertEqual(data['status'], 'error')
+        self.assertEqual(data['events'], [])
+
+    def test_missing_or_changed_install_triplet_fails_closed(self):
+        story = genuine('snapshot.sample.json')
+        self.accept(self.write(story, 'integrity'), install=True)
+        folder = self.root / story['topic_id'] / story['edition_date']
+        self.client.force_login(self.reader)
+        for filename in ('v1.sidecar.json', 'v1.meta.json', 'v1.json'):
+            path = folder / filename
+            original = path.read_bytes()
+            changed_bytes = (json.dumps({**json.loads(original), 'snapshot_sha256': '0' * 64}).encode()
+                             if filename == 'v1.meta.json' else original + b' ')
+            for changed in (None, changed_bytes):
+                with self.subTest(filename=filename, missing=changed is None):
+                    if changed is None:
+                        path.unlink()
+                    else:
+                        path.write_bytes(changed)
+                    # A missing snapshot is a genuinely absent install; other broken triplet members are errors.
+                    data = self.client.get('/api/feed/?date=2026-10-22').json()
+                    self.assertEqual(data['events'], [])
+                    if filename != 'v1.json' or changed is not None:
+                        self.assertEqual(data['status'], 'error')
+                        self.assertEqual(data['publication']['status'], 'error')
+                    path.write_bytes(original)
 
     def test_versions_are_immutable_and_a_broken_file_becomes_an_error_row(self):
         story, _ = self.install_two_topics()

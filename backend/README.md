@@ -53,6 +53,8 @@ Reasoning 1.0 editions for signed-in readers: `reasoning_snapshot --file … --s
 
 ## Decisions
 
+2026-10-26 · rcc00n / Codex · Installed-reader responses require the original snapshot, bound sidecar and matching install-record hashes/identity; a broken installed day reports an error instead of pending, and fictional installs are served only in DEBUG. Why: file loss or replacement must not bypass acceptance or make a production demo fixture appear as genuine news. This is storage integrity, not independent execution or source verification.
+
 2026-10-24 · rcc00n / Codex · Optional local `QUORUM_REASONING_PREVIEW_SIDECAR` binds snapshot hash, edition, run, status and window before exposing only provisional/capture/hash metadata. Why: genuine provisional output needs visible corpus limits without exporting private sidecar paths or changing strict production ingestion. This verifies the binding, not execution or row-manifest truth. Exact-byte historical v3 ledger handling is documented at `reasoning_preview.envelope` call; all other ledger checks remain strict.
 
 2026-10-24 · rcc00n / Codex · Opt-in reasoning previews join validated catalog metadata in the portal projection, leaving the original reasoning JSON and publication gates unchanged. Identity policy is canonical in `catalog_sources.bind_sources`; dates absent from the registry stay null. Why: real source ratings need exact identity and attribution without changing the owner snapshot contract.
