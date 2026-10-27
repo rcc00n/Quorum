@@ -305,6 +305,20 @@ const assert = require("node:assert/strict");
     // The DEMO notice closes for the visit and shows again in a fresh context (2026-10-27, Anastasia/Claude Code;
     // components/dismissible-notice.tsx): its wording stays, a click on its named close button hides it, a reload in the
     // same tab keeps it hidden (sessionStorage), and a new browser context sees it again.
+    // A click on text deep in the page focuses nothing, so Tab goes on from there, not back to a notice's close button
+    // or to the main column (2026-10-27: #main is focusable only for the moment a notice closes).
+    {
+      const text = page.locator("#evidence-explorer .analysis-block-heading p:not(.eyebrow)").first();
+      await text.scrollIntoViewIfNeeded();
+      await text.click();
+      await page.keyboard.press("Tab");
+      const where = await page.evaluate(() => {
+        const a = document.activeElement, t = document.querySelector("#evidence-explorer .analysis-block-heading p:not(.eyebrow)");
+        return { close: !!(a && a.classList && a.classList.contains("notice-close")), main: a === document.getElementById("main"), body: a === document.body,
+          after: !!(a && t && (t.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING)), mainTabindex: document.getElementById("main").hasAttribute("tabindex") };
+      });
+      assert.deepEqual(where, { close: false, main: false, body: false, after: true, mainTabindex: false }, "Tab continues from the clicked text");
+    }
     const demoNote = (p) => p.getByText("DEMO · Fictional interface fixture. Not verified news or live findings.", { exact: true });
     await demoNote(page).waitFor();
     await page.getByRole("button", { name: "Close DEMO notice", exact: true }).click();

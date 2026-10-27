@@ -21,7 +21,9 @@ export function DismissibleNotice({ storageKey, closeLabel, className, role, chi
 }) {
   const key = `quorum.notice.${storageKey}.closed`;
   const [open, setOpen] = useState(() => !closedThisPage.has(key));
-  // A layout effect hides a notice closed earlier in the session before the browser paints this mount.
+  // On a client navigation this layout effect hides a notice closed earlier in the session before the browser paints
+  // the mount. On a full load the server markup still holds it; the pre-paint script in app/layout.tsx has already set
+  // data-notice-<key>="closed" on <html> from the same storage key, and app/workspace.css hides it until this unmounts it.
   useLayoutEffect(() => {
     try {
       if (window.sessionStorage.getItem(key) === "1") {
@@ -40,9 +42,16 @@ export function DismissibleNotice({ storageKey, closeLabel, className, role, chi
     } catch {
       // Without storage the notice is hidden until reload only.
     }
+    document.documentElement.setAttribute(`data-notice-${storageKey}`, "closed");
     // The button leaves the page with its notice; focus moves to the main column so keyboard and screen-reader users
-    // keep their place (#main is the skip link's target and takes focus programmatically).
-    document.getElementById("main")?.focus({ preventScroll: true });
+    // keep their place. #main takes focus only for this moment: tabindex is set here and removed on its next blur, so
+    // a mouse click on text elsewhere never focuses the column and Tab keeps going from the click point.
+    const main = document.getElementById("main");
+    if (main) {
+      main.setAttribute("tabindex", "-1");
+      main.addEventListener("blur", () => main.removeAttribute("tabindex"), { once: true });
+      main.focus({ preventScroll: true });
+    }
     setOpen(false);
   }
   return (

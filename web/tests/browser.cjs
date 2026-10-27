@@ -57,7 +57,10 @@ const assert = require("node:assert/strict");
   const aiNote = (p) => p.getByRole("note").filter({ hasText: "AI-written headlines." });
   await page.getByRole("button", { name: "Close AI headline notice", exact: true }).click();
   assert.equal(await aiNote(page).count(), 0, "the AI notice hides when closed");
-  await page.reload();
+  // A full load paints it hidden from the start: the pre-paint script marks <html> before hydration (app/layout.tsx).
+  await page.reload({ waitUntil: "domcontentloaded" });
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-notice-ai-headlines")), "closed");
+  assert.ok(["none", "absent"].includes(await page.evaluate(() => { const n = document.querySelector(".ai-notice"); return n ? getComputedStyle(n).display : "absent"; })), "hidden before hydration");
   await page.getByText("No published events are available").waitFor();
   assert.equal(await aiNote(page).count(), 0, "it stays hidden for the visit");
   {

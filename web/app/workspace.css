@@ -802,9 +802,16 @@ label {
   margin: 20px 0;
   background: var(--tray);
 }
-/* The main column takes focus when a notice closes (its button leaves the page); it is not a control, so no ring. */
-.workspace-main:focus {
+/* The main column takes focus for a moment when a notice closes (its button leaves the page; tabindex is set then and
+   removed on blur); it is not a control, so no ring. */
+.workspace-main[tabindex="-1"]:focus {
   outline: none;
+}
+/* A notice closed earlier in this browser session stays hidden from the first paint of a full load: the pre-paint
+   script in app/layout.tsx marks <html> from sessionStorage before the server markup is drawn (2026-10-27). */
+html[data-notice-ai-headlines="closed"] .notice-dismissible.ai-notice,
+html[data-notice-demo="closed"] .notice-dismissible.demo-notice {
+  display: none;
 }
 /* The close button: a 24 px ink circle with a white ×, inside a 32 px target; the focus ring per --focus. */
 .notice-close {

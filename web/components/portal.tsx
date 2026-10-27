@@ -315,7 +315,7 @@ export function Portal({
             screen while the next date (or story) loads, dimmed and marked busy, and updates in place when the answer
             arrives; the "Preparing your workspace" state is for the first load only. Why: Anastasia's review of
             2026-10-27: every date change blanked the board and drew it again, a white flash and blocks materialising. */}
-        <main id="main" className="workspace-main" tabIndex={-1} aria-busy={loading && !!data ? true : undefined}>
+        <main id="main" className="workspace-main" aria-busy={loading && !!data ? true : undefined}>
           {/* The AI headline notice opens every workspace page, before any state, so it never moves; it closes for the browser
               session only (components/dismissible-notice.tsx, decision there). */}
           <AiNotice />

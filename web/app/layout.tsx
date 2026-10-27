@@ -24,7 +24,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('quorum-theme');if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t}}catch(e){}",
+              "try{var t=localStorage.getItem('quorum-theme');if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t}}catch(e){}" +
+              // DECISION(2026-10-27, Anastasia/Claude Code): the notices closed for this browser session (components/
+              // dismissible-notice.tsx) are marked on <html> before first paint, so a full load never flashes them; the
+              // server markup and hydration stay the same. Why: a closed notice painted and then vanished on every reload.
+              "try{['ai-headlines','demo'].forEach(function(k){if(sessionStorage.getItem('quorum.notice.'+k+'.closed')==='1'){document.documentElement.setAttribute('data-notice-'+k,'closed')}})}catch(e){}",
           }}
         />
         <ScrollState />
