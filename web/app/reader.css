@@ -1,0 +1,42 @@
+/* See DECISIONS › Reader workspace: the default remains reading; analysis is one deliberate action away. */
+.investigation-reader { --reader-top: 80px; min-width: 0; }
+.reader-bar { position: sticky; top: var(--reader-top); z-index: 12; background: var(--paper, #fff); padding: 14px 0 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); scroll-margin-top: var(--reader-top); }
+.reader-bar-caption { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 11px; color: var(--ink-2); }
+.reader-bar-caption > :first-child { color: var(--accent); font-weight: 500; }
+.reader-tabs { display: grid; grid-template-columns: repeat(5, 1fr) 65px; gap: 4px; }
+.reader-tabs button { display: flex; align-items: center; gap: 10px; justify-content: center; padding: 14px 10px; min-height: 48px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--ink-2); background: transparent; font: inherit; font-size: 13px; cursor: pointer; transition: background 180ms, color 180ms, border-color 180ms; }
+.reader-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--paper-tint, #f7f5f1); }
+.reader-tabs button:hover { color: var(--ink); background: #f6f4f1; }
+.reader-tabs button:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; }
+.reader-tab-number { color: var(--ink-2); font-size: 10px; font-family: ui-monospace, monospace; }
+.reader-story-context { max-width: 720px; margin: 26px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+[data-reader-panel] { padding-top: 28px; min-width: 0; animation: reader-arrive 220ms ease-out; scroll-margin-top: calc(var(--reader-top) + 120px); }
+[data-reader-panel][hidden] { display: none !important; }
+[data-reader-panel] :is([id], summary) { scroll-margin-top: calc(var(--reader-top) + 130px); }
+[data-reader-panel] > :is(.r-section, .analysis-block, .spectrum, .revision-section) { margin-top: 0; padding-top: 0; border-top: 0; }
+.investigation-reader .reader-opening { max-width: 740px; margin: 12px auto 48px; }
+.reader-opening h1 { font-size: clamp(32px, 4.5vw, 54px); font-weight: 500; line-height: 1.1; letter-spacing: -.045em; }
+.reader-opening .lede { font-size: 18px; line-height: 1.6; margin: 24px 0; color: var(--ink-2); }
+.reader-brief { margin: 32px 0; border-top: 1px solid var(--rule); }
+.reader-brief-group { border-bottom: 1px solid var(--rule); }
+.reader-brief-group > summary { list-style: none; display: flex; justify-content: space-between; gap: 16px; padding: 18px 0; font-size: 16px; cursor: pointer; }
+.reader-brief-group > summary::-webkit-details-marker { display: none; }
+.reader-brief-group > summary span { color: var(--accent); transition: rotate 180ms; }
+.reader-brief-group[open] > summary span { rotate: 90deg; }
+.reader-brief-group article { padding: 16px 0; border-top: 1px solid var(--rule); }
+.reader-brief-group h3 { font-size: 17px; font-weight: 500; line-height: 1.5; }
+.reader-brief-group article p { font-size: 14px; color: var(--ink-2); line-height: 1.65; margin: 10px 0; }
+.reader-map-note { font-size: 12px; color: var(--ink-2); margin-bottom: 18px; }
+.investigation-reader .story-appendix { margin-bottom: 0; }
+.investigation-reader[data-reader-view="all"] [data-reader-panel] + [data-reader-panel] { padding-top: 48px; }
+@keyframes reader-arrive { from { opacity: .45; translate: 0 7px; } to { opacity: 1; translate: 0 0; } }
+@media (max-width: 700px) {
+  .reader-tabs { grid-template-columns: repeat(5, 1fr) 36px; gap: 0; }
+  .reader-tabs button { padding: 12px 3px; font-size: 11px; }
+  .reader-tab-number { display: none; }
+  .reader-bar-caption > :last-child { max-width: 190px; text-align: right; }
+  .reader-story-context { font-size: 12px; margin-top: 18px; }
+  [data-reader-panel] { padding-top: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { [data-reader-panel] { animation: none; } .reader-tabs button, .reader-brief-group > summary span { transition: none; } }
+@media print { .reader-bar, .reader-story-context { display: none; } [data-reader-panel][hidden] { display: block !important; } }

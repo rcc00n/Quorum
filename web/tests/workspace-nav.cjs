@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const build=process.env.QUORUM_WEB_BUILD||path.join(require('os').homedir(),'.local/share/quorum/portal-web-build');
+const ts=require(path.join(build,'node_modules/typescript')),m={};
+new Function('exports',ts.transpileModule(fs.readFileSync(path.join(__dirname,'../lib/workspace-nav.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(m);
+assert.equal(m.workspaceItems(null,'2026-10-26').length,4);
+const data={topics:[{id:'topic/one',name:'Café policy'}],events:[{id:'event/one',title:'DEMO exact title',date:'2026-10-26',reasoning:{needs_review:true}}]};
+const items=m.workspaceItems(data,'2026-10-25','event/one','revision & 1');
+assert.equal(items.find(x=>x.id==='topic:topic/one').href,'/topics/topic%2Fone?date=2026-10-25');
+assert.equal(items.find(x=>x.id==='view:map').href,'/events/event%2Fone?date=2026-10-26&revision=revision%20%26%201#reader-map');
+assert.equal(items.find(x=>x.id==='event:event/one').needsReview,true);
+assert.equal(items.find(x=>x.id==='view:map').needsReview,true);
+assert.equal(m.searchWorkspace(items,'CAFE')[0].label,'Café policy');
+assert.equal(m.searchWorkspace(items,'graph audience')[0].id,'view:map');
+assert.deepEqual(m.searchWorkspace(items,'no-such-destination'),[]);
+assert.ok(m.searchWorkspace([...items,...items],'').length<=10);
+assert.equal(data.events[0].title,'DEMO exact title');
+console.log('PASS: local workspace search scope, accent/token matching, map priority, exact date/revision and encoded IDs');

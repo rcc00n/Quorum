@@ -28,3 +28,20 @@ class SecretAliasTests(unittest.TestCase):
     def test_blank_and_documented_placeholder_values_remain_valid(self):
         result = self.scan('METERLESS_TOKEN=\nMODEL_API_KEY_2=<private-key>\n')
         self.assertEqual(result.returncode, 0)
+
+
+class ReviewedAssetTests(unittest.TestCase):
+    def test_only_exact_reviewed_png_bytes_are_permitted(self):
+        import hashlib
+        import importlib.util
+        from unittest.mock import patch
+        spec = importlib.util.spec_from_file_location('index_scanner', SCANNER)
+        scanner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scanner)
+        image = b'\x89PNG\r\n\x1a\nTEST-only-image-data'
+        name = 'docs/reviews/TEST/public.png'
+        with patch.dict(scanner.REVIEWED_IMAGES, {name: hashlib.sha256(image).hexdigest()}, clear=True):
+            self.assertTrue(scanner.approved_review_image(name, image))
+            self.assertFalse(scanner.approved_review_image(name, image + b'changed'))
+            self.assertFalse(scanner.approved_review_image('private.png', image))
+            self.assertFalse(scanner.approved_review_image(name, b'not a PNG'))

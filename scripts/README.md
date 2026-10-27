@@ -44,4 +44,7 @@ They create only TEST inputs and disposable indexes; they are not live integrati
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · The index scanner permits only exact hash-bound public/fictional PR47 review PNGs, retaining size/path/secret checks and rejecting changed or unlisted binaries. Why: preserve the approved visual review artifacts without a blanket image/binary exclusion.
+
+
 2026-10-25 · rcc00n / Codex · Keep original receipt auditing independent of reasoning/runtime clients; require external inputs/reports and compare ordered row occurrences with explicit proof limits. Why: offline audit must preserve multiplicity and private material without spending credits or turning partial reconciliation into execution/publication approval. Numeric bounds and historical seed handling are recorded at their implementation sites.
