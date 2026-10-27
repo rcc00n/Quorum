@@ -97,6 +97,7 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck, polish) | The landing tidied as one system: balanced headings and no orphan lines, hairlines only between paper sections, one grey tray at 14 px for every filled block (the beige card retired), one manner for disclosures, the sources field inset with the audience ticks and the cohort table left to the Sources page, phone buttons at the column's width, the tablet card capped, graph captions on the estimate's measure, one-phrase sponsor lane lines, the footer regrouped; second round the same night: one type scale read back from the served page (display 84/80/56/24/20, text 20/17/15/13, mono 12 and 11-upper-case labels), both bands alike with the hero's pair of actions, 4 px corners on every control, the SQL block and the board's card on their own corners, one rhythm (56/48/16). See › Landing after the deck › Polish. | Anastasia's brief of 2026-10-27 night: consistent, clear, not loaded with text, the identity kept; cluely.com as the reference for space, not style. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The remaining sections in the deck's manner: the anatomy as the cabinet draws it (card, grey trays, mono labels), a glow behind the two statement bands and the deck's closing line, the trace without frame or rules, sponsors and team as columns, limits as numbered rows with the word list in a tray. | Anastasia's review of 2026-10-27: every section after the deck's devices, consistent with the hero, the sources and the graph; the blur used again, sparingly. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The architecture section is the run graph drawn from graph.json after LangGraph Studio's graph view, in the landing's identity, with the seven captions aligned to the nodes and the loop limits as chips in them; the rule card stays. | Anastasia, 2026-10-27: the architecture as in the LangGraph Studio graphs, in our style, with captions, a redrawn graph true to the content; the old card kept too. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The sources section carries the Sources page's spectrum instrument from the registry fixture, fitted to the page: a full-width 360 px field with the ticks inside, grey fills instead of rules, the mode control in the section's head, one mono caption line; sections divided by one hairline. | Anastasia's reviews of 2026-10-27: the same chart as the Sources tab; too many lines; the chart to the section's width with the text along its edges; the caption took a line of its own; the head felt foreign to the section. |
@@ -200,6 +201,79 @@ and the committed fixtures, which `web/tests/landing.cjs` reads back from the se
 - **Sponsors, limits, team.** Sponsors as three columns with a rule on top, the lane line in mono grey; limits as two
   columns of numbered rows (mono `01`–`07`) with no rules and the 26 forbidden words in a grey tray across both columns,
   the quotation closing the section; the team's roles in the mono.
+
+### Polish (27 October, night; Anastasia / Claude Code, same branch)
+
+Anastasia's brief of 2026-10-27 night: consistent, clear, not loaded with text; the identity, the colours and every
+recorded decision kept; cluely.com as the reference for the feeling of space (one object per screen, few words, air),
+not for its style or palette. Each change below is one rule, so a later pass can revert one without the others.
+
+- **Type.** Headings balance their lines (`text-wrap: balance` on h1, h2, the two statement leads and the quotation);
+  running text avoids a one-word last line (`text-wrap: pretty` on every paragraph). The h2 measure is 24ch (was 20ch),
+  so most section heads stand on one line from 1024 px and the longest breaks into two even lines.
+- **Dividers.** A band (the two statement bands and the trace, on `--paper-2`) separates by its fill: no column
+  hairline at its top edge and none under its bottom edge. The hairline remains between two paper sections only
+  (hero → sources, what you get → how it works, sponsors → limits, limits → team).
+- **One tray.** Every filled block on the landing is the cabinet's grey `--tray` with 14 px corners: the key and Also
+  today rows, the ledger's label line, the word list, the selected-source reading, the card under the graph (it was
+  beige `--paper-2` at 8 px). `--paper-2` is kept for the three bands only; the evidence sheet keeps its paper with the
+  ink rule; the 12 px corners of the evening pass are superseded.
+- **Disclosures.** One manner for every closed block in the sections: 15 px at 500 in ink, a `+` in umber that turns
+  to `−` when open, the native marker hidden; the instrument's "How ratings are calculated" joins the registry's
+  "All 40 rows" (it showed the browser's triangle in mono). The sheet's "Query details and provenance" keeps Vadim's
+  layout (label left, `+` right).
+- **Sources.** The field's stage is inset 6 px so a mark at −1 or +1 (AllSides, MBFC) is centred on the frame and stays
+  inside the column. The audience ticks are not drawn on the landing: inside the plot they collided with the badges
+  of marks at −1, outside it they hung past the column; the reading gives the selected source's audience as a number
+  and the footnote says the scale is logarithmic; the signed-in Sources page keeps them. The registry cohort table is
+  not shown on the landing either (the Sources page carries it): five columns of shares were the section's heaviest
+  text; the section ends with the reading, the footnote and two disclosures. Both supersede the matching clauses of
+  the evening's sources bullet.
+- **Hero.** On phones the two buttons take the column's width, one under the other. Between 700 and 900 px the compact
+  card is capped at 560 px so it stays an object under the title rather than a band. The wire's foot is one short mono
+  line ("Real titles of the 24 October window, cut at 80 characters by the file · the 40 sources · the 15 agents in run
+  order · hover to pause").
+- **How it works.** The caption column is capped at 470 px, the measure `captionHeight()` in `graph.tsx` assumes, so
+  the estimated block heights match the rendered captions at 1440 and step 05 is no longer sparse.
+- **Sponsors.** The mono lane line under each name is one phrase ("steps 01 · 04 · every read", "3.5 Lightning ·
+  3 Ultra 550B · every step", "the provider lane"); the texts and their claims are unchanged.
+- **Trace.** The sub under the heading is `--ink-2` like every other sub (it was ink); the tray line still carries
+  the fictional label in ink.
+- **Footer.** The wordmark and its line stand together at the left, the two links at the right; on phones they stack.
+
+Second round, the same night (Anastasia: "another round of consistency; every section, every detail; what did we
+want to convey"). The page's vocabulary is written down and every element mapped to it; the font sizes in use were
+read back from the served page to check.
+
+- **Type scale.** Display: h1 84, the two bands' questions 80, h2 56, names that head a column 24 (sponsor, team
+  member, the selected source), heads inside an object 20 (a step's caption, the card under the graph), the
+  statement leads 24. Text: the sub 20, a statement of the product 17 (the limits, the standfirst), text inside an
+  object 15 (anatomy slots, captions' bodies, vendor texts, tray rows, the ledger's decisions, nav, buttons,
+  footer), a secondary line 13 (reasons, part notes, the reading's small lines). Mono: every caption, number and
+  metadata line 12 (kickers at 500 upper case; the wire's lines, the graph's numbers, the x-axis, the quotation's
+  source, the colophon, the sheet's figures block were 11–13.5); a label inside an object 11 at 500 upper case with
+  0.06 em (the anatomy's margin labels, the ledger's group heads, the reading's "Selected source", "Editorial
+  position", "Audience estimate"); the graph's lane line 10 and its pills 11 inside the drawing. The limits' chips, the
+  ledger's node names and the board card's lines in small are 12 as well; the quotation is 30 like the anatomy's
+  headline slot, one size for a headline-sized line inside a section.
+- **Statement bands.** Both bands are one question at the same size (clamp 40–80 px, wrapped greedily so "Do not
+  trust it." stays whole on a phone) and one answer line in ink at 24 px, 28 px under it. The closing band's actions
+  are the hero's pair, primary and quiet, in one row; the plain "Sign in" link under the button is gone.
+- **Sources' tail.** After the instrument's footnote comes the window's line (the registry lead, moved up by grid
+  order; static text, so the tab order is unchanged), then the two disclosures as a pair. The sheet's figures block
+  lets the label wrap and never the figures, at every width: at 1440 the compact card is 370 px and "50 · 19 · 17"
+  ran past its edge.
+- **Controls.** Every control on the landing has 4 px corners, as DESIGN › Shape says: the mode select loses the
+  pill of the evening pass and takes the buttons' corner, a `--rule` border and the body face. Pills remain only
+  as the graph's start and end nodes, which are not controls.
+- **Trays and cards.** The SQL block inside the sheet is a tray too (grey, no border, 8 px corners as a small
+  object); the board's card drawn in the anatomy keeps the board's own 20 px corners (`app/today.css`): it is the
+  board's 320 px card itself, not a miniature. Corners on the landing are therefore: 4 controls, 8 small objects
+  (graph nodes, the SQL block), 14 trays and the sheet, 20 the board's card, 999 the graph's terminal pills.
+- **Rhythm.** 56 px from a section head to its object (the team list was 64), 48 px from an object to its closing
+  element (the card under the graph, the quotation; the sponsors' colophon already was), 16 px under a column's
+  rule (sponsors were 18), 6 and 12 px inside a column (the team's already were). The footer's full-width hairline
+  is gone: the closing band's edge separates it, like every band.
 
 ## Instrument refinement
 

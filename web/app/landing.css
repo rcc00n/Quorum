@@ -21,6 +21,17 @@
   color: var(--ink);
   margin: 0;
 }
+/* Polish of 2026-10-27 (night): headings balance their lines and running text avoids a one-word last line,
+   so no section ends on "job." or "trace." alone (web/DESIGN.md › Landing after the deck › Polish). */
+.landing :is(h1, h2),
+.landing .lp-truth-answer,
+.landing .lp-final-lead,
+.landing .lp-quote p {
+  text-wrap: balance;
+}
+.landing p {
+  text-wrap: pretty;
+}
 .landing h1 {
   font-size: clamp(48px, 6vw, 84px);
   line-height: 1;
@@ -31,10 +42,12 @@
   font-size: clamp(38px, 4vw, 56px);
   line-height: 1.06;
   letter-spacing: -0.022em;
-  max-width: 20ch;
+  max-width: 24ch; /* most section heads on one line at 1024 and wider; the longest balances into two (was 20ch) */
 }
+/* Second round (2026-10-27 night): two display sizes under h2, nothing else: 24 px for a name that heads a column
+   (sponsor, team member, the selected source) and 20 px for a head inside an object (a step's caption, the card). */
 .landing h3 {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.25;
   letter-spacing: -0.012em;
 }
@@ -116,9 +129,6 @@
   line-height: 1.45;
   color: var(--ink-2);
   max-width: 56ch;
-}
-.landing .lp-sub-ink {
-  color: var(--ink);
 }
 .landing .lp-legend {
   margin-top: 16px;
@@ -227,6 +237,12 @@
   background: var(--rule);
 }
 .landing .lp-hero { padding-bottom: 64px; }
+/* A band (paper-2 with the glow or the ledger) separates by its fill: no hairline at its top edge and none under its
+   bottom edge, so a section is opened by one device, never two (2026-10-27 night, Anastasia/Claude Code). */
+.landing main > :is(.lp-truth, .lp-trace, .lp-final)::before,
+.landing main > :is(.lp-truth, .lp-trace, .lp-final) + section::before {
+  display: none;
+}
 
 /* Hero: on the wider measure, 7 columns of text and 5 of sheet. */
 .landing .lp-hero {
@@ -461,15 +477,12 @@
   margin-top: 20px;
   padding-top: 14px;
   gap: 6px 16px;
-  font-size: 13px;
+}
+.lp-kv-figures {
+  grid-template-columns: minmax(0, 1fr) auto; /* the label wraps, the figures never (the compact card is 370 px wide at 1440) */
 }
 .lp-kv-figures dd {
   white-space: nowrap; /* "50 · 19 · 17" is one figure; tests/landing.cjs reads it as one string */
-}
-@media (max-width: 700px) {
-  .lp-kv-figures {
-    grid-template-columns: minmax(0, 1fr) auto; /* the label wraps, the figures do not */
-  }
 }
 .lp-sql {
   margin: 20px 0 16px;
@@ -477,22 +490,39 @@
   padding-top: 12px;
 }
 .lp-sql summary,
-.lp-registry summary {
+.lp-registry summary,
+.landing .spectrum-modern > details > summary {
   cursor: pointer;
   font-size: 15px;
   font-weight: 500;
   color: var(--ink);
   list-style: none;
+  padding: 6px 0;
+  width: fit-content; /* the focus ring hugs the words, not the column */
+}
+.lp-sql summary::-webkit-details-marker,
+.lp-registry summary::-webkit-details-marker,
+.landing .spectrum-modern > details > summary::-webkit-details-marker {
+  display: none;
 }
 .lp-sql summary::before,
-.lp-registry summary::before {
+.lp-registry summary::before,
+.landing .spectrum-modern > details > summary::before {
   content: "+ ";
   font-family: var(--mono);
   color: var(--umber);
 }
 .lp-sql[open] summary::before,
-.lp-registry[open] summary::before {
+.lp-registry[open] summary::before,
+.landing .spectrum-modern > details[open] > summary::before {
   content: "− ";
+}
+.landing .spectrum-modern > details > p {
+  margin: 8px 0 12px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  max-width: 60ch;
 }
 .lp-sql pre {
   margin: 12px 0 0;
@@ -501,10 +531,10 @@
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
+  background: var(--tray);
+  border: 0;
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 12px 14px;
   color: var(--ink);
 }
 .landing .lp-sql .lp-fine {
@@ -668,18 +698,24 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-glow { filter: blur(70px); } /* static; nothing moves */
 }
-.landing .lp-truth-q {
-  font-size: clamp(44px, 6vw, 80px);
+/* Second round: both bands are one question at the same size and one answer line in ink at 24 px; the closing band's
+   actions are the hero's pair (primary, quiet) in one row. */
+.landing .lp-truth-q,
+.landing .lp-final h2 {
+  font-size: clamp(40px, 6vw, 80px);
   line-height: 1;
   max-width: none;
   letter-spacing: -0.025em;
+  text-wrap: pretty; /* not balance: "Do not trust it. / Check it.", never "Do not trust / it. Check it." */
 }
-.landing .lp-truth-answer {
+.landing .lp-truth-answer,
+.landing .lp-final-lead {
   font-family: var(--display);
   font-weight: 500;
   font-size: 24px;
   line-height: 1.35;
   letter-spacing: -0.01em;
+  color: var(--ink);
   max-width: 34ch;
   margin: 28px auto 0;
 }
@@ -714,6 +750,8 @@
   color: var(--ink-2);
 }
 .landing .lp-slot p {
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--ink-2);
   max-width: 56ch;
 }
@@ -753,7 +791,7 @@
 }
 .lp-tray-row {
   background: var(--tray);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 14px 18px;
 }
 .landing .lp-tray-row p {
@@ -773,7 +811,7 @@
   width: 320px;
   max-width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: var(--radius);
+  border-radius: 20px; /* app/today.css .tb-card-link: the same card at the same width */
   overflow: hidden;
   background: #6f6962;
   isolation: isolate;
@@ -799,7 +837,7 @@
   display: grid;
   place-items: center;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.72);
 }
@@ -821,7 +859,7 @@
 }
 .lp-mini-meta {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.72);
 }
@@ -847,7 +885,7 @@
   gap: 16px;
   flex-wrap: wrap;
   background: var(--tray);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 12px 18px;
   margin-bottom: 36px;
   font-family: var(--mono);
@@ -896,7 +934,7 @@
 }
 .lp-ledger-node {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
   color: var(--ink);
@@ -930,15 +968,15 @@
 }
 .lp-vendors li {
   border-top: 1px solid var(--rule);
-  padding-top: 18px;
+  padding-top: 16px;
 }
 .landing .lp-vendor-name {
-  font-size: 28px;
-  line-height: 1.1;
+  font-size: 24px;
+  line-height: 1.2;
   letter-spacing: -0.015em;
 }
 .landing .lp-vendor-where {
-  margin-top: 8px;
+  margin-top: 6px;
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 500;
@@ -946,7 +984,7 @@
   color: var(--ink-2);
 }
 .landing .lp-vendor-text {
-  margin-top: 14px;
+  margin-top: 12px;
   font-size: 15px;
   line-height: 1.55;
   color: var(--ink-2);
@@ -954,7 +992,7 @@
 .landing .lp-dev {
   margin-top: 48px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--ink-2);
   max-width: 76ch;
@@ -987,7 +1025,7 @@
   grid-column: 1 / -1;
   margin-top: 8px;
   background: var(--tray);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 18px 20px 18px 20px;
 }
 .landing .lp-limit-words > div > p:first-child {
@@ -1009,14 +1047,14 @@
   color: var(--ink-2);
 }
 .lp-quote {
-  margin: 64px 0 0;
+  margin: 48px 0 0;
   padding: 0;
   max-width: 40ch;
 }
 .landing .lp-quote p {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1.15;
   letter-spacing: -0.02em;
 }
@@ -1025,14 +1063,15 @@
   margin-top: 12px;
   font-style: normal;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   color: var(--ink-2);
 }
 
 /* Team */
 .lp-team-list {
   list-style: none;
-  margin: 64px 0 0;
+  margin: 56px 0 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1046,9 +1085,9 @@
   display: block;
   font-family: var(--display);
   font-weight: 500;
-  font-size: 22px;
-  line-height: 1.25;
-  letter-spacing: -0.012em;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
 }
 .lp-team-list span {
   display: block;
@@ -1070,34 +1109,24 @@
   justify-items: center;
 }
 .lp-final > :not(.lp-glow) { position: relative; }
-.landing .lp-final h2 {
-  max-width: none;
-}
-.landing .lp-final-lead {
-  margin-top: 16px;
-  font-family: var(--display);
-  font-weight: 500;
-  font-size: 24px;
-  line-height: 1.3;
-  color: var(--ink-2);
-}
-.landing .lp-final .lp-button {
-  margin-top: 32px;
-}
-.landing .lp-final .lp-link {
-  margin-top: 16px;
+.landing .lp-final .lp-cta-row {
+  justify-content: center;
 }
 
 /* Footer */
 .lp-foot {
-  border-top: 1px solid var(--rule);
-  padding: 40px var(--column-gutter);
+  padding: 40px var(--column-gutter) 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
-  font-size: 14px;
+  font-size: 15px;
+}
+.lp-foot-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
 }
 .landing .lp-foot p {
   color: var(--ink-2);
@@ -1188,9 +1217,6 @@
   .lp-link {
     display: none;
   }
-  .landing .lp-final .lp-link {
-    display: inline-block;
-  }
   .landing h1 {
     font-size: clamp(38px, 10.5vw, 46px);
   }
@@ -1218,6 +1244,9 @@
   .lp-sheet {
     padding: 20px 18px 22px;
   }
+  .lp-cta-row .lp-button {
+    width: 100%;
+  }
   .lp-spectrum {
     grid-template-columns: 1fr;
     row-gap: 40px;
@@ -1239,15 +1268,17 @@
     grid-template-columns: 1fr;
     row-gap: 6px;
   }
-  .landing .lp-vendor-name {
-    font-size: 26px;
-  }
   .lp-team-list {
     grid-template-columns: 1fr;
   }
   .lp-foot {
     flex-direction: column;
     align-items: flex-start;
+    gap: 16px;
+  }
+  .lp-foot-brand {
+    flex-direction: column;
+    gap: 6px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1321,7 +1352,7 @@
   overflow: hidden;
   border-bottom: 1px solid var(--rule);
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--ink-2);
   padding: 9px 0;
@@ -1376,7 +1407,7 @@
       "wire wire wire wire wire wire wire wire wire wire wire wire"
       "foot foot foot foot foot foot foot foot foot foot foot foot";
   }
-  .landing .lp-sheet-compact { margin-top: 0; }
+  .landing .lp-sheet-compact { margin-top: 0; max-width: 560px; }
 }
 @media (max-width: 900px) {
   .lp-field-wrap { top: 420px; right: -30%; width: 110%; height: 900px; opacity: 0.85; }
@@ -1399,22 +1430,34 @@
   min-height: 40px;
   padding: 0 36px 0 16px;
   border: 1px solid var(--rule);
-  border-radius: 999px;
+  border-radius: var(--radius-s); /* the landing's controls: 4 px, as the buttons (the pill of the evening pass is superseded) */
   background: var(--paper);
-  font-size: 14px;
+  font-family: var(--body);
+  font-size: 15px;
+  color: var(--ink);
 }
 /* One sentence above, the instrument, mono captions: the instrument's own intro, its instruction line and the cohort
    footnote are restated or redundant here and stay hidden (Anastasia, 2026-10-27: laconic, like the deck). */
 .landing .spectrum-modern > .section-heading + p { display: none; }
 .landing .sp-instruction, .landing .sp-cohorts-note { display: none; }
-.landing .sp-caption, .landing .sp-footnote, .landing .sp-label, .landing .sp-y-label {
+.landing .sp-caption, .landing .sp-footnote, .landing .sp-y-label, .landing .spectrum-modern .inline-label {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--ink-2);
 }
+/* The reading's labels as the page's object labels (the anatomy's margin labels, the ledger's group heads). */
+.landing .sp-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+/* The reading's small lines at the page's small size, 13 px, not the instrument's 11. */
+.landing .sp-reading > div > span:not(.sp-label), .landing .sp-reading a, .landing .sp-source-domain { font-size: 13px; }
 .landing .sp-cohorts h3 { font-size: 20px; margin-top: 28px; }
-.landing .spectrum-modern > details > summary { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; }
 .landing .lp-registry-lead {
   margin: 36px 0 0;
   font-family: var(--mono);
@@ -1439,7 +1482,11 @@
   border-radius: 14px;
 }
 .landing .sp-footnote { margin: 16px 0 0; }
-.landing .sp-cohorts { margin: 20px 0 0; }
+/* DECISION(2026-10-27 night, Anastasia/Claude Code): the registry cohort table is not shown on the landing; the
+   signed-in Sources page carries it. Supersedes the "cohort table on the tray" clause of the evening's decision.
+   Why: five columns of shares under the plot were the section's heaviest block of text; the landing shows the
+   instrument and the reading, the page shows the arithmetic. */
+.landing .sp-cohorts { display: none; }
 .landing .sp-cohorts h3 {
   font-family: var(--mono);
   font-size: 11px;
@@ -1460,38 +1507,33 @@
 .landing .sp-cohorts thead th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 14px; }
 .landing .sp-cohorts tbody tr:nth-child(even) :is(th, td) { background: rgba(0, 0, 0, 0.035); }
 .landing .sp-cohorts tbody tr:last-child :is(th, td) { padding-bottom: 14px; }
-.landing .spectrum-modern > details { margin-top: 18px; border: 0; padding: 0; }
-.landing .lp-registry { border: 0; margin-top: 10px; }
-.landing .spectrum-modern > details > summary { color: var(--ink-2); }
-.landing .lp-registry-lead { margin-top: 28px; }
+.landing .spectrum-modern > details { margin-top: 12px; border: 0; padding: 0; }
+.landing .lp-registry { border: 0; margin-top: 4px; }
+/* The section's tail in reading order: the instrument's footnote, the window's line (moved up by grid order; it is
+   static text, so the tab order is unchanged), then the two disclosures as a pair. */
+.landing .lp-sources > .lp-registry-lead { order: 1; margin-top: 10px; }
+.landing .lp-sources .spectrum-modern > details { order: 2; margin-top: 20px; }
+.landing .lp-sources > .lp-registry { order: 3; }
 /* DECISION(2026-10-27, Anastasia/Claude Code): on the landing the field spans the section's full width and stands
    360 px tall (400 on phones); the audience ticks move inside the plot, under their gridlines on a paper chip, the
    lowest one above its line, so nothing hangs outside the frame; the perspective floor is off, since it would reach past the frame.
    Every block of the section (captions, the field, the reading, the table, the registry lines) then shares the same
    two edges. Why: Anastasia, 2026-10-27: the chart to the section's width and a little taller, the text along its
    borders so that nothing sticks out and the section reads as one system. */
-.landing .sp-stage { padding: 26px 0 48px; }
+.landing .sp-stage { padding: 26px 6px 48px; } /* 6 px: a mark at −1 or +1 is centred on the frame and stays inside the column */
 .landing .sp-chart { height: 360px; }
 /* The perspective floor would reach past the frame's edges at full width; the frame is enough here. */
 .landing .sp-floor { display: none; }
-.landing .sp-y-tick {
-  right: auto;
-  left: 14px; /* clear of a mark's core on the −1 edge (the AllSides mode puts marks there) */
-  transform: translateY(4px);
-  padding: 0 5px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.86);
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.5;
-  letter-spacing: 0.02em;
-}
-.landing .sp-chart > span.sp-y-tick:last-of-type { transform: translateY(calc(-100% - 4px)); }
-.landing .sp-x-labels { font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; color: var(--ink-2); }
+/* DECISION(2026-10-27 night, Anastasia/Claude Code): the audience ticks are not drawn on the landing. Inside the
+   plot they collided with the badges of marks at −1 (AllSides, MBFC); outside it they hung past the column. The
+   reading under the plot gives the selected source's audience as a number and the footnote says the scale is
+   logarithmic; the signed-in Sources page keeps the ticks. Why: nothing may collide or stick out, and the landing's
+   instrument is a teaser of the page's, not its replacement. */
+.landing .sp-y-tick { display: none; }
+.landing .sp-x-labels { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; color: var(--ink-2); }
 @media (max-width: 700px) {
-  .landing .sp-stage { padding-left: 0; padding-right: 0; }
+  .landing .sp-stage { padding-left: 6px; padding-right: 6px; } /* the marks at −1 and +1 stay inside the column on phones too */
   .landing .sp-chart { height: 400px; }
-  .landing .sp-y-tick { right: auto; font-size: 10px; }
 }
 /* DECISION(2026-10-27, Anastasia/Claude Code): the sources section's head and the instrument interlock: the section
    is a two-column grid, the heading and the sub at the left, the instrument's mode control at the right on the sub's
@@ -1548,19 +1590,19 @@
 .lp-graph-svg .lp-node rect { fill: var(--paper); stroke: var(--rule); stroke-width: 1; }
 .lp-graph-svg .lp-node-model rect { fill: var(--tray); stroke: var(--tray); }
 .lp-graph-svg .lp-node-name { font-size: 12px; font-weight: 500; fill: var(--ink); }
-.lp-graph-svg .lp-node-lane { font-size: 9.5px; letter-spacing: 0.02em; fill: var(--ink-2); }
+.lp-graph-svg .lp-node-lane { font-size: 10px; letter-spacing: 0.02em; fill: var(--ink-2); }
 .lp-graph-svg .lp-pill rect { fill: var(--tray); }
-.lp-graph-svg .lp-pill text { font-size: 10.5px; letter-spacing: 0.02em; fill: var(--ink-2); }
+.lp-graph-svg .lp-pill text { font-size: 11px; letter-spacing: 0.02em; fill: var(--ink-2); }
 .lp-graph-captions { list-style: none; margin: 0; padding: 0; display: grid; }
-.lp-gc { align-self: start; padding-top: 2px; min-width: 0; }
+.lp-gc { align-self: start; padding-top: 2px; min-width: 0; max-width: 470px; } /* the measure captionHeight() in graph.tsx assumes */
 .lp-gc-head { display: flex; align-items: baseline; gap: 12px; }
-.lp-gc-n { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink-2); }
-.landing .lp-gc h3 { font-size: 18px; line-height: 1.3; }
+.lp-gc-n { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink-2); }
+.landing .lp-gc h3 { font-size: 20px; line-height: 1.25; }
 .landing .lp-gc-lead { margin-top: 6px; font-size: 15px; line-height: 1.45; color: var(--ink); }
-.landing .lp-gc-body { margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
-.landing .lp-gc-rule { margin-top: 8px; font-family: var(--mono); font-size: 11px; line-height: 1.7; color: var(--ink-2); }
+.landing .lp-gc-body { margin-top: 4px; font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+.landing .lp-gc-rule { margin-top: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--ink-2); }
 .landing .lp-gc-nodes { display: none; }
-.lp-chip { display: inline-block; white-space: nowrap; font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--ink); border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 1px 7px; margin-right: 8px; }
+.lp-chip { display: inline-block; white-space: nowrap; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink); border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 1px 7px; margin-right: 8px; }
 .lp-chip-mark { color: var(--ink-2); }
 @media (max-width: 900px) {
   .lp-graph { grid-template-columns: minmax(0, 1fr); row-gap: 40px; }
@@ -1571,14 +1613,21 @@
   .landing .lp-gc-nodes { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
 }
 /* The rule under the graph, kept beside the escalate line of the caption (Anastasia, 2026-10-27: "keep the old one too"). */
+/* DECISION(2026-10-27 night, Anastasia/Claude Code): one fill for every tray on the landing, the cabinet's grey --tray
+   with 14 px corners (the key and Also today rows, the ledger's label line, the word list, the cohort table, the
+   selected-source reading, this card); the beige --paper-2 is kept for the three bands only and the sheet keeps its
+   paper with the ink rule. The 12 px of the first pass and the card's 8 px beige are superseded. Why: the page read
+   as two systems, beige boxes and grey boxes; one tray, one radius. */
 .lp-card {
-  margin-top: 64px;
-  background: var(--paper-2);
-  border-radius: var(--radius);
-  padding: 32px 36px;
+  margin-top: 48px;
+  background: var(--tray);
+  border-radius: 14px;
+  padding: 24px 28px;
 }
 .landing .lp-card p {
-  margin-top: 8px;
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--ink-2);
   max-width: 60ch;
 }

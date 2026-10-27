@@ -202,9 +202,9 @@ const LOOP_WHEN: Record<keyof typeof rules.loops, string> = {
 const ESCALATE_WHEN = "above the bar on points, no confirmed claim: out of the stories, into the roundup as \u201creported, not confirmed\u201d, flagged needs review";
 
 const VENDORS: { name: string; where: string; text: string }[] = [
-  { name: "Zetaris", where: "steps 01 · 04 · every read of the corpus", text: "Every read of the corpus is SQL through Zetaris: sources, publications, official documents, previous days. The query at the top of this page is one of them." },
-  { name: "NVIDIA Nemotron", where: "3.5 Lightning · steps 01–04, 06, 07 · 3 Ultra 550B · step 05", text: "Nemotron 3.5 Lightning reads, labels and writes. Nemotron 3 Ultra 550B is the blind fact-checker and the third reviewer." },
-  { name: "Meterless", where: "the provider lane · one model id per lane · a signed receipt per call", text: "Nightshift is supported as the primary provider, with an exact model id per lane and a signed receipt per call. The canonical runs so far used NVIDIA’s direct route; the Meterless engine integration is in progress." },
+  { name: "Zetaris", where: "steps 01 · 04 · every read", text: "Every read of the corpus is SQL through Zetaris: sources, publications, official documents, previous days. The query at the top of this page is one of them." },
+  { name: "NVIDIA Nemotron", where: "3.5 Lightning · 3 Ultra 550B · every step", text: "Nemotron 3.5 Lightning reads, labels and writes. Nemotron 3 Ultra 550B is the blind fact-checker and the third reviewer." },
+  { name: "Meterless", where: "the provider lane", text: "Nightshift is supported as the primary provider, with an exact model id per lane and a signed receipt per call. The canonical runs so far used NVIDIA’s direct route; the Meterless engine integration is in progress." },
 ];
 
 const LIMITS = [
@@ -381,7 +381,7 @@ export default function Home() {
             </div>
           </div>
           <p className="lp-wire-foot">
-            {`Real titles read through Zetaris in the ${dayLabel(evidence.edition_date)} window, cut at 80 characters by the file · the ${registry.count} sources of the registry · the ${graph.nodes.length} agents in run order. Hover to pause.`}
+            {`Real titles of the ${dayLabel(evidence.edition_date)} window, cut at 80 characters by the file · the ${registry.count} sources · the ${graph.nodes.length} agents in run order · hover to pause`}
           </p>
         </section>
 
@@ -494,7 +494,7 @@ export default function Home() {
         <section id="trace" className="lp-trace" aria-labelledby="trace-title">
           <Kicker text="The trace" slug="docs/examples/snapshot.sample.json" href={`${REPO}/blob/master/docs/examples/snapshot.sample.json`} />
           <h2 id="trace-title">Under every story, its trace.</h2>
-          <p className="lp-sub lp-sub-ink">
+          <p className="lp-sub">
             These rows come from the committed dry-run sample, not from a published edition: a second research
             round and a rejected first draft are in them.
           </p>
@@ -604,18 +604,22 @@ export default function Home() {
           {/* The deck's closing line (Anastasia, 2026-10-27, the landing after the deck); the earlier headline stays as its lead. */}
           <h2 id="final-title">Do not trust it. Check it.</h2>
           <p className="lp-final-lead">Read the working.</p>
-          <Link href="/register" className="lp-button">
-            Choose your topics
-          </Link>
-          <Link href="/login" className="lp-link">
-            Sign in
-          </Link>
+          <div className="lp-cta-row">
+            <Link href="/register" className="lp-button">
+              Choose your topics
+            </Link>
+            <Link href="/login" className="lp-button lp-button-quiet">
+              Sign in
+            </Link>
+          </div>
         </section>
       </main>
 
       <footer className="lp-foot">
-        <span className="lp-masthead lp-masthead-small">Quorum</span>
-        <p>Evidence under every line.</p>
+        <div className="lp-foot-brand">
+          <span className="lp-masthead lp-masthead-small">Quorum</span>
+          <p>Evidence under every line.</p>
+        </div>
         <nav aria-label="Footer">
           <a href={REPO}>github.com/rcc00n/Quorum</a>
           <Link href="/login">Sign in</Link>

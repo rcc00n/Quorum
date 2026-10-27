@@ -50,13 +50,14 @@ const RIGHT_OF: Record<string, string> = { escalate: "review_disputed" };
 
 const W = 400, BOX_W = 168, BOX_H = 44, CX = 120, CX_RIGHT = 310, PITCH = 68, MIN_BLOCK = 136, PILL_H = 28, TOP = 42;
 const half = BOX_W / 2, hh = BOX_H / 2;
-// The caption's height, estimated from its text at the narrowest desktop width of the caption column (about
-// 440 px: 52 characters of the lead, 60 of the body, 66 of a rule line), so a block is never shorter than the
-// caption beside it; the grid row may still grow (minmax) if a line wraps earlier, at the cost of alignment below.
+// The caption's height, estimated from its text at the caption column's measure (470 px, app/landing.css .lp-gc:
+// about 58 characters of the 15 px lead, 58 of the 15 px body, 60 of a 12 px mono rule line), so a block is never
+// shorter than the caption beside it; the grid row may still grow (minmax) if a line wraps earlier, at the cost
+// of alignment below. Second round of 2026-10-27: the body is 15 px and the rules 12 px, the estimate follows.
 function captionHeight(s: GraphStep) {
   const lines = (text: string, perLine: number) => Math.max(1, Math.ceil(text.length / perLine));
-  const rules = (s.rules ?? []).reduce<number>((sum, r) => sum + lines(ruleText(r), 66) * 19 + 8, 0);
-  return 2 + 24 + 6 + lines(s.lead, 52) * 22 + 4 + lines(s.body, 60) * 21 + rules + 16;
+  const rules = (s.rules ?? []).reduce<number>((sum, r) => sum + lines(ruleText(r), 60) * 20.4 + 8, 0);
+  return 2 + 25 + 6 + lines(s.lead, 58) * 22 + 4 + lines(s.body, 58) * 22.5 + rules + 16;
 }
 function ruleText(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
