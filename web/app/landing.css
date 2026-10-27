@@ -644,18 +644,35 @@
 
 /* What is truth: a band, one statement, centred. */
 .lp-truth {
+  position: relative;
+  overflow: clip;
   background: var(--paper-2);
   text-align: center;
 }
-.landing .lp-bracket {
+.lp-truth > :not(.lp-glow) { position: relative; }
+/* DECISION(2026-10-27, Anastasia/Claude Code): the blur returns as a device, sparingly: a soft glow (two warm
+   radial fields blurred 70 px) at the back of the two statement bands, "What is truth?" and the closing, and
+   nowhere else; no text in it, no edge. Why: Anastasia, 2026-10-27: use the blur again, not everywhere, for
+   beauty and variety. */
+.lp-glow {
+  position: absolute;
+  inset: -20% -10%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 55% at 32% 40%, rgba(201, 162, 126, 0.32), transparent 70%),
+    radial-gradient(30% 50% at 70% 60%, rgba(255, 255, 255, 0.9), transparent 70%),
+    radial-gradient(24% 40% at 58% 20%, rgba(123, 86, 52, 0.12), transparent 70%);
+  filter: blur(70px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-glow { filter: blur(70px); } /* static; nothing moves */
+}
+.landing .lp-truth-q {
   font-size: clamp(44px, 6vw, 80px);
   line-height: 1;
   max-width: none;
   letter-spacing: -0.025em;
-}
-.landing .lp-bracket span {
-  color: var(--ink-2); /* grey brackets, like the anatomy page's (Anastasia, 2026-10-26) */
-  font-weight: 400;
 }
 .landing .lp-truth-answer {
   font-family: var(--display);
@@ -667,36 +684,31 @@
   margin: 28px auto 0;
 }
 
-/* What you get: the anatomy of a story, a page with margin labels in grey parentheses (Anastasia, 2026-10-26: no
-   umber inside the anatomy page or the timeline; grey and ink only). */
-.lp-page {
-  margin: 64px auto 0;
-  max-width: 760px;
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 48px 56px 56px;
+/* What you get: the anatomy of a story as the cabinet draws it (decision in page.tsx at the anatomy, 2026-10-27):
+   mono margin labels, the Home slot as the board's card (blurred field, headline band), the reading key and Also
+   today as grey tray rows, one hairline where the article has one, before the appendix. Grey and ink only. */
+.lp-anatomy {
+  margin: 56px 0 0;
+  max-width: 860px;
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  column-gap: 40px;
-  row-gap: 32px;
+  grid-template-columns: 150px minmax(0, 1fr);
+  column-gap: 48px;
+  row-gap: 36px;
   align-items: start;
 }
 .lp-part-label {
   display: block;
-  font-family: var(--display);
+  padding-top: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
   font-weight: 500;
-  font-size: 15px;
-  line-height: 1.3;
-  color: var(--ink);
-}
-.lp-paren {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--ink-2);
-  font-weight: 400;
 }
 .lp-part-note {
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 13px;
   line-height: 1.5;
   color: var(--ink-2);
@@ -708,8 +720,8 @@
 .landing .lp-slot-headline p {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 28px;
-  line-height: 1.15;
+  font-size: 30px;
+  line-height: 1.12;
   letter-spacing: -0.015em;
   color: var(--ink);
 }
@@ -723,15 +735,6 @@
   font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--ink-2);
-}
-.landing .lp-slot-key p {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-2);
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  padding: 8px 0;
-  max-width: none;
 }
 .lp-slot-trail {
   display: block;
@@ -748,55 +751,105 @@
   border-top: 1px solid var(--rule);
   padding-top: 16px;
 }
-.lp-home-card,
-.lp-also-card {
-  background: var(--paper-2);
-  border-radius: var(--radius);
-  padding: 20px 24px;
+.lp-tray-row {
+  background: var(--tray);
+  border-radius: 12px;
+  padding: 14px 18px;
 }
-.lp-card-meta {
-  display: block;
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.02em;
+.landing .lp-tray-row p {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: none;
+}
+.landing .lp-tray-key p {
+  font-size: 13px;
   color: var(--ink-2);
 }
-.lp-home-line {
-  display: block;
-  margin-top: 8px;
+/* The board's card in small: the same blurred field and the same band as app/today.css (.tb-card-link-blank,
+   .tb-card-text), so the landing shows the card the cabinet shows. */
+.lp-mini-card {
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #6f6962;
+  isolation: isolate;
+  display: grid;
+  align-items: end;
+  color: #fff;
+}
+.lp-mini-card::before {
+  content: "";
+  position: absolute;
+  inset: -48px;
+  z-index: -1;
+  background:
+    radial-gradient(44% 60% at 24% 36%, rgba(201, 162, 126, 0.34), transparent 70%),
+    radial-gradient(34% 52% at 78% 30%, rgba(255, 255, 255, 0.2), transparent 70%),
+    radial-gradient(48% 46% at 62% 84%, rgba(255, 255, 255, 0.14), transparent 70%),
+    radial-gradient(28% 40% at 10% 86%, rgba(0, 0, 0, 0.3), transparent 70%);
+  filter: blur(26px);
+}
+.lp-mini-note {
+  position: absolute;
+  inset: 0 0 38%;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.72);
+}
+.lp-mini-text {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  background: rgba(0, 0, 0, 0.46);
+}
+.lp-mini-text::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 96px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.02) 12%, rgba(0, 0, 0, 0.08) 28%, rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0.33) 62%, rgba(0, 0, 0, 0.42) 80%, rgba(0, 0, 0, 0.46) 100%);
+}
+.lp-mini-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.72);
+}
+.lp-mini-line {
   font-family: var(--display);
   font-weight: 500;
   font-size: 20px;
-  line-height: 1.3;
-  color: var(--ink);
-}
-.landing .lp-also-card p {
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--ink);
+  line-height: 1.25;
 }
 
 /* The trace: a band, a ledger grouped by part of the story. Grey and ink only (Anastasia, 2026-10-26): group
-   heads and step numbers grey, loop rows marked by one ink edge and nothing else. */
+   heads and step numbers grey, loop rows marked by one ink edge and nothing else. 2026-10-27: no frame and no
+   rules under the group heads, the fictional label as a grey tray line (the landing after the deck). */
 .lp-trace {
   background: var(--paper-2);
 }
 .lp-ledger {
-  margin-top: 64px;
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-top: 2px solid var(--ink);
-  border-radius: var(--radius);
-  padding: 20px 32px 32px;
+  margin-top: 56px;
 }
 .lp-ledger-head {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 12px;
-  margin-bottom: 28px;
+  background: var(--tray);
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 36px;
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 500;
@@ -815,9 +868,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-2);
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 6px;
-  margin: 32px 0 16px;
+  margin: 40px 0 14px;
 }
 .landing .lp-group-head:first-of-type {
   margin-top: 0;
@@ -832,10 +883,9 @@
 .lp-group-head + .lp-ledger-row {
   margin-top: 0;
 }
+.lp-ledger-row, .landing .lp-group-head { padding-left: 14px; }
 .lp-ledger-loop {
   box-shadow: inset 2px 0 0 var(--ink);
-  margin-left: -14px;
-  padding-left: 12px;
 }
 .lp-ledger-step {
   font-family: var(--mono);
@@ -869,22 +919,21 @@
   color: var(--ink-2);
 }
 
-/* Sponsors */
+/* Sponsors: three columns with a rule on top (the deck's device), the lane line in mono grey. */
 .lp-vendors {
   list-style: none;
-  margin: 64px 0 0;
+  margin: 56px 0 0;
   padding: 0;
   display: grid;
-  row-gap: 40px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px;
 }
 .lp-vendors li {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  column-gap: 40px;
-  align-items: start;
+  border-top: 1px solid var(--rule);
+  padding-top: 18px;
 }
 .landing .lp-vendor-name {
-  font-size: 32px;
+  font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.015em;
 }
@@ -894,10 +943,13 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
-  color: var(--umber);
+  color: var(--ink-2);
 }
 .landing .lp-vendor-text {
-  max-width: 56ch;
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
 }
 .landing .lp-dev {
   margin-top: 48px;
@@ -908,25 +960,38 @@
   max-width: 76ch;
 }
 
-/* Limits: rows with a grey dash, the quotation closing the section. Grey and ink only (Anastasia, 2026-10-26). */
+/* Limits: two columns of numbered rows, no rules (2026-10-27, the landing after the deck); the word list as a
+   grey tray across both columns; the quotation closes the section. Grey and ink only. */
 .lp-limits-list {
-  margin: 64px 0 0;
+  margin: 56px 0 0;
   padding: 0;
   list-style: none;
-  max-width: 60ch;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 56px;
 }
 .lp-limits-list li {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  padding: 20px 0;
-  border-top: 1px solid var(--rule);
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
 }
-.lp-limits-list li:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-.lp-dash {
+.lp-limit-n {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   color: var(--ink-2);
+  padding-top: 4px;
+}
+.lp-limit-words {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  background: var(--tray);
+  border-radius: 12px;
+  padding: 18px 20px 18px 20px;
+}
+.landing .lp-limit-words > div > p:first-child {
+  color: var(--ink);
 }
 .landing .lp-forbidden-words {
   margin-top: 10px;
@@ -987,21 +1052,34 @@
 }
 .lp-team-list span {
   display: block;
-  margin-top: 4px;
-  font-size: 15px;
-  line-height: 1.55;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
   color: var(--ink-2);
 }
 
 /* Final: a band, a headline, the button, centred. */
 .landing .lp-final {
+  position: relative;
+  overflow: clip;
   background: var(--paper-2);
   text-align: center;
   display: grid;
   justify-items: center;
 }
+.lp-final > :not(.lp-glow) { position: relative; }
 .landing .lp-final h2 {
   max-width: none;
+}
+.landing .lp-final-lead {
+  margin-top: 16px;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--ink-2);
 }
 .landing .lp-final .lp-button {
   margin-top: 32px;
@@ -1086,15 +1164,18 @@
   .lp-registry ol {
     columns: 2;
   }
-  .lp-page {
+  .lp-anatomy {
     max-width: 100%;
-    padding: 40px 40px 48px;
   }
   .lp-ledger-row {
     grid-template-columns: 40px 130px minmax(0, 1fr);
   }
-  .lp-vendors li {
-    grid-template-columns: 200px minmax(0, 1fr);
+  .lp-vendors {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .lp-limits-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 700px) {
@@ -1144,31 +1225,19 @@
   .lp-registry ol {
     columns: 1;
   }
-  .lp-page {
-    padding: 24px;
+  .lp-anatomy {
     grid-template-columns: 1fr;
     row-gap: 8px;
   }
   .lp-part:not(:first-child) {
-    margin-top: 20px;
+    margin-top: 24px;
   }
   .landing .lp-slot-headline p {
     font-size: 24px;
   }
-  .lp-ledger {
-    padding: 16px 20px 24px;
-  }
   .lp-ledger-row {
     grid-template-columns: 1fr;
     row-gap: 6px;
-  }
-  .lp-ledger-loop {
-    margin-left: -10px;
-    padding-left: 8px;
-  }
-  .lp-vendors li {
-    grid-template-columns: 1fr;
-    row-gap: 8px;
   }
   .landing .lp-vendor-name {
     font-size: 26px;
@@ -1513,3 +1582,9 @@
   color: var(--ink-2);
   max-width: 60ch;
 }
+/* app/instrument-polish.css (Vadim's WEB-PAPERCLIP-POLISH-01) gives the trace ledger a shadow and its label line a
+   beige bordered field; on the landing after the deck the ledger carries no frame and the label is a grey tray line,
+   so the two rules are overridden here by specificity (DECISION 2026-10-27, Anastasia/Claude Code; the polish file
+   itself is untouched, as with the reader bar). */
+.landing .lp-trace .lp-ledger { box-shadow: none; }
+.landing .lp-trace .lp-ledger-head { background: var(--tray); border: 0; padding: 12px 18px; }

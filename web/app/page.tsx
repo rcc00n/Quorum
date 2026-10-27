@@ -408,9 +408,8 @@ export default function Home() {
         </section>
 
         <section id="truth" className="lp-truth" aria-labelledby="truth-title">
-          <h2 id="truth-title" className="lp-bracket">
-            <span aria-hidden="true">(</span>What is truth?<span aria-hidden="true">)</span>
-          </h2>
+          <span className="lp-glow" aria-hidden="true" />
+          <h2 id="truth-title" className="lp-truth-q">What is truth?</h2>
           <p className="lp-truth-answer">
             A signed document, or a claim confirmed by sources that do not depend on each other. Everything else is
             a statement, and is shown as one.
@@ -421,26 +420,27 @@ export default function Home() {
           <Kicker text="What you get" slug="docs/DECISIONS.md › Stories as articles" href={`${REPO}/blob/master/docs/DECISIONS.md#stories-as-articles`} />
           <h2 id="get-title">What you read each morning.</h2>
           <p className="lp-sub">One story per topic you follow. Two to four minutes, built only from verified claims, no evaluation added.</p>
-          <div className="lp-page">
+          {/* DECISION(2026-10-27, Anastasia/Claude Code; landing after the deck): the anatomy is drawn as the cabinet
+              draws it: the Home slot is the board's story card (its blurred field and headline band), the reading
+              key and Also today are the cabinet's grey tray rows, the margin labels are mono captions without the
+              prototype's parentheses, and the only rule is the article's own, before the appendix. The parts and
+              their words are unchanged (DECISIONS › Stories as articles). Why: Anastasia's review of 2026-10-27:
+              "the What you get section too", in the deck's manner, consistent with the rest. */}
+          <div className="lp-anatomy">
             {ANATOMY.map((part) => (
               <Fragment key={part.label}>
                 <div className="lp-part">
-                  <span className="lp-part-label">
-                    <span className="lp-paren" aria-hidden="true">
-                      {"( "}
-                    </span>
-                    {part.label}
-                    <span className="lp-paren" aria-hidden="true">
-                      {" )"}
-                    </span>
-                  </span>
+                  <span className="lp-part-label">{part.label}</span>
                   {part.note && <span className="lp-part-note">{part.note}</span>}
                 </div>
                 <div className={`lp-slot lp-slot-${part.kind}`}>
                   {part.kind === "home" ? (
-                    <div className="lp-home-card">
-                      <span className="lp-card-meta">{`${evidence.topic_id} · edition ${evidence.edition_date}`}</span>
-                      <span className="lp-home-line">{part.text}</span>
+                    <div className="lp-mini-card">
+                      <span className="lp-mini-note">Imagine a photo here.</span>
+                      <div className="lp-mini-text">
+                        <span className="lp-mini-meta">{`${evidence.topic_id} · edition ${evidence.edition_date}`}</span>
+                        <span className="lp-mini-line">{part.text}</span>
+                      </div>
                     </div>
                   ) : part.kind === "standfirst" ? (
                     <p>
@@ -452,8 +452,8 @@ export default function Home() {
                       <p>{part.text}</p>
                       <span className="lp-slot-trail">evidence · source · quote · status</span>
                     </>
-                  ) : part.kind === "also" ? (
-                    <div className="lp-also-card">
+                  ) : part.kind === "also" || part.kind === "key" ? (
+                    <div className={part.kind === "key" ? "lp-tray-row lp-tray-key" : "lp-tray-row"}>
                       <p>{part.text}</p>
                     </div>
                   ) : (
@@ -551,18 +551,14 @@ export default function Home() {
           <Kicker text="Limits" slug="reasoning/config/reasoning.toml" href={`${REPO}/blob/master/reasoning/config/reasoning.toml`} />
           <h2 id="limits-title">What it does not do.</h2>
           <ul className="lp-limits-list" role="list">
-            {LIMITS.map((text) => (
+            {LIMITS.map((text, i) => (
               <li key={text}>
-                <span className="lp-dash" aria-hidden="true">
-                  —
-                </span>
+                <span className="lp-limit-n">{String(i + 1).padStart(2, "0")}</span>
                 <p>{text}</p>
               </li>
             ))}
-            <li>
-              <span className="lp-dash" aria-hidden="true">
-                —
-              </span>
+            <li className="lp-limit-words">
+              <span className="lp-limit-n">{String(LIMITS.length + 1).padStart(2, "0")}</span>
               <div>
                 <p>{`${rules.forbidden_words.length} words a draft may not use.`}</p>
                 <p className="lp-forbidden-words">
@@ -604,7 +600,10 @@ export default function Home() {
         </section>
 
         <section id="final" className="lp-final" aria-labelledby="final-title">
-          <h2 id="final-title">Read the working.</h2>
+          <span className="lp-glow" aria-hidden="true" />
+          {/* The deck's closing line (Anastasia, 2026-10-27, the landing after the deck); the earlier headline stays as its lead. */}
+          <h2 id="final-title">Do not trust it. Check it.</h2>
+          <p className="lp-final-lead">Read the working.</p>
           <Link href="/register" className="lp-button">
             Choose your topics
           </Link>

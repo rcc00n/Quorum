@@ -97,6 +97,7 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The remaining sections in the deck's manner: the anatomy as the cabinet draws it (card, grey trays, mono labels), a glow behind the two statement bands and the deck's closing line, the trace without frame or rules, sponsors and team as columns, limits as numbered rows with the word list in a tray. | Anastasia's review of 2026-10-27: every section after the deck's devices, consistent with the hero, the sources and the graph; the blur used again, sparingly. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The architecture section is the run graph drawn from graph.json after LangGraph Studio's graph view, in the landing's identity, with the seven captions aligned to the nodes and the loop limits as chips in them; the rule card stays. | Anastasia, 2026-10-27: the architecture as in the LangGraph Studio graphs, in our style, with captions, a redrawn graph true to the content; the old card kept too. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The sources section carries the Sources page's spectrum instrument from the registry fixture, fitted to the page: a full-width 360 px field with the ticks inside, grey fills instead of rules, the mode control in the section's head, one mono caption line; sections divided by one hairline. | Anastasia's reviews of 2026-10-27: the same chart as the Sources tab; too many lines; the chart to the section's width with the text along its edges; the caption took a line of its own; the head felt foreign to the section. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck, branch `anastasia/web-landing-polish`) | The landing's hero takes the deck's devices: a sentence typed once in a fixed box, a compact evidence card, three quiet running lines of real data (titles with source tags, the registry, the agents), the blurred tally at the very back of the page with faded edges. landing.cjs asserts the three lines and the field. | Anastasia's reviews of 2026-10-27: the deck's typewriter shifted the text; the lines must not pull attention; the blur back, with no visible edge, behind everything. |
@@ -186,6 +187,19 @@ and the committed fixtures, which `web/tests/landing.cjs` reads back from the se
   escalation rule as a line of step 05; the card "No confirmed claim, no story." stays under the graph. On phones the
   graph scales to the screen and the captions follow as a list with the node names. A block is as tall as its nodes
   or its caption, estimated from the text, so the edges lengthen where a caption is long.
+- **What you get.** The anatomy as the cabinet draws it: mono margin labels without the prototype's parentheses, the
+  Home slot as the board's story card in small (the same blurred field and headline band as `app/today.css`), the
+  reading key and Also today as grey `--tray` rows, the article's one rule before the appendix and no frame; the parts
+  and their words unchanged (DECISIONS › Stories as articles).
+- **The two statement bands.** "What is truth?" loses its brackets; the closing reads the deck's line "Do not trust it.
+  Check it." with the earlier "Read the working." as its lead. Behind each a soft glow (`.lp-glow`: two warm radial
+  fields blurred 70 px, no text, no edge): the blur as a device, used twice and nowhere else.
+- **The trace.** No frame and no rules under the group heads; the fictional label and the row count as one grey tray
+  line; rows and heads inset 14 px so a loop row's ink edge stays inside the column. Two rules of
+  `app/instrument-polish.css` (the ledger's shadow, the bordered beige label) are overridden on the landing only.
+- **Sponsors, limits, team.** Sponsors as three columns with a rule on top, the lane line in mono grey; limits as two
+  columns of numbered rows (mono `01`–`07`) with no rules and the 26 forbidden words in a grey tray across both columns,
+  the quotation closing the section; the team's roles in the mono.
 
 ## Instrument refinement
 
