@@ -130,7 +130,8 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
       ],
       {
         cwd: build,
-        env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+        // Installed-edition regression pairs +14 server with -10 browser: dates always differ.
+        env: { ...process.env, ...(installedMode ? {TZ: "Pacific/Kiritimati"} : {}), NEXT_TELEMETRY_DISABLED: "1" },
         stdio: "ignore",
       },
     ),
