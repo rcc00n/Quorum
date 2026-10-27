@@ -262,7 +262,7 @@
    field, which still shows through; the fade is the band's ::before over the picture's foot with eased stops,
    since a short linear ramp reads as a hard edge (Mach bands) and looked like two darkenings laid over each
    other; a pane with a crisp rim and a backdrop blur was tried and declined, the gradient stays. The "Imagine
-   a photo here." note keeps its z-index above the fade. Why: Anastasia's reviews of 2026-10-27: "the lower
+   a photo here." note sits centred in the picture area, above the fade. Why: Anastasia's reviews of 2026-10-27: "the lower
    part darker, more contrast", "the whole background blurred, the headline part just darker", "a little more
    transparent, the transition is harsh", "close to a matte black", "more transparent, as if dark glass were
    laid over the background", "bring the gradient back, the glass only said how transparent". */
@@ -363,11 +363,16 @@
   filter: blur(26px);
   pointer-events: none;
 }
+/* Centred in the picture area, where the photograph would be, at the credit's size (Anastasia, 2026-10-27;
+   it sat in the credit's corner before). */
 .tb .tb-card-note {
   position: absolute;
-  left: 14px;
-  bottom: 10px;
+  inset: 0;
   z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 0 20px;
+  text-align: center;
   font-size: 12px;
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.92);
