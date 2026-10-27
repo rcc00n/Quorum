@@ -41,6 +41,12 @@ existing placeholder; reader/auth/publication rules and all original edition byt
 
 ## Web API
 
+The operator-assigned Django group `Quorum public demo` marks an intentionally public, non-staff
+shared reader. Profile/password/preference POSTs return 403 for that group; session/profile/feed GETs,
+login and logout remain available. No new API fields, schema or permission grants. Give the dedicated
+account the four demo topics before publishing its credentials; never publish an existing private judge
+or staff password. Canonical authorization: docs/DECISIONS.md › User account and interface.
+
 All JSON; `/api/` is same-origin. GET `/session/` returns `{user, csrfToken}`. Send that token as `X-CSRFToken` for every POST, including login/register. The token rotates after login. HttpOnly session and CSRF cookies; no JWTs. Private responses use `Cache-Control: no-store`.
 
 | Endpoint | Method | Input / result |
@@ -74,6 +80,11 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 Reasoning 1.0 editions for signed-in readers: `reasoning_snapshot --file … --sha256 … --sidecar … --sidecar-sha256 … --producer-commit … --install` copies an accepted edition into `QUORUM_REASONING_EDITIONS_ROOT/<topic>/<date>/v<N>.json` with its sidecar and an install record (mode 0600; a version is never overwritten); `--allow-fictional` works in DEBUG only, for a rehearsal with the bundled sample. The producer's config is read with `git show <commit>:reasoning/config/reasoning.toml`, so run `git fetch origin` first (reasoning pushes every producer commit before handing files over); on a release without `.git`, pass `--producer-config <reasoning.toml>` with the matching file instead. Each edition row of the feed carries the preview's honesty labels (`provisional`, `corpus_as_of_utc`, `edition_window_utc`, `warnings`) and every roundup line keeps the producer's `label`, `line_source` and `needs_review`; `publication.provisional` is true when any edition of the day is, with `publication.corpus_as_of_utc` the earliest capture time among those editions; an event page narrows both to the event's own edition. The acceptance report and the install record say where the producer's config came from (`config_source`: git or file). With `QUORUM_ENABLE_REASONING_READER=1`, `/api/feed/` and `/api/events/<id>/` answer from the installed editions of a date before the proposal store, for signed-in users only; nothing changes for anonymous visitors or while the flag is off. See `portal/reasoning_editions.py`.
 
 ## Decisions
+
+2026-10-27 · rcc00n / Codex · WEB-PUBLIC-DEMO-01: group-marked shared readers cannot mutate
+profile, password or preferences; enforce on the server, with the existing 403 error displayed by the
+portal. Why: Vadim explicitly requested one public demo login/password, and a visitor must not be able
+to change the shared access or feed. Normal accounts and their API behavior are preserved.
 
 2026-10-27 · rcc00n / Codex · WEB-MEDIA-01: reviewed lead photos live in an atomic private manifest,
 bound to exact accepted snapshot SHA256/topic/date/event; immutable manifest copies and expected-current

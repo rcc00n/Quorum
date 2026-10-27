@@ -79,6 +79,33 @@ class PortalTests(TestCase):
         self.assertTrue(self.user.check_password("A-new-perspective-926!"))
         self.assertEqual(self.client.get("/api/feed/").status_code, 200)
 
+    def test_public_demo_cannot_change_shared_credentials_profile_or_topics(self):
+        from django.contrib.auth.models import Group
+        from .views import PUBLIC_DEMO_GROUP
+
+        self.user.groups.add(Group.objects.create(name=PUBLIC_DEMO_GROUP))
+        Preference.objects.update_or_create(user=self.user, defaults={"topics": ["demo-topic"]})
+        self.client.force_login(self.user)
+        original = (self.user.password, self.user.first_name, self.user.email)
+        for endpoint_name, payload in (
+            ("profile", {"name": "Changed", "email": "changed@example.com"}),
+            ("preferences", {"topics": []}),
+            ("password", {"old_password": "A-clear-perspective-928!", "new_password1": "A-new-perspective-926!", "new_password2": "A-new-perspective-926!"}),
+        ):
+            result = self.post(endpoint_name, payload)
+            self.assertEqual(result.status_code, 403)
+            self.assertIn("read-only", result.json()["error"])
+        self.user.refresh_from_db()
+        self.assertEqual((self.user.password, self.user.first_name, self.user.email), original)
+        self.assertEqual(Preference.objects.get(user=self.user).topics, ["demo-topic"])
+        self.assertFalse(self.user.is_staff or self.user.is_superuser)
+        self.assertEqual(self.client.get("/api/session/").status_code, 200)
+        self.assertEqual(self.client.get("/api/profile/").status_code, 200)
+        self.assertEqual(self.client.get("/api/feed/").status_code, 200)
+        self.assertEqual(self.post("logout", {}).status_code, 200)
+        result = self.post("login", {"username": self.user.username, "password": "A-clear-perspective-928!"})
+        self.assertEqual(result.status_code, 200)
+
     def test_preferences_and_empty_feed(self):
         self.client.force_login(self.user)
         self.assertEqual(

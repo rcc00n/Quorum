@@ -17,13 +17,20 @@ def response(data, status=200):
     return r
 
 
-def endpoint(methods, auth=False):
+PUBLIC_DEMO_GROUP = "Quorum public demo"
+
+
+def endpoint(methods, auth=False, writable=False):
     def decorate(fn):
         @require_http_methods(methods)
         @wraps(fn)
         def wrapped(request, *args, **kwargs):
             if auth and not request.user.is_authenticated:
                 return response({"error": "Sign in to continue."}, 401)
+            # DECISION(2026-10-27, rcc00n/Codex): the deliberately public demo may read, sign in and
+            # sign out, but cannot edit its shared account/topics. Why: visitors must not lock each other out.
+            if writable and request.method != "GET" and request.user.groups.filter(name=PUBLIC_DEMO_GROUP).exists():
+                return response({"error": "The public demo account is read-only. Create your own account to change profile, password or topics."}, 403)
             try:
                 request.payload = json.loads(request.body or b"{}")
                 if not isinstance(request.payload, dict):
@@ -102,7 +109,7 @@ def signout(request):
     return response({"ok": True})
 
 
-@endpoint(["GET", "POST"], auth=True)
+@endpoint(["GET", "POST"], auth=True, writable=True)
 def profile(request):
     if request.method == "POST":
         data = request.payload
@@ -122,7 +129,7 @@ def profile(request):
     return response({"user": user_data(request.user)})
 
 
-@endpoint(["POST"], auth=True)
+@endpoint(["POST"], auth=True, writable=True)
 def preferences(request):
     topics = request.payload.get("topics")
     allowed = {t["id"] for t in adapter.snapshot()["topics"]}
@@ -138,7 +145,7 @@ def preferences(request):
     return response({"user": user_data(request.user)})
 
 
-@endpoint(["POST"], auth=True)
+@endpoint(["POST"], auth=True, writable=True)
 def password(request):
     form = PasswordChangeForm(request.user, request.payload)
     if not form.is_valid():
