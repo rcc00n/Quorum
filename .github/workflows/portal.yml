@@ -3,7 +3,7 @@ name: Portal regressions
 # Why: the approved sequential merge workflow needs web regressions after owner changes.
 on:
   push:
-    branches: ["feature/web-*", integration]
+    branches: ["feature/web-*", integration, master]
     paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', 'agent/**', 'scripts/**', 'docs/examples/**', '.github/workflows/portal.yml']
   pull_request:
     branches: [integration, master]
@@ -13,7 +13,7 @@ permissions:
   contents: read
 jobs:
   portal:
-    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/feature/web-') || github.ref == 'refs/heads/integration'
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/feature/web-') || github.ref == 'refs/heads/integration' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:

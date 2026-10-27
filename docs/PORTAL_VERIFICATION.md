@@ -453,3 +453,59 @@ Packaged Django/standalone Next start on new loopback ports; a restored disposab
 account passes CSRF login and the authenticated feed remains pending with
 publication disabled. This is local rehearsal only; target-host deployment and
 production restore remain unauthorized and untested for this release.
+
+## Raw v4/v6 execution receipt intake — 2026-10-25
+
+This supersedes the **missing raw ledger/journal/log** limitation of the earlier
+intake milestone above. The owner handed over 14 unchanged originals and published
+full byte lengths/hashes in [Issue #2 comment 6403229269](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6403229269).
+All 14 match those public receipts. Both original snapshot hashes are also checked.
+Raw inputs/reports and the operator manifest stay outside Git.
+
+| Check | Historical v4 | Current v6 |
+| --- | --- | --- |
+| Ledger rows, ordered equality with journal projection | 1674 / PASS | 3013 / PASS |
+| Served replies with independently recomputed SHA-256 | 1668 / PASS | 3003 / PASS |
+| Inherited plus current error rows | 6 | 10 |
+| Logged replays in the publishing attempt | 1495 | 321 + 1098 = 1419 |
+| Logged new journal rows in that attempt | 85 | 21 + 108 = 129 |
+| Errors among those new rows | 0 | 2 |
+| Ultra among those new rows | 6 | 0 |
+
+Seed lineage: original attempt 3 has 1601 rows. Attempt 4 retains its ordered 1561
+non-`review_disputed` rows and adds 28; the 40 removed reviewer rows are explicit,
+not silently deduplicated. Journals 4→5→6→7 preserve their predecessor's exact bytes
+as a prefix. The 32 duplicate seed-key occurrences remain counted. Attempt 5
+restored 1589 rows, replayed 1495, leaving 88 replayable rows and 6 error rows unused.
+No logged new request key in attempts 5/6/7 overlaps the queue available to that
+process. This supports the disclosed seed/replay arithmetic without inventing
+per-request replay receipts.
+
+Attempt 6 (the v5 intermediate version) has 518 + 692 new journal rows, with log
+replays 235 + 352. Attempt 7 restores 2884 rows in process 1 and 2905 in process 2;
+the live-row task/lane/model/duration/token metadata agrees exactly with each log.
+Independent reconstruction from the relevant committed prompt/config/DATA_NOTE
+material also matches all recorded request digests across the five original files:
+1601 / 1589 / 1674 / 2884 / 3013 occurrences, zero mismatches. These include copied
+seed prefixes; their sum is not a count of unique calls or spending.
+
+Remaining limits are narrower: task-only replay logs cannot prove which exact
+request-key/FIFO occurrence was consumed. Checkpoints and process-start receipts
+were not supplied, and a consistent journal/log does not cryptographically attest
+provider execution or prove source relevance/correctness. These flags remain false,
+as do publication and the native consumer's execution/source-text verification.
+No original is edited and no snapshot ledger is rewritten. Historical v4 impact
+hold and the v6 D5 limitations remain intact.
+
+The reusable verifier and synthetic negative cases are in
+[scripts/README.md](../scripts/README.md#original-execution-receipts).
+The actual private run checked 16 bound inputs (14 raw files plus two snapshots)
+without a provider, database restore, graph execution or model credits.
+
+PR #19 passed both owner reviews at `0e5b749` and was merged normally as
+`1444e7ccefc0f326e3a178916d9a7c713be042bf`; its tree equals the tested integration
+checkpoint. Master manual workflow 40238340725 passes combined Python but skips
+portal under the old branch condition. The reviewed PR's full portal/Chromium check
+remains valid for the identical tree; a follow-up extends push/manual coverage to
+master so future master checks run both jobs. This is a code checkpoint, not a
+production release or sponsor certification.
