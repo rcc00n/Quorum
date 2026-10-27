@@ -8,6 +8,10 @@
   /* The fill of pill trays and low rows on the app routes (the date control, the story's view bar, Also today,
      Impact, the claim groups): a neutral grey, clearly off the paper (Anastasia, 2026-10-27: "greyer, white melts in; plain grey, not light brown"). */
   --tray: #e5e5e5;
+  /* DECISION(2026-10-27, Anastasia/Claude Code): one pale yellow for one element, the AI headline notice on the signed-in
+     pages (components/ai-notice.tsx); ink text on it reads at about 16:1. Nowhere else; every other filled element keeps
+     --tray. The app routes have no dark theme, so there is no dark value. Why: Anastasia asked for a yellow notice. */
+  --notice-yellow: #fff1b8;
   --ink: #141414;
   --ink-2: #5f5a53;
   --rule: #dcd6cc;

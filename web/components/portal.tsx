@@ -21,6 +21,8 @@ import { storySources, STORY_MAP_NOTE } from "@/lib/story-sources";
 import { EditionNotes } from "./editorial";
 import { visibleStories, isQuietDay } from "@/lib/editorial";
 import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
+import { AiNotice } from "./ai-notice";
+import { DismissibleNotice } from "./dismissible-notice";
 import { ReasoningEvidence } from "./reasoning-evidence";
 import { ReasoningSpectrum } from "./reasoning-spectrum";
 import { ReasoningTimeline } from "./reasoning-timeline";
@@ -314,6 +316,9 @@ export function Portal({
             arrives; the "Preparing your workspace" state is for the first load only. Why: Anastasia's review of
             2026-10-27: every date change blanked the board and drew it again, a white flash and blocks materialising. */}
         <main id="main" className="workspace-main" aria-busy={loading && !!data ? true : undefined}>
+          {/* The AI headline notice opens every workspace page, before any state, so it never moves; it closes for the browser
+              session only (components/dismissible-notice.tsx, decision there). */}
+          <AiNotice />
           {loading && !data ? (
             <div className="loading" role="status">
               <div className="loading-line" />
@@ -359,11 +364,15 @@ export function Portal({
                 </p>
               </div>
               )}
+              {/* The DEMO notice can be closed for the visit like the AI notice (2026-10-27, Anastasia/Claude Code;
+                  components/dismissible-notice.tsx); its meaning and wording stay (DECISIONS › User account and interface). */}
               {data?.status === "demo" && (
-                <p className="message" role="status">
-                  DEMO · Fictional interface fixture. Not verified news or live
-                  findings.
-                </p>
+                <DismissibleNotice storageKey="demo" closeLabel="Close DEMO notice" className="message demo-notice" role="status">
+                  <p>
+                    DEMO · Fictional interface fixture. Not verified news or live
+                    findings.
+                  </p>
+                </DismissibleNotice>
               )}
               {/* The settings page shows no edition, so it carries no publication notice (polish, 2026-10-27). */}
               {view !== "settings" && <PublicationNotice publication={data?.publication} />}

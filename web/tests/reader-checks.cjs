@@ -1,6 +1,12 @@
 // Actual reader navigation; the caller separately verifies all original content in All sections.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 module.exports=async({page})=>{
+ // The AI headline notice opens the signed-in page, above the story (2026-10-27, Anastasia/Claude Code; components/ai-notice.tsx).
+ const aiNote=page.getByRole('note').filter({hasText:'AI-written headlines.'});
+ assert.equal(await aiNote.count(),1);await aiNote.waitFor();
+ assert.ok((await aiNote.textContent()).includes('Quorum supports no political party or group.'));
+ await page.locator('.investigation-reader').waitFor();
+ assert.ok(await aiNote.evaluate(n=>{const r=document.querySelector('.investigation-reader');return !!r&&!!(n.compareDocumentPosition(r)&Node.DOCUMENT_POSITION_FOLLOWING);}),'the notice comes before the story');
  const reader=page.locator('.investigation-reader'),tab=name=>reader.getByRole('tab',{name,exact:true});
  const needsReview=await reader.getByText('Requires editorial review',{exact:true}).isVisible();
  assert.equal(await tab('Reading').getAttribute('aria-selected'),'true');

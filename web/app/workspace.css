@@ -730,7 +730,8 @@ label {
     gap: 6px;
   }
 }
-/* One grey for every filled element on the app routes (Anastasia, 2026-10-27): notices, status panels, the
+/* One grey for every filled element on the app routes (Anastasia, 2026-10-27; one exception since the same day, the AI
+   headline notice on --notice-yellow, at the end of this file): notices, status panels, the
    search key cap and the hover of the "+ Add topics" pill share --tray with the rows and trays above. */
 .workspace-search kbd { background: var(--tray); }
 .quiet-day { background: var(--tray); border-radius: 14px; }
@@ -755,8 +756,93 @@ label {
   box-shadow: 0 1px 0 #cfcfcf;
   color: var(--ink-2);
 }
-/* While the next date loads, the page stays and dims a little instead of blanking (second cabinet pass). */
-.workspace-main[aria-busy="true"] > :not(.publication-line, .publication-notice) {
+/* While the next date loads, the page stays and dims a little instead of blanking (second cabinet pass). The AI
+   headline notice stays at full strength (2026-10-27). */
+.workspace-main[aria-busy="true"] > :not(.publication-line, .publication-notice, .ai-notice) {
   opacity: 0.72;
   transition: opacity 160ms ease;
+}
+
+/* The notices at the top of the workspace (2026-10-27, Anastasia/Claude Code; components/dismissible-notice.tsx and
+   ai-notice.tsx, decisions there): the AI headline notice on --notice-yellow and every .message (DEMO, saved, status) on
+   --tray, all with the trays' 14 px corners and no edge at the left; the two closable notices hold their text and a
+   close button side by side, so on a phone the text wraps beside the button and never under it. The first version's
+   2 px umber edge and square corners are superseded the same day. */
+.workspace-main .message {
+  border-left: 0;
+  border-radius: 14px;
+}
+.workspace-main > .notice-dismissible {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: start;
+  padding: 10px 10px 10px 16px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--ink);
+}
+.workspace-main > .notice-dismissible .notice-body p {
+  margin: 0;
+  padding-top: 5px;
+  color: var(--ink);
+}
+.workspace-main > .ai-notice {
+  margin: 0 0 20px;
+  background: var(--notice-yellow);
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.workspace-main > .ai-notice strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.workspace-main > .demo-notice {
+  margin: 20px 0;
+  background: var(--tray);
+}
+/* The main column takes focus for a moment when a notice closes (its button leaves the page; tabindex is set then and
+   removed on blur); it is not a control, so no ring. */
+.workspace-main[tabindex="-1"]:focus {
+  outline: none;
+}
+/* A notice closed earlier in this browser session stays hidden from the first paint of a full load: the pre-paint
+   script in app/layout.tsx marks <html> from sessionStorage before the server markup is drawn (2026-10-27). */
+html[data-notice-ai-headlines="closed"] .notice-dismissible.ai-notice,
+html[data-notice-demo="closed"] .notice-dismissible.demo-notice {
+  display: none;
+}
+/* The close button: a 24 px ink circle with a white ×, inside a 32 px target; the focus ring per --focus. */
+.notice-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.notice-close > span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  transition: background-color 160ms ease;
+}
+.notice-close:hover > span {
+  background: var(--umber-ink);
+}
+.notice-close:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-close > span { transition: none; }
 }
