@@ -15,6 +15,20 @@ spec.loader.exec_module(upgrade)
 
 
 class UpgradeSafetyTests(unittest.TestCase):
+    def test_target_tests_are_isolated_from_auth_and_installed_editions(self):
+        original = {'DJANGO_SECRET_KEY': 'TEST-production-secret', 'QUORUM_PORTAL_DATA': '/var/lib/quorum',
+                    'QUORUM_ENABLE_REASONING_READER': '1', 'QUORUM_REASONING_EDITIONS_ROOT': '/var/lib/quorum/editions',
+                    'QUORUM_ENABLE_REASONING_PREVIEW': '1', 'QUORUM_SNAPSHOT_ROOT': '/TEST/published'}
+        isolated = upgrade.isolated_test_environment(original, '/tmp/TEST-quorum-release')
+        self.assertEqual(isolated['QUORUM_PORTAL_DATA'], '/tmp/TEST-quorum-release')
+        self.assertNotEqual(isolated['DJANGO_SECRET_KEY'], original['DJANGO_SECRET_KEY'])
+        self.assertEqual(isolated['QUORUM_ENABLE_REASONING_READER'], '0')
+        self.assertEqual(isolated['QUORUM_REASONING_EDITIONS_ROOT'], '')
+        self.assertEqual(isolated['QUORUM_SNAPSHOT_ROOT'], '')
+        self.assertEqual(original['QUORUM_ENABLE_REASONING_READER'], '1')
+        with self.assertRaisesRegex(RuntimeError, 'outside_production'):
+            upgrade.isolated_test_environment(original, '/var/lib/quorum/TEST-tmp')
+
     def test_release_scope_and_symlinks(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
