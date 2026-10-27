@@ -23,8 +23,9 @@ module.exports=async({page})=>{
   await page.goto(url.href);
   try { await page.waitForFunction(()=>document.querySelector('#reader-tab-evidence')?.getAttribute('aria-selected')==='true'); }
   catch { throw Error('Deep-link state: '+JSON.stringify(await page.evaluate(id=>({hash:location.hash,target:!!document.getElementById(id),panel:document.getElementById(id)?.closest('[data-reader-panel]')?.getAttribute('data-reader-panel'),view:document.querySelector('.investigation-reader')?.getAttribute('data-reader-view')}),id))); }
-  const target=page.locator(`[id="${id}"]`);assert.notEqual(await target.getAttribute('open'),null);
-  await page.waitForFunction(id=>document.getElementById(id)?.querySelector(':scope > summary')===document.activeElement,id);
+  const target=page.locator(`[id="${id}"]`);
+  await page.waitForFunction(id=>document.getElementById(id)?.hasAttribute("open")&&document.getElementById(id)?.querySelector(':scope > summary')===document.activeElement,id);
+  assert.notEqual(await target.getAttribute("open"),null);
  }
  await page.emulateMedia({reducedMotion:'reduce'});
  for(const width of [1440,768,390]){

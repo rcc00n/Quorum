@@ -1,5 +1,5 @@
 "use client";
-import { Children, isValidElement, useEffect, useRef, useState } from "react";
+import { Children, isValidElement, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import type { Event, Source } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
@@ -44,19 +44,16 @@ export function InvestigationReader({ title, children, className = "" }: { title
     if (header) observer?.observe(header);
     return () => { window.removeEventListener("hashchange", resolveHash); window.removeEventListener("popstate", resolveHash); observer?.disconnect(); };
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const target = pendingTarget.current; if (!target) return;
     // DECISION(2026-10-27, rcc00n/Codex): consume a deep link only after its pane is visible.
-    // Why: initial mount can queue the pane change before this effect runs; premature consumption loses focus.
+    // Why: hydration/hash events can change the pane before paint; focus must follow the committed visible DOM.
     if (active !== "all" && target.closest<HTMLElement>("[data-reader-panel]")?.dataset.readerPanel !== active) return;
     pendingTarget.current = null;
-    const frame = requestAnimationFrame(() => {
-      for (let el: HTMLElement | null = target; el && el !== root.current; el = el.parentElement) if (el instanceof HTMLDetailsElement) el.open = true;
+    for (let el: HTMLElement | null = target; el && el !== root.current; el = el.parentElement) if (el instanceof HTMLDetailsElement) el.open = true;
       const focus = target instanceof HTMLDetailsElement ? target.querySelector<HTMLElement>(":scope > summary") : target;
       if (focus) { if (!focus.hasAttribute("tabindex") && !focus.matches("a,button,input,select,summary")) focus.tabIndex = -1; focus.focus({ preventScroll: true }); }
-      target.scrollIntoView({ block: "start" });
-    });
-    return () => cancelAnimationFrame(frame);
+    target.scrollIntoView({ block: "start" });
   }, [active, hashEpoch]);
   function select(view: View) {
     pendingTarget.current = null; setActive(view);
