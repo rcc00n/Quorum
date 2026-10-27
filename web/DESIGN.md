@@ -97,6 +97,7 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The architecture section is the run graph drawn from graph.json after LangGraph Studio's graph view, in the landing's identity, with the seven captions aligned to the nodes and the loop limits as chips in them; the rule card stays. | Anastasia, 2026-10-27: the architecture as in the LangGraph Studio graphs, in our style, with captions, a redrawn graph true to the content; the old card kept too. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The sources section carries the Sources page's spectrum instrument from the registry fixture, fitted to the page: a full-width 360 px field with the ticks inside, grey fills instead of rules, the mode control in the section's head, one mono caption line; sections divided by one hairline. | Anastasia's reviews of 2026-10-27: the same chart as the Sources tab; too many lines; the chart to the section's width with the text along its edges; the caption took a line of its own; the head felt foreign to the section. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck, branch `anastasia/web-landing-polish`) | The landing's hero takes the deck's devices: a sentence typed once in a fixed box, a compact evidence card, three quiet running lines of real data (titles with source tags, the registry, the agents), the blurred tally at the very back of the page with faded edges. landing.cjs asserts the three lines and the field. | Anastasia's reviews of 2026-10-27: the deck's typewriter shifted the text; the lines must not pull attention; the blur back, with no visible edge, behind everything. |
 | 2026-10-27 | Anastasia / Claude Code (second cabinet pass) | The topic page as a list: stories as rows like Also today, cards only on Home; no tabs, rail or rubric dump; spectrum kept; History and Sources with pill controls; one neutral grey `--tray` for every filled element; chevrons as the disclosure sign; row labels in ink. See › Cabinet. | Anastasia's reviews of 2026-10-27: a topic page with the board's cards read as Home; the fill should be plain grey, not light brown; the diagonal arrow read as a link. |
@@ -173,6 +174,18 @@ and the committed fixtures, which `web/tests/landing.cjs` reads back from the se
   restated here or carried by the registry list. Sections are divided by one column-wide hairline
   (`main > section + section::before`), the hero's bottom padding reduced to meet it. The ledger's audience number renders
   with a fixed locale, since the landing renders it on the server.
+- **How it works.** The seven-step timeline gives way to the run graph drawn (`components/landing/graph.tsx`, decision
+  there): the fifteen nodes of `fixtures/landing/graph.json` top to bottom in run order, the edges exactly those of
+  ARCHITECTURE § 5's mermaid, solid for the run's path and dashed for an edge that runs on a condition, the three loops
+  as arcs at the right, escalate as a box beside review_disputed returning into frame, start and end as grey pills;
+  after LangGraph Studio's graph view, in the landing's identity: rounded boxes, the node's name in the mono with its
+  lane under it (Nemotron 3.5 Lightning, Nemotron 3 Ultra 550B or code), a model node on the cabinet's grey `--tray`, a
+  code node on paper with a hairline. The seven captions stand at the right in a grid whose rows are the graph's
+  blocks, each beside its nodes (title, lead, body; the node and vendor lines are gone since the boxes say it); the
+  loop conditions in the words of § 5's edge labels and the limits `loops.key = n` as chips inside the caption, and the
+  escalation rule as a line of step 05; the card "No confirmed claim, no story." stays under the graph. On phones the
+  graph scales to the screen and the captions follow as a list with the node names. A block is as tall as its nodes
+  or its caption, estimated from the text, so the edges lengthen where a caption is long.
 
 ## Instrument refinement
 

@@ -776,114 +776,6 @@
   color: var(--ink);
 }
 
-/* How it works: the graph as a timeline. A rail, a dot per step, a label column and a text column. Grey and ink
-   only: numbers and node lines grey, the vendor line ink, looping steps with an ink dot. */
-.lp-steps {
-  list-style: none;
-  margin: 64px 0 0;
-  padding: 0;
-  position: relative;
-}
-.lp-steps::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 1px;
-  background: var(--rule);
-}
-.lp-step {
-  position: relative;
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  column-gap: 32px;
-  padding-left: 40px;
-  margin-top: 56px;
-}
-.lp-step:first-child {
-  margin-top: 0;
-}
-.lp-step::before {
-  content: "";
-  position: absolute;
-  left: -4.5px;
-  top: 6px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--ink-2);
-}
-.lp-step-loop::before {
-  background: var(--ink);
-}
-.lp-step-label {
-  display: grid;
-  gap: 6px;
-  align-content: start;
-}
-.lp-step-n {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--ink-2);
-}
-.landing .lp-step-nodes {
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-2);
-  overflow-wrap: anywhere;
-}
-.landing .lp-step-vendor {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: var(--ink);
-}
-.lp-chip {
-  justify-self: start;
-  margin-top: 4px;
-  display: inline-block;
-  white-space: nowrap;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-s);
-  padding: 3px 8px;
-}
-.lp-chip-mark {
-  color: var(--ink-2);
-}
-.landing .lp-step-lead {
-  font-family: var(--display);
-  font-weight: 500;
-  font-size: 24px;
-  line-height: 1.3;
-  color: var(--ink);
-  max-width: 60ch;
-}
-.landing .lp-step-body {
-  margin-top: 10px;
-  color: var(--ink-2);
-  max-width: 60ch;
-}
-.lp-card {
-  margin-top: 64px;
-  background: var(--paper-2);
-  border-radius: var(--radius);
-  padding: 32px 36px;
-}
-.landing .lp-card p {
-  margin-top: 8px;
-  color: var(--ink-2);
-  max-width: 60ch;
-}
-
 /* The trace: a band, a ledger grouped by part of the story. Grey and ink only (Anastasia, 2026-10-26): group
    heads and step numbers grey, loop rows marked by one ink edge and nothing else. */
 .lp-trace {
@@ -1198,12 +1090,6 @@
     max-width: 100%;
     padding: 40px 40px 48px;
   }
-  .lp-step {
-    grid-template-columns: 1fr;
-    row-gap: 12px;
-    padding-left: 32px;
-    margin-top: 40px;
-  }
   .lp-ledger-row {
     grid-template-columns: 40px 130px minmax(0, 1fr);
   }
@@ -1268,9 +1154,6 @@
   }
   .landing .lp-slot-headline p {
     font-size: 24px;
-  }
-  .landing .lp-step-lead {
-    font-size: 20px;
   }
   .lp-ledger {
     padding: 16px 20px 24px;
@@ -1583,4 +1466,50 @@
   .landing .lp-sources { grid-template-columns: minmax(0, 1fr); }
   .landing .lp-sources .spectrum-modern .section-heading { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 24px; }
   .landing .lp-sources .spectrum-instrument { margin-top: 28px; }
+}
+/* How it works: the run graph drawn (components/landing/graph.tsx, decision there) at the left, the seven captions
+   at the right in a grid whose rows are the graph's blocks, so each caption stands beside its nodes. Grey and ink
+   only: a model node on the cabinet's grey, a code node on paper with a hairline, edges in --ink-2. */
+.lp-graph { display: grid; grid-template-columns: 400px minmax(0, 1fr); column-gap: 56px; align-items: start; margin-top: 56px; }
+.lp-graph-svg { display: block; width: 400px; height: auto; overflow: visible; }
+.lp-graph-svg text { font-family: var(--mono); }
+.lp-graph-svg .lp-edge { fill: none; stroke: var(--ink-2); stroke-width: 1; }
+.lp-graph-svg .lp-edge-cond { stroke-dasharray: 3 4; }
+.lp-graph-svg .lp-arrow { fill: var(--ink-2); }
+.lp-graph-svg .lp-node rect { fill: var(--paper); stroke: var(--rule); stroke-width: 1; }
+.lp-graph-svg .lp-node-model rect { fill: var(--tray); stroke: var(--tray); }
+.lp-graph-svg .lp-node-name { font-size: 12px; font-weight: 500; fill: var(--ink); }
+.lp-graph-svg .lp-node-lane { font-size: 9.5px; letter-spacing: 0.02em; fill: var(--ink-2); }
+.lp-graph-svg .lp-pill rect { fill: var(--tray); }
+.lp-graph-svg .lp-pill text { font-size: 10.5px; letter-spacing: 0.02em; fill: var(--ink-2); }
+.lp-graph-captions { list-style: none; margin: 0; padding: 0; display: grid; }
+.lp-gc { align-self: start; padding-top: 2px; min-width: 0; }
+.lp-gc-head { display: flex; align-items: baseline; gap: 12px; }
+.lp-gc-n { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink-2); }
+.landing .lp-gc h3 { font-size: 18px; line-height: 1.3; }
+.landing .lp-gc-lead { margin-top: 6px; font-size: 15px; line-height: 1.45; color: var(--ink); }
+.landing .lp-gc-body { margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.landing .lp-gc-rule { margin-top: 8px; font-family: var(--mono); font-size: 11px; line-height: 1.7; color: var(--ink-2); }
+.landing .lp-gc-nodes { display: none; }
+.lp-chip { display: inline-block; white-space: nowrap; font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--ink); border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 1px 7px; margin-right: 8px; }
+.lp-chip-mark { color: var(--ink-2); }
+@media (max-width: 900px) {
+  .lp-graph { grid-template-columns: minmax(0, 1fr); row-gap: 40px; }
+  .lp-graph-svg { width: 100%; max-width: 400px; margin: 0 auto; }
+  .lp-graph-captions { display: block; }
+  .lp-gc { margin-top: 28px; }
+  .lp-gc:first-child { margin-top: 0; }
+  .landing .lp-gc-nodes { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+}
+/* The rule under the graph, kept beside the escalate line of the caption (Anastasia, 2026-10-27: "keep the old one too"). */
+.lp-card {
+  margin-top: 64px;
+  background: var(--paper-2);
+  border-radius: var(--radius);
+  padding: 32px 36px;
+}
+.landing .lp-card p {
+  margin-top: 8px;
+  color: var(--ink-2);
+  max-width: 60ch;
 }

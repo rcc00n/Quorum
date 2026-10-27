@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { PageMotion } from "@/components/page-motion";
 import Link from "next/link";
 import { Tenets } from "@/components/landing/tenets";
+import { RunGraph } from "@/components/landing/graph";
 import { Spectrum } from "@/components/spectrum";
 import type { Source as RegistrySource } from "@/lib/api";
 import evidence from "@/fixtures/landing/zetaris-evidence-russia-ukraine-war-2026-10-24.json";
@@ -150,21 +151,22 @@ function sortRows(list: Source[]) {
   );
 }
 
-/* The seven steps of the graph. DECISION(2026-10-26, Anastasia/Claude Code): the vendor line per step names the
-   lane and the code of docs/ARCHITECTURE.md § 5's node table and reasoning.toml [models] (default lane → Nemotron
-   3.5 Lightning; fact_checker and reviewer → Nemotron 3 Ultra 550B); ● marks a node that calls a model, ○ a node
-   that is code only; Meterless is named in #runs only, because the canonical runs used NVIDIA's direct route.
-   Why: the page may not claim a route the journals do not back; if Yelysei changes a node's lane, only this
-   constant changes. The nodes of the seven steps must cover graph.json in run order (checked below). */
-type Step = { n: string; title: string; nodes: string[]; nodeLine: string; vendor: string; lead: string; body: string; loop?: keyof typeof rules.loops };
+/* The seven steps of the graph: the captions beside the drawn graph (components/landing/graph.tsx, where each
+   node's lane is recorded). DECISION(2026-10-26, Anastasia/Claude Code; amended 2026-10-27): the lane per node is
+   written in the node's box of the drawing, from docs/ARCHITECTURE.md § 5's node table and reasoning.toml [models]
+   (default lane → Nemotron 3.5 Lightning; fact_checker and reviewer → Nemotron 3 Ultra 550B), ● for a node that
+   calls a model, ○ for code; Meterless is named in #runs only, because the canonical runs used NVIDIA's direct
+   route. Why: the page may not claim a route the journals do not back; if Yelysei changes a node's lane, one table
+   changes. The nodes of the seven steps must cover graph.json in run order (checked below). */
+type Step = { n: string; title: string; nodes: string[]; lead: string; body: string; loop?: keyof typeof rules.loops };
 const STEPS: Step[] = [
-  { n: "01", title: "Plan and cluster", nodes: ["plan", "cluster"], nodeLine: "○ plan · ● cluster", vendor: "Zetaris SQL · Nemotron 3.5 Lightning · merged in code", lead: "Groups the day's documents into events.", body: "The model writes one key per document: actors, action, place, date. Code merges the obvious pairs and asks the model only about the ones in between." },
-  { n: "02", title: "Score the bar", nodes: ["score_importance"], nodeLine: "● score_importance", vendor: "Nemotron 3.5 Lightning · points by code", lead: "Decides what is big enough to be a story.", body: "The model reports the legal status and the state of the act; code turns them into points. Ten stories a day is a cap, not a target." },
-  { n: "03", title: "Extract claims", nodes: ["extract_claims"], nodeLine: "● extract_claims", vendor: "Nemotron 3.5 Lightning · quotes checked by code", lead: "Breaks each event into checkable claims.", body: "Each claim keeps the sentence it came from. A quote code cannot find in the text is thrown out." },
-  { n: "04", title: "Research and verify", nodes: ["research", "verify"], nodeLine: "● research ⇄ ○ verify", vendor: "Zetaris SQL · Nemotron 3.5 Lightning · verdict by rule", lead: "Looks for evidence for and against each claim.", body: "A contradiction counts only when the model quotes it and code finds the words in the passage. A thin claim sends the event back for a second round over the rest of the day, the official documents and earlier days.", loop: "research_rounds_max" },
-  { n: "05", title: "Blind fact-check", nodes: ["fact_check", "adjudicate", "review_disputed", "escalate"], nodeLine: "● fact_check → ○ adjudicate ⇄ ● review_disputed → ○ escalate", vendor: "Nemotron 3 Ultra 550B · adjudicated in code", lead: "A second model checks again, seeing nothing from the first.", body: "Only events that can reach the bar get this check. Same corpus, no notes from the first pass. When the two disagree, a third blind pass chooses between their evidence chains and code validates the choice. Still unresolved: disputed.", loop: "review_disputed_max" },
-  { n: "06", title: "Write and critique", nodes: ["frame", "write", "critique"], nodeLine: "● frame → ● write ⇄ ○ critique", vendor: "Nemotron 3.5 Lightning · rules checked in code", lead: "Writes the story, then checks it against the rules.", body: "A draft with a forbidden word or an unattributed statement goes back to the writer. A third rejection is published flagged, never dropped and never quietly approved.", loop: "drafts_max" },
-  { n: "07", title: "Roundup and publish", nodes: ["roundup", "publish"], nodeLine: "● roundup · ● publish", vendor: "Nemotron 3.5 Lightning · one immutable snapshot", lead: "Everything else gets one line. Then one snapshot.", body: "One line per event below the bar, then one immutable snapshot per topic and day, with every trace row inside it." },
+  { n: "01", title: "Plan and cluster", nodes: ["plan", "cluster"], lead: "Groups the day's documents into events.", body: "The model writes one key per document: actors, action, place, date. Code merges the obvious pairs and asks the model only about the ones in between." },
+  { n: "02", title: "Score the bar", nodes: ["score_importance"], lead: "Decides what is big enough to be a story.", body: "The model reports the legal status and the state of the act; code turns them into points. Ten stories a day is a cap, not a target." },
+  { n: "03", title: "Extract claims", nodes: ["extract_claims"], lead: "Breaks each event into checkable claims.", body: "Each claim keeps the sentence it came from. A quote code cannot find in the text is thrown out." },
+  { n: "04", title: "Research and verify", nodes: ["research", "verify"], lead: "Looks for evidence for and against each claim.", body: "A contradiction counts only when the model quotes it and code finds the words in the passage. A thin claim sends the event back for a second round over the rest of the day, the official documents and earlier days.", loop: "research_rounds_max" },
+  { n: "05", title: "Blind fact-check", nodes: ["fact_check", "adjudicate", "review_disputed", "escalate"], lead: "A second model checks again, seeing nothing from the first.", body: "Only events that can reach the bar get this check. Same corpus, no notes from the first pass. When the two disagree, a third blind pass chooses between their evidence chains and code validates the choice. Still unresolved: disputed.", loop: "review_disputed_max" },
+  { n: "06", title: "Write and critique", nodes: ["frame", "write", "critique"], lead: "Writes the story, then checks it against the rules.", body: "A draft with a forbidden word or an unattributed statement goes back to the writer. A third rejection is published flagged, never dropped and never quietly approved.", loop: "drafts_max" },
+  { n: "07", title: "Roundup and publish", nodes: ["roundup", "publish"], lead: "Everything else gets one line. Then one snapshot.", body: "One line per event below the bar, then one immutable snapshot per topic and day, with every trace row inside it." },
 ];
 const stepNodes = STEPS.flatMap((s) => s.nodes);
 if (stepNodes.length !== graph.nodes.length || graph.nodes.some((n, i) => stepNodes[i] !== n)) {
@@ -190,6 +192,14 @@ const GROUP_OF_NODE: Record<string, string> = {
 };
 const loopByFrom = new Map(graph.loops.map((l) => [l.from, l]));
 const loops = rules.loops as Record<string, number>;
+/* The conditions of the three loops and of the escalation, in the words of docs/ARCHITECTURE.md § 5's edge labels;
+   written beside the step in the captions, since the drawing's edges carry no text (decision in graph.tsx). */
+const LOOP_WHEN: Record<keyof typeof rules.loops, string> = {
+  research_rounds_max: "a claim is thin and the event has a round left",
+  review_disputed_max: "verifier and fact-checker disagree on a claim",
+  drafts_max: "rejected and drafts < 3",
+};
+const ESCALATE_WHEN = "above the bar on points, no confirmed claim: out of the stories, into the roundup as \u201creported, not confirmed\u201d, flagged needs review";
 
 const VENDORS: { name: string; where: string; text: string }[] = [
   { name: "Zetaris", where: "steps 01 · 04 · every read of the corpus", text: "Every read of the corpus is SQL through Zetaris: sources, publications, official documents, previous days. The query at the top of this page is one of them." },
@@ -459,31 +469,19 @@ export default function Home() {
           <Kicker text="How it works · one run per topic per day" slug="docs/ARCHITECTURE.md § 5" href={`${REPO}/blob/master/docs/ARCHITECTURE.md`} />
           <h2 id="loop-title">Seven steps from the feeds to the story.</h2>
           <p className="lp-sub">Models read and write. Code decides. Every step leaves a row in the trace.</p>
-          <p className="lp-legend">{`${graph.nodes.length} nodes · ${graph.loops.length} loops · ● a model reads or writes · ○ code decides`}</p>
-          <ol className="lp-steps" role="list">
-            {STEPS.map((s) => (
-              <li key={s.n} className={s.loop ? "lp-step lp-step-loop" : "lp-step"}>
-                <div className="lp-step-label">
-                  <span className="lp-step-n">{s.n}</span>
-                  <h3>{s.title}</h3>
-                  <p className="lp-step-nodes">{s.nodeLine}</p>
-                  <p className="lp-step-vendor">{s.vendor}</p>
-                  {s.loop && (
-                    <span className="lp-chip">
-                      <span className="lp-chip-mark" aria-hidden="true">
-                        {"↺ "}
-                      </span>
-                      {`loops.${s.loop} = ${loops[s.loop]}`}
-                    </span>
-                  )}
-                </div>
-                <div className="lp-step-text">
-                  <p className="lp-step-lead">{s.lead}</p>
-                  <p className="lp-step-body">{s.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <p className="lp-legend">{`${graph.nodes.length} nodes · ${graph.loops.length} loops · ● a model reads or writes · ○ code decides · dashed edges run on a condition`}</p>
+          <RunGraph
+            nodes={graph.nodes}
+            startLabel={"the day\u2019s documents"}
+            endLabel="the edition snapshot"
+            steps={STEPS.map((s) => ({
+              n: s.n, title: s.title, nodes: s.nodes, lead: s.lead, body: s.body,
+              rules: [
+                ...(s.loop ? [<><span className="lp-chip"><span className="lp-chip-mark" aria-hidden="true">{"\u21ba "}</span>{`loops.${s.loop} = ${loops[s.loop]}`}</span>{LOOP_WHEN[s.loop]}</>] : []),
+                ...(s.nodes.includes("escalate") ? [<><span className="lp-chip">{"\u2192 escalate"}</span>{ESCALATE_WHEN}</>] : []),
+              ],
+            }))}
+          />
           <div className="lp-card">
             <h3>No confirmed claim, no story.</h3>
             <p>
