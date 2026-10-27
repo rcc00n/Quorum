@@ -54,6 +54,14 @@ const assert = require("node:assert/strict");
         .waitFor();
     }
     const claims = response.events[0].analysis.claims;
+    // Explicitly fictional source rows exercise the instrument; no production ratings are assigned here.
+    const chartSources = [-.5, 0, .5].map((score, i) => ({
+      id: `DEMO-chart-${i}`, name: `DEMO chart source ${i}`, domain: 'example.com',
+      allsides: score, mbfc: score, adfontes: i === 1 ? null : score,
+      audience: 1000 * 10 ** i, audience_source_url: `https://example.com/demo-audience-${i}`,
+    }));
+    response.events[0].sources.push(...chartSources);
+
     response.events[0].article = {
       paragraphs: claims
         .filter((c) => c.status !== "disputed")
@@ -125,6 +133,7 @@ const assert = require("node:assert/strict");
         .getByLabel("Cohort rating mode", { exact: true })
         .selectOption(mode);
     }
+    await require('./spectrum-checks.cjs')({page, sources:response.events[0].sources});
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.locator("#evidence-explorer").scrollIntoViewIfNeeded();

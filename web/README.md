@@ -35,6 +35,8 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-26 · rcc00n / Codex · WEB-SPECTRUM-MOTION-01 uses a native source-position/audience instrument with exact existing ratings, logarithmic cited audience, an inspectable source selection and optional shallow pointer depth. Keyboard arrows, the complete source/provenance list, missing-data states and reduced motion remain available; no WebGL or animation dependency. Why: Vadim requested a separate frontend workstream with stronger diagrams and visible motion; presentation must preserve the canonical axes and source facts. Composition and motion: DESIGN.md › Spectrum instrument.
+
 2026-10-26 · rcc00n / Codex · Dashboard links accept an explicit edition date, with the same date format check as topic/story routes. Why: judges can open the accepted historical edition without relabelling it as today's news; the default remains the current day.
 
 2026-10-26 · rcc00n / Codex · Installed events reuse the recorded evidence, spectrum and timeline components with the exact optional `reasoning_context` trace/roundup and story-title index; trace links remain on authenticated portal routes. Why: the story-only projection otherwise loses all investigation records and shows empty structured-analysis panels. The reasoning-owned schema and types are unchanged; this is the portal projection.
