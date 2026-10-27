@@ -74,7 +74,12 @@ export function InvestigationReader({ head, children, className = "" }: { title?
     pendingTarget.current = null; setActive(view);
     history.pushState(history.state, "", `#reader-${view}`);
     requestAnimationFrame(() => {
-      const el = root.current; if (!el) return;
+      // DECISION(2026-10-27, Anastasia/Claude Code): a chosen view starts at the bar, which then sits under the site
+      // header, with the story's head scrolled away. Why: since the cabinet pages pass the head (date, headline, review
+      // label, standfirst) sits inside the reader above the bar; scrolling to the reader's top left the whole head
+      // between the header and the panel, and on the real 26 October edition the Source map's chart fell 14 px below
+      // the fold at 390 px (master's installed-edition check, reader-checks.cjs). The head remains one scroll away.
+      const el = bar.current ?? root.current; if (!el) return;
       const header = document.querySelector<HTMLElement>(".sidebar")?.getBoundingClientRect().height || 0;
       window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - header), behavior: "instant" });
     });

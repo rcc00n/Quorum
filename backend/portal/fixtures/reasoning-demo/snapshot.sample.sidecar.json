@@ -1,0 +1,21 @@
+{
+  "snapshot": {
+    "sha256": "2dd7510a618c584ee3925efb9de3c745417a6abe549a10f3042271ce22ab0366",
+    "topic_id": "russia-ukraine-war",
+    "edition_date": "2026-10-22",
+    "version": 1,
+    "run_id": "2026-10-22-russia-ukraine-war-1",
+    "status": "ok",
+    "bytes": 64912
+  },
+  "provisional": true,
+  "corpus_as_of_utc": "2026-10-21T09:30:00Z",
+  "edition_window_utc": [
+    "2026-10-21T09:30:00Z",
+    "2026-10-22T09:30:00Z"
+  ],
+  "producer": {
+    "commit": "6ea82434d0f06cefb51f5536732ceac68e9780ef",
+    "config_sha256": "fc3a3e4f199b5d7b3d33b84bb8ff4647f3c6e2be5c1cf186f819efa191242bfe"
+  }
+}

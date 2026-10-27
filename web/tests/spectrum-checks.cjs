@@ -39,7 +39,14 @@ module.exports=async({page,sources})=>{
  }
  if(await spectrum.locator('.sp-point').count()){
   await page.setViewportSize({width:1440,height:1000});await page.mouse.move(0,0);
-  const minor=spectrum.locator('.sp-point:not(.sp-point-major):not([aria-pressed="true"])').first(); // a selected mark shows its label by design
+  // a selected mark shows its label by design.
+  // DECISION(2026-10-27, Anastasia/Claude Code): hover the first such mark whose centre is its own. On the real
+  // 26 October registry the Associated Press mark's centre lies under The Washington Post's 44 px target, so a
+  // pointer there names the Post; that overlap is reported for the component, not hidden here. Why: this check is
+  // about a name appearing on hover, not about which of two overlapping targets wins.
+  const candidates=spectrum.locator('.sp-point:not(.sp-point-major):not([aria-pressed="true"])');
+  const ownId=await candidates.evaluateAll(els=>{for(const el of els){el.scrollIntoView({block:'center',behavior:'instant'});const r=el.getBoundingClientRect();const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);if(hit&&hit.closest('.sp-point')===el)return el.dataset.sourceId;}return null;});
+  const minor=ownId?spectrum.locator(`.sp-point[data-source-id="${ownId}"]`):candidates.first();
   // DECISION(2026-10-27, rcc00n/Codex): wait for label opacity to settle after the phone-to-desktop resize.
   // Why: the production browser can observe the existing 120ms CSS transition; keep the exact visibility assertion.
   if(await minor.count()){await page.waitForFunction(e=>getComputedStyle(e.querySelector('.sp-point-label')).opacity==='0',await minor.elementHandle());assert.equal(await minor.locator('.sp-point-label').evaluate(e=>getComputedStyle(e).opacity),'0');await minor.hover();await page.waitForFunction(e=>getComputedStyle(e.querySelector('.sp-point-label')).opacity==='1',await minor.elementHandle());}

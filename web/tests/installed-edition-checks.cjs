@@ -90,7 +90,14 @@ module.exports = async ({browser, root, password, temp, build}) => {
     assert.equal(await page.getByText(/DEMO · Fictional interface fixture/).count(), 0);
     assert.equal(await page.locator('a[href^="/preview/reasoning"]').count(), 0);
   }
+  // "Also today" lives on Home only since the cabinet pages pass (web/DESIGN.md › Cabinet, PR #69), as analysis.cjs
+  // asserts: the topic page has none, the board carries every roundup line of the edition (rows past the fold are in
+  // the DOM, hidden). This check is not in CI and had kept the old placement (2026-10-27, Anastasia/Claude Code).
   await page.goto(`${root}/topics/${original.topic_id}?date=${day}`);
+  if (original.stories.length) await page.locator('.topic-story-title', {hasText: original.stories[0].headline}).first().waitFor();
+  else await page.getByText('A quiet day for major stories').first().waitFor();
+  assert.equal(await page.getByRole('heading', {name: 'Also today', exact: true}).count(), 0);
+  await page.goto(`${root}/dashboard?date=${day}`);
   await page.getByRole('heading', {name: 'Also today', exact: true}).waitFor();
   assert.equal(await page.locator('.roundup-item').count(), original.roundup.count);
   await require('./sources-route-checks.cjs')({page,browser,root});

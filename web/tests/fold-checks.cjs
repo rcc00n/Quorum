@@ -12,9 +12,10 @@ module.exports = async ({browser, root, env, password}) => {
   const day = sample.edition_date, base = sample.roundup.groups[0];
   const items = Array.from({length: 5}, (_, i) => {
     const it = base.items[i % base.items.length];
+    // Row 2 is flagged and row 3 is a raw-title fallback (2026-10-27): both labels render on the row.
     return {
       event_id: null, text: `TEST fold row ${i + 1}: ${it.line}`, status: 'unknown', label: it.status,
-      line_source: null, needs_review: false,
+      line_source: i === 2 ? 'title' : null, needs_review: i === 1,
       sources: it.sources.map((s, j) => ({title: `${s.title} TEST ${i + 1}.${j + 1}`, url: s.url})),
     };
   });
@@ -79,7 +80,11 @@ module.exports = async ({browser, root, env, password}) => {
       assert.equal(await button.textContent(), 'Show fewer');
       assert.equal(await group.locator('.roundup-item[hidden]').count(), 0);
       assert.equal(await group.locator('.roundup-item[inert]').count(), 0);
-      assert.deepEqual(await rows.locator('p').allTextContents(), items.map((it) => it.text));
+      assert.deepEqual(await rows.evaluateAll((els) => els.map((el) => el.querySelector('p').textContent)), items.map((it) => it.text));
+      assert.deepEqual(await rows.locator('.story-review').allTextContents(), ['Requires editorial review']);
+      assert.equal(await rows.nth(1).locator('.story-review').count(), 1);
+      assert.deepEqual(await rows.locator('p.help').allTextContents(), ['Source headline fallback; no generated roundup line was supplied.']);
+      assert.equal(await rows.nth(2).locator('p.help').count(), 1);
       assert.deepEqual(await rows.locator('small').allTextContents(),
         items.map((it) => it.label.charAt(0).toUpperCase() + it.label.slice(1)));
       for (let i = 0; i < 5; i++) {

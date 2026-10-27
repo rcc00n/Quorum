@@ -68,7 +68,10 @@ export function isQuietDay(snapshot: Snapshot, edition: EditionPresentation) {
     snapshot.publication?.status === "available" &&
     edition.completion === "complete" &&
     edition.quiet_day &&
-    !snapshot.errors?.length &&
+    // DECISION(2026-10-27, Anastasia/Claude Code): an error of another topic's edition does not cancel this
+    // topic's quiet day; errors without a topic (the proposal store's) still do. Why: the reader answers a day
+    // from every installed edition and appends each edition's recorded failures with its topic.
+    !snapshot.errors?.some((err) => !err.topic_id || err.topic_id === edition.topic_id) &&
     !snapshot.events.some(
       (e) => e.date === edition.date && e.topic_id === edition.topic_id,
     )
