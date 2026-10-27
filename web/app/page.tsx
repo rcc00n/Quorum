@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { PageMotion } from "@/components/page-motion";
 import Link from "next/link";
-import { Typewriter, type TypewriterLine } from "@/components/landing/typewriter";
+import { Tenets } from "@/components/landing/tenets";
 import evidence from "@/fixtures/landing/zetaris-evidence-russia-ukraine-war-2026-10-24.json";
 import trace from "@/fixtures/landing/trace.sample.json";
 import registry from "@/fixtures/landing/sources.json";
@@ -60,6 +60,13 @@ function supersedeChain(rows: SampleRow[]): SampleRow[] {
   }
   return out;
 }
+
+// The running line's titles: the Reuters chain in supersede order first, then the other rows of the sample.
+const wireTitles = (() => {
+  const rows = evidence.documents.sample as SampleRow[];
+  const ordered = supersedeChain(rows.filter((r) => r.source_id === "reuters"));
+  return [...ordered, ...rows.filter((r) => !ordered.includes(r))];
+})();
 
 // The evidence file truncates titles to 80 characters; an ellipsis marks the cut, nothing is completed.
 function cut(title: string) {
@@ -224,9 +231,6 @@ const ANATOMY: Part[] = [
 
 export default function Home() {
   const f = figures();
-  const reuters = supersedeChain(evidence.documents.sample.filter((s) => s.source_id === "reuters"));
-  const chain: TypewriterLine[] = reuters.map((r) => ({ id: r.id, text: cut(r.title_80) }));
-  const chainIds = reuters.map((r) => r.id).join(" → ");
   const columns: { key: Column; label: string; figure: number; line: string; rows: Source[] }[] = (["left", "centre", "right"] as Column[]).map((key) => {
     const members = registry.sources.filter((s) => columnOf(s) === key);
     const matched = members.filter((s) => docCounts[s.id] !== undefined).length;
@@ -243,6 +247,13 @@ export default function Home() {
 
   return (
     <div className="landing">
+      {/* The blurred field at the very back of the page (Anastasia, 2026-10-27): the window's tally as letterforms
+          softened into tone, reaching from behind the header into the hero and the next section, edges faded by a
+          mask so no border shows; every text node is an "id count" pair of documents.by_source and the test reads
+          them back. */}
+      <div className="lp-field-wrap" aria-hidden="true">
+        <Field id="lp-blur-hero" />
+      </div>
       <PageMotion root=".landing main" />
       <header className="lp-head">
         <Link href="/" className="lp-masthead" aria-label="Quorum home">
@@ -272,10 +283,7 @@ export default function Home() {
               <a href={HACKATHON}>Open Agent Hackathon 2026</a> · Track 03 · Reasoning Architecture
             </p>
             <h1 id="hero-title">The news, with its working shown.</h1>
-            <p className="lp-lead">
-              Quorum takes one event, reads how outlets across the spectrum and official bodies reported it,
-              separates what is known from what is claimed, and shows you the evidence under every line.
-            </p>
+            <Tenets text={"Checked twice, by agents that never see each other\u2019s notes."} />
             <div className="lp-cta-row">
               <Link href="/register" className="lp-button">
                 Choose your topics
@@ -285,14 +293,7 @@ export default function Home() {
               </a>
             </div>
           </div>
-          <figure className="lp-chain">
-            <Typewriter lines={chain} className="lp-type" />
-            <figcaption>{`Three versions of one Reuters story, doc ${chainIds}. A re-edited publication counts once.`}</figcaption>
-          </figure>
-          <div className="lp-field-wrap" aria-hidden="true">
-            <Field id="lp-blur-hero" />
-          </div>
-          <aside className="lp-sheet lp-sheet-focus" aria-labelledby="evidence-title">
+          <aside className="lp-sheet lp-sheet-focus lp-sheet-compact" aria-labelledby="evidence-title">
             <p className="lp-eyebrow">Real query · read through Zetaris</p>
             <h2 id="evidence-title" className="lp-sheet-title">
               {`${evidence.topic_id} · edition ${evidence.edition_date}`}
@@ -347,6 +348,52 @@ export default function Home() {
               </dl>
             </details>
           </aside>
+          {/* The deck's three running lines (web/DESIGN.md › Landing after the deck): the real titles of the window
+              with their source tag, the chain's three Reuters rows first and in order (the test reads them back),
+              then the registry, then the fifteen agents in run order. Each track holds its items twice for a
+              seamless loop; the second half is hidden from assistive technology, and without motion the lines
+              wrap and the duplicate is not shown. */}
+          <div className="lp-wire" aria-label="Real headlines of the window, the forty sources and the fifteen agents">
+            <div className="lp-line lp-line-big" style={{ "--d": "70s" } as React.CSSProperties}>
+              <div className="lp-track">
+                {[0, 1].map((half) => (
+                  <Fragment key={half}>
+                    {wireTitles.map((r) => (
+                      <span key={`${half}-${r.id}`} aria-hidden={half === 1 ? true : undefined}>
+                        <em>{r.source_id}</em>
+                        {cut(r.title_80)}
+                      </span>
+                    ))}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+            <div className="lp-line lp-line-reverse" style={{ "--d": "55s" } as React.CSSProperties}>
+              <div className="lp-track">
+                {[0, 1].map((half) => (
+                  <Fragment key={half}>
+                    {registry.sources.map((src) => (
+                      <span key={`${half}-${src.id}`} aria-hidden={half === 1 ? true : undefined}>{src.name}</span>
+                    ))}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+            <div className="lp-line" style={{ "--d": "48s" } as React.CSSProperties}>
+              <div className="lp-track">
+                {[0, 1].map((half) => (
+                  <Fragment key={half}>
+                    {graph.nodes.map((n, i) => (
+                      <span key={`${half}-${n}`} aria-hidden={half === 1 ? true : undefined}>{`${String(i + 1).padStart(2, "0")} · ${n}`}</span>
+                    ))}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+          <p className="lp-wire-foot">
+            {`Real titles read through Zetaris in the ${dayLabel(evidence.edition_date)} window, cut at 80 characters by the file · the ${registry.count} sources of the registry · the ${graph.nodes.length} agents in run order. Hover to pause.`}
+          </p>
         </section>
 
         <section id="sources" className="lp-sources" aria-labelledby="sources-title">

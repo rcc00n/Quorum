@@ -97,6 +97,7 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck, branch `anastasia/web-landing-polish`) | The landing's hero takes the deck's devices: a sentence typed once in a fixed box, a compact evidence card, three quiet running lines of real data (titles with source tags, the registry, the agents), the blurred tally at the very back of the page with faded edges. landing.cjs asserts the three lines and the field. | Anastasia's reviews of 2026-10-27: the deck's typewriter shifted the text; the lines must not pull attention; the blur back, with no visible edge, behind everything. |
 | 2026-10-27 | Anastasia / Claude Code (second cabinet pass) | The topic page as a list: stories as rows like Also today, cards only on Home; no tabs, rail or rubric dump; spectrum kept; History and Sources with pill controls; one neutral grey `--tray` for every filled element; chevrons as the disclosure sign; row labels in ink. See › Cabinet. | Anastasia's reviews of 2026-10-27: a topic page with the board's cards read as Home; the fill should be plain grey, not light brown; the diagonal arrow read as a link. |
 | 2026-10-27 | Anastasia / Claude Code (second cabinet pass, branch `anastasia/web-cabinet-pages`) | The story page after the board's rules (see › Cabinet, Story page): head above a sticky tray of round pills, Impact and the claim groups as counted rounded rows, the publication line as the foot colophon, scroll anchoring off; trays and rows on `--paper-3` everywhere. | Anastasia's review of 2026-10-27 of the whole cabinet: the title first and the menu fixed under it, rounded like Home; the five links read as random and nothing explained them; the fill should not melt into the paper; an opened row moved the page. |
 | 2026-10-27 | Anastasia / Claude Code (cabinet pass, branch `anastasia/web-cabinet`) | The signed-in pages after untitled.stream (see › Cabinet): the board carries the topic picker behind a "+ Add topics" pill and opens it inline; one mono metadata line under the title replaces the status prose; the plain publication line becomes a mono colophon at the foot (warnings stay on top); "Also today" gets a heading of the title's weight, mono kickers and low rounded rows; the settings page becomes Account (name, email, password, sign out); the menu reads Home · History · Sources · Account; interface text on the app routes in Inter with display headings and mono metadata, adopted by amending DECISIONS item 9 from Anastasia's name as look owner; the menu labels, the topic relocation and the cutoff wording are recorded canonically in docs/DECISIONS.md › User account and interface (cabinet navigation amendment). Honesty texts unchanged; the smoke test reads the picker on the board. | Anastasia's review of 2026-10-27: the home should show the title with the date and then the topics with their news, nothing else; topics are managed where they are read; "Also today" should read as the second part after Today in rows that echo the cards; the reference's discipline of one thing per section, metadata in mono and a single "+" to add. |
@@ -138,6 +139,26 @@ Adapted on the paper identity (the dark ground is not taken; the landing is unto
 ## Headline-only source bars
 
 2026-10-27 · rcc00n / Codex · Vadim requested soft colour in the landing's empty source-bar outlines. Use 25% of each existing cohort colour (neutral ink for the centre/unrated column) on paper, keeping the thin full-colour outline and explicit `headline` label. This supersedes only the transparent interior of the earlier outlined treatment; access level 2 still means headline/lead only. Exact counts, scale, widths, source order, tier/flank, absent/no-feed states and registry fields remain. Legend: solid = full text; light fill with outline = headline and lead. This is data colour in an existing cohort comparison, not a new brand accent. Today/cabinet remains with Anastasia's active branch (Issue #2 6435761422).
+
+## Landing after the deck (27 October, evening; branch `anastasia/web-landing-polish`)
+
+Anastasia's reference of 2026-10-27: the team's slide deck. Taken from it are the devices, not the slides: one precise
+sentence with the visual that proves it beside it; display headings, mono captions, hairlines; running lines of real
+data; a typed sentence; columns with a rule on top. Nothing on the page claims more than docs/DECISIONS.md, ARCHITECTURE § 5
+and the committed fixtures, which `web/tests/landing.cjs` reads back from the served HTML.
+
+- **Hero.** The headline and the kicker stay. The lead is one sentence from the deck, "Checked twice, by agents that never
+  see each other's notes.", typed once after load and left standing in a two-line box of fixed height (`components/landing/tenets.tsx`),
+  so nothing under it moves; without motion it stands at once. The evidence sheet becomes a compact card beside the title
+  (two figures, the edition line, the query details and SQL under the same disclosure, words unchanged). Under the hero,
+  the deck's wire: three running lines between hairlines, quiet (small, `--ink-2`, 72 % opacity) so they do not pull the eye
+  off the title: the window's real titles with their source tag in umber mono (the Reuters chain first and in order), the
+  forty names of the registry, the fifteen agents in run order; each track carries its items twice for a seamless loop,
+  the second half hidden from assistive technology; hover pauses; without motion the lines wrap and the duplicate is hidden.
+  A mono foot names the data. The blurred field (the window's tally as softened letterforms) returns at the very back of the
+  page: absolute on the landing root, from behind the header through the hero into the second section, its edges faded by a
+  radial mask so no border shows, the header, main and footer above it; the root clips the overflow. The blur is a device
+  to be used again, sparingly, further down.
 
 ## Instrument refinement
 

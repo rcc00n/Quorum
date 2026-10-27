@@ -151,6 +151,14 @@ if (!url) {
   for (const [key, n] of Object.entries(rulesCopy.loops)) {
     if (graphCopy.loops.some((l) => l.limit_key === key)) assert.ok(html.includes("loops." + key + " = " + n), "loop limit missing: " + key);
   }
+  // The hero's running lines (web/DESIGN.md › Landing after the deck, 2026-10-27) replaced the blurred tally field:
+  // the big line carries every sample title with its source tag, the middle line the whole registry, the last
+  // line the agents in run order; nothing else is written there.
+  assert.strictEqual((html.match(/class="lp-line(?: |")/g) || []).length, 3, "the wire must have three lines");
+  for (const r of docs.sample) assert.ok(html.includes(">" + r.source_id + "</em>" + r.title_80), "wire title with its source tag missing: " + r.id);
+  for (const s of sourcesCopy.sources) assert.ok(html.includes(">" + s.name + "</span>"), "wire source missing: " + s.id);
+  graphCopy.nodes.forEach((n, i) => assert.ok(html.includes(String(i + 1).padStart(2, "0") + " · " + n), "wire agent missing: " + n));
+  // The blurred field behind the sheet carries exactly the by_source pairs of the evidence file, nothing else.
   const svgs = [...html.matchAll(/<svg class="lp-field"[\s\S]*?<\/svg>/g)];
   assert.ok(svgs.length >= 1, "blurred field not found");
   const allowed = new Set(Object.entries(docs.by_source).map(([id, n]) => id + " " + n));
@@ -162,7 +170,7 @@ if (!url) {
   assert.ok(!/every (model )?(call|request) (runs|goes|is routed) through Meterless|all (calls|requests) (run|go) through Meterless/i.test(html), "forbidden claim about Meterless");
   assert.ok(!/built (in|with) Cursor|Cursor/i.test(html), "forbidden claim about Cursor");
   assert.ok(!/Nunito/.test(html), "the rounded face must not be referenced on the landing");
-  console.log("PASS: served landing carries anchors, figures, fictional label, chain order, tally ids, loop limits and an honest field");
+  console.log("PASS: served landing carries anchors, figures, fictional label, chain order, tally ids, loop limits, the three running lines and an honest field");
 })().catch((e) => {
   console.error("FAIL: " + e.message);
   process.exit(1);

@@ -4,6 +4,8 @@
    at .landing .lp-button). Corners: 8 px on containers, 4 px on controls (DECISION in web/DESIGN.md › Decisions,
    2026-10-26 evening). Rhythm: 128 px sections, one object per section, no page-wide hairlines. */
 .landing {
+  position: relative;
+  overflow-x: clip; /* the blurred field reaches past the right edge */
   background: var(--paper);
   color: var(--ink);
   font-family: var(--body);
@@ -223,8 +225,9 @@
   column-gap: 24px;
   row-gap: 56px;
   grid-template-areas:
-    "text text text text text text text card card card card card"
-    "chain chain chain chain chain chain chain card card card card card";
+    "text text text text text text text text card card card card"
+    "wire wire wire wire wire wire wire wire wire wire wire wire"
+    "foot foot foot foot foot foot foot foot foot foot foot foot";
   align-items: start;
 }
 .lp-hero-text {
@@ -349,23 +352,31 @@
    DECISION(2026-10-26, Anastasia/Claude Code): umber at fill-opacity .5 and ink-2 at .42 before a stdDeviation-22
    blur, which leaves patches of about #e3d9cf on paper (measured by eye on the 1440 px check; .18 was invisible);
    nothing in --ink-2 under 18 px lies on it. */
+/* The blur at the very back of the page (Anastasia, 2026-10-27): absolute on the landing root, from behind the
+   header down into the second section, every edge faded by a radial mask so nothing reads as a border; the page's
+   header, main and footer sit above it. Used again, sparingly, further down the page. */
 .lp-field-wrap {
-  display: none;
+  display: block;
   position: absolute;
-  top: 120px;
-  right: -6%;
-  width: 54%;
-  height: calc(100% - 120px);
+  top: -80px;
+  right: -14%;
+  width: 66%;
+  height: 1240px;
   z-index: 0;
   pointer-events: none;
   user-select: none;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 38%);
-  mask-image: linear-gradient(to right, transparent, #000 38%);
+  -webkit-mask-image: radial-gradient(ellipse 62% 56% at 62% 44%, #000 18%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
+  mask-image: radial-gradient(ellipse 62% 56% at 62% 44%, #000 18%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
+}
+.landing > header, .landing > main, .landing > footer {
+  position: relative;
+  z-index: 1;
 }
 .lp-field {
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
 /* The evidence sheet: a sheet of the product, 2 px ink rule on top. */
@@ -1280,4 +1291,127 @@
   .landing .lp-button {
     transition: none;
   }
+}
+
+/* Landing after the deck (2026-10-27, Anastasia/Claude Code; web/DESIGN.md › Landing after the deck). */
+/* The hero's lead: one tenet at a time in a two-line box that never changes height. */
+.lp-tenets {
+  position: relative;
+  max-width: 34ch;
+  min-height: calc(2 * 1.4em);
+  font-size: clamp(20px, 2.1vw, 26px);
+  line-height: 1.4;
+  color: var(--ink-2);
+  letter-spacing: -0.01em;
+}
+.lp-tenets-live {
+  margin: 0;
+  min-height: inherit;
+}
+.lp-caret {
+  display: inline-block;
+  width: 0.5ch;
+  height: 0.9em;
+  background: var(--umber);
+  vertical-align: -0.1em;
+  margin-left: 2px;
+  animation: lp-blink 1s steps(1) infinite;
+}
+@keyframes lp-blink { 50% { opacity: 0; } }
+.lp-tenets-static {
+  display: none;
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-tenets-live { display: none; }
+  .lp-tenets-static { display: block; }
+  .lp-tenets { min-height: 0; }
+}
+/* The compact evidence sheet beside the title. */
+.landing .lp-sheet-compact {
+  margin-top: 56px;
+  padding: 20px 22px 18px;
+  border-radius: 14px;
+}
+.landing .lp-sheet-compact .lp-eyebrow { margin-bottom: 8px; }
+.landing .lp-sheet-compact .lp-sheet-title { margin-bottom: 14px; font-size: 12px; }
+.landing .lp-sheet-compact .lp-figures { gap: 12px 20px; }
+.landing .lp-sheet-compact .lp-figures dd { font-size: 40px; }
+.landing .lp-sheet-compact .lp-figures dt { font-size: 12px; }
+/* The three running lines between ink rules, the deck's wire. */
+/* Quiet: smaller and lighter than the deck's, hairlines not ink, so the lines do not pull the eye off the title
+   (Anastasia, 2026-10-27). */
+.lp-wire {
+  grid-area: wire;
+  margin-top: 8px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+  opacity: 0.72;
+}
+.lp-line {
+  display: flex;
+  white-space: nowrap;
+  overflow: hidden;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  padding: 9px 0;
+}
+.lp-line:last-child { border-bottom: 0; }
+.lp-line-big {
+  font-family: var(--display);
+  font-size: clamp(17px, 1.7vw, 21px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  padding: 11px 0;
+}
+.lp-track {
+  display: inline-flex;
+  animation: lp-run var(--d, 60s) linear infinite;
+}
+.lp-line:hover .lp-track { animation-play-state: paused; }
+.lp-line-reverse .lp-track { animation-direction: reverse; }
+.lp-track > span { padding: 0 28px; border-right: 1px solid var(--rule); }
+.lp-line-big .lp-track > span { padding: 0 32px; }
+.lp-track em {
+  font-style: normal;
+  color: var(--umber);
+  font-family: var(--mono);
+  font-size: 0.5em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-right: 14px;
+}
+@keyframes lp-run { to { transform: translateX(-50%); } }
+.lp-wire-foot {
+  grid-area: foot;
+  margin: -32px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-track { animation: none; flex-wrap: wrap; }
+  .lp-line { white-space: normal; }
+  .lp-track > span[aria-hidden="true"] { display: none; }
+  .lp-track > span { padding: 4px 16px 4px 0; border-right: 0; }
+}
+@media (max-width: 900px) {
+  .landing .lp-hero {
+    grid-template-areas:
+      "text text text text text text text text text text text text"
+      "card card card card card card card card card card card card"
+      "wire wire wire wire wire wire wire wire wire wire wire wire"
+      "foot foot foot foot foot foot foot foot foot foot foot foot";
+  }
+  .landing .lp-sheet-compact { margin-top: 0; }
+}
+@media (max-width: 900px) {
+  .lp-field-wrap { top: 420px; right: -30%; width: 110%; height: 900px; opacity: 0.85; }
 }
