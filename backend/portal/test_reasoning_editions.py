@@ -214,6 +214,25 @@ class ReasoningEditionsTests(TestCase):
         self.assertNotIn("installed", report)
         self.assertEqual(list(self.root.iterdir()), [])
 
+    def test_install_enforces_private_directories_and_refuses_links(self):
+        story = genuine('snapshot.sample.json')
+        options = self.write(story, 'permissions')
+        topic = self.root / story['topic_id']
+        topic.mkdir(mode=0o755)
+        self.accept(options, install=True)
+        day = topic / story['edition_date']
+        for path in (self.root, topic, day):
+            self.assertEqual(path.stat().st_mode & 0o777, 0o700)
+        for path in day.iterdir():
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        other = genuine('snapshot.sample.json', 'linked-topic')
+        outside = Path(self.temp.name) / 'outside'
+        outside.mkdir()
+        (self.root / 'linked-topic').symlink_to(outside, target_is_directory=True)
+        report = self.accept(self.write(other, 'linked'), blocked=True, install=True)
+        self.assertIn('linked_editions_directory', report['issues'])
+        self.assertEqual(list(outside.iterdir()), [])
+
     def test_honesty_labels_travel_with_the_edition(self):
         story = genuine("snapshot.sample.json")
         self.accept(self.write(story, "story", provisional=True), install=True)

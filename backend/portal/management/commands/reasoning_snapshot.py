@@ -51,8 +51,16 @@ def install(raw, sidecar_raw, p, options, report):
     require(bool(root), 'editions_root_not_configured')
     base = Path(root)
     require(base.is_absolute() and base.is_dir(), 'editions_root_unavailable')
-    folder = base / p['topic_id'] / p['edition_date']
-    folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # DECISION(2026-10-26, rcc00n/Codex): every installed-edition directory is private, including existing ones.
+    # Why: mkdir(parents=True) leaves intermediate topic directories at the process default permissions.
+    require(not base.is_symlink(), 'linked_editions_directory')
+    base.chmod(0o700)
+    folder = base
+    for name in (p['topic_id'], p['edition_date']):
+        folder = folder / name
+        require(not folder.is_symlink(), 'linked_editions_directory')
+        folder.mkdir(exist_ok=True, mode=0o700)
+        folder.chmod(0o700)
     target = folder / f"v{p['version']}.json"
     require(not target.exists(), 'edition_version_already_installed')
     meta = dict(
