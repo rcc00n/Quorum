@@ -1,6 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Snapshot, Topic, User, Event } from "@/lib/api";
+import { api } from "@/lib/api";
+import { TopicPicker } from "./topic-picker";
 import type { EditionPresentation } from "@/lib/editorial";
 import { visibleStories, isQuietDay, licensedPhoto } from "@/lib/editorial";
 import { describeCut, utcLabel } from "@/lib/edition-cut.mjs";
@@ -71,7 +74,30 @@ function StoryCard({ event, topicName, day, lead }: { event: Event; topicName: s
   );
 }
 
+// DECISION(2026-10-27, Anastasia/Claude Code; cabinet pass after untitled.stream): the board carries the
+// user's topics itself. One "+ Add topics" control at the top opens the same picker the first setup uses,
+// saving through the existing preferences call and reloading the page; the settings page keeps name, email
+// and password only. Under the title one mono line of metadata replaces the prose status lines (the smoke
+// test's sentences are kept verbatim inside it). Why: Anastasia's review of 2026-10-27: the page should show
+// the title with the date and then the topics with their news, nothing else; topics are managed where they
+// are read, as untitled.stream adds with one "+" where the library is.
 export function TodayBoard({ data, user, day, today, onDay }: Props) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>(user?.topics ?? []);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  useEffect(() => { setSelected(user?.topics ?? []); }, [user]);
+  async function saveTopics() {
+    setBusy(true);
+    setNote("");
+    try {
+      await api<{ user: User }>("preferences", { topics: selected });
+      window.location.reload();
+    } catch (e) {
+      setNote((e as Error).message);
+      setBusy(false);
+    }
+  }
   // DECISION(2026-10-26, Anastasia/Claude Code; Yelysei's review of PR #27): sections come from the user's own
   // topics, not from data.topics ∩ user.topics, so a followed topic missing from the snapshot's list and a
   // `requested:<key>` entry still get a section ("Waiting for its first brief"); the legacy id `ukraine-aid` maps
@@ -99,37 +125,47 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
           <h1>
             {isToday ? "Today" : "Edition"}, <span className="tb-date">{longDate(day)}</span>
           </h1>
-          <p className="tb-count">{`${n} ${n === 1 ? "topic" : "topics"} in your brief`}</p>
-          {noEdition && (
-            <p className="tb-status">
-              {`No edition for ${longDate(day)} is installed on this portal. No published events are available for this edition.`}
-            </p>
-          )}
-          {!noEdition && status !== "demo" && stories.length === 0 && (
-            <p className="tb-status">No published events are available for this edition.</p>
-          )}
+          <p className="tb-meta">
+            <span className="tb-count">{`${n} ${n === 1 ? "topic" : "topics"} in your brief`}</span>
+            {noEdition && (
+              <span className="tb-status">
+                {`No edition for ${longDate(day)} is installed on this portal. No published events are available for this edition.`}
+              </span>
+            )}
+            {!noEdition && status !== "demo" && stories.length === 0 && (
+              <span className="tb-status">No published events are available for this edition.</span>
+            )}
+          </p>
         </div>
         <div className="tb-controls">
           <label className="tb-date-pick">
             <span>Edition date</span>
             <input type="date" value={day} max={today} onChange={(e) => onDay(e.target.value || today)} />
           </label>
-          <Link href="/settings" className="tb-link">
-            My topics
-          </Link>
+          <button type="button" className="tb-add" aria-expanded={open || n === 0} aria-controls="tb-topics" onClick={() => setOpen((o) => !o)}>
+            <span className="tb-add-mark" aria-hidden="true">{open || n === 0 ? "−" : "+"}</span>
+            {n === 0 ? "Choose topics" : "Add topics"}
+          </button>
         </div>
       </header>
 
-      {n === 0 && (
-        <section className="tb-section tb-tint-2" aria-labelledby="tb-none">
-          <div className="tb-section-head">
-            <h2 id="tb-none">You follow no topics yet.</h2>
-          </div>
-          <Link href="/onboarding" className="button tb-choose">
-            Choose your topics
-          </Link>
-        </section>
-      )}
+      {/* The picker stays in the document while closed (hidden), so the page keeps one place for topics. */}
+      <section id="tb-topics" className="tb-topics" aria-label="Your topics" hidden={!open && n > 0}>
+        <TopicPicker
+          topics={data?.topics ?? []}
+          catalogRevision={data?.catalog_revision ?? null}
+          selected={selected}
+          onChange={setSelected}
+          busy={busy}
+          onSave={saveTopics}
+          saveLabel="Save topics"
+        />
+        {note && (
+          <p className="message" role="status">
+            {note}
+          </p>
+        )}
+      </section>
 
       {topics.map(({ topic: t, waitingFirst }, i) => {
         const own = stories.filter((e) => e.topic_id === t.id);

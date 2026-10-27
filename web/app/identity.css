@@ -22,6 +22,12 @@
      (DECISIONS item 9, amended 2026-10-26). Why: Anastasia asked for the strictness of a well-known news agency. */
   --display: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
   --body: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
+  /* DECISION(2026-10-27, Anastasia/Claude Code, proposal for her approval): the app routes (the cabinet) set
+     their interface text in Inter, already packaged for the portal, with headings in the display face and
+     metadata in the mono; the landing and the gate keep --body. Why: Anastasia's reference of 2026-10-27,
+     untitled.stream, sets everything in one neutral UI grotesque at small sizes with mono metadata, and the
+     cabinet should read as a tool rather than a front page. DECISIONS item 9 is amended once she approves. */
+  --ui: "Inter Variable", -apple-system, system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   /* DECISION(2026-10-26, Anastasia/Claude Code): one page measure for every route: content in a centred column
      of 1024 px including 22 px gutters (980 px of text), as on apple.com; a full-width bar or section reads

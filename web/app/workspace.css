@@ -16,7 +16,7 @@
   --border: var(--rule);
 }
 body {
-  font-family: var(--body);
+  font-family: var(--ui);
   font-size: 15px;
   background: var(--paper);
   color: var(--ink);
@@ -165,7 +165,7 @@ summary:focus-visible {
 }
 /* The footer as on the landing (app/landing.css .lp-foot): wordmark, one line, the repository (2026-10-27). */
 .workspace-footer {
-  font-family: var(--body);
+  font-family: var(--ui);
   font-size: 15px;
   letter-spacing: 0;
   color: var(--ink);
@@ -196,7 +196,21 @@ summary:focus-visible {
   text-underline-offset: 4px;
 }
 /* The publication line (components/analysis-workspace.tsx PublicationNotice, words unchanged) as a quiet
-   dateline above the title: grey, 12 px, no bold (2026-10-27). The warning version keeps its panel. */
+   dateline above the title: grey, 12 px, no bold (2026-10-27). The warning version keeps its panel.
+   On the board (cabinet pass, 2026-10-27) the plain line moves to the foot of the page as a mono colophon,
+   so the title is the first thing read; the warning panel stays at the top. */
+.workspace-main:has(.tb) {
+  display: flex;
+  flex-direction: column;
+}
+.workspace-main:has(.tb) > .publication-line {
+  order: 99;
+  margin: 48px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
 .publication-line {
   font-size: 12px;
   line-height: 1.6;
@@ -219,7 +233,7 @@ summary:focus-visible {
 
 /* Type on the pages */
 .eyebrow {
-  font-family: var(--body);
+  font-family: var(--ui);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -261,7 +275,7 @@ summary:focus-visible {
   letter-spacing: -0.015em;
 }
 .edition-label {
-  font-family: var(--body);
+  font-family: var(--ui);
   color: var(--ink);
 }
 .event-row {
@@ -308,7 +322,7 @@ summary:focus-visible {
   font-size: 24px;
 }
 .brief-aside h4 {
-  font-family: var(--body);
+  font-family: var(--ui);
   font-weight: 500;
 }
 .brief-aside p:not(.eyebrow) {
@@ -337,7 +351,7 @@ summary:focus-visible {
   color: #fff;
   border-radius: 2px;
   gap: 10px;
-  font-family: var(--body);
+  font-family: var(--ui);
   font-size: 14px;
   font-weight: 500;
   padding: 12px 18px;
@@ -357,7 +371,7 @@ input,
 select {
   border: 1px solid var(--rule);
   border-radius: 2px;
-  font-family: var(--body);
+  font-family: var(--ui);
   color: var(--ink);
   background: var(--paper);
 }
@@ -402,7 +416,7 @@ label {
   font-weight: 500;
 }
 .citation blockquote {
-  font-family: var(--body);
+  font-family: var(--ui);
   font-size: 17px;
   line-height: 1.6;
 }
@@ -434,14 +448,107 @@ label {
 .r-coverage-bar span {
   background: var(--ink);
 }
+/* "Also today" (components/editorial.tsx EditionNote, markup Vadim's, styled here; cabinet pass 2026-10-27):
+   the day's digest sentence, then a heading of the title's weight, then the groups as mono kickers and every
+   event as a low rounded row the width of the column: the line, its status in mono at the right, its sources
+   beneath. Why: Anastasia's review: the section should read as the second part after Today, in rows that
+   echo the cards above. */
 .edition-notes {
-  border-top: 1px solid var(--rule);
+  border-top: 0;
+  margin-top: 56px;
+  padding-top: 0;
+}
+.edition-notes > p:first-child {
+  font-size: 17px;
+  line-height: 1.5;
+  max-width: 64ch;
+  margin: 0;
 }
 .edition-notes > section {
-  margin-top: 28px; /* the digest sentence and the "Also today" head touched */
+  margin-top: 28px;
+}
+.edition-notes > section > h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(30px, 3.2vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+.edition-notes .help {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  margin: 0 0 8px;
+}
+.roundup-group {
+  margin-top: 24px;
+}
+.roundup-group h4 {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+}
+.roundup-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 20px;
+  align-items: baseline;
+  padding: 14px 18px;
+  margin: 0 0 8px;
+  border-bottom: 0;
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+.roundup-item p {
+  grid-column: 1;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.roundup-item small {
+  grid-column: 2;
+  grid-row: 1;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.roundup-item .article-references {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.roundup-item .article-references a {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+.roundup-item .article-references a:hover {
+  color: var(--ink);
+  text-decoration-color: var(--umber);
 }
 
 @media (max-width: 700px) {
+  .roundup-item {
+    grid-template-columns: 1fr;
+  }
+  .roundup-item small {
+    grid-column: 1;
+    grid-row: auto;
+  }
   .sidebar {
     grid-template-columns: auto 1fr;
     padding-top: 12px;

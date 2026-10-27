@@ -7,7 +7,7 @@
 .tb {
   display: grid;
   gap: 20px;
-  font-family: var(--body);
+  font-family: var(--ui);
 }
 .tb-head {
   display: flex;
@@ -17,10 +17,19 @@
   flex-wrap: wrap;
   padding-bottom: 8px;
 }
-.tb .tb-count {
-  font-size: 15px;
-  margin: 10px 0 0;
-  color: var(--ink);
+/* One mono line of metadata under the title (cabinet pass, 2026-10-27): the topic count, then a status
+   sentence only when there is one; the smoke test's sentences are kept verbatim in their own spans. */
+.tb .tb-meta {
+  margin: 12px 0 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+  max-width: 72ch;
+}
+.tb .tb-meta > span + span::before {
+  content: " · ";
 }
 .tb h1 {
   font-family: var(--display);
@@ -35,10 +44,7 @@
   font-weight: 500;
 }
 .tb .tb-status {
-  margin: 6px 0 0;
-  font-size: 15px;
-  color: var(--ink);
-  max-width: 64ch;
+  color: var(--ink-2);
 }
 .tb-controls {
   display: flex;
@@ -65,15 +71,40 @@
   width: auto;
   border-radius: 2px;
 }
-.tb .tb-link {
+/* "+ Add topics": a pill in the manner of untitled.stream's round "+" (cabinet pass, 2026-10-27). */
+.tb .tb-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 16px 0 12px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--ui);
   font-size: 14px;
   font-weight: 500;
-  color: var(--ink);
-  padding-bottom: 10px;
-  border-bottom: 2px solid transparent;
+  cursor: pointer;
 }
-.tb .tb-link:hover {
-  border-bottom-color: var(--ink);
+.tb .tb-add:hover {
+  background: var(--paper-2);
+}
+.tb .tb-add[aria-expanded="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.tb .tb-add-mark {
+  font-family: var(--mono);
+  font-size: 16px;
+  line-height: 1;
+}
+.tb .tb-topics {
+  border-top: 1px solid var(--rule);
+  padding: 20px 0 8px;
+}
+.tb .tb-topics[hidden] {
+  display: none;
 }
 
 /* Sections: no ground of their own (Anastasia, 2026-10-26: the page stays white, only the cards have weight);
@@ -100,7 +131,7 @@
 .tb .tb-section-head h2 {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 26px;
+  font-size: 24px;
   letter-spacing: -0.015em;
   margin: 0;
 }
@@ -113,8 +144,10 @@
   text-underline-offset: 5px;
 }
 .tb .tb-section-meta {
-  font-size: 14px;
-  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
   margin: 0;
 }
 .tb .tb-choose {

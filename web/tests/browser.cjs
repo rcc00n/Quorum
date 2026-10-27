@@ -53,11 +53,13 @@ const fs = require("fs");
     path: shot + "/dashboard-desktop.png",
     fullPage: true,
   });
+  // Cabinet pass (2026-10-27): the topic picker lives on the board, so the persistence check reads it there.
   for (const r of [
     "/history",
     "/topics/pending",
     "/events/pending",
     "/settings",
+    "/dashboard",
   ])
     await go(r);
   if (
