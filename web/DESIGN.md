@@ -124,6 +124,11 @@ Adapted on the paper identity (the dark ground is not taken; the landing is unto
 - **Also today** (the roundup under the board; markup Vadim's, styled here): the day's digest sentence at 17 px, the heading at the title's weight (clamp 30–40 px), the help line in mono, each status group as a mono kicker, each event as a low rounded row the width of the column (`--paper-2`, 14 px corners): the line at 16 px, its status label in mono at the right, its sources beneath in mono; on phones the label drops under the line.
 - **Account** (menu label "Account", was "My topics"): name, email, password, sign out; the topics live on Home.
 - Deferred: a scrollable row of recommended topics under the board, as cards; round icon buttons in the bar.
+## Instrument refinement
+
+2026-10-27 · rcc00n / Codex · WEB-PAPERCLIP-POLISH-01, requested by Vadim. Visual reference inspected at [Paperclip](https://paperclip.ing/) at 1440 and 390 px: thin framed surfaces, inset task panels, subtle nested divisions and clearly grouped controls. Adopt those construction details in Quorum's existing paper/ink/umber tokens. Keep the current typefaces/weights, hero/grid/wireline, page measure, card silhouettes, content, status wording and political data colours. No third-party assets/code, rainbow accents, dark-page conversion, rounded-pill system or button lift is adopted; earlier identity decisions remain in force.
+
+Visual thesis: a paper reading surface with quietly framed, precise instruments. Content plan: retain existing landing and reading sections; refine only existing sheets, ledgers, tab/date controls, search and topic rows. Interaction thesis: restrained hover/selection highlights, the existing search entrance and reader transition; all new transitions stop under reduced motion. Implementation: `app/instrument-polish.css`; one import is the feature boundary and can be reverted independently of navigation/data.
 
 ## Spectrum instrument
 
