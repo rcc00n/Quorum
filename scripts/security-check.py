@@ -65,6 +65,20 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, rcc00n/Codex): permit only these eight visually inspected PR #52 screenshot bytes.
+# Why: Anastasia's local disposable-account/public-registry evidence is safe; keep arbitrary binaries excluded.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-web-spectrum-polish/before-desktop.png': '3c907df4d91c9d050483ca875b0cd68abc3d11f66180e11fc4c3dfa86103b99d',
+    'docs/reviews/2026-10-27-web-spectrum-polish/field-desktop-hover.png': 'f20f84e726251c5a04eaf2a81811e95b007c2f1a0670dc235573adfe0a127579',
+    'docs/reviews/2026-10-27-web-spectrum-polish/field-desktop.png': '97353091011d907a9152132d34fdc9be98b112de2cd800357d100a17892bd5cf',
+    'docs/reviews/2026-10-27-web-spectrum-polish/field-phone-selected.png': '6afa8d21ce28e4982ba7770b3015712a993a763e7ef82e7e6f47568cd82bde2f',
+    'docs/reviews/2026-10-27-web-spectrum-polish/field-tablet.png': 'c2359700d20f876639a698ab99605689433aec7b79d5a06eb82605f885081f11',
+    'docs/reviews/2026-10-27-web-spectrum-polish/ledger-open-desktop.png': '1f474b810b982429437221cf3c93789d916bfc7f3623eb0bc40b0e796a6382e0',
+    'docs/reviews/2026-10-27-web-spectrum-polish/page-desktop.png': '8ea44d01c543b049267e46015d7829bbeb028f92cc3a271283b0dad05a5d39b7',
+    'docs/reviews/2026-10-27-web-spectrum-polish/page-phone.png': '2d81cd794e3696fc3639535ef21d0721d5aafd7b2826677025225d91e1cf6b41',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])
