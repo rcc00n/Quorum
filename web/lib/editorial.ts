@@ -30,6 +30,7 @@ export type EditionPresentation = {
   edition_window_utc?: [string, string];
   closed_edition?: boolean;
   warnings?: string[];
+  missing_provenance?: string[];
   roundup: {
     name: string;
     items: {

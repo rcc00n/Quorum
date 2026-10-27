@@ -43,6 +43,9 @@ export type Evidence = {
 // Portal view model; reasoning-owned 1.0 consumer types live in reasoning.ts.
 export type Event = {
   reasoning?: ReasoningStory;
+  reasoning_context?: Pick<ReasoningRun, "edition_date" | "version" | "trace" | "roundup"> & {
+    stories: Pick<ReasoningStory, "event_id" | "headline">[];
+  };
   article?: ArticlePresentation;
   analysis?: StructuredAnalysis;
   id: string;

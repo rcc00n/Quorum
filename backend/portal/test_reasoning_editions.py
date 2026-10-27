@@ -132,6 +132,10 @@ class ReasoningEditionsTests(TestCase):
                 self.assertEqual([e["id"] for e in data["events"]], [event_id])
                 self.assertEqual(data["events"][0]["reasoning"]["reading_minutes"], story["stories"][0]["reading_minutes"])
                 self.assertEqual(data["publication"]["revision"], "editions-2026-10-22")
+                context = data['events'][0]['reasoning_context']
+                self.assertEqual(context['trace'], story['trace'])
+                self.assertEqual(context['roundup'], story['roundup'])
+                self.assertEqual(context['stories'], [{k: s[k] for k in ('event_id', 'headline')} for s in story['stories']])
         unknown = self.client.get("/api/events/TEST-unknown/?date=2026-10-22").json()
         self.assertEqual(unknown["events"], [])
         self.assertEqual(unknown["publication"]["revision"], "editions-2026-10-22")

@@ -196,6 +196,13 @@ def snapshot(day, topic="", revision=None):
             partial.append(True)
             continue
         p = result["reasoning"]
+        # DECISION(2026-10-26, rcc00n/Codex): carry exact recorded run context to the installed story page.
+        # Why: the story projection alone drops the edition trace, leaving judges with empty evidence panels.
+        context = {k: p[k] for k in ('edition_date', 'version', 'roundup')}
+        context['trace'] = p.get('trace', [])
+        context['stories'] = [{k: story[k] for k in ('event_id', 'headline')} for story in p['stories']]
+        for event_row in result['events']:
+            event_row['reasoning_context'] = context
         seen.append(name)
         fictional = fictional or p["provenance"]["fictional"]
         partial.append(result["preview"]["status"] == "partial")
