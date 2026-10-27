@@ -160,7 +160,7 @@ Source memory (H-MEM, 2026-10-26; DECISIONS › Still to clarify, Build rule; `r
 
 | Use | Model | Notes |
 | --- | --- | --- |
-| Claim extraction, stance, framing labels, writing, critique, roundup lines, summary | NVIDIA Nemotron via Meterless (`meterless/auto` or a named lane) | Same route as `smoke_test.py`; keys only in `.env`. |
+| Claim extraction, stance, framing labels, writing, critique, roundup lines, summary | NVIDIA Nemotron via Meterless Nightshift, exact model ids per lane: Nemotron 3.5 Lightning 30B on the worker lane, Nemotron 3 Ultra 550B on the blind fact-checker and reviewer lanes (`reasoning/README.md` › Run it; `meterless/auto` was the pre-2026-10-26 wording) | Same route as `smoke_test.py`; keys only in `.env`. |
 | Fact-checker | A different model when the rules allow; otherwise Nemotron with its own context and tools | Independence comes first from the blind context and separate tools, second from model diversity. |
 | Embeddings for clustering | None in v0: stemmed event-key overlap in Python | `nvidia/nemotron-3-embed-1b` is the later option for the overlap measure if the first live days show the filter still misses pairs; swap without touching the graph. |
 
@@ -183,7 +183,7 @@ Reasoning publishes one snapshot per topic and edition day. The portal's adapter
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
   "window": {"start": "2026-10-21T09:30:00Z", "end": "2026-10-22T09:30:00Z"},
-  "provenance": {"corpus": "zetaris", "model": "meterless/auto", "fictional": false},
+  "provenance": {"corpus": "zetaris", "model": "nvidia/nemotron-3.5-lightning-30b-a3b", "fictional": false},
   "bar": {"threshold": 6, "confirmation_min": 1},
   "summary": "Three stories crossed the bar out of 17 events. …",
   "sources_missing": ["newsmax"],
@@ -323,9 +323,7 @@ review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-re
   partial` (63 model errors, all HTTP 429 or no-JSON), 0 stories (highest rubric total 5). Two defects it exposed are
   fixed after it (a 429 aborted an event's fact-check; shared pacing across lanes). The canonical run on the closed
   edition follows; Issue #2 holds the hand-over (snapshot + sidecar SHA-256).
-- BLOCKED: the Nightshift route — the Windows runtime binds Windows loopback only, so a run must start from a
-  Windows Python venv or after an approved WSL networking change; the Meterless Engine feature — proposal
-  written, go/no-go and a checkout pending *(superseded 2026-10-26 by the H-MEM line below)*.
+- Nightshift route: done 2026-10-26 *(this line was "BLOCKED" until then; the runtime still binds Windows loopback only, so runs start from a Windows Python venv)*: a labelled showcase edition (climate-policy, 202 of 202 calls with receipts, Issue #2 6423850385) and the H-MEM live check (188 calls, 0 failed) ran through it; the 27 October editions run with `--route meterless` (`scripts/run_editions.py`, runbook `docs/reviews/2026-10-27-demo-runbook.md`). The Meterless Engine feature: see the H-MEM line below *(its earlier "proposal written, go/no-go and a checkout pending" wording was superseded 2026-10-26)*.
 - H-MEM source memory, the Meterless Engine feature (2026-10-26, branch `yelysei/meterless-engine`; DECISIONS.md ›
   Still to clarify, Build rule; hand-over log [2026-10-26-meterless-engine-build.md](reviews/2026-10-26-meterless-engine-build.md)):
   TESTED (conformance 13/13, exit 0, against `reasoning/memory/sidecar.mjs`; the engine-backed memory tests and the
