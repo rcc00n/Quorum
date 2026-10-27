@@ -28,6 +28,8 @@ import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
 import { BriefStatus } from "./brief-status";
 import { TodayBoard } from "./today-board";
+import { EditionNavigation } from "./edition-navigation";
+import { editionHref, validEditionDate } from "@/lib/edition-navigation.mjs";
 import { StoryCrumb, storyReadable, ReviewLabel } from "./story";
 import {
   api,
@@ -84,12 +86,14 @@ export function Portal({
   view,
   id,
   initialDay,
+  initialTopic,
   initialRevision,
   initialPreview = false,
 }: {
   view: string;
   id?: string;
   initialDay?: string;
+  initialTopic?: string;
   initialRevision?: string;
   initialPreview?: boolean;
 }) {
@@ -109,8 +113,12 @@ export function Portal({
       month: "long", day: "numeric", year: "numeric",
     }).format(new Date()));
   }, []);
-  const [day, setDay] = useState(initialDay || today());
-  const [topic, setTopic] = useState(view === "topic" ? id || "" : "");
+  const day = initialDay || today();
+  const topic = view === "topic" ? id || "" : initialTopic || "";
+  function selectEdition(nextDay: string, nextTopic = topic) {
+    if (validEditionDate(nextDay) && nextDay <= today())
+      router.push(editionHref(path, nextDay, view === "history" ? nextTopic : ""), { scroll: false });
+  }
   const [selected, setSelected] = useState<string[]>([]);
   const load = useCallback(async () => {
     setError("");
@@ -118,7 +126,8 @@ export function Portal({
     try {
       const s = await session();
       if (!s.user) {
-        router.replace("/login");
+        const destination = window.location.pathname + window.location.search + window.location.hash;
+        router.replace(destination === "/dashboard" ? "/login" : `/login?next=${encodeURIComponent(destination)}`);
         return;
       }
       setUser(s.user);
@@ -179,6 +188,9 @@ export function Portal({
       ? d.date === day && (!topic || d.topic_id === topic)
       : user?.topics.includes(d.topic_id),
   );
+  const dashboardUnavailable = data?.status === "error" || data?.publication?.status === "error" ||
+    (["stale", "partial"].includes(data?.publication?.status || "") &&
+      !visibleStories(data?.events || [], day, "", user?.topics || []).length);
   const names: Record<string, string> = {
     dashboard: "Your daily perspective",
     topic: data?.topics.find((t) => t.id === id)?.name || "Topic brief",
@@ -228,7 +240,8 @@ export function Portal({
               <Link
                 key={url as string}
                 className={path === url ? "active" : ""}
-                href={url as string}
+                href={url === "/history" ? editionHref("/history", data?.events.find(e => e.id === id)?.date || day, view === "topic" ? topic : "") : url as string}
+                aria-current={path === url ? "page" : undefined}
               >
                 <I size={18} />
                 {label as string}
@@ -410,6 +423,12 @@ export function Portal({
               ) : view === "onboarding" ? (
                 topicsPanel
               ) : view === "dashboard" ? (
+                <>
+                {dashboardUnavailable && <div className="edition-recovery">
+                  <EditionNavigation day={day} today={today()} onDay={selectEdition} />
+                  <Link href={editionHref("/history", day)}>History</Link>
+                </div>}
+                {
                 // DECISION(2026-10-26, Anastasia/Claude Code; Yelysei's reviews of PR #27): the board keeps the honest
                 // empty states and the edition notes of the brief view; a failed, stale or partial edition never
                 // reads as "waiting" (DECISIONS › User account and interface, Guards). A stale or partial day that
@@ -433,10 +452,11 @@ export function Portal({
                   </Empty>
                 ) : (
                   <>
-                    <TodayBoard data={data} user={user} day={day} today={today()} onDay={(d) => setDay(d)} />
+                    <TodayBoard data={data} user={user} day={day} today={today()} onDay={selectEdition} />
                     {data && <EditionNotes snapshot={data} day={day} topic="" followed={user?.topics || []} />}
                   </>
-                )
+                )}
+                </>
               ) : view === "event" ? (
                 (() => {
                   const event = data?.events.find((e) => e.id === id);
@@ -469,23 +489,17 @@ export function Portal({
                       <span>Evidence first</span>
                     </div>
                     <div className="filters">
-                      <label>
-                        Edition date
-                        <input
-                          type="date"
-                          value={day}
-                          max={today()}
-                          onChange={(e) => setDay(e.target.value || today())}
-                        />
-                      </label>
+                      <EditionNavigation day={day} today={today()} onDay={selectEdition} />
                       {view === "history" && (
                         <label>
                           Topic
                           <select
+                            aria-label="Topic"
                             value={topic}
-                            onChange={(e) => setTopic(e.target.value)}
+                            onChange={(e) => selectEdition(day, e.target.value)}
                           >
                             <option value="">All topics</option>
+                            {topic && !data?.topics.some(t => t.id === topic) && <option value={topic}>{topic}</option>}
                             {data?.topics.map((t) => (
                               <option key={t.id} value={t.id}>
                                 {t.name}

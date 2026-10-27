@@ -92,6 +92,8 @@ A story is a short article the reader can form their own view from: facts with s
 
 The shared signed-in navigation also provides a local destination search (Search, Ctrl/Cmd-K) over the currently loaded edition's topics/stories and existing app routes. It explicitly does not claim to search unloaded news or start analysis. Date, revision and story-view links preserve their original context (2026-10-27, Vadim / rcc00n with Codex, same requested interaction upgrade).
 
+**Edition navigation continuity (2026-10-27, Vadim / rcc00n with Codex).** Dashboard, topic and History date controls use explicit URL query state; History also preserves its topic filter. Refresh and browser Back/Forward retain the selected edition, and History from a story retains that story's date. Previous/next controls step by calendar day, with next disabled at the reader's local today; they do not imply an edition exists. The default remains today, with honest pending states; date controls remain available beside unavailable, partial or stale empty states. Sign-in returns a reader to the original local workspace/story path, including date, revision and pane hash, through a bounded allowlist; registration still starts at first setup. Why: the production audit found date resets and lost shared-story context. No automatic latest-edition substitution, new data API or processing trigger.
+
 ## Selecting major news
 
 Importance is measured by impact on people's lives, not by how many outlets covered an event. Ten stories a day per topic is a cap, not a target: a day with three stories shows three, a day with none says so.
@@ -286,6 +288,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | rcc00n / Codex, production UI/UX audit requested by Vadim | Preserve date/topic URL state and contextual History; add calendar-day controls and bounded local sign-in return destinations. | Actual production navigation lost historical editions on refresh/History and shared-story context at sign-in; retain the approved identity and truthful edition states. |
 | 2026-10-27 | rcc00n / Codex | Add shared local destination search over loaded edition topics/stories, app pages and current-story analysis views; preserve exact date/revision links. | Faster navigation throughout the app without new API/inference requests or paid tooling. |
 | 2026-10-27 | rcc00n / Codex, explicit interface request by Vadim | Add a reading-first investigation workspace with pinned evidence/coverage/map/trace views, complete All sections and preserved deep links; continuous-scroll-only appendix access superseded. | Reach diagrams in one action without changing story content, schema, source values or spending inference credits. |
 | 2026-10-26 | rcc00n / Codex, explicit frontend request by Vadim | Add an authenticated Sources entry and `/sources` registry spectrum; retain canonical ratings, cited log-audience axis and provenance. Earlier three-item navigation is superseded only for this entry. | Direct access to the requested interactive diagram; no inference or event-coverage claim from registry membership. |

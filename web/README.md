@@ -35,6 +35,8 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · Edition controls share `EditionNavigation` and UTC calendar arithmetic; route search parameters own the selected day/topic, through normal Next navigation. Sign-in return validation is restricted to local workspace routes. Why: restore refresh/Back/Forward and shared-story continuity found in the production audit, without new APIs or dependencies; canonical behavior is docs/DECISIONS.md › Edition navigation continuity. Existing typography, cards and motion remain; narrow controls reuse identity tokens and 44 px targets. Browser regression: `tests/edition-navigation-checks.cjs` runs through the real isolated HTTP boundary; pure calendar/redirect guards: `node web/tests/edition-navigation.cjs`.
+
 2026-10-27 · rcc00n / Codex · `WorkspaceNavigator` uses a native dialog/combobox and searches only loaded topic/story labels and fixed local destinations. Current-story view links retain the producer date/revision; selecting a same-page hash activates the reader without refetching. Why: app-wide keyboard navigation and immediate diagrams without an API, new dependency or model request.
 
 2026-10-27 · rcc00n / Codex · `InvestigationReader` owns local view state and hash navigation; panels stay mounted so source selections/disclosures/filters survive switching. Existing original-content browser assertions run in All sections alongside focused pane/deep-link/keyboard/no-refetch checks. Why: the new reading-first navigation must reduce scrolling without removing evidence or weakening its regressions; see docs/DECISIONS.md › Reader workspace amendment.

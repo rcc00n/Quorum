@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, User } from "@/lib/api";
 import { ThemeToggle } from "./theme-toggle";
+import { workspaceReturnPath } from "@/lib/return-path.mjs";
 import "@/app/gate.css";
 
 // DECISION(2026-10-26, Anastasia/Claude Code): sign-in and sign-up share one gate screen in the portal's identity,
@@ -25,7 +26,10 @@ export function Auth({ register = false }: { register?: boolean }) {
         username: f.get("username"),
         password: f.get("password"),
       });
-      router.replace(register ? "/onboarding" : "/dashboard");
+      if (register) router.replace("/onboarding");
+      // DECISION(2026-10-27, rcc00n/Codex): use native navigation at the successful sign-in boundary.
+      // Why: Next 16 duplicated the return fragment when the login query itself contained its encoded hash.
+      else window.location.replace(workspaceReturnPath(new URLSearchParams(window.location.search).get("next")));
     } catch (e) {
       setError((e as Error).message);
     } finally {
