@@ -125,3 +125,13 @@ The source map has a direct signed-in entry at `/sources`; the app menu is Today
 2026-10-27 · rcc00n / Codex · Reading workspace uses a pinned numbered navigation instrument and one active pane; graph access is immediate, complete content remains in All sections, and reduced motion disables panel entry. Existing paper/ink/umber identity and story wording stay. Why: Vadim requested a substantial interaction upgrade without model spend; canonical product scope is docs/DECISIONS.md › Reader workspace amendment.
 
 2026-10-27 · rcc00n / Codex · App navigation adds a searchable destination sheet: one large input, a numbered list, one warm selected rule and a native modal backdrop; it is accessible from Search or Ctrl/Cmd-K. Why: a consistent interaction across the app without changing the identity or adding decorative dashboards.
+
+## Visual hierarchy refinement — 27 October 2026
+
+Visual thesis: quiet evidence instruments, with one clear measurement and secondary provenance.
+Content plan: Impact label → supplied score and four rubric dimensions → optional original notes; hero counts/date → source record → optional technical details.
+Interaction thesis: native disclosures expose detail deliberately; the existing shallow hero depth remains the only surface motion. No extra ambient animation or dependency.
+
+2026-10-27 · rcc00n / Codex · Impact uses a compact title, a large supplied total and four restrained segmented point scales after expansion; raw rationales remain in a secondary disclosure. Why: Vadim's screenshot review requested readable accents with less clutter; numeric data stays behind the reader's deliberate link, consistent with DECISIONS › User account and interface.
+
+2026-10-27 · rcc00n / Codex · Hero evidence-sheet refinement keeps the existing 12-column hero/wire line and type, emphasizing the two recorded counts and folding technical detail under Query details and provenance. Why: Vadim’s screenshot review; scope approved by Anastasia in Issue #2 comment6434672425, subject to before/after look approval in the PR. Existing source/date/context stay visible and all original proof fields remain present.
