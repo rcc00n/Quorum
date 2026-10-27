@@ -12,7 +12,7 @@ Tool details: [reasoning/README.md](../../reasoning/README.md) › Daily edition
 Settings for the canonical runs:
 
 - route: `--route meterless` for every topic (no `--keys`).
-- hmem: on (set by the follow-up commit after the engine merge)
+- hmem: on, through `--hmem on` on the live command (Yelysei's D3, DECISIONS log 2026-10-27); the committed `[engines] hmem` stays `off`. The runner needs `METERLESS_HOME` and `QUORUM_HMEM_DIR` in its environment, creates the store (0700) before the first child and runs the topics one after another on the one shared store. The engine's recalls show as `memory` trace rows; `receipt_hmem_injected` is Nightshift's own memory, off by the guard, and stays 0.
 - topics, in this order: `immigration-southern-border`, `russia-ukraine-war`, `tariffs-trade-war-china`,
   `ai-regulation-export-controls`.
 
@@ -43,6 +43,7 @@ Run time, for planning only: the two climate-policy runs of 26 October on this r
   Meterless run, and are what the manual fallback uses. Never print any of them.
 - The Nightshift runtime is running on this machine (loopback port 8088), started from Windows, not WSL.
 - Windows venv in `reasoning/`: `.venv\Scripts\activate`; every command below runs from `reasoning/`.
+- For `--hmem on`: `METERLESS_HOME` points at the Meterless reference checkout (`scripts/setup-meterless.sh`, commit `1742dec…`) and `QUORUM_HMEM_DIR` at a fresh directory outside the repository, both exported in the shell that runs the commands below; the runner refuses `--hmem on` without them.
 
 ## 1. Restore the post-cut dump (10:30 UTC, 06:30 local)
 
@@ -82,10 +83,10 @@ Go on only when:
 
 ## 4. The four runs (from about 10:50 UTC, 06:50 local)
 
-The same command with `--live`:
+The same command with `--hmem on --live` (the plan run above needs no `--hmem`; the flag only matters for live children):
 
 ```bash
-python -X utf8 scripts/run_editions.py --date 2026-10-27 --topics immigration-southern-border,russia-ukraine-war,tariffs-trade-war-china,ai-regulation-export-controls --route meterless --out snapshots/_private --log-dir snapshots/_runs/logs --status-dir snapshots/_runs/status --dry-check-out snapshots/_runs/dry --live
+python -X utf8 scripts/run_editions.py --date 2026-10-27 --topics immigration-southern-border,russia-ukraine-war,tariffs-trade-war-china,ai-regulation-export-controls --route meterless --hmem on --out snapshots/_private --log-dir snapshots/_runs/logs --status-dir snapshots/_runs/status --dry-check-out snapshots/_runs/dry --live
 ```
 
 It runs the topics one after the other and exits 0 when all four are published. Per run, the log is
