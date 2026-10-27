@@ -49,13 +49,17 @@ function StoryCard({ event, topicName, day, lead }: { event: Event; topicName: s
   return (
     <li className={lead ? "tb-card tb-card-lead" : "tb-card"}>
       <Link href={`/events/${encodeURIComponent(event.id)}?date=${day}`} className="tb-card-link">
-        <div className="tb-card-media" aria-hidden={picture ? undefined : true}>
-          {picture && (
+        <div className={picture ? "tb-card-media" : "tb-card-media tb-card-media-missing"} aria-hidden={picture ? undefined : true}>
+          {picture ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={picture.url} alt={picture.caption} />
               <span className="tb-card-credit">{`Photo: ${picture.credit}`}</span>
             </>
+          ) : (
+            // The quieter version of the story page's missing-photo line (components/story.tsx PhotoMissing);
+            // the whole area is decorative on a card, whose link text is the headline.
+            <span className="tb-card-note">Imagine a photo here.</span>
           )}
         </div>
         <span className="tb-card-topic">{topicName}</span>

@@ -84,6 +84,62 @@
   outline-offset: 3px;
   border-radius: var(--radius-s);
 }
+/* The lead slot without a licensed photo (components/story.tsx PhotoMissing, decision there): warm blobs of
+   the identity's own colours blurred into a field, oversized so the blur has no hard edge, and the sentence
+   centred over it in ink (about 11:1 on the darkest blob). No image, no request, no motion. */
+.story-photo-missing .story-photo-frame {
+  background: var(--paper-2);
+}
+.story-photo-blur {
+  position: absolute;
+  inset: -56px;
+  display: block;
+  background:
+    radial-gradient(42% 60% at 22% 36%, rgba(123, 86, 52, 0.42), transparent 70%),
+    radial-gradient(34% 50% at 78% 28%, rgba(95, 90, 83, 0.36), transparent 70%),
+    radial-gradient(26% 40% at 58% 62%, rgba(201, 162, 126, 0.55), transparent 70%),
+    radial-gradient(48% 44% at 64% 86%, rgba(220, 214, 204, 0.95), transparent 70%),
+    radial-gradient(30% 42% at 10% 88%, rgba(20, 20, 20, 0.2), transparent 70%),
+    radial-gradient(18% 30% at 90% 72%, rgba(20, 20, 20, 0.14), transparent 70%),
+    var(--paper-2);
+  filter: blur(30px);
+  pointer-events: none;
+}
+.story-page .story-photo-note {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  max-width: none;
+  font-family: var(--display);
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--ink);
+}
+.story-page .story-photo-note > span {
+  display: block;
+}
+.story-page .story-photo-note-lead {
+  font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin-bottom: 8px;
+}
+.story-page .story-photo-note-lead::before {
+  content: "( ";
+  color: var(--ink-2);
+}
+.story-page .story-photo-note-lead::after {
+  content: " )";
+  color: var(--ink-2);
+}
 .story-caption {
   margin-top: 12px;
   font-size: 13px;
@@ -470,8 +526,12 @@
   scroll-margin-top: 88px;
 }
 
-/* The claims-only page under a story (no analysis supplied): the claim sections as panels. */
+/* The claims-only page under a story (no analysis supplied): the claim sections as panels.
+   DECISION(2026-10-27, Anastasia/Claude Code): the panel is a block, not globals.css's two-column grid. Why:
+   that grid keeps its first column for the eyebrow, which this page hides, so the heading dropped into the
+   40 px column and overlapped the first claim at every width. */
 .story-page-plain .analysis-section {
+  display: block;
   margin-top: 32px;
   padding: 40px 40px 48px;
   border-radius: var(--radius);
