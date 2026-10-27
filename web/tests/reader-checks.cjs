@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 module.exports=async({page})=>{
  const reader=page.locator('.investigation-reader'),tab=name=>reader.getByRole('tab',{name,exact:true});
+ const needsReview=await reader.getByText('Requires editorial review',{exact:true}).isVisible();
  assert.equal(await tab('Reading').getAttribute('aria-selected'),'true');
  assert.equal(await reader.locator('[data-reader-panel]:visible').count(),1);
  const search=new URL(page.url()).search;
@@ -9,6 +10,7 @@ module.exports=async({page})=>{
  await tab('Source map').click();await reader.locator('[data-reader-panel="map"]').waitFor({state:'visible'});
  await page.waitForFunction(()=>(document.querySelector('[data-reader-panel="map"] .sp-chart')||document.querySelector('[data-reader-panel="map"] .spectrum-instrument'))?.getBoundingClientRect().top<innerHeight);
  await reader.getByRole('heading',{name:'Source spectrum',exact:true}).waitFor();
+ if(needsReview)await reader.getByText('Requires editorial review',{exact:true}).first().waitFor();
  assert.equal(new URL(page.url()).search,search);assert.equal(new URL(page.url()).hash,'#reader-map');
  assert.equal(await reader.locator('[data-reader-panel="evidence"]').isVisible(),false);
  await tab('Evidence').click();await tab('Source map').click();await page.goBack();

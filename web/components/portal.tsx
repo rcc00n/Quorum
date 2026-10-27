@@ -68,7 +68,7 @@ function Analysis({
   if (event.analysis || !event.reasoning || !event.reasoning_context)
     return <AnalysisWorkspace event={event} publication={publication} sources={sources} />;
   const readable = storyReadable(event, sources);
-  return <InvestigationReader title={event.title} className={readable ? "story-page story-page-plain" : ""}>
+  return <InvestigationReader title={event.title} needsReview={event.reasoning.needs_review} className={readable ? "story-page story-page-plain" : ""}>
     <ReaderPanel name="reading"><EventReading event={event} sources={sources} /></ReaderPanel>
     <ReaderPanel name="evidence">
       {readable && <LegacyClaims event={event} />}

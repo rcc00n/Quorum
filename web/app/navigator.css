@@ -19,3 +19,5 @@
 @keyframes navigator-in { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
 @media (max-width: 700px) { .workspace-search { font-size: 12px; } .workspace-search kbd { display: none; } .workspace-search-dialog { padding: 20px; margin-top: 5dvh; max-height: 90dvh; } .workspace-search-dialog footer { flex-direction: column; gap: 6px; } }
 @media (prefers-reduced-motion: reduce) { .workspace-search-dialog[open] { animation: none; } }
+
+.workspace-search-results .workspace-result-review { color: var(--umber-ink); font-weight: 500; }

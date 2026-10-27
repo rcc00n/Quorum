@@ -1,5 +1,5 @@
 import type { Snapshot } from "./api";
-export type WorkspaceItem = { id: string; label: string; detail: string; href: string; keywords?: string };
+export type WorkspaceItem = { id: string; label: string; detail: string; href: string; keywords?: string; needsReview?: boolean };
 export function workspaceItems(data: Snapshot | null, day: string, currentId?: string, revision?: string): WorkspaceItem[] {
   const items: WorkspaceItem[] = [
     { id: "today", label: "Today", detail: "Your daily brief", href: "/dashboard", keywords: "home news" },
@@ -10,11 +10,11 @@ export function workspaceItems(data: Snapshot | null, day: string, currentId?: s
   for (const topic of data?.topics || []) items.push({ id: `topic:${topic.id}`, label: topic.name, detail: "Topic · viewed edition", href: `/topics/${encodeURIComponent(topic.id)}?date=${encodeURIComponent(day)}` });
   for (const event of data?.events || []) {
     const href = `/events/${encodeURIComponent(event.id)}?date=${encodeURIComponent(event.date)}${event.id === currentId && revision ? `&revision=${encodeURIComponent(revision)}` : ""}`;
-    items.push({ id: `event:${event.id}`, label: event.title, detail: `Story · ${event.date}`, href });
+    items.push({ id: `event:${event.id}`, label: event.title, detail: `Story · ${event.date}`, href, needsReview: !!event.reasoning?.needs_review });
     if (event.id === currentId) for (const [view, label, keywords] of [
       ["evidence", "Evidence · this story", "claims citations reviewers"], ["coverage", "Coverage · this story", "perspectives framing"],
       ["map", "Source map · this story", "graph chart spectrum political audience"], ["trace", "Investigation · this story", "trace reasoning steps"],
-    ]) items.push({ id: `view:${view}`, label, detail: event.title, href: `${href}#reader-${view}`, keywords });
+    ]) items.push({ id: `view:${view}`, label, detail: event.title, href: `${href}#reader-${view}`, keywords, needsReview: !!event.reasoning?.needs_review });
   }
   return items;
 }

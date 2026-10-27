@@ -1,11 +1,13 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 module.exports=async({page})=>{
+ const needsReview=await page.locator('.story-review:visible').count()>0;
  const original=page.url(),dialog=page.getByRole('dialog',{name:'Go anywhere'}),input=page.getByRole('combobox',{name:'Search this edition and workspace'});
  await page.keyboard.press('Control+k');await dialog.waitFor();
  let requests=0;const count=r=>{if(/\/api\//.test(r.url()))requests++};page.on('request',count);
  await input.fill('no-such-destination-TEST');await dialog.getByText('No matching destination',{exact:false}).waitFor();
  await input.fill('graph audience');await dialog.getByRole('option').first().waitFor();
  assert.ok((await dialog.getByRole('option').first().textContent()).includes('Source map · this story'));
+ if(needsReview)await dialog.getByRole('option').first().getByText('Requires editorial review',{exact:true}).waitFor();
  assert.equal(requests,0,'Searching loaded items must not request new data');page.off('request',count);
  await page.keyboard.press('Enter');await page.waitForFunction(()=>document.querySelector('#reader-tab-map')?.getAttribute('aria-selected')==='true');
  await page.getByRole('button',{name:'Search workspace',exact:true}).click();await dialog.waitFor();

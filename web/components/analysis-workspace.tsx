@@ -482,7 +482,7 @@ export function AnalysisWorkspace({
   // Why: DECISIONS › Reader workspace supersedes only the continuous appendix navigation.
   const readable = !supplementary && readableArticle(event);
   return (
-    <InvestigationReader title={event.title} className={readable ? "analysis-workspace story-page" : "analysis-workspace"}>
+    <InvestigationReader title={event.title} needsReview={event.reasoning?.needs_review} className={readable ? "analysis-workspace story-page" : "analysis-workspace"}>
       <ReaderPanel name="reading"><EventReading event={event} sources={sources} /></ReaderPanel>
       <ReaderPanel name="evidence">
       <section id="evidence-explorer" className="analysis-block">

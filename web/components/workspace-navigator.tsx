@@ -36,8 +36,8 @@ export function WorkspaceNavigator({ data, day, currentId, revision, disabled }:
           else if (e.key === "Enter") { e.preventDefault(); if (results[selected]) choose(results[selected]); }
         }} />
       <div id="workspace-search-results" role="listbox" aria-label="Workspace destinations" className="workspace-search-results">
-        {results.map((item, i) => <button key={item.id} type="button" role="option" id={`workspace-result-${i}`} aria-selected={selected === i} tabIndex={-1} onPointerMove={() => setIndex(i)} onClick={() => choose(item)}>
-          <span className="workspace-result-index">{String(i + 1).padStart(2, "0")}</span><span><strong>{item.label}</strong><small>{item.detail}</small></span><span aria-hidden="true">↗</span>
+        {open && results.map((item, i) => <button key={item.id} type="button" role="option" id={`workspace-result-${i}`} aria-selected={selected === i} tabIndex={-1} onPointerMove={() => setIndex(i)} onClick={() => choose(item)}>
+          <span className="workspace-result-index">{String(i + 1).padStart(2, "0")}</span><span><strong>{item.label}</strong><small>{item.detail}</small>{item.needsReview && <small className="workspace-result-review">Requires editorial review</small>}</span><span aria-hidden="true">↗</span>
         </button>)}
       </div>
       {!results.length && <p className="workspace-search-empty" role="status">No matching destination in the loaded edition. Try a topic or page name.</p>}

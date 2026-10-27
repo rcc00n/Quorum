@@ -16,7 +16,7 @@ const views = [
 type View = typeof views[number][0];
 export function ReaderPanel({ children }: { name: Exclude<View, "all">; children: ReactNode }) { return <>{children}</>; }
 
-export function InvestigationReader({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
+export function InvestigationReader({ title, children, className = "", needsReview = false }: { title: string; children: ReactNode; className?: string; needsReview?: boolean }) {
   const [active, setActive] = useState<View>("reading");
   const [hashEpoch, setHashEpoch] = useState(0);
   const root = useRef<HTMLDivElement>(null), bar = useRef<HTMLElement>(null);
@@ -90,7 +90,7 @@ export function InvestigationReader({ title, children, className = "" }: { title
           ref={el => { if (el) tabs.current.set(id, el); else tabs.current.delete(id); }}><span className="reader-tab-number">0{i + 1}</span>{label}</button>)}
       </div>
     </nav>
-    {active !== "reading" && active !== "all" && <h1 className="reader-story-context">{title}</h1>}
+    {active !== "reading" && active !== "all" && <><h1 className="reader-story-context">{title}</h1>{needsReview && <ReviewLabel />}</>}
     <div id="reader-content">{panels.map(panel => <div key={panel.props.name} id={`reader-${panel.props.name}`} data-reader-panel={panel.props.name}
       role="tabpanel" aria-labelledby={active === "all" ? "reader-tab-all" : `reader-tab-${panel.props.name}`} tabIndex={0}
       hidden={active !== "all" && active !== panel.props.name}>{panel.props.children}</div>)}</div>
