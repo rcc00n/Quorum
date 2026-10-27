@@ -4,6 +4,15 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. The latest production milestone is below; older tables remain historical evidence.
 
+## Complete photo coverage — 27 October 2026 UTC
+
+WEB-MEDIA-02 DEPLOYED: `20261027-photo-coverage-r2`, source `0499866`, normal #93/#95/#94.
+All nine current and one historical story have reviewed photos; both low-quality orbital stills are
+replaced by a sharp 1920px Starlink terminal photo. The landing example now has a credited/licensed,
+explicitly illustrative file photograph with readable text on its existing band. Also today #85 is retained.
+[Exact source/artifact, CI, actual public image/four-width, session and preservation evidence](reviews/2026-10-27-editorial-photos-release.md#complete-photo-coverage-and-quality-follow-up--web-media-02).
+This supersedes the earlier two-unreviewed-photo limitation. No new model run or original-edition change.
+
 ## Reviewed lead-photo release — 27 October 2026 UTC
 
 WEB-MEDIA-01 DEPLOYED: `20261027-editorial-photos-r2`, source `169b0fc`, normal #86–#89.

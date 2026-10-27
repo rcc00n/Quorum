@@ -2,6 +2,19 @@
 
 Owner: Vadim. Shared release tracker: [Issue #2](https://github.com/rcc00n/Quorum/issues/2). This is the canonical web technical release gate; [implementation inventory](IMPLEMENTATION_STATUS.md) records individual capabilities. Check boxes only for a particular release with its commit, environment, test outcome and rollback revision; a previous release's pass does not approve a new release.
 
+## Complete photo coverage acceptance — 27 October 2026 UTC
+
+Only `20261027-photo-coverage-r2` / `0499866d51a65c549d3a644a6a039e24278714ca`.
+[Exact evidence and the historical scope of older rows](reviews/2026-10-27-editorial-photos-release.md#complete-photo-coverage-and-quality-follow-up--web-media-02).
+
+- [x] Normal #93/#95/#94 merges; exact final-source and final-release portal/combined-python CI PASS.
+- [x] Actual source/date/author/licence/visual review, final private manifest and current/history exact bindings PASS.
+- [x] All ten actual story images/captions/source/licence links, Home nine-of-nine and sharp Starlink replacement at desktop/phone PASS.
+- [x] Final clean source-bound package and real public landing photo/attribution/final contrast, 1440/768/390/320, no errors/overflow/failed static assets/API calls PASS.
+- [x] Guarded Quorum-only switch/private backup/rollback target, persistent session/preferences/exact event payloads and final HTTPS/TLS PASS.
+- [x] All 15 users/preferences, 15 installed original files, SSH/environment and 24 original container identities/start times preserved; extra transient container recorded separately; SQLite/services/flags PASS.
+- [ ] Automatic photo tool and full sponsor/recall/submission gates remain separate; no new rollback rehearsal is claimed by this small follow-up.
+
 ## Reviewed lead-photo acceptance — 27 October 2026 UTC
 
 Only `20261027-editorial-photos-r2` / `169b0fc744e8dac8225c2f3e198712d858d110c1`.
