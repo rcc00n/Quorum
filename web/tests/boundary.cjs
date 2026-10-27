@@ -316,7 +316,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
         {
           env: { ...process.env, QUORUM_TEST_URL: root, ...extra },
           // These two suites use public DOM or explicit DEMO interception, never account credentials.
-          stdio: ["motion.cjs", "analysis.cjs"].includes(file) ? "inherit" : "ignore",
+          stdio: ["motion.cjs", "landing-evidence.cjs", "analysis.cjs"].includes(file) ? "inherit" : "ignore",
         },
       );
       children.push(child);
@@ -327,6 +327,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
     });
   }
   await browserScript("motion.cjs");
+  await browserScript("landing-evidence.cjs");
   await browserScript("analysis.cjs", { QUORUM_ANALYSIS_FIXTURE: output });
   await browserScript("demo.cjs", {
     TYPESCRIPT_MODULE: path.join(build, "node_modules/typescript"),
