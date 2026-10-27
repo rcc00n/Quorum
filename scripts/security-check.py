@@ -45,6 +45,16 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, rcc00n/Codex): permit only these inspected FICTIONAL #55 comparison bytes.
+# Why: complete Anastasia's requested before/after record without publishing private production data.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-paperclip-comparison/search-before-1440.png': '2e5167179a1c5688a5a7f12715e5751557ebdda20b9482d136e1c89d8398fca5',
+    'docs/reviews/2026-10-27-paperclip-comparison/search-after-1440.png': 'f6b75bea335c39fc8594906d5645c21d8f6e60f496ed07fd976f0f69858f822e',
+    'docs/reviews/2026-10-27-paperclip-comparison/search-before-390.png': 'f771f13f38ba429b94b38bcaa1a51e928aac52146aabc72cdbc2e7212dbe031b',
+    'docs/reviews/2026-10-27-paperclip-comparison/search-after-390.png': '01fe78d4897eae2e7d985e7a6aa8d3bb519c066babf247cffb03aaec1c950a21',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])
