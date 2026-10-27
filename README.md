@@ -8,6 +8,8 @@ Quorum is a multi-agent system that takes one news event, gathers coverage from 
 
 Built by team **Quorum** for the [Open Agent Hackathon 2026](https://hackathon.genai.works/event/open-agent-hackathon-2026), Track 03 — **Reasoning Architecture**. Build window 22–27 October 2026; submissions close 27 October 2026, 23:45 UTC.
 
+**Live site:** https://quorum.raccncode.com/ — the landing is public; the reader behind it needs a login.
+
 **Live authenticated demo:** https://quorum.raccncode.com/dashboard?date=2026-10-26 —
 the genuine provisional immigration edition (1 story, 19 roundup entries, 174 trace steps).
 Sign in with the privately supplied judge account, or register under the existing open-registration flow.
@@ -133,12 +135,78 @@ The loops: `verify → research` (at most 2 research rounds, round 2 only for th
 
 ## Run it
 
-One path through the whole system; each step is documented in its module. The collector and the reasoning block read the repo-level `.env` (`.env.example` lists their names); the portal takes its switches as exported environment variables (`backend/README.md`).
+One path through the whole system, in the order the data flows: collect, reason, serve, install. Each step is documented in its module; the commands below are the ones those READMEs give, copied here so a reviewer can go from a clone to a running portal without reading them first. The collector and the reasoning block read the repo-level `.env` (`.env.example` lists every name); the portal takes its switches as exported environment variables (`backend/README.md`).
 
-1. **Collect** (`collectors/README.md`): `docker compose -f collectors/docker-compose.yml up -d --build` starts PostgreSQL and the collector (one pass over every topic, then a 15-minute pause); with the official Zetaris platform running, `python3 collectors/zetaris/register.py` registers that database as `QUORUM_COLLECT`.
-2. **Reason** (`reasoning/README.md`): from `reasoning/`, `pip install -e ".[dev]"`; a dry run with no credits, `python -m quorum_reasoning.run --topic russia-ukraine-war --date 2026-10-22 --dry-run`; a live edition over the collected corpus (model route and `ZETARIS_*` settings in `.env`), `python -m quorum_reasoning.run --topic <topic> --date <date> --model live --corpus zetaris --out snapshots/_private`. The snapshot lands as the next immutable `v<N>.json`.
-3. **Serve** (`backend/README.md`, `web/README.md`): Django on `127.0.0.1:8017`; then `bash deploy/build-web.sh` and, from `~/.local/share/quorum/portal-web-build`, `npm run dev -- --hostname 127.0.0.1 --port 3017`.
-4. **Check an edition** (`backend/README.md`, `docs/PORTAL_INTEGRATION.md`, `docs/SNAPSHOT_PROPOSAL.md`): a reasoning 1.0 snapshot with its sidecar is checked read-only with `python backend/manage.py reasoning_snapshot --file … --sha256 … --sidecar … --sidecar-sha256 … --producer-commit …` (the acceptance command does not publish; merged PR #31 adds `--install` to copy cleanly accepted bytes into the login-only reader's directory) and viewed in the development-only preview (`QUORUM_ENABLE_REASONING_PREVIEW=1`, `QUORUM_REASONING_PREVIEW_FILE=<snapshot>`, `DJANGO_DEBUG=1`, localhost, route `/preview/reasoning`). The portal's own store takes proposal-format snapshots: `portal_snapshot validate --file <candidate.json>`, then `portal_snapshot prepare` and `portal_snapshot publish --file $QUORUM_SNAPSHOT_ROOT/staging/<file> --sha256 <sha256>` behind the `QUORUM_ENABLE_SNAPSHOT_PUBLICATION` flag.
+**0. Prerequisites.** Docker Desktop (PostgreSQL, the collector and the official Zetaris platform run in containers), Python 3.12 or newer, Node 22 or newer, and a model route: the Meterless Nightshift runtime on the same machine (the primary route) or an NVIDIA API key (the development alternative). Copy the template and fill in the Zetaris settings and the model route; the file is git-ignored and never committed.
+
+```bash
+git clone https://github.com/rcc00n/Quorum.git && cd Quorum
+cp .env.example .env        # fill ZETARIS_* and the model route (METERLESS_TOKEN, or MODEL_BASE_URL + MODEL_API_KEY)
+```
+
+**1. Collect** (`collectors/README.md`). Starts PostgreSQL and the collector, which makes one pass over every topic in the `topics` table and then pauses for 15 minutes. With the official Zetaris platform running, the second command registers that database in Zetaris as the datasource `QUORUM_COLLECT`; run it again after a schema change, because Zetaris caches column lists.
+
+```bash
+docker compose -f collectors/docker-compose.yml up -d --build
+python3 collectors/zetaris/register.py
+docker compose -f collectors/docker-compose.yml logs -f collector     # watch a pass
+```
+
+**2. Reason** (`reasoning/README.md`). The graph runs from `reasoning/` in its own virtual environment. A dry run spends no credits: the fixture corpus and deterministic stand-ins for every model call. `--models` lists the routes the configured runtime offers and sends no completion; `--test-connection` sends one small completion per lane and prints the answering model and its receipt. A live edition reads the day's documents through Zetaris and writes the next immutable `v<N>.json` under `--out`, with a journal, a ledger and per-node checkpoints beside it.
+
+```bash
+cd reasoning
+python -m venv .venv && . .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+python -m pytest                                      # rules + end-to-end dry run, no credits
+
+python -m quorum_reasoning.run --topic russia-ukraine-war --date 2026-10-22 --dry-run      # no credits
+python -m quorum_reasoning.run --models                                                    # free
+python -m quorum_reasoning.run --test-connection                                           # 2 paid calls
+python -m quorum_reasoning.run --topic <topic> --date <YYYY-MM-DD> --model live --corpus zetaris --out snapshots/_private
+python -m quorum_reasoning.run --topic <topic> --date <YYYY-MM-DD> --model live --corpus zetaris --out snapshots/_private --resume   # continue a run that died
+```
+
+A whole day of editions for several topics goes through the edition runner: without `--live` it only runs the dry checks and prints the call estimates; with `--live` it runs the topics one after another, writes one log per run and one status file per topic, and on `--route meterless` stops a topic at its first error instead of patching around it (`docs/reviews/2026-10-27-demo-runbook.md`). `--hmem on` switches the H-MEM source memory on and needs `METERLESS_HOME` and `QUORUM_HMEM_DIR` exported.
+
+```bash
+python -X utf8 scripts/run_editions.py --date <YYYY-MM-DD> --topics immigration-southern-border,russia-ukraine-war --route meterless --out snapshots/_private --log-dir snapshots/_runs/logs --status-dir snapshots/_runs/status --dry-check-out snapshots/_runs/dry
+python -X utf8 scripts/run_editions.py --date <YYYY-MM-DD> --topics immigration-southern-border,russia-ukraine-war --route meterless --hmem on --out snapshots/_private --log-dir snapshots/_runs/logs --status-dir snapshots/_runs/status --dry-check-out snapshots/_runs/dry --live
+```
+
+Every published edition gets a sidecar and two sha256 files for the hand-over to the portal; the hand-over set is the snapshot, the sidecar, both hashes and the producer commit, never the ledger or the journal.
+
+```bash
+python -X utf8 scripts/edition_sidecar.py --snapshot snapshots/_private/<topic>/<date>/v<N>.json --corpus-as-of <YYYY-MM-DDTHH:MMZ> --producer-commit $(git rev-parse HEAD)
+```
+
+**3. Serve** (`backend/README.md`, `web/README.md`). Django on `127.0.0.1:8017` first, then the Next.js portal on `127.0.0.1:3017`, which rewrites `/api/`, `/staff/` and `/staff-static/` to Django. `deploy/build-web.sh` builds the web app outside the repository.
+
+```bash
+python3 -m venv ~/.local/share/quorum/portal-venv
+~/.local/share/quorum/portal-venv/bin/pip install -r backend/requirements.txt
+export DJANGO_DEBUG=1
+~/.local/share/quorum/portal-venv/bin/python backend/manage.py migrate
+~/.local/share/quorum/portal-venv/bin/python backend/manage.py createsuperuser
+~/.local/share/quorum/portal-venv/bin/python backend/manage.py runserver 127.0.0.1:8017
+```
+
+```bash
+bash deploy/build-web.sh
+cd ~/.local/share/quorum/portal-web-build
+npm run dev -- --hostname 127.0.0.1 --port 3017       # then open http://127.0.0.1:3017
+```
+
+**4. Check and install an edition** (`backend/README.md` › Control and checks, `docs/PORTAL_INTEGRATION.md`). The acceptance command checks a reasoning 1.0 snapshot read-only: both sha256 values against the bytes, the sidecar's binding to the snapshot, the producer commit (resolved with `git show` in the portal's own checkout, so fetch first) and the hash of `reasoning/config/reasoning.toml` at that commit, and that the output is genuine model output. `--install` copies cleanly accepted bytes into the login-only reader's directory, `QUORUM_REASONING_EDITIONS_ROOT`; a checkout without `.git` (a release tarball) passes `--producer-config` with that commit's `reasoning.toml` instead.
+
+```bash
+git fetch origin
+export QUORUM_REASONING_EDITIONS_ROOT=~/.local/share/quorum/editions && mkdir -p "$QUORUM_REASONING_EDITIONS_ROOT"
+~/.local/share/quorum/portal-venv/bin/python backend/manage.py reasoning_snapshot --file v1.json --sha256 <sha256 of v1.json> --sidecar v1.json.sidecar.json --sidecar-sha256 <sha256 of the sidecar> --producer-commit <40-hex commit>             # check only
+~/.local/share/quorum/portal-venv/bin/python backend/manage.py reasoning_snapshot --file v1.json --sha256 <sha256 of v1.json> --sidecar v1.json.sidecar.json --sidecar-sha256 <sha256 of the sidecar> --producer-commit <40-hex commit> --install   # check, then install
+```
+
+Signed-in readers then see the edition on the board for its date, with its `provisional`, `corpus as of` and `requires editorial review` labels. The development-only preview renders a snapshot file without installing it (`QUORUM_ENABLE_REASONING_PREVIEW=1`, `QUORUM_REASONING_PREVIEW_FILE=<snapshot>`, `DJANGO_DEBUG=1`, route `/preview/reasoning`). The portal's own proposal store is a separate path: `portal_snapshot validate --file <candidate.json>`, then `portal_snapshot prepare` and `portal_snapshot publish --file $QUORUM_SNAPSHOT_ROOT/staging/<file> --sha256 <sha256>` behind the `QUORUM_ENABLE_SNAPSHOT_PUBLICATION` flag (`docs/SNAPSHOT_PROPOSAL.md`).
 
 ## Samples: inputs and outputs
 
