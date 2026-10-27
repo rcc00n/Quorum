@@ -35,6 +35,13 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · WEB-MEDIA-02: the landing anatomy's Home example uses the reviewed
+1 June 2024 Supreme Court photograph by 颐园居 (Commons, CC-BY-SA-4.0), labelled as an illustrative
+file photo with source/author/licence links. Its prior blurred-fill/placeholder choice is superseded only
+for this example; see DESIGN.md › Decisions, 2026-10-27. The existing card proportions/text band,
+palette, evidence field and all news/trace fixtures stay. Why: Vadim explicitly requested a photo in
+the landing example as well as every installed story; an illustration must not imply a live headline.
+
 2026-10-27 · rcc00n / Codex · WEB-MEDIA-01 reuses `StoryPhoto` in both readable articles and the claims-only
 reader. A reviewed image does not make prose readable or change a claim/review status; the original
 `storyReadable` gate stays. Why: real installed stories can legitimately use the claims-only view, whose
