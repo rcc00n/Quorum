@@ -157,6 +157,7 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
           busy={busy}
           onSave={saveTopics}
           saveLabel="Save topics"
+          compact
         />
         {note && (
           <p className="message" role="status">

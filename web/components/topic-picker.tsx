@@ -21,9 +21,11 @@ type Props = {
   busy: boolean;
   onSave: () => void;
   saveLabel: string;
+  /** The board's panel (cabinet pass, 2026-10-27): no explanatory lines, the search placeholder is the one hint. */
+  compact?: boolean;
 };
 
-export function TopicPicker({ topics, catalogRevision, selected, onChange, busy, onSave, saveLabel }: Props) {
+export function TopicPicker({ topics, catalogRevision, selected, onChange, busy, onSave, saveLabel, compact = false }: Props) {
   const [query, setQuery] = useState("");
   const matches = useMemo(() => matchTopics(topics, query) as Topic[], [topics, query]);
   const byId = useMemo(() => new Map(topics.map((t) => [t.id, t.name])), [topics]);
@@ -42,15 +44,17 @@ export function TopicPicker({ topics, catalogRevision, selected, onChange, busy,
   }
 
   return (
-    <section className="topic-picker tp">
+    <section className={compact ? "topic-picker tp tp-compact" : "topic-picker tp"}>
       <div className="tp-head">
         <h2>Your topics</h2>
         <span className="tp-count">{`${selected.length} selected`}</span>
       </div>
-      <p className="tp-lead">
-        Type a topic to find it in the catalog, or pick it from the list. The agents collect and verify stories on
-        your topics alone.
-      </p>
+      {!compact && (
+        <p className="tp-lead">
+          Type a topic to find it in the catalog, or pick it from the list. The agents collect and verify stories on
+          your topics alone.
+        </p>
+      )}
       {catalogRevision && <p className="help">Team catalog snapshot · definitions only. Live analysis is pending.</p>}
       {topics.length ? (
         <>
@@ -61,14 +65,16 @@ export function TopicPicker({ topics, catalogRevision, selected, onChange, busy,
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Type a topic and press Enter"
+              placeholder={compact ? "Search the catalog, Enter adds the first match" : "Type a topic and press Enter"}
               autoComplete="off"
-              aria-describedby="tp-search-hint"
+              aria-describedby={compact ? undefined : "tp-search-hint"}
             />
           </label>
-          <p id="tp-search-hint" className="tp-hint">
-            Enter adds the first match. One at a time: a war, a country, a court case, a company, an industry.
-          </p>
+          {!compact && (
+            <p id="tp-search-hint" className="tp-hint">
+              Enter adds the first match. One at a time: a war, a country, a court case, a company, an industry.
+            </p>
+          )}
           {selected.length > 0 && (
             <ul className="tp-chips" role="list" aria-label="Chosen topics">
               {selected.map((id) => (
@@ -102,9 +108,11 @@ export function TopicPicker({ topics, catalogRevision, selected, onChange, busy,
           <p>You can return here to choose topics once the catalog is available.</p>
         </aside>
       )}
-      <p className="tp-foot">
-        {`${selected.length} ${selected.length === 1 ? "topic" : "topics"} · up to ten stories a day for each, none on a quiet day · change them any time`}
-      </p>
+      {!compact && (
+        <p className="tp-foot">
+          {`${selected.length} ${selected.length === 1 ? "topic" : "topics"} · up to ten stories a day for each, none on a quiet day · change them any time`}
+        </p>
+      )}
       <button type="button" className="button tp-button" disabled={busy} onClick={onSave}>
         {saveLabel}
       </button>
