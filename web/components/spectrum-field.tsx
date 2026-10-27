@@ -6,6 +6,29 @@ import { cohort, rating, safeUrl } from "@/lib/api";
 import { spectrumGeometry } from "@/lib/spectrum-geometry";
 
 const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+// DECISION(2026-10-27, Anastasia/Claude Code; WEB-SPECTRUM-POLISH-02, Vadim's scope): every plotted mark carries a
+// label from the registry's own identity, never a typed list: a major-tier source (registry `tier`) wears its `id`
+// as a short badge (upper case, hyphens as spaces), always visible from 701 px; every other source shows its `name`
+// on hover, keyboard focus and selection. Labels anchor away from the plot's edges by the mark's x, and two
+// major badges that would collide stack the smaller audience below its mark. On phones badges show only on the
+// selected mark. Labels are aria-hidden: the button's aria-label already names the source. Why: Anastasia's
+// review of the spectrum (Issue #2, 2026-10-27): an unlabelled field cannot be read without the inspector.
+export function markLabel(source: Pick<Source, "id" | "name" | "tier">) {
+  return source.tier === "major" ? source.id.toUpperCase().replace(/-/g, " ") : source.name;
+}
+export function labelLayout(points: { id: string; x: number; y: number; audience: number }[], major: Set<string>) {
+  const placed: { x: number; y: number; pos: "above" | "below" }[] = [];
+  const layout = new Map<string, { side: "left" | "right" | "center"; pos: "above" | "below" }>();
+  for (const p of [...points].filter(p => major.has(p.id)).sort((a, b) => b.audience - a.audience)) {
+    const collides = placed.some(q => Math.abs(q.x - p.x) < 7 && Math.abs(q.y - p.y) < 9 && q.pos === "above")
+      || points.some(q => q.id !== p.id && Math.abs(q.x - p.x) < 4 && p.y - q.y > 3 && p.y - q.y < 12); // a mark right above
+    const pos = collides ? "below" : "above";
+    placed.push({ x: p.x, y: p.y, pos });
+    layout.set(p.id, { side: p.x >= 80 ? "right" : p.x <= 20 ? "left" : "center", pos });
+  }
+  for (const p of points) if (!layout.has(p.id)) layout.set(p.id, { side: p.x >= 80 ? "right" : p.x <= 20 ? "left" : "center", pos: "above" });
+  return layout;
+}
 export function SpectrumField({ sources, mode, selectedId, onSelect }: {
   sources: Source[]; mode: string; selectedId: string | null; onSelect: (id: string) => void;
 }) {
@@ -22,6 +45,8 @@ export function SpectrumField({ sources, mode, selectedId, onSelect }: {
   const selected = sources.find(s => s.id === selectedId) || sources.find(s => s.id === geometry.points[0]?.id) || sources[0];
   const active = geometry.points.find(p => p.id === selected?.id);
   const focusId = active?.id || geometry.points[0]?.id;
+  const majorIds = new Set(sources.filter(s => s.tier === "major").map(s => s.id));
+  const labels = labelLayout(geometry.points, majorIds);
   const score = selected ? rating(selected, mode) : null;
   const audienceUrl = selected ? safeUrl(selected.audience_source_url || "") : undefined;
 
@@ -84,7 +109,8 @@ export function SpectrumField({ sources, mode, selectedId, onSelect }: {
             {geometry.points.map((p, i) => {
               const source = sources.find(s => s.id === p.id)!;
               const lean = cohort(p.score).toLowerCase();
-              return <button type="button" className={`sp-point sp-point-${lean}`} key={p.id}
+              const label = labels.get(p.id)!;
+              return <button type="button" className={`sp-point sp-point-${lean}${majorIds.has(p.id) ? " sp-point-major" : ""}`} key={p.id}
                 ref={node => { if (node) buttons.current.set(p.id, node); else buttons.current.delete(p.id); }}
                 style={{ left: `${p.x}%`, top: `${p.y}%`, "--sp-delay": `${i * 12}ms` } as CSSProperties}
                 data-source-id={p.id} data-score={p.score} data-audience={p.audience} data-x={p.x} data-y={p.y}
@@ -92,6 +118,7 @@ export function SpectrumField({ sources, mode, selectedId, onSelect }: {
                 aria-pressed={active?.id === p.id} tabIndex={focusId === p.id ? 0 : -1}
                 onFocus={() => onSelect(p.id)} onPointerEnter={() => onSelect(p.id)} onClick={() => onSelect(p.id)} onKeyDown={e => navigate(e, i)}>
                 <span className="sp-point-halo" /><span className="sp-point-core" />
+                <span className="sp-point-label" aria-hidden="true" data-side={label.side} data-pos={label.pos}>{markLabel(source)}</span>
               </button>;
             })}
             <div className="sp-x-labels" aria-hidden="true"><span>Left −1</span><span>Center 0</span><span>Right +1</span></div>
