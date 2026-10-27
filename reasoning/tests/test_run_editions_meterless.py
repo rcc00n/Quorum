@@ -18,8 +18,8 @@ import test_run_editions as base  # the shared world (Env), the runner module an
 
 re_mod = base.re_mod
 DATE = base.DATE
-TOKEN = "fake-meterless-token-MMMM-0001"
-NVIDIA_FILE_KEY = "fake-nvidia-file-key-NNNN-0002"
+TOKEN = "QT.EST-meterless-token-for-tests-only"  # a dot keeps scripts/security-check.py from reading it as a real token
+NVIDIA_FILE_KEY = "QT.EST-nvidia-file-key-for-tests-only"
 
 FAKE_METERLESS_RUN = r'''
 import json, os, sqlite3, sys, time
@@ -42,7 +42,7 @@ for line in Path(sc["env_file"]).read_text().splitlines():
         if k not in os.environ:
             os.environ[k] = v
 names = ("MODEL_BASE_URL", "MODEL_API_KEY", "QUORUM_MIN_INTERVAL_MS", "QUORUM_MIN_INTERVAL_MS_FACT_CHECKER",
-         "QUORUM_MIN_INTERVAL_MS_REVIEWER", "MODEL_API_KEY_8", "MODEL_API_KEY_9")
+         "QUORUM_MIN_INTERVAL_MS_REVIEWER", "MODEL_API_KEY_8", "MODEL_API_KEY_9", "QUORUM_HMEM", "QUORUM_HMEM_DIR", "METERLESS_HOME")
 rec = {"topic": topic, "argv": args, "resume": "--resume" in args, "start": time.time(),
        "env": {k: os.environ.get(k) for k in names}, "token_seen": os.environ.get("METERLESS_TOKEN") == sc.get("token")}
 tmp = rec_dir / f"{time.time_ns()}-{os.getpid()}.tmp"
@@ -484,3 +484,30 @@ def test_the_watch_reads_only_rows_added_after_it_started(tmp_path: Path):
         fh.write("\n")
     assert watch.poll() and "lane unverified" in watch.reason
     assert not watch.trip("later reason") and "lane unverified" in watch.reason  # the first reason stays
+
+
+# --hmem on: the source memory for the live children (D3)
+
+
+def test_hmem_on_gives_live_children_the_switch_and_the_store(mw: MWorld, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    store = tmp_path / "hmem-store"
+    monkeypatch.setenv("METERLESS_HOME", str(tmp_path / "meterless"))
+    monkeypatch.setenv("QUORUM_HMEM_DIR", str(store))
+    mw.scenario({"t1": [{}], "t2": [{}]})
+    assert mw.run("t1,t2", "--hmem", "on") == 0
+    assert store.is_dir() and (store.stat().st_mode & 0o777) == 0o700
+    runs = mw.w.runs()
+    assert [r["topic"] for r in runs] == ["t1", "t2"]
+    for r in runs:
+        assert r["env"]["QUORUM_HMEM"] == "on" and r["env"]["QUORUM_HMEM_DIR"] == str(store), r["env"]
+        assert r["env"]["METERLESS_HOME"] == str(tmp_path / "meterless")
+
+
+def test_hmem_off_by_default_and_on_needs_its_environment(mw: MWorld, monkeypatch: pytest.MonkeyPatch):
+    mw.scenario({"t1": [{}]})
+    assert mw.run("t1") == 0
+    assert all(r["env"]["QUORUM_HMEM"] is None for r in mw.w.runs())
+    monkeypatch.delenv("METERLESS_HOME", raising=False)
+    monkeypatch.delenv("QUORUM_HMEM_DIR", raising=False)
+    with pytest.raises(SystemExit):
+        mw.run("t1", "--hmem", "on")

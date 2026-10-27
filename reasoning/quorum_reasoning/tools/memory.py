@@ -13,7 +13,13 @@ from .corpus import OFFICIAL_ID_OFFSET, _edition_window, _previous_window, previ
 
 
 def enabled(state):
-    return config.get('engines','hmem','off') == 'on' and not llm.is_dry_run(state.get('dry_run',True))
+    # DECISION(2026-10-27, Yelysei's D3 committed by Anastasia/Claude Code on his hand-over, Issue #2 6430304098):
+    # QUORUM_HMEM=on|off in the environment overrides `[engines] hmem` for one process, so scripts/run_editions.py
+    # --hmem on switches the source memory on for its live children while the committed config stays "off".
+    # Why: the 27 October editions run with H-MEM on without committing a config that would switch it on for every
+    # developer run.
+    setting = (os.environ.get('QUORUM_HMEM') or '').strip().lower() or config.get('engines','hmem','off')
+    return setting == 'on' and not llm.is_dry_run(state.get('dry_run',True))
 
 
 def identity(doc):

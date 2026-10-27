@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import json
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -301,6 +302,8 @@ def _environment_with_fake_secrets(monkeypatch, tmp_path):
 
 def _assert_only_the_allowlist(env, tmp_path):
     upper = {name.upper(): value for name, value in env.items()}
+    if sys.platform == "darwin":
+        upper.pop("__CF_USER_TEXT_ENCODING", None)  # macOS injects it into every child; not part of the allowlist
     assert set(upper) <= SIDECAR_NAMES
     assert not any(memory._NEVER_TO_SIDECAR.fullmatch(name) for name in env)
     assert not [secret for secret in FAKE_SECRETS.values() if any(secret in value for value in env.values())]

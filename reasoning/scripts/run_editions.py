@@ -914,6 +914,7 @@ class Ctx:
     stop_rule: bool = False  # --route meterless: the Meterless stop rule (decision at MeterlessWatch)
     keyed: bool = False  # --keys given: every live child holds one injected direct-route key
     route_env: dict[str, str] = field(default_factory=dict)  # set in every live child's environment (METERLESS_CHILD_ENV)
+    hmem_env: dict[str, str] = field(default_factory=dict)  # --hmem on: QUORUM_HMEM, QUORUM_HMEM_DIR, METERLESS_HOME for live children
     token_missing: bool = False  # --route meterless without a Meterless token: nothing is started
     fallback_keys: list[str] = field(default_factory=list)  # key variable NAMES for the printed manual fallback
     fallback_dirs: list[str] = field(default_factory=list)  # --out/--log-dir/--status-dir/--dry-check-out as given
@@ -949,6 +950,7 @@ def _child_env(ctx: Ctx, key: Key | None) -> dict[str, str]:
         env["MODEL_API_KEY"] = ctx.key_values[key.name]
     if key is not None:
         env.update(ctx.route_env)  # a live child on --route meterless (decision at METERLESS_CHILD_ENV)
+        env.update(ctx.hmem_env)  # --hmem on (decision at the --hmem argument)
     env["PYTHONUNBUFFERED"] = "1"
     env.setdefault("PYTHONIOENCODING", "utf-8")
     return env
@@ -1445,6 +1447,14 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--estimate-factor", type=float, default=ESTIMATE_FACTOR, help=f"dry-check count x this = the estimate (default {ESTIMATE_FACTOR})")
     ap.add_argument("--attempt", type=int, default=1, help="run.py --attempt for every topic (default 1)")
     ap.add_argument("--live", action="store_true", help="start the live runs (paid); without it only the dry checks and the plan run")
+    # DECISION(2026-10-27, Yelysei's D3 committed by Anastasia/Claude Code on his hand-over, Issue #2 6430304098): --hmem on
+    # gives every live child QUORUM_HMEM=on (tools/memory.enabled reads it before the committed `[engines] hmem`, which
+    # stays "off"), QUORUM_HMEM_DIR and METERLESS_HOME from this process's environment; the store directory is created
+    # (0700) before the first child so that recalls reach the engine; and the topics run one after another, because they
+    # share one store lock: --hmem on refuses more than one key. Why: the 27 October editions run with H-MEM on.
+    ap.add_argument("--hmem", choices=("on", "off"), default="off",
+                    help="switch the H-MEM source memory on for the live children (needs METERLESS_HOME and QUORUM_HMEM_DIR "
+                         "in the environment; one key only, the topics run one after another)")
     ap.add_argument("--allow-before-cut", action="store_true", help="with --live: allow a start before the edition cut (05:30 New York); rehearsals only")
     ap.add_argument("--env-file", default=None, help="the .env the key values (and the dry checks' Zetaris settings) come from; default <repo>/.env. "
                                                      "A live run always reads <repo>/.env itself, so --live refuses another file")
@@ -1533,6 +1543,18 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
     from quorum_reasoning import llm
 
     route_env = dict(METERLESS_CHILD_ENV) if meterless else {}
+    hmem_env: dict[str, str] = {}
+    if args.hmem == "on":
+        home = os.environ.get("METERLESS_HOME", "").strip()
+        store = os.environ.get("QUORUM_HMEM_DIR", "").strip()
+        if not home or not store:
+            ap.error("--hmem on needs METERLESS_HOME and QUORUM_HMEM_DIR in the environment")
+        if len(keys) > 1:
+            ap.error("--hmem on runs the topics one after another: give one key (or none on --route meterless)")
+        store_dir = Path(store).expanduser()
+        store_dir.mkdir(parents=True, exist_ok=True)
+        os.chmod(store_dir, 0o700)
+        hmem_env = {"QUORUM_HMEM": "on", "QUORUM_HMEM_DIR": str(store_dir), "METERLESS_HOME": home}
     token_missing = False
     if meterless:
         token_missing = not any(len(child_value(n, file_values, route_env).strip()) >= MIN_KEY_CHARS for n in METERLESS_TOKEN_NAMES)
@@ -1564,7 +1586,7 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
               dry_cmd=dry_cmd or [args.python, "-X", "utf8", str(SCRIPTS / "dry_check.py")],
               workdir=REASONING, env_file=env_file if env_file.is_file() else None, key_values=key_values, blank=blank,
               redactor=redactor, timeout_s=args.run_timeout_min * 60 if args.run_timeout_min > 0 else None,
-              factor=args.estimate_factor, route=route, stop_rule=meterless, keyed=any(k.inject for k in keys), route_env=route_env,
+              factor=args.estimate_factor, route=route, stop_rule=meterless, keyed=any(k.inject for k in keys), route_env=route_env, hmem_env=hmem_env,
               token_missing=token_missing, fallback_keys=nvidia_key_names(file_values),
               fallback_dirs=["--out", args.out, "--log-dir", args.log_dir, "--status-dir", args.status_dir,
                              "--dry-check-out", args.dry_check_out])
