@@ -4,6 +4,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import type { Event, Source } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
 import { Story, storyReadable, ReviewLabel } from "./story";
+import { ImpactAssessment } from "./impact-assessment";
 
 const views = [
   ["reading", "Read", "Reading", "The story, at your pace"],
@@ -55,9 +56,11 @@ export function InvestigationReader({ title, children, className = "", needsRevi
       if (focus) { if (!focus.hasAttribute("tabindex") && !focus.matches("a,button,input,select,summary")) focus.tabIndex = -1; focus.focus({ preventScroll: true }); }
     target.scrollIntoView({ block: "start" });
   }, [active, hashEpoch]);
+  // DECISION(2026-10-27, rcc00n/Codex; race traced by Anastasia/Claude Code): preserve Next's history state.
+  // Why: its patched pushState otherwise re-syncs the router and may replace a subsequent claim hash with the old tab URL.
   function select(view: View) {
     pendingTarget.current = null; setActive(view);
-    history.pushState(null, "", `#reader-${view}`);
+    history.pushState(history.state, "", `#reader-${view}`);
     requestAnimationFrame(() => {
       const el = root.current; if (!el) return;
       const header = document.querySelector<HTMLElement>(".sidebar")?.getBoundingClientRect().height || 0;
@@ -79,7 +82,7 @@ export function InvestigationReader({ title, children, className = "", needsRevi
     let target: HTMLElement | null; try { target = document.getElementById(decodeURIComponent(a.hash.slice(1))); } catch { return; }
     const panel = target?.closest<HTMLElement>("[data-reader-panel]");
     if (!target || !panel || !root.current?.contains(panel) || panel.dataset.readerPanel === active) return;
-    e.preventDefault(); history.pushState(null, "", a.hash); pendingTarget.current = target; setActive(panel.dataset.readerPanel as View);
+    e.preventDefault(); history.pushState(history.state, "", a.hash); pendingTarget.current = target; setActive(panel.dataset.readerPanel as View);
   }}>
     <nav className="reader-bar" ref={bar} aria-label="Story workspace">
       <div className="reader-bar-caption"><span>Read. Compare. Verify.</span><span>{views.find(v => v[0] === active)?.[3]}</span></div>
@@ -108,7 +111,7 @@ export function EventReading({ event, sources }: { event: Event; sources: Source
   if (storyReadable(event, sources)) return <Story event={event} sources={sources} />;
   return <div className="reader-opening"><p className="eyebrow">EVENT ANALYSIS / {event.date}</p><h1>{event.title}</h1>
     {event.reasoning?.needs_review && <ReviewLabel />}<p className="lede">{event.summary}</p>
-    {event.importance && <details className="reader-selection"><summary>Story selection<span aria-hidden="true">+</span></summary><strong>{event.importance.label}</strong><p>{event.importance.explanation}</p></details>}
+    <ImpactAssessment event={event} />
     <LegacyClaims event={event} />
   </div>;
 }
