@@ -137,6 +137,16 @@ const assert = require("node:assert/strict");
         .selectOption(mode);
     }
     await require('./spectrum-checks.cjs')({page, sources:response.events[0].sources});
+    const suppliedArticle=response.events[0].article;
+    delete response.events[0].article;
+    response.events[0].reasoning={rubric:{legal_force:2,reach:2,irreversibility:1,confirmation:1,total:6,rationale:{legal_force:'DEMO supplied legal rationale'}}};
+    await open();await page.getByRole('tab',{name:'Reading',exact:true}).click();
+    await require('./impact-checks.cjs')({page,event:response.events[0]});
+    response.events[0].reasoning.rubric.total=99;
+    await open();await page.getByRole('tab',{name:'Reading',exact:true}).click();
+    assert.equal(await page.locator('.impact-assessment').count(),response.events[0].importance?1:0);
+    assert.equal(await page.locator('.impact-total-value').count(),0);
+    delete response.events[0].reasoning;response.events[0].article=suppliedArticle;
     chartSources[0].audience = 0;
     await open();
     await page.locator('.sp-source-button').filter({hasText:chartSources[0].name}).click();

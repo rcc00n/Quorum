@@ -35,6 +35,8 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · Impact is a compact native disclosure; a complete supplied rubric uses the canonical 2/3/2/2 dimension ranges and a matching supplied total, with rationales/original notes on demand. Partial/inconsistent rubrics retain the original label/notes without an invented numeric diagram. Why: Vadim requested clear accents rather than raw rubric text; source fields and scoring stay unchanged (docs/DECISIONS.md › Selecting major news).
+
 2026-10-27 · rcc00n / Codex · `WorkspaceNavigator` uses a native dialog/combobox and searches only loaded topic/story labels and fixed local destinations. Current-story view links retain the producer date/revision; selecting a same-page hash activates the reader without refetching. Why: app-wide keyboard navigation and immediate diagrams without an API, new dependency or model request.
 
 2026-10-27 · rcc00n / Codex · `InvestigationReader` owns local view state and hash navigation; panels stay mounted so source selections/disclosures/filters survive switching. Existing original-content browser assertions run in All sections alongside focused pane/deep-link/keyboard/no-refetch checks. Why: the new reading-first navigation must reduce scrolling without removing evidence or weakening its regressions; see docs/DECISIONS.md › Reader workspace amendment.

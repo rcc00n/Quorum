@@ -60,6 +60,7 @@ module.exports = async ({browser, root, password, temp, build}) => {
     assert.deepEqual(result.events[0].reasoning_context.trace, original.trace);
     await page.goto(`${root}/events/${story.event_id}?date=${day}`);
     await page.getByRole('heading', {name: story.headline, exact: true}).waitFor();
+    await require('./impact-checks.cjs')({page,event:feed.events.find(e=>e.id===story.event_id)});
     await require('./reader-checks.cjs')({page});
     await require("./navigator-checks.cjs")({page});
     for (const name of ['Evidence Explorer', 'Perspective Comparison', 'Investigation Timeline'])

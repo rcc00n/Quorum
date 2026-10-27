@@ -4,6 +4,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import type { Event, Source } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
 import { Story, storyReadable, ReviewLabel } from "./story";
+import { ImpactAssessment } from "./impact-assessment";
 
 const views = [
   ["reading", "Read", "Reading", "The story, at your pace"],
@@ -108,7 +109,7 @@ export function EventReading({ event, sources }: { event: Event; sources: Source
   if (storyReadable(event, sources)) return <Story event={event} sources={sources} />;
   return <div className="reader-opening"><p className="eyebrow">EVENT ANALYSIS / {event.date}</p><h1>{event.title}</h1>
     {event.reasoning?.needs_review && <ReviewLabel />}<p className="lede">{event.summary}</p>
-    {event.importance && <details className="reader-selection"><summary>Story selection<span aria-hidden="true">+</span></summary><strong>{event.importance.label}</strong><p>{event.importance.explanation}</p></details>}
+    <ImpactAssessment event={event} />
     <LegacyClaims event={event} />
   </div>;
 }
