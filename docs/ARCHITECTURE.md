@@ -133,6 +133,8 @@ class RunState(TypedDict):                      # reasoning/quorum_reasoning/sta
 | `roundup` | events below the bar | one line per event with source and status, grouped, ordered by rubric total | yes, for the line text |
 | `publish` | everything | snapshot JSON, version +1, stored; summary paragraph for the topic page | yes, for the summary |
 
+Source memory (H-MEM, 2026-10-26; DECISIONS › Still to clarify, Build rule; `reasoning/memory/README.md`), only with `[engines] hmem = "on"` and never in a dry run: at the end of `frame`, one `memory` trace row (event null) for the write of each outlet's interpretation label and the bound supporting evidence of confirmed fact/number claims into the reference engine; in research round 2, one `memory` row per thin claim for the recall, which may move an exactly matching current document up the ordinary candidate list, under the unchanged cap. The recalled document is fetched and judged like any other candidate: no remembered quote, stance or verdict becomes evidence. A memory failure keeps the ordinary ranking, adds a run error with node `memory` and so makes the edition `partial`; the snapshot's shape does not change.
+
 ### Loops and limits
 
 - `verify → research`: at most 2 research rounds per event (`loops.research_rounds_max`). Round 2 runs only for thin claims and widens to the rest of the day's corpus, the official documents and the previous `research.previous_days` edition windows (built 2026-10-24: the same two SQL statements over the earlier interval; those documents are evidence only and an evidence row from one says `from_previous_day`). Still planned, DEFERRED: the official sites of record, and the GDELT DOC API as a discovery tool over the domains already in `sources` (an article GDELT finds counts toward confirmation only when its domain has an `independence_group`; other domains count as spread, never as confirmation). Google News RSS is dropped: its links do not resolve to the publication's URL without JavaScript (Anastasia, 2026-10-22). The trace shows round 2 as `research` iteration 2 and whether it changed a verdict.
@@ -158,7 +160,7 @@ class RunState(TypedDict):                      # reasoning/quorum_reasoning/sta
 
 | Use | Model | Notes |
 | --- | --- | --- |
-| Claim extraction, stance, framing labels, writing, critique, roundup lines, summary | NVIDIA Nemotron via Meterless (`meterless/auto` or a named lane) | Same route as `smoke_test.py`; keys only in `.env`. |
+| Claim extraction, stance, framing labels, writing, critique, roundup lines, summary | NVIDIA Nemotron via Meterless Nightshift, exact model ids per lane: Nemotron 3.5 Lightning 30B on the worker lane, Nemotron 3 Ultra 550B on the blind fact-checker and reviewer lanes (`reasoning/README.md` › Run it; `meterless/auto` was the pre-2026-10-26 wording) | Same route as `smoke_test.py`; keys only in `.env`. |
 | Fact-checker | A different model when the rules allow; otherwise Nemotron with its own context and tools | Independence comes first from the blind context and separate tools, second from model diversity. |
 | Embeddings for clustering | None in v0: stemmed event-key overlap in Python | `nvidia/nemotron-3-embed-1b` is the later option for the overlap measure if the first live days show the filter still misses pairs; swap without touching the graph. |
 
@@ -181,7 +183,7 @@ Reasoning publishes one snapshot per topic and edition day. The portal's adapter
   "expires_at": "2026-10-23T12:00:00Z",
   "edition_timezone": "America/New_York",
   "window": {"start": "2026-10-21T09:30:00Z", "end": "2026-10-22T09:30:00Z"},
-  "provenance": {"corpus": "zetaris", "model": "meterless/auto", "fictional": false},
+  "provenance": {"corpus": "zetaris", "model": "nvidia/nemotron-3.5-lightning-30b-a3b", "fictional": false},
   "bar": {"threshold": 6, "confirmation_min": 1},
   "summary": "Three stories crossed the bar out of 17 events. …",
   "sources_missing": ["newsmax"],
@@ -261,11 +263,13 @@ reasoning/                      # the package; see reasoning/README.md for comma
     nodes/                      # one file per node: plan, cluster, score, extract, research, verify, fact_check,
                                 # adjudicate, escalate, frame, write, critique, roundup, publish; routes beside their node
     rules/                      # confirmation.py, impact_bar.py, writing_rules.py — pure functions, unit-tested
-    tools/                      # corpus.py (Zetaris SQL via agent/tools_zetaris.py, fixture in dry run), fetch_text.py
+    tools/                      # corpus.py (Zetaris SQL via agent/tools_zetaris.py, fixture in dry run), fetch_text.py,
+                                # memory.py (source memory hooks; off by default)
     prompts/                    # one Markdown system prompt per model task
     dryrun.py                   # deterministic twin of every model task (no credits)
     fixtures/sample_day.json    # fictional corpus for the dry run and the tests
     trace.py, ids.py, text.py, llm.py, config.py, run.py
+  memory/sidecar.mjs            # the unchanged Meterless H-MEM reference engine as a JSON-on-stdin subprocess (checkout in METERLESS_HOME)
   tests/                        # rules, end-to-end dry run, escalation path, Mermaid
 ```
 
@@ -319,9 +323,33 @@ review reports: [2026-10-23-reasoning-review.md](reviews/2026-10-23-reasoning-re
   partial` (63 model errors, all HTTP 429 or no-JSON), 0 stories (highest rubric total 5). Two defects it exposed are
   fixed after it (a 429 aborted an event's fact-check; shared pacing across lanes). The canonical run on the closed
   edition follows; Issue #2 holds the hand-over (snapshot + sidecar SHA-256).
-- BLOCKED: the Nightshift route — the Windows runtime binds Windows loopback only, so a run must start from a
-  Windows Python venv or after an approved WSL networking change; the Meterless Engine feature — proposal
-  written, go/no-go and a checkout pending.
+- Nightshift route: done 2026-10-26 *(this line was "BLOCKED" until then; the runtime still binds Windows loopback only, so runs start from a Windows Python venv)*: a labelled showcase edition (climate-policy, 202 of 202 calls with receipts, Issue #2 6423850385) and the H-MEM live check (188 calls, 0 failed) ran through it; the 27 October editions run with `--route meterless` (`scripts/run_editions.py`, runbook `docs/reviews/2026-10-27-demo-runbook.md`). The Meterless Engine feature: see the H-MEM line below *(its earlier "proposal written, go/no-go and a checkout pending" wording was superseded 2026-10-26)*.
+- H-MEM source memory, the Meterless Engine feature (2026-10-26, branch `yelysei/meterless-engine`; DECISIONS.md ›
+  Still to clarify, Build rule; hand-over log [2026-10-26-meterless-engine-build.md](reviews/2026-10-26-meterless-engine-build.md)):
+  TESTED (conformance 13/13, exit 0, against `reasoning/memory/sidecar.mjs`; the engine-backed memory tests and the
+  full suite green with `METERLESS_HOME` set) and INTEGRATED on the write path only, in one live check with the flag
+  on and a private `--out` (`frame` → sidecar → reference engine, 3 records persisted). Recall through the engine is
+  TESTED only (real engine, stubbed model and fetch): the live check's recalls came before the store existed and were
+  answered by the sidecar without the engine. Not DEPLOYED: canonical editions keep `[engines] hmem = "off"`.
+  Anastasia's review of the stored DocRef identity is pending (BLOCKED on her). *(superseded 2026-10-26 by the next
+  line; its "exit 0" is held by neither kept conformance scorecard, see the hand-over log › Status)*
+- H-MEM source memory, status until Yelysei decides (2026-10-26, conservative wording chosen by the review
+  coordinator; the same in DECISIONS.md › Still to clarify and its log row): H-MEM source memory: TESTED (conformance
+  13/13 against the sidecar; engine-backed tests with the real reference engine, stubbed model and fetch) and
+  INTEGRATED live on the WRITE path only (one live check, climate-policy 2026-10-26, Meterless route: frame → sidecar
+  → reference HMEM, 3 records). A live recall through the engine has not run yet: the store directory did not exist
+  when research round 2 ran, so the sidecar answered all 26 recall requests itself before opening the engine. That is
+  expected from the next live run with hmem on. Still open:
+  - docs/RELEASE_CHECKLIST.md › H-MEM acceptance (Anastasia's DocRef approval, then a genuine recall and fresh source
+    re-verification);
+  - the challenge-page acceptance check.
+
+  Whether this already counts as 'Build rule met' is Yelysei's decision, asked 2026-10-26. Not DEPLOYED: canonical
+  editions keep `[engines] hmem = "off"`.
+  Launch environment: the engine-backed tests ran again at 7d7a3f1, with the allowlisted sidecar environment
+  (`tools/memory._SIDECAR_ENV`) and `METERLESS_HOME` set (2026-10-26 21:56Z: 16 passed, 2 symlink skips, exit
+  0); the live check ran before that change, with the inherited environment, and has not been repeated
+  (hand-over log › Status).
 - NOT_STARTED: a live eval run (`tests/eval.py --live`, opt-in); the sources-registry load for the coverage
   denominators (`sources_missing` is still `[]`; product decision pending).
 - DEFERRED for the hackathon, stated here so nothing is implied (DECISIONS.md log, 2026-10-24): `server.py`

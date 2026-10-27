@@ -14,7 +14,7 @@ permissions:
 jobs:
   portal:
     if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/feature/web-') || github.ref == 'refs/heads/integration'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
       DJANGO_DEBUG: '1'
@@ -38,7 +38,12 @@ jobs:
       - name: Install isolated browser test tools
         run: |
           npm install --prefix "$RUNNER_TEMP/quorum-browser" --no-audit --no-fund --ignore-scripts playwright@1.64.1
-          node "$RUNNER_TEMP/quorum-browser/node_modules/playwright/cli.js" install --with-deps chromium
+          # DECISION(2026-10-26, rcc00n/Codex): use the hosted image's installed Chrome and fail if absent.
+          # Why: repeated Ubuntu-mirror font downloads exhausted CI timeouts before any browser test ran.
+          quorum_ci_chrome="$(command -v google-chrome)"
+          test -x "$quorum_ci_chrome"
+          "$quorum_ci_chrome" --version
+          echo "CHROMIUM_PATH=$quorum_ci_chrome" >> "$GITHUB_ENV"
       - name: Run authenticated browser regressions
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/quorum-browser/node_modules/playwright
@@ -50,7 +55,7 @@ jobs:
           node web/tests/boundary.cjs --reasoning --roundup-checks
 
   combined-python:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       DJANGO_DEBUG: '1'

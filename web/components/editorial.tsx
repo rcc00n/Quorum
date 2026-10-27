@@ -165,7 +165,9 @@ function EditionNote({
                 <div className="roundup-item" key={i}>
                   <p>{item.text}</p>
                   <small>
-                    {item.status === "attributed"
+                    {item.label
+                      ? item.label.charAt(0).toUpperCase() + item.label.slice(1)
+                      : item.status === "attributed"
                       ? "Attributed statement"
                       : item.status === "established"
                         ? "Established"

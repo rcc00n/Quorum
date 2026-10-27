@@ -1,0 +1,420 @@
+/* WEB-UX-04: the app routes (daily brief, history, topic, event, settings) in the portal's identity.
+   Loaded after globals.css (app/layout.tsx). It does not rewrite Vadim's layout rules; it re-points the
+   variables they read (--accent, --bg, --text, --muted, --border) at the identity tokens of identity.css,
+   replaces the serif display face with the grotesque, squares the corners, and overrides the handful of
+   rules that hard-code the former teal palette. Cohort and status colours of the analysis views are data
+   colours and stay untouched.
+   DECISION(2026-10-26, Anastasia/Claude Code): a token layer over globals.css instead of a rewrite. Why: the
+   landing, the gate screens and the workspace must read as one paper before the deadline; a rewrite of
+   2 800 lines of shared styles two days before it would risk every route Vadim's tests cover. */
+:root {
+  --bg: var(--paper);
+  --surface: var(--paper);
+  --text: var(--ink);
+  --muted: var(--ink);
+  --accent: var(--umber);
+  --border: var(--rule);
+}
+body {
+  font-family: var(--body);
+  font-size: 15px;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+h1,
+h2 {
+  letter-spacing: -0.02em;
+}
+p {
+  color: var(--ink);
+}
+em {
+  color: var(--umber-ink);
+  font-style: normal;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* Brand: the wordmark in the display face, the circle mark retired. */
+.brandmark {
+  display: none;
+}
+.brand {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  text-transform: capitalize;
+  color: var(--ink);
+}
+.brand-dot {
+  color: var(--umber);
+}
+
+/* Shell: the sidebar becomes the site header (DECISION 2026-10-26, Anastasia/Claude Code: the menu moves to the
+   top, Today · History · My topics, the account and sign-out at the right; the sidebar's topic list is retired in
+   favour of the board's sections and "My topics". Revised the same day on Anastasia's review: the bar takes the
+   landing masthead's layout and colours, 72 px, wordmark left, menu centred, actions right, ink on the page, no
+   rule; its surface, clear at rest and frosted paper once the page scrolls under it, is app/header.css. The
+   markup in components/portal.tsx is unchanged.) */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+}
+.sidebar {
+  height: auto;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 32px;
+  color: var(--ink);
+  border-right: 0; /* the inline gutter comes from app/header.css */
+}
+.sidebar .brand {
+  font-size: 24px;
+  color: var(--ink);
+}
+.sidebar .brand-dot {
+  display: none; /* the wordmark reads "Quorum", as on the landing */
+}
+.nav-label,
+.sidebar-topics,
+.sidebar nav svg,
+.sidebar .text-button svg {
+  display: none;
+}
+.sidebar nav {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+}
+.sidebar nav a {
+  color: var(--ink);
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 0 2px;
+  margin-left: 0;
+  border-bottom: 2px solid transparent;
+}
+.sidebar nav a:hover,
+.sidebar nav a.active {
+  background: none;
+  box-shadow: none;
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.sidebar-bottom {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 15px;
+  justify-self: end;
+}
+.sidebar-bottom > a {
+  color: var(--ink);
+  font-size: 15px;
+  margin: 0;
+}
+.account-name {
+  color: var(--ink);
+  border: 0;
+  border-bottom: 2px solid transparent; /* the same baseline as the sign-out link */
+  padding: 0 0 2px;
+  font-weight: 500;
+  margin: 0;
+}
+.text-button {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 0 2px;
+  border-bottom: 2px solid transparent;
+}
+.text-button:hover {
+  border-bottom-color: var(--ink);
+}
+.sidebar :is(a, button):focus-visible {
+  outline-color: var(--ink);
+}
+.workspace-header {
+  display: none;
+}
+.workspace-main {
+  padding: 32px var(--gutter) 48px;
+  max-width: var(--measure); /* the page column of identity.css; globals.css centres it */
+}
+.workspace-footer {
+  font-family: var(--body);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  border-top: 1px solid var(--rule);
+  padding-inline: var(--column-gutter);
+}
+.workspace-footer span:first-child {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Type on the pages */
+.eyebrow {
+  font-family: var(--body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.page-heading h1 {
+  font-size: clamp(32px, 3.4vw, 44px);
+  line-height: 1.08;
+  margin: 10px 0 12px;
+}
+.page-heading > p,
+.page-heading > p:last-child {
+  font-size: 15px;
+  color: var(--ink);
+}
+.help {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.muted {
+  color: var(--ink);
+}
+.tabs > span {
+  font-size: 14px;
+  color: var(--ink);
+}
+.tabs .selected {
+  border-bottom: 2px solid var(--ink);
+  color: var(--ink);
+}
+.filters label {
+  color: var(--ink);
+  font-size: 12px;
+}
+.section-heading h2,
+.settings-grid h2 {
+  font-size: 24px;
+  letter-spacing: -0.015em;
+}
+.edition-label {
+  font-family: var(--body);
+  color: var(--ink);
+}
+.event-row {
+  border-bottom: 1px solid var(--rule);
+}
+.event-row h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 24px;
+  letter-spacing: -0.015em;
+}
+.event-row p {
+  color: var(--ink);
+  font-size: 15px;
+}
+.empty svg {
+  color: var(--ink);
+}
+.empty h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 22px;
+}
+.empty p {
+  color: var(--ink);
+}
+.empty a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.brief-aside {
+  border-left: 1px solid var(--rule);
+}
+.brief-aside h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 24px;
+}
+.brief-aside h4 {
+  font-family: var(--body);
+  font-weight: 500;
+}
+.brief-aside p:not(.eyebrow) {
+  color: var(--ink);
+  font-size: 14px;
+}
+.brief-aside a {
+  color: var(--ink);
+  font-size: 14px;
+}
+.aside-rule {
+  background: var(--rule);
+}
+.status-dot {
+  background: var(--umber);
+}
+.followed > svg,
+.followed > a {
+  color: var(--ink);
+}
+
+/* Controls */
+.button {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+  border-radius: 2px;
+  gap: 10px;
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 18px;
+}
+.button:hover {
+  background: var(--umber-ink);
+  border-color: var(--umber-ink);
+  transform: none;
+}
+.secondary-button {
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  border-radius: 2px;
+  font-weight: 500;
+}
+input,
+select {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-family: var(--body);
+  color: var(--ink);
+  background: var(--paper);
+}
+input[type="checkbox"] {
+  accent-color: var(--ink);
+}
+label {
+  color: var(--ink);
+  font-size: 13px;
+}
+.message {
+  background: var(--paper-2);
+  border-left: 2px solid var(--umber);
+  color: var(--ink);
+  border-radius: 0;
+}
+.error {
+  background: var(--paper-2);
+  border-color: var(--umber-ink);
+}
+.notice {
+  background: var(--paper-2);
+  border-left: 2px solid var(--umber);
+}
+.notice p {
+  color: var(--ink);
+}
+
+/* Analysis and reasoning views: the former teal chrome; cohort and status colours are left as they are. */
+.publication-notice,
+.uncertainty,
+.r-claim-status {
+  background: var(--paper-2);
+}
+.claim-detail h3,
+.perspective-column h3 {
+  font-family: var(--display);
+  font-weight: 500;
+}
+.coverage-measures strong {
+  font-family: var(--display);
+  font-weight: 500;
+}
+.citation blockquote {
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.6;
+}
+.r-demo strong,
+.r-impact dt strong,
+.r-loop-overview strong,
+.r-repeat summary strong,
+.r-repeat .r-iteration,
+.r-final strong {
+  color: var(--umber-ink);
+}
+.r-standfirst,
+.r-kind-not_confirmed > p,
+.r-paragraph.r-kind-not_confirmed > p:not(.help):not(.r-passage-label),
+.r-evidence-counts > span,
+.r-evidence .r-stance {
+  color: var(--ink);
+}
+.r-final,
+.r-disagreement {
+  border-left: 2px solid var(--umber);
+}
+.r-final {
+  background: var(--paper-2);
+}
+.r-repeat {
+  border-left: 2px solid var(--umber) !important;
+}
+.r-coverage-bar span {
+  background: var(--ink);
+}
+.edition-notes {
+  border-top: 1px solid var(--rule);
+}
+
+@media (max-width: 700px) {
+  .sidebar {
+    grid-template-columns: auto 1fr;
+    padding-top: 12px;
+    gap: 4px 16px;
+  }
+  .sidebar nav {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    gap: 18px;
+    overflow-x: auto;
+  }
+  .sidebar nav a {
+    padding: 8px 0 10px;
+    white-space: nowrap;
+  }
+  /* DECISION(2026-10-26, Anastasia/Claude Code): on phones the account block (name, Sign out, staff link)
+     is hidden, as the sidebar hid it before the bar; signing out stays on My topics. Why: the bar's second
+     Sign out next to the page's own made web/tests/browser.cjs ambiguous at 390 px and failed CI on #27. */
+  .sidebar-bottom {
+    display: none;
+  }
+  .workspace-main {
+    padding: 24px var(--gutter) 40px;
+  }
+}

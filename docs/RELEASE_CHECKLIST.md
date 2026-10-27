@@ -35,6 +35,7 @@ Historical gates below refer to their pinned milestone in [PORTAL_VERIFICATION.m
 - [ ] Agreed versioned contract and narrowly scoped transport/auth; genuine securely published result displayed on the portal with provenance/revision and failure handling (all).
 - [ ] Repeatable real end-to-end demo and auditable public-safe trace; fixture tests are separately labelled (all).
 - [ ] Confirm Track 03 workspace selection and organizer-rule evidence, including unresolved human-reported Cursor update (all).
+- [ ] Judges' reader on the VPS: `QUORUM_ENABLE_REASONING_READER=1` and `QUORUM_REASONING_EDITIONS_ROOT` in `/etc/quorum/portal.env`, each 27 October edition installed with `reasoning_snapshot … --install` after acceptance, checked signed-in on the site (Anastasia, covering Vadim's items).
 - [ ] Final 1–4 minute video, slides, source/setup/usage/dependencies, sponsor-use explanation and verified submission before 2026-10-27 23:45 UTC (all).
 
 ## Rollback

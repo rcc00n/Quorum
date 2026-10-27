@@ -20,7 +20,8 @@ import type {
 } from "@/lib/analysis";
 import { displayTime } from "@/lib/analysis";
 import { Spectrum } from "./spectrum";
-import { StoryArticle } from "./editorial";
+import { Story, claimKey, ReviewLabel } from "./story";
+import { readableArticle } from "@/lib/editorial";
 
 const statusNames = {
   established: "Established",
@@ -114,6 +115,13 @@ export function PublicationNotice({
         Generated {displayTime(p.generated_at)} · Revision{" "}
         {p.revision || "unavailable"}
       </span>
+      {p.provisional && (
+        <span>
+          {p.corpus_as_of_utc
+            ? `Provisional corpus as of ${displayTime(p.corpus_as_of_utc)}: the producer's capture metadata, not an independent verification.`
+            : "Provisional corpus: capture metadata unavailable, no sidecar is bound."}
+        </span>
+      )}
       {p.expires_at && (
         <span>
           Freshness deadline {displayTime(p.expires_at)}. Publication status
@@ -224,9 +232,7 @@ function ClaimDetail({
       open={index === 0}
     >
       <summary>
-        <span className="claim-index">
-          {String(index + 1).padStart(2, "0")}
-        </span>
+        <span className="claim-index">{claimKey(index)}</span>
         <div>
           <span className={"claim-state state-" + claim.status}>
             {statusNames[claim.status]}
@@ -470,22 +476,30 @@ export function AnalysisWorkspace({
     (x, y) =>
       x.timestamp.localeCompare(y.timestamp) || x.id.localeCompare(y.id),
   );
+  // DECISION(2026-10-26, Anastasia/Claude Code): when the reasoning output supplied a readable article, the head
+  // of the page is the story (components/story.tsx) and this workspace becomes its appendix, restyled by
+  // app/story.css under .story-page; otherwise the page is unchanged. Why: web/DESIGN.md › Decisions (story page).
+  const readable = !supplementary && readableArticle(event);
   return (
-    <div className="analysis-workspace">
-      {!supplementary && (
-        <>
-          <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
-          <h1>{event.title}</h1>
-          <p className="lede">{event.summary}</p>
-          {event.importance && (
-            <aside className="notice">
-              <strong>{event.importance.label}</strong>
-              <p>{event.importance.explanation}</p>
-            </aside>
-          )}
-        </>
+    <div className={readable ? "analysis-workspace story-page" : "analysis-workspace"}>
+      {readable ? (
+        <Story event={event} sources={sources} />
+      ) : (
+        !supplementary && (
+          <>
+            <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
+            <h1>{event.title}</h1>
+            {event.reasoning?.needs_review && <ReviewLabel />}
+            <p className="lede">{event.summary}</p>
+            {event.importance && (
+              <aside className="notice">
+                <strong>{event.importance.label}</strong>
+                <p>{event.importance.explanation}</p>
+              </aside>
+            )}
+          </>
+        )
       )}
-      <StoryArticle event={event} />
       <nav className="analysis-navigation" aria-label="Analysis sections">
         <a href="#evidence-explorer">
           <SearchCheck size={16} />

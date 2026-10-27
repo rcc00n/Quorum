@@ -43,6 +43,9 @@ export type Evidence = {
 // Portal view model; reasoning-owned 1.0 consumer types live in reasoning.ts.
 export type Event = {
   reasoning?: ReasoningStory;
+  reasoning_context?: Pick<ReasoningRun, "edition_date" | "version" | "trace" | "roundup"> & {
+    stories: Pick<ReasoningStory, "event_id" | "headline">[];
+  };
   article?: ArticlePresentation;
   analysis?: StructuredAnalysis;
   id: string;
@@ -104,6 +107,16 @@ export async function feed(day: string, topic: string): Promise<Snapshot> {
   );
   if (!res.ok)
     throw new Error("Your brief could not be loaded. Please try again.");
+  return res.json();
+}
+// The gated development preview (backend/portal/views.py reasoning_preview): the event route reads it when
+// asked with ?preview=1, so a reasoning story can be read as a story before any edition is published.
+export async function previewSnapshot(day?: string): Promise<Snapshot> {
+  const query = new URLSearchParams();
+  if (day) query.set("date", day);
+  const res = await fetch(`/api/preview/reasoning/?${query}`, { cache: "no-store" });
+  if (!res.ok)
+    throw new Error("This preview could not be loaded. Please try again.");
   return res.json();
 }
 export async function eventSnapshot(

@@ -50,7 +50,7 @@ def _entries(content: bytes) -> list[dict]:
     return out
 
 
-def collect_official_feed(conn, fetcher: Fetcher, source: dict, topics: list[dict]) -> dict:
+def collect_official_feed(conn, fetcher: Fetcher, source: dict, topics: list[dict], store_only: str | None = None) -> dict:
     """RSS of a government body (whitehouse.gov, defense.gov, state.gov): press releases, briefings, transcripts.
 
     `topics` is the ordered list of active topics (load_topics); each feed is walked once and every entry is stored
@@ -74,8 +74,8 @@ def collect_official_feed(conn, fetcher: Fetcher, source: dict, topics: list[dic
             if not title or not link:
                 continue
             topic, _match = first_topic_match(title, lead, topics)
-            if topic is None:
-                continue
+            if topic is None or (store_only is not None and topic["id"] != store_only):
+                continue  # store_only: a single-topic pass (run.py --topic) keeps the loop's ownership rule
             stats["matched"] += 1
             page = fetcher.get(link)
             text = extract_text(page.text) if page is not None else ""
@@ -96,11 +96,12 @@ def collect_official_feed(conn, fetcher: Fetcher, source: dict, topics: list[dic
     return stats
 
 
-def collect_source(conn, fetcher: Fetcher, source: dict, topics: list[dict]) -> dict:
+def collect_source(conn, fetcher: Fetcher, source: dict, topics: list[dict], store_only: str | None = None) -> dict:
     """Walk every feed of one source once, matching every active topic. Returns counters.
 
     `topics` is the ordered list from load_topics; an entry goes to the first topic that matches it (first_topic_match
-    in common.py; decision: README › Decisions, 2026-10-25) and is skipped when none does.
+    in common.py; decision: README › Decisions, 2026-10-25) and is skipped when none does. `store_only` (run.py
+    --topic) stores only the entries that topic wins; the others are skipped, never re-owned.
     """
     stats = {"seen": 0, "matched": 0, "inserted": 0, "level2": 0, "by_topic": {t["id"]: 0 for t in topics}}
     for feed_url in source["rss_urls"]:
@@ -115,8 +116,8 @@ def collect_source(conn, fetcher: Fetcher, source: dict, topics: list[dict]) -> 
             if not title or not link:
                 continue
             topic, match = first_topic_match(title, lead, topics)
-            if topic is None:
-                continue
+            if topic is None or (store_only is not None and topic["id"] != store_only):
+                continue  # store_only: a single-topic pass (run.py --topic) keeps the loop's ownership rule
             stats["matched"] += 1
             byline = entry.get("author")
             published = parse_dt(entry.get("published") or entry.get("updated"))

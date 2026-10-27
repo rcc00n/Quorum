@@ -151,6 +151,24 @@ const assert = require("node:assert/strict");
     await page
       .getByText("This edition is out of date", { exact: true })
       .waitFor();
+    // A provisional corpus (the login-only reader's label) is named with its capture time.
+    response.publication.status = "available";
+    response.publication.fallback = false;
+    response.publication.provisional = true;
+    response.publication.corpus_as_of_utc = "2026-10-22T09:30:00Z";
+    await open();
+    await page
+      .getByText("Provisional corpus as of", { exact: false })
+      .waitFor();
+    response.publication.provisional = false;
+    // A story the producer flagged needs_review carries the label on the claims-only head.
+    response.events[0].reasoning = { needs_review: true };
+    await open();
+    await page
+      .getByText("Requires editorial review", { exact: true })
+      .first()
+      .waitFor();
+    delete response.events[0].reasoning;
     response.events[0].analysis.trace = [];
     await open();
     await page
@@ -193,7 +211,7 @@ const assert = require("node:assert/strict");
       .getByRole("heading", { name: "Also today", exact: true })
       .waitFor();
     for (const [status, title] of [
-      ["pending", "Space for a clearer picture"],
+      ["pending", "No edition for 22 October 2026 is installed on this portal."],
       ["error", "This edition is unavailable"],
       ["partial", "This edition is incomplete"],
       ["stale", "This stored edition is out of date"],

@@ -16,6 +16,10 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), "quorum-boundary-")),
   children = [];
 let proxy, browser;
 const reasoningMode = process.argv.includes("--reasoning");
+const installedMode = process.argv.includes("--installed-editions");
+if (installedMode && (!path.isAbsolute(process.env.QUORUM_TEST_REASONING_EDITIONS_ROOT || "") ||
+    !path.isAbsolute(process.env.QUORUM_TEST_INSTALLED_SOURCE || "")))
+  throw Error("Installed-edition checks require explicit external accepted root and original source");
 const sourceIndex = process.argv.indexOf("--reasoning-file");
 const reasoningFile = sourceIndex < 0 ? null : process.argv[sourceIndex + 1];
 if (sourceIndex >= 0 && (!reasoningMode || !reasoningFile || reasoningFile.startsWith("--")))
@@ -67,12 +71,14 @@ const run = (args, env) =>
     DJANGO_CSRF_ORIGINS: root,
     QUORUM_PORTAL_DATA: path.join(temp, "auth"),
     QUORUM_CATALOG_PATH: process.env.QUORUM_TEST_CATALOG_FILE || "",
-    QUORUM_SNAPSHOT_ROOT: reasoningMode ? "" : path.join(temp, "snapshots"),
-    QUORUM_ENABLE_SNAPSHOT_PUBLICATION: reasoningMode ? "" : "1",
+    QUORUM_SNAPSHOT_ROOT: reasoningMode || installedMode ? "" : path.join(temp, "snapshots"),
+    QUORUM_ENABLE_SNAPSHOT_PUBLICATION: reasoningMode || installedMode ? "" : "1",
+    QUORUM_ENABLE_REASONING_READER: installedMode ? "1" : "",
+    QUORUM_REASONING_EDITIONS_ROOT: installedMode ? process.env.QUORUM_TEST_REASONING_EDITIONS_ROOT : "",
     QUORUM_ENABLE_REASONING_PREVIEW: reasoningMode ? "1" : "",
     QUORUM_REASONING_PREVIEW_FILE: path.join(temp, "reasoning.json"),
     QUORUM_REASONING_PREVIEW_SIDECAR: process.env.QUORUM_TEST_REASONING_SIDECAR || "",
-    QUORUM_TEST_REASONING_ONLY: reasoningMode ? "1" : "",
+    QUORUM_TEST_REASONING_ONLY: reasoningMode || installedMode ? "1" : "",
     PYTHONPATH: path.join(repo, "backend"),
     QUORUM_TEST_PASSWORD: password,
   };
@@ -161,6 +167,10 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     executablePath: process.env.CHROMIUM_PATH,
     args: ["--no-sandbox"],
   });
+  if (installedMode) {
+    await require('./installed-edition-checks.cjs')({browser, root, password, temp, build});
+    return;
+  }
   if (reasoningMode) {
     if (process.argv.includes("--roundup-checks")) {
       await require("./roundup-checks.cjs")({ browser, root, env, password });
