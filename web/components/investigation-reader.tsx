@@ -1,6 +1,7 @@
 "use client";
 import { Children, isValidElement, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { Event, Source } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
 import { Story, storyReadable, ReviewLabel, formatDate } from "./story";
@@ -28,6 +29,7 @@ export function InvestigationReader({ head, children, className = "" }: { title?
   const pendingTarget = useRef<HTMLElement | null>(null);
   const tabs = useRef(new Map<View, HTMLButtonElement>());
   const panels = Children.toArray(children).filter(isValidElement<{ name: Exclude<View, "all">; children: ReactNode }>);
+  const pathname = usePathname(), search = useSearchParams()?.toString() ?? "";
   function resolveHash() {
     let id: string;
     try { id = decodeURIComponent(location.hash.slice(1)); } catch { return; }
@@ -49,6 +51,12 @@ export function InvestigationReader({ head, children, className = "" }: { title?
     if (header) observer?.observe(header);
     return () => { window.removeEventListener("hashchange", resolveHash); window.removeEventListener("popstate", resolveHash); observer?.disconnect(); };
   }, []);
+  // DECISION(2026-10-27, Anastasia/Claude Code): a router navigation that changes the path or the query (the app
+  // search's "this story" items push `?date=…#reader-map`) fires neither hashchange nor popstate, so the hash is
+  // resolved again whenever they change. Until the second cabinet pass the page blanked and the reader remounted on
+  // every load, which read the hash by accident; a page that keeps its content while loading needs this instead.
+  // Why: CI's navigator check (Enter on "Source map · this story") stayed on the previous view.
+  useEffect(() => { resolveHash(); }, [pathname, search]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const target = pendingTarget.current; if (!target) return;
     // DECISION(2026-10-27, rcc00n/Codex): consume a deep link only after its pane is visible.
