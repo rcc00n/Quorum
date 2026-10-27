@@ -144,6 +144,25 @@ const assert = require("node:assert/strict");
     const {storySources}=require('../lib/story-sources.ts');
     await require('./spectrum-checks.cjs')({page, sources:storySources(response.events[0],(response.sources||[]).length?response.sources:response.events[0].sources), scope:'story'});
     const suppliedArticle=response.events[0].article,suppliedImportance=response.events[0].importance;
+    // WEB-MEDIA-01 regression: an unrenderable DEMO prose block keeps the claims-only view,
+    // while independently reviewed media still exposes its caption/source/licence. No real photo fetched.
+    const testPhoto={url:'https://upload.wikimedia.org/TEST-reviewed.svg',source_url:'https://commons.wikimedia.org/wiki/File:TEST-reviewed',
+      license_url:'https://creativecommons.org/publicdomain/zero/1.0/',license:'CC0-1.0',credit:'TEST photographer',caption:'TEST reviewed context image.',rights_confirmed:true};
+    await page.route(testPhoto.url,r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="gray"/></svg>'}));
+    response.events[0].article={...suppliedArticle,paragraphs:[{kind:'fact',text:'DEMO invalid prose must remain hidden.',claim_ids:['TEST-absent-claim']}],photo:testPhoto};
+    await open();await page.getByRole('tab',{name:'Reading',exact:true}).click();
+    assert.equal(await page.locator('.story').count(),0);assert.equal(await page.locator('.reader-brief').count(),1);
+    assert.equal(await page.getByText('DEMO invalid prose must remain hidden.',{exact:true}).count(),0);
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:1000});const image=page.locator('.story-photo img');await image.scrollIntoViewIfNeeded();
+      await page.waitForFunction(e=>e.complete&&e.naturalWidth>0,await image.elementHandle());
+      assert.equal(await image.getAttribute('alt'),testPhoto.caption);
+      assert.equal(await page.locator('.story-credit').getAttribute('href'),testPhoto.source_url);
+      assert.equal(await page.locator('.story-caption a').getAttribute('href'),testPhoto.license_url);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    }
+    await page.unroute(testPhoto.url);await page.setViewportSize({width:1440,height:1000});
+    response.events[0].article=suppliedArticle;
     response.events[0].importance={label:"DEMO Impact 6 / 9",explanation:"DEMO original selection notes, unchanged."};
     delete response.events[0].article;
     response.events[0].reasoning={rubric:{legal_force:2,reach:2,irreversibility:1,confirmation:1,total:6,rationale:{legal_force:'DEMO supplied legal rationale'}}};

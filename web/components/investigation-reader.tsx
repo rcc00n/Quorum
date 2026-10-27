@@ -4,7 +4,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { Event, Source } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
-import { Story, storyReadable, ReviewLabel, formatDate } from "./story";
+import { Story, StoryPhoto, storyReadable, ReviewLabel, formatDate } from "./story";
 import { ImpactAssessment } from "./impact-assessment";
 import { ChevronDown } from "lucide-react";
 
@@ -138,6 +138,9 @@ export function EventReading({ event, sources, headless = false }: { event: Even
   if (storyReadable(event, sources)) return <Story event={event} sources={sources} headless={headless} />;
   return <div className="reader-opening">{!headless && <><p className="eyebrow">EVENT ANALYSIS / {event.date}</p><h1>{event.title}</h1>
     {event.reasoning?.needs_review && <ReviewLabel />}<p className="lede">{event.summary}</p></>}
+    {/* DECISION(2026-10-27, rcc00n/Codex): reviewed media is independent of the prose-readability gate.
+        Why: a claims-only story still needs its image's caption/source/licence; claims and prose rules stay. */}
+    {event.article?.photo && <div className="story-page"><StoryPhoto key={event.article.photo.url} photo={event.article.photo} /></div>}
     <ImpactAssessment event={event} />
     <LegacyClaims event={event} />
   </div>;
