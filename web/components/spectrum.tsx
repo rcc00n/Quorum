@@ -88,7 +88,7 @@ export function Spectrum({ sources, standalone = false }: { sources: Source[]; s
           <h3 id="sp-cohorts-head">{`Registry cohorts under ${MODE_LABEL[mode] ?? mode}`}</h3>
           <table>
             <thead>
-              <tr><th scope="col">Cohort</th><th scope="col">Outlets</th><th scope="col">Share of outlets</th><th scope="col">Cited audience</th><th scope="col">Share of audience</th></tr>
+              <tr><th scope="col">Cohort</th><th scope="col">Outlets</th><th scope="col">Share of outlets</th><th scope="col">Cited estimates, summed</th><th scope="col">Share of cited estimates</th></tr>
             </thead>
             <tbody>
               {shares.rows.map(r => (
@@ -103,7 +103,7 @@ export function Spectrum({ sources, standalone = false }: { sources: Source[]; s
             </tbody>
           </table>
           <p className="sp-cohorts-note">
-            {`Shares of the ${shares.tiered} major- and minor-tier sources rated under this mode${shares.centre ? ` (${shares.centre} of them in the centre, in no cohort)` : ""}; audience shares of the ${shares.withAudience} with a cited estimate${shares.withoutAudience ? `, ${shares.withoutAudience} without one left out, not counted as zero` : ""}. Not in any cohort: ${shares.noTier} rated ${shares.noTier === 1 ? "source" : "sources"} without a tier, ${shares.unrated} unrated under this mode. Registry shares, not which sources covered an event.`}
+            {`Outlet shares of the ${shares.tiered} major- and minor-tier sources rated under this mode${shares.centre ? ` (${shares.centre} of them in the centre, in no cohort)` : ""}. Audience shares are shares of the supplied cited estimates of the ${shares.withAudience} sources that have one, summed as supplied: not deduplicated reach, not unique people${shares.withoutAudience ? `; ${shares.withoutAudience} without a cited estimate left out, not counted as zero, and a cohort with none shows no share` : ""}. Not in any cohort: ${shares.noTier} rated ${shares.noTier === 1 ? "source" : "sources"} without a tier, ${shares.unrated} unrated under this mode. Registry shares, not which sources covered an event or how many people it reached.`}
           </p>
         </section>
       )}

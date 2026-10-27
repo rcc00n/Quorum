@@ -2,11 +2,14 @@
 // (registry `tier`) × left/right (the selected mode's score at the agreed ±0.25 thresholds). Pure arithmetic on
 // values the caller already computed with lib/api's rating(); no formula is repeated here.
 // DECISION(2026-10-27, Anastasia/Claude Code; WEB-SPECTRUM-POLISH-02, prepared for Vadim's data-presentation
-// review): denominators are stated, never implied. Outlet shares divide by the tiered sources rated under the
-// mode (the four cohorts plus tiered sources in the centre); audience shares divide by the cited audience of
-// those same sources, and a source without a cited audience is counted apart, never as zero. Sources without
-// a tier (agencies, official bodies, the centre paper) and sources unrated under the mode are reported as
-// their own buckets. These are registry shares; nothing here says which sources covered an event.
+// review; amended on his review of PR #52): denominators are stated, never implied. Outlet shares divide by the
+// tiered sources rated under the mode (the four cohorts plus tiered sources in the centre); audience shares are
+// shares of the supplied cited estimates of those same sources, summed as supplied (not deduplicated reach, not
+// unique people), and a source without a cited estimate is counted apart, never as zero. A cohort with members
+// but no cited estimate at all has no audience share (null), so an unknown never reads as zero; an empty cohort
+// and a cohort whose only cited estimate is zero both read 0. Sources without a tier (agencies, official bodies,
+// the centre paper) and sources unrated under the mode are reported as their own buckets. These are registry
+// shares; nothing here says which sources covered an event or how many people it reached.
 export type CohortInput = { id: string; tier: "major" | "minor" | null | undefined; score: number | null; audience: number | null | undefined; audienceCited: boolean };
 export type CohortKey = "major-left" | "major-right" | "minor-left" | "minor-right";
 export type CohortRow = { key: CohortKey; tier: "major" | "minor"; lean: "left" | "right"; outlets: number; outletShare: number | null; audience: number; audienceShare: number | null; withoutAudience: number };
@@ -30,7 +33,7 @@ export function cohortShares(inputs: CohortInput[]): CohortShares {
       outlets: members.length,
       outletShare: tieredRated.length ? members.length / tieredRated.length : null,
       audience,
-      audienceShare: audienceDenominator > 0 ? audience / audienceDenominator : null,
+      audienceShare: members.length === 0 ? 0 : withAudience.length === 0 ? null : audienceDenominator > 0 ? audience / audienceDenominator : 0,
       withoutAudience: members.length - withAudience.length,
     };
   }));
