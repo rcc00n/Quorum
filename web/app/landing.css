@@ -4,6 +4,8 @@
    at .landing .lp-button). Corners: 8 px on containers, 4 px on controls (DECISION in web/DESIGN.md › Decisions,
    2026-10-26 evening). Rhythm: 128 px sections, one object per section, no page-wide hairlines. */
 .landing {
+  position: relative;
+  overflow-x: clip; /* the blurred field reaches past the right edge */
   background: var(--paper);
   color: var(--ink);
   font-family: var(--body);
@@ -19,6 +21,17 @@
   color: var(--ink);
   margin: 0;
 }
+/* Polish of 2026-10-27 (night): headings balance their lines and running text avoids a one-word last line,
+   so no section ends on "job." or "trace." alone (web/DESIGN.md › Landing after the deck › Polish). */
+.landing :is(h1, h2),
+.landing .lp-truth-answer,
+.landing .lp-final-lead,
+.landing .lp-quote p {
+  text-wrap: balance;
+}
+.landing p {
+  text-wrap: pretty;
+}
 .landing h1 {
   font-size: clamp(48px, 6vw, 84px);
   line-height: 1;
@@ -29,10 +42,12 @@
   font-size: clamp(38px, 4vw, 56px);
   line-height: 1.06;
   letter-spacing: -0.022em;
-  max-width: 20ch;
+  max-width: 24ch; /* most section heads on one line at 1024 and wider; the longest balances into two (was 20ch) */
 }
+/* Second round (2026-10-27 night): two display sizes under h2, nothing else: 24 px for a name that heads a column
+   (sponsor, team member, the selected source) and 20 px for a head inside an object (a step's caption, the card). */
 .landing h3 {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.25;
   letter-spacing: -0.012em;
 }
@@ -114,9 +129,6 @@
   line-height: 1.45;
   color: var(--ink-2);
   max-width: 56ch;
-}
-.landing .lp-sub-ink {
-  color: var(--ink);
 }
 .landing .lp-legend {
   margin-top: 16px;
@@ -208,8 +220,28 @@
 
 /* Sections: 128 px of air, content on the centred page column (identity.css), no hairlines across the page. */
 .landing main > section {
-  padding: 128px var(--column-gutter);
+  padding: 96px var(--column-gutter);
   scroll-margin-top: 80px;
+}
+/* DECISION(2026-10-27, Anastasia/Claude Code; landing after the deck): a hairline the width of the column opens
+   every section after the first, and the sections sit closer (96 px, the hero ending at 64 px). Supersedes the
+   "no page-wide hairlines" clause of the Air pass for this one rule: the line stays inside the column, not across
+   the page. Why: Anastasia's review of 2026-10-27, too much empty space between the hero and the sources and no
+   separator between them. */
+.landing main > section + section::before {
+  content: "";
+  display: block;
+  height: 1px;
+  max-width: var(--measure);
+  margin: -96px auto 88px;
+  background: var(--rule);
+}
+.landing .lp-hero { padding-bottom: 64px; }
+/* A band (paper-2 with the glow or the ledger) separates by its fill: no hairline at its top edge and none under its
+   bottom edge, so a section is opened by one device, never two (2026-10-27 night, Anastasia/Claude Code). */
+.landing main > :is(.lp-truth, .lp-trace, .lp-final)::before,
+.landing main > :is(.lp-truth, .lp-trace, .lp-final) + section::before {
+  display: none;
 }
 
 /* Hero: on the wider measure, 7 columns of text and 5 of sheet. */
@@ -223,8 +255,9 @@
   column-gap: 24px;
   row-gap: 56px;
   grid-template-areas:
-    "text text text text text text text card card card card card"
-    "chain chain chain chain chain chain chain card card card card card";
+    "text text text text text text text text card card card card"
+    "wire wire wire wire wire wire wire wire wire wire wire wire"
+    "foot foot foot foot foot foot foot foot foot foot foot foot";
   align-items: start;
 }
 .lp-hero-text {
@@ -349,23 +382,34 @@
    DECISION(2026-10-26, Anastasia/Claude Code): umber at fill-opacity .5 and ink-2 at .42 before a stdDeviation-22
    blur, which leaves patches of about #e3d9cf on paper (measured by eye on the 1440 px check; .18 was invisible);
    nothing in --ink-2 under 18 px lies on it. */
+/* The blur at the very back of the page (Anastasia, 2026-10-27): absolute on the landing root, from behind the
+   header down into the second section, every edge faded by a radial mask so nothing reads as a border; the page's
+   header, main and footer sit above it. Used again, sparingly, further down the page. */
 .lp-field-wrap {
-  display: none;
+  display: block;
   position: absolute;
-  top: 120px;
-  right: -6%;
-  width: 54%;
-  height: calc(100% - 120px);
+  top: -80px;
+  right: -14%;
+  width: 66%;
+  height: 1240px;
   z-index: 0;
   pointer-events: none;
   user-select: none;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 38%);
-  mask-image: linear-gradient(to right, transparent, #000 38%);
+  -webkit-mask-image: radial-gradient(ellipse 62% 56% at 62% 44%, #000 18%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
+  mask-image: radial-gradient(ellipse 62% 56% at 62% 44%, #000 18%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
+}
+/* main and footer above the field. The header is not listed: it is sticky by app/header.css (clear at rest, frosted
+   paper once scrolled, DECISION 2026-10-26 there) and already above the field at z-index 10; listing it here with
+   position: relative, as the evening pass did, won the cascade and un-stuck it (found by Anastasia, 2026-10-27 night). */
+.landing > main, .landing > footer {
+  position: relative;
+  z-index: 1;
 }
 .lp-field {
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
 /* The evidence sheet: a sheet of the product, 2 px ink rule on top. */
@@ -436,15 +480,12 @@
   margin-top: 20px;
   padding-top: 14px;
   gap: 6px 16px;
-  font-size: 13px;
+}
+.lp-kv-figures {
+  grid-template-columns: minmax(0, 1fr) auto; /* the label wraps, the figures never (the compact card is 370 px wide at 1440) */
 }
 .lp-kv-figures dd {
   white-space: nowrap; /* "50 · 19 · 17" is one figure; tests/landing.cjs reads it as one string */
-}
-@media (max-width: 700px) {
-  .lp-kv-figures {
-    grid-template-columns: minmax(0, 1fr) auto; /* the label wraps, the figures do not */
-  }
 }
 .lp-sql {
   margin: 20px 0 16px;
@@ -452,22 +493,39 @@
   padding-top: 12px;
 }
 .lp-sql summary,
-.lp-registry summary {
+.lp-registry summary,
+.landing .spectrum-modern > details > summary {
   cursor: pointer;
   font-size: 15px;
   font-weight: 500;
   color: var(--ink);
   list-style: none;
+  padding: 6px 0;
+  width: fit-content; /* the focus ring hugs the words, not the column */
+}
+.lp-sql summary::-webkit-details-marker,
+.lp-registry summary::-webkit-details-marker,
+.landing .spectrum-modern > details > summary::-webkit-details-marker {
+  display: none;
 }
 .lp-sql summary::before,
-.lp-registry summary::before {
+.lp-registry summary::before,
+.landing .spectrum-modern > details > summary::before {
   content: "+ ";
   font-family: var(--mono);
   color: var(--umber);
 }
 .lp-sql[open] summary::before,
-.lp-registry[open] summary::before {
+.lp-registry[open] summary::before,
+.landing .spectrum-modern > details[open] > summary::before {
   content: "− ";
+}
+.landing .spectrum-modern > details > p {
+  margin: 8px 0 12px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  max-width: 60ch;
 }
 .lp-sql pre {
   margin: 12px 0 0;
@@ -476,10 +534,10 @@
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
+  background: var(--tray);
+  border: 0;
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 12px 14px;
   color: var(--ink);
 }
 .landing .lp-sql .lp-fine {
@@ -619,72 +677,92 @@
 
 /* What is truth: a band, one statement, centred. */
 .lp-truth {
+  position: relative;
+  overflow: clip;
   background: var(--paper-2);
   text-align: center;
 }
-.landing .lp-bracket {
-  font-size: clamp(44px, 6vw, 80px);
+.lp-truth > :not(.lp-glow) { position: relative; }
+/* DECISION(2026-10-27, Anastasia/Claude Code): the blur returns as a device, sparingly: a soft glow (two warm
+   radial fields blurred 70 px) at the back of the two statement bands, "What is truth?" and the closing, and
+   nowhere else; no text in it, no edge. Why: Anastasia, 2026-10-27: use the blur again, not everywhere, for
+   beauty and variety. */
+.lp-glow {
+  position: absolute;
+  inset: -20% -10%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 55% at 32% 40%, rgba(201, 162, 126, 0.32), transparent 70%),
+    radial-gradient(30% 50% at 70% 60%, rgba(255, 255, 255, 0.9), transparent 70%),
+    radial-gradient(24% 40% at 58% 20%, rgba(123, 86, 52, 0.12), transparent 70%);
+  filter: blur(70px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-glow { filter: blur(70px); } /* static; nothing moves */
+}
+/* Second round: both bands are one question at the same size and one answer line in ink at 24 px; the closing band's
+   actions are the hero's pair (primary, quiet) in one row. */
+.landing .lp-truth-q,
+.landing .lp-final h2 {
+  font-size: clamp(40px, 6vw, 80px);
   line-height: 1;
   max-width: none;
   letter-spacing: -0.025em;
+  text-wrap: pretty; /* not balance: "Do not trust it. / Check it.", never "Do not trust / it. Check it." */
 }
-.landing .lp-bracket span {
-  color: var(--ink-2); /* grey brackets, like the anatomy page's (Anastasia, 2026-10-26) */
-  font-weight: 400;
-}
-.landing .lp-truth-answer {
+.landing .lp-truth-answer,
+.landing .lp-final-lead {
   font-family: var(--display);
   font-weight: 500;
   font-size: 24px;
   line-height: 1.35;
   letter-spacing: -0.01em;
+  color: var(--ink);
   max-width: 34ch;
   margin: 28px auto 0;
 }
 
-/* What you get: the anatomy of a story, a page with margin labels in grey parentheses (Anastasia, 2026-10-26: no
-   umber inside the anatomy page or the timeline; grey and ink only). */
-.lp-page {
-  margin: 64px auto 0;
-  max-width: 760px;
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 48px 56px 56px;
+/* What you get: the anatomy of a story as the cabinet draws it (decision in page.tsx at the anatomy, 2026-10-27):
+   mono margin labels, the Home slot as the board's card (blurred field, headline band), the reading key and Also
+   today as grey tray rows, one hairline where the article has one, before the appendix. Grey and ink only. */
+.lp-anatomy {
+  margin: 56px 0 0;
+  max-width: 860px;
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  column-gap: 40px;
-  row-gap: 32px;
+  grid-template-columns: 150px minmax(0, 1fr);
+  column-gap: 48px;
+  row-gap: 36px;
   align-items: start;
 }
 .lp-part-label {
   display: block;
-  font-family: var(--display);
+  padding-top: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
   font-weight: 500;
-  font-size: 15px;
-  line-height: 1.3;
-  color: var(--ink);
-}
-.lp-paren {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--ink-2);
-  font-weight: 400;
 }
 .lp-part-note {
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 13px;
   line-height: 1.5;
   color: var(--ink-2);
 }
 .landing .lp-slot p {
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--ink-2);
   max-width: 56ch;
 }
 .landing .lp-slot-headline p {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 28px;
-  line-height: 1.15;
+  font-size: 30px;
+  line-height: 1.12;
   letter-spacing: -0.015em;
   color: var(--ink);
 }
@@ -698,15 +776,6 @@
   font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--ink-2);
-}
-.landing .lp-slot-key p {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-2);
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  padding: 8px 0;
-  max-width: none;
 }
 .lp-slot-trail {
   display: block;
@@ -723,163 +792,105 @@
   border-top: 1px solid var(--rule);
   padding-top: 16px;
 }
-.lp-home-card,
-.lp-also-card {
-  background: var(--paper-2);
-  border-radius: var(--radius);
-  padding: 20px 24px;
+.lp-tray-row {
+  background: var(--tray);
+  border-radius: 14px;
+  padding: 14px 18px;
 }
-.lp-card-meta {
-  display: block;
+.landing .lp-tray-row p {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: none;
+}
+.landing .lp-tray-key p {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+/* The board's card in small: the same blurred field and the same band as app/today.css (.tb-card-link-blank,
+   .tb-card-text), so the landing shows the card the cabinet shows. */
+.lp-mini-card {
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 20px; /* app/today.css .tb-card-link: the same card at the same width */
+  overflow: hidden;
+  background: #6f6962;
+  isolation: isolate;
+  display: grid;
+  align-items: end;
+  color: #fff;
+}
+.lp-mini-card::before {
+  content: "";
+  position: absolute;
+  inset: -48px;
+  z-index: -1;
+  background:
+    radial-gradient(44% 60% at 24% 36%, rgba(201, 162, 126, 0.34), transparent 70%),
+    radial-gradient(34% 52% at 78% 30%, rgba(255, 255, 255, 0.2), transparent 70%),
+    radial-gradient(48% 46% at 62% 84%, rgba(255, 255, 255, 0.14), transparent 70%),
+    radial-gradient(28% 40% at 10% 86%, rgba(0, 0, 0, 0.3), transparent 70%);
+  filter: blur(26px);
+}
+.lp-mini-note {
+  position: absolute;
+  inset: 0 0 38%;
+  display: grid;
+  place-items: center;
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.02em;
-  color: var(--ink-2);
+  color: rgba(255, 255, 255, 0.72);
 }
-.lp-home-line {
-  display: block;
-  margin-top: 8px;
-  font-family: var(--display);
-  font-weight: 500;
-  font-size: 20px;
-  line-height: 1.3;
-  color: var(--ink);
-}
-.landing .lp-also-card p {
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--ink);
-}
-
-/* How it works: the graph as a timeline. A rail, a dot per step, a label column and a text column. Grey and ink
-   only: numbers and node lines grey, the vendor line ink, looping steps with an ink dot. */
-.lp-steps {
-  list-style: none;
-  margin: 64px 0 0;
-  padding: 0;
+.lp-mini-text {
   position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  background: rgba(0, 0, 0, 0.46);
 }
-.lp-steps::before {
+.lp-mini-text::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 1px;
-  background: var(--rule);
+  right: 0;
+  bottom: 100%;
+  height: 96px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.02) 12%, rgba(0, 0, 0, 0.08) 28%, rgba(0, 0, 0, 0.2) 45%, rgba(0, 0, 0, 0.33) 62%, rgba(0, 0, 0, 0.42) 80%, rgba(0, 0, 0, 0.46) 100%);
 }
-.lp-step {
-  position: relative;
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  column-gap: 32px;
-  padding-left: 40px;
-  margin-top: 56px;
-}
-.lp-step:first-child {
-  margin-top: 0;
-}
-.lp-step::before {
-  content: "";
-  position: absolute;
-  left: -4.5px;
-  top: 6px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--ink-2);
-}
-.lp-step-loop::before {
-  background: var(--ink);
-}
-.lp-step-label {
-  display: grid;
-  gap: 6px;
-  align-content: start;
-}
-.lp-step-n {
+.lp-mini-meta {
   font-family: var(--mono);
   font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--ink-2);
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.72);
 }
-.landing .lp-step-nodes {
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-2);
-  overflow-wrap: anywhere;
-}
-.landing .lp-step-vendor {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: var(--ink);
-}
-.lp-chip {
-  justify-self: start;
-  margin-top: 4px;
-  display: inline-block;
-  white-space: nowrap;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-s);
-  padding: 3px 8px;
-}
-.lp-chip-mark {
-  color: var(--ink-2);
-}
-.landing .lp-step-lead {
+.lp-mini-line {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 24px;
-  line-height: 1.3;
-  color: var(--ink);
-  max-width: 60ch;
-}
-.landing .lp-step-body {
-  margin-top: 10px;
-  color: var(--ink-2);
-  max-width: 60ch;
-}
-.lp-card {
-  margin-top: 64px;
-  background: var(--paper-2);
-  border-radius: var(--radius);
-  padding: 32px 36px;
-}
-.landing .lp-card p {
-  margin-top: 8px;
-  color: var(--ink-2);
-  max-width: 60ch;
+  font-size: 20px;
+  line-height: 1.25;
 }
 
 /* The trace: a band, a ledger grouped by part of the story. Grey and ink only (Anastasia, 2026-10-26): group
-   heads and step numbers grey, loop rows marked by one ink edge and nothing else. */
+   heads and step numbers grey, loop rows marked by one ink edge and nothing else. 2026-10-27: no frame and no
+   rules under the group heads, the fictional label as a grey tray line (the landing after the deck). */
 .lp-trace {
   background: var(--paper-2);
 }
 .lp-ledger {
-  margin-top: 64px;
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-top: 2px solid var(--ink);
-  border-radius: var(--radius);
-  padding: 20px 32px 32px;
+  margin-top: 56px;
 }
 .lp-ledger-head {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 12px;
-  margin-bottom: 28px;
+  background: var(--tray);
+  border-radius: 14px;
+  padding: 12px 18px;
+  margin-bottom: 36px;
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 500;
@@ -898,9 +909,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-2);
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 6px;
-  margin: 32px 0 16px;
+  margin: 40px 0 14px;
 }
 .landing .lp-group-head:first-of-type {
   margin-top: 0;
@@ -915,10 +924,9 @@
 .lp-group-head + .lp-ledger-row {
   margin-top: 0;
 }
+.lp-ledger-row, .landing .lp-group-head { padding-left: 14px; }
 .lp-ledger-loop {
   box-shadow: inset 2px 0 0 var(--ink);
-  margin-left: -14px;
-  padding-left: 12px;
 }
 .lp-ledger-step {
   font-family: var(--mono);
@@ -929,7 +937,7 @@
 }
 .lp-ledger-node {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
   color: var(--ink);
@@ -952,64 +960,79 @@
   color: var(--ink-2);
 }
 
-/* Sponsors */
+/* Sponsors: three columns with a rule on top (the deck's device), the lane line in mono grey. */
 .lp-vendors {
   list-style: none;
-  margin: 64px 0 0;
+  margin: 56px 0 0;
   padding: 0;
   display: grid;
-  row-gap: 40px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px;
 }
 .lp-vendors li {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  column-gap: 40px;
-  align-items: start;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
 }
 .landing .lp-vendor-name {
-  font-size: 32px;
-  line-height: 1.1;
+  font-size: 24px;
+  line-height: 1.2;
   letter-spacing: -0.015em;
 }
 .landing .lp-vendor-where {
-  margin-top: 8px;
+  margin-top: 6px;
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
-  color: var(--umber);
+  color: var(--ink-2);
 }
 .landing .lp-vendor-text {
-  max-width: 56ch;
+  margin-top: 12px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
 }
 .landing .lp-dev {
   margin-top: 48px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--ink-2);
   max-width: 76ch;
 }
 
-/* Limits: rows with a grey dash, the quotation closing the section. Grey and ink only (Anastasia, 2026-10-26). */
+/* Limits: two columns of numbered rows, no rules (2026-10-27, the landing after the deck); the word list as a
+   grey tray across both columns; the quotation closes the section. Grey and ink only. */
 .lp-limits-list {
-  margin: 64px 0 0;
+  margin: 56px 0 0;
   padding: 0;
   list-style: none;
-  max-width: 60ch;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 56px;
 }
 .lp-limits-list li {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  padding: 20px 0;
-  border-top: 1px solid var(--rule);
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
 }
-.lp-limits-list li:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-.lp-dash {
+.lp-limit-n {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   color: var(--ink-2);
+  padding-top: 4px;
+}
+.lp-limit-words {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  background: var(--tray);
+  border-radius: 14px;
+  padding: 18px 20px 18px 20px;
+}
+.landing .lp-limit-words > div > p:first-child {
+  color: var(--ink);
 }
 .landing .lp-forbidden-words {
   margin-top: 10px;
@@ -1027,14 +1050,14 @@
   color: var(--ink-2);
 }
 .lp-quote {
-  margin: 64px 0 0;
+  margin: 48px 0 0;
   padding: 0;
   max-width: 40ch;
 }
 .landing .lp-quote p {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1.15;
   letter-spacing: -0.02em;
 }
@@ -1043,14 +1066,15 @@
   margin-top: 12px;
   font-style: normal;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   color: var(--ink-2);
 }
 
 /* Team */
 .lp-team-list {
   list-style: none;
-  margin: 64px 0 0;
+  margin: 56px 0 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1064,45 +1088,48 @@
   display: block;
   font-family: var(--display);
   font-weight: 500;
-  font-size: 22px;
-  line-height: 1.25;
-  letter-spacing: -0.012em;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
 }
 .lp-team-list span {
   display: block;
-  margin-top: 4px;
-  font-size: 15px;
-  line-height: 1.55;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
   color: var(--ink-2);
 }
 
 /* Final: a band, a headline, the button, centred. */
 .landing .lp-final {
+  position: relative;
+  overflow: clip;
   background: var(--paper-2);
   text-align: center;
   display: grid;
   justify-items: center;
 }
-.landing .lp-final h2 {
-  max-width: none;
-}
-.landing .lp-final .lp-button {
-  margin-top: 32px;
-}
-.landing .lp-final .lp-link {
-  margin-top: 16px;
+.lp-final > :not(.lp-glow) { position: relative; }
+.landing .lp-final .lp-cta-row {
+  justify-content: center;
 }
 
 /* Footer */
 .lp-foot {
-  border-top: 1px solid var(--rule);
-  padding: 40px var(--column-gutter);
+  padding: 40px var(--column-gutter) 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
-  font-size: 14px;
+  font-size: 15px;
+}
+.lp-foot-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
 }
 .landing .lp-foot p {
   color: var(--ink-2);
@@ -1169,21 +1196,18 @@
   .lp-registry ol {
     columns: 2;
   }
-  .lp-page {
+  .lp-anatomy {
     max-width: 100%;
-    padding: 40px 40px 48px;
-  }
-  .lp-step {
-    grid-template-columns: 1fr;
-    row-gap: 12px;
-    padding-left: 32px;
-    margin-top: 40px;
   }
   .lp-ledger-row {
     grid-template-columns: 40px 130px minmax(0, 1fr);
   }
-  .lp-vendors li {
-    grid-template-columns: 200px minmax(0, 1fr);
+  .lp-vendors {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .lp-limits-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 700px) {
@@ -1195,9 +1219,6 @@
   }
   .lp-link {
     display: none;
-  }
-  .landing .lp-final .lp-link {
-    display: inline-block;
   }
   .landing h1 {
     font-size: clamp(38px, 10.5vw, 46px);
@@ -1226,6 +1247,9 @@
   .lp-sheet {
     padding: 20px 18px 22px;
   }
+  .lp-cta-row .lp-button {
+    width: 100%;
+  }
   .lp-spectrum {
     grid-template-columns: 1fr;
     row-gap: 40px;
@@ -1233,37 +1257,19 @@
   .lp-registry ol {
     columns: 1;
   }
-  .lp-page {
-    padding: 24px;
+  .lp-anatomy {
     grid-template-columns: 1fr;
     row-gap: 8px;
   }
   .lp-part:not(:first-child) {
-    margin-top: 20px;
+    margin-top: 24px;
   }
   .landing .lp-slot-headline p {
     font-size: 24px;
   }
-  .landing .lp-step-lead {
-    font-size: 20px;
-  }
-  .lp-ledger {
-    padding: 16px 20px 24px;
-  }
   .lp-ledger-row {
     grid-template-columns: 1fr;
     row-gap: 6px;
-  }
-  .lp-ledger-loop {
-    margin-left: -10px;
-    padding-left: 8px;
-  }
-  .lp-vendors li {
-    grid-template-columns: 1fr;
-    row-gap: 8px;
-  }
-  .landing .lp-vendor-name {
-    font-size: 26px;
   }
   .lp-team-list {
     grid-template-columns: 1fr;
@@ -1271,6 +1277,11 @@
   .lp-foot {
     flex-direction: column;
     align-items: flex-start;
+    gap: 16px;
+  }
+  .lp-foot-brand {
+    flex-direction: column;
+    gap: 6px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1281,3 +1292,351 @@
     transition: none;
   }
 }
+
+/* Landing after the deck (2026-10-27, Anastasia/Claude Code; web/DESIGN.md › Landing after the deck). */
+/* The hero's lead: one tenet at a time in a two-line box that never changes height. */
+.lp-tenets {
+  position: relative;
+  max-width: 34ch;
+  min-height: calc(2 * 1.4em);
+  font-size: clamp(20px, 2.1vw, 26px);
+  line-height: 1.4;
+  color: var(--ink-2);
+  letter-spacing: -0.01em;
+}
+.lp-tenets-live {
+  margin: 0;
+  min-height: inherit;
+}
+.lp-caret {
+  display: inline-block;
+  width: 0.5ch;
+  height: 0.9em;
+  background: var(--umber);
+  vertical-align: -0.1em;
+  margin-left: 2px;
+  animation: lp-blink 1s steps(1) infinite;
+}
+@keyframes lp-blink { 50% { opacity: 0; } }
+.lp-tenets-static {
+  display: none;
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-tenets-live { display: none; }
+  .lp-tenets-static { display: block; }
+  .lp-tenets { min-height: 0; }
+}
+/* The compact evidence sheet beside the title. */
+.landing .lp-sheet-compact {
+  margin-top: 56px;
+  padding: 20px 22px 18px;
+  border-radius: 14px;
+}
+.landing .lp-sheet-compact .lp-eyebrow { margin-bottom: 8px; }
+.landing .lp-sheet-compact .lp-sheet-title { margin-bottom: 14px; font-size: 12px; }
+.landing .lp-sheet-compact .lp-figures { gap: 12px 20px; }
+.landing .lp-sheet-compact .lp-figures dd { font-size: 40px; }
+.landing .lp-sheet-compact .lp-figures dt { font-size: 12px; }
+/* The three running lines between ink rules, the deck's wire. */
+/* Quiet: smaller and lighter than the deck's, hairlines not ink, so the lines do not pull the eye off the title
+   (Anastasia, 2026-10-27). */
+.lp-wire {
+  grid-area: wire;
+  margin-top: 8px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+  opacity: 0.72;
+}
+.lp-line {
+  display: flex;
+  white-space: nowrap;
+  overflow: hidden;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  padding: 9px 0;
+}
+.lp-line:last-child { border-bottom: 0; }
+.lp-line-big {
+  font-family: var(--display);
+  font-size: clamp(17px, 1.7vw, 21px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  padding: 11px 0;
+}
+.lp-track {
+  display: inline-flex;
+  animation: lp-run var(--d, 60s) linear infinite;
+}
+.lp-line:hover .lp-track { animation-play-state: paused; }
+.lp-line-reverse .lp-track { animation-direction: reverse; }
+.lp-track > span { padding: 0 28px; border-right: 1px solid var(--rule); }
+.lp-line-big .lp-track > span { padding: 0 32px; }
+.lp-track em {
+  font-style: normal;
+  color: var(--umber);
+  font-family: var(--mono);
+  font-size: 0.5em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-right: 14px;
+}
+@keyframes lp-run { to { transform: translateX(-50%); } }
+.lp-wire-foot {
+  grid-area: foot;
+  margin: -32px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-track { animation: none; flex-wrap: wrap; }
+  .lp-line { white-space: normal; }
+  .lp-track > span[aria-hidden="true"] { display: none; }
+  .lp-track > span { padding: 4px 16px 4px 0; border-right: 0; }
+}
+@media (max-width: 900px) {
+  .landing .lp-hero {
+    grid-template-areas:
+      "text text text text text text text text text text text text"
+      "card card card card card card card card card card card card"
+      "wire wire wire wire wire wire wire wire wire wire wire wire"
+      "foot foot foot foot foot foot foot foot foot foot foot foot";
+  }
+  .landing .lp-sheet-compact { margin-top: 0; max-width: 560px; }
+}
+@media (max-width: 900px) {
+  .lp-field-wrap { top: 420px; right: -30%; width: 110%; height: 900px; opacity: 0.85; }
+}
+/* The sources section carries the Sources page's instrument (components/spectrum.tsx, app/spectrum.css): its own
+   heading is visually hidden since the section has one, its ledger too since the registry list below carries the
+   same forty rows with the window's counts; the mode select sits at the right of the section's first line. */
+.landing .spectrum-modern { margin-top: 40px; }
+.landing .spectrum-modern .section-heading > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.landing .spectrum-modern .section-heading { display: flex; justify-content: flex-end; }
+.landing .spectrum-modern .sp-ledger { display: none; }
+.landing .spectrum-modern .inline-label select {
+  min-height: 40px;
+  padding: 0 36px 0 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-s); /* the landing's controls: 4 px, as the buttons (the pill of the evening pass is superseded) */
+  background: var(--paper);
+  font-family: var(--body);
+  font-size: 15px;
+  color: var(--ink);
+}
+/* One sentence above, the instrument, mono captions: the instrument's own intro, its instruction line and the cohort
+   footnote are restated or redundant here and stay hidden (Anastasia, 2026-10-27: laconic, like the deck). */
+.landing .spectrum-modern > .section-heading + p { display: none; }
+.landing .sp-instruction, .landing .sp-cohorts-note { display: none; }
+.landing .sp-caption, .landing .sp-footnote, .landing .sp-y-label, .landing .spectrum-modern .inline-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+/* The reading's labels as the page's object labels (the anatomy's margin labels, the ledger's group heads). */
+.landing .sp-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+/* The reading's small lines at the page's small size, 13 px, not the instrument's 11. */
+.landing .sp-reading > div > span:not(.sp-label), .landing .sp-reading a, .landing .sp-source-domain { font-size: 13px; }
+.landing .sp-cohorts h3 { font-size: 20px; margin-top: 28px; }
+.landing .lp-registry-lead {
+  margin: 36px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+/* One hairline fewer inside the sources section: the instrument's heading row keeps no rule of its own; the ink
+   rule under the mode select stays (Anastasia, 2026-10-27). */
+.landing .spectrum-modern .section-heading { border-bottom: 0; padding-bottom: 0; margin-bottom: 8px; }
+.landing .spectrum-modern { border-top: 0; padding-top: 0; }
+/* DECISION(2026-10-27, Anastasia/Claude Code): inside the sources section the instrument's rules give way to fills
+   and spacing: no rule above or below the field, the selected-source reading and the cohort table on the cabinet's
+   grey --tray with 14 px corners and no row rules (a faint zebra instead), captions in the mono; the only line left
+   is the section's opening hairline and the chart's own frame. Why: Anastasia's review of 2026-10-27, too many
+   lines, the same text kept but set apart by fill rather than rule, the grey of Home's fills rather than beige. */
+.landing .spectrum-instrument { margin: 16px 0 24px; border-top: 0; border-bottom: 0; }
+.landing .sp-inspector {
+  border-top: 0;
+  padding: 22px 24px;
+  background: var(--tray);
+  border-radius: 14px;
+}
+.landing .sp-footnote { margin: 16px 0 0; }
+/* DECISION(2026-10-27 night, Anastasia/Claude Code): the registry cohort table is not shown on the landing; the
+   signed-in Sources page carries it. Supersedes the "cohort table on the tray" clause of the evening's decision.
+   Why: five columns of shares under the plot were the section's heaviest block of text; the landing shows the
+   instrument and the reading, the page shows the arithmetic. */
+.landing .sp-cohorts { display: none; }
+.landing .sp-cohorts h3 {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+}
+.landing .sp-cohorts table {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--tray);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.landing .sp-cohorts th, .landing .sp-cohorts td { border-bottom: 0; padding: 11px 18px; }
+.landing .sp-cohorts thead th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 14px; }
+.landing .sp-cohorts tbody tr:nth-child(even) :is(th, td) { background: rgba(0, 0, 0, 0.035); }
+.landing .sp-cohorts tbody tr:last-child :is(th, td) { padding-bottom: 14px; }
+.landing .spectrum-modern > details { margin-top: 12px; border: 0; padding: 0; }
+.landing .lp-registry { border: 0; margin-top: 4px; }
+/* The section's tail in reading order: the instrument's footnote, the window's line (moved up by grid order; it is
+   static text, so the tab order is unchanged), then the two disclosures as a pair. */
+.landing .lp-sources > .lp-registry-lead { order: 1; margin-top: 10px; }
+.landing .lp-sources .spectrum-modern > details { order: 2; margin-top: 20px; }
+.landing .lp-sources > .lp-registry { order: 3; }
+/* DECISION(2026-10-27, Anastasia/Claude Code): on the landing the field spans the section's full width and stands
+   360 px tall (400 on phones); the audience ticks move inside the plot, under their gridlines on a paper chip, the
+   lowest one above its line, so nothing hangs outside the frame; the perspective floor is off, since it would reach past the frame.
+   Every block of the section (captions, the field, the reading, the table, the registry lines) then shares the same
+   two edges. Why: Anastasia, 2026-10-27: the chart to the section's width and a little taller, the text along its
+   borders so that nothing sticks out and the section reads as one system. */
+.landing .sp-stage { padding: 26px 6px 48px; } /* 6 px: a mark at −1 or +1 is centred on the frame and stays inside the column */
+.landing .sp-chart { height: 360px; }
+/* The perspective floor would reach past the frame's edges at full width; the frame is enough here. */
+.landing .sp-floor { display: none; }
+/* DECISION(2026-10-27 night, Anastasia/Claude Code): the audience ticks are not drawn on the landing. Inside the
+   plot they collided with the badges of marks at −1 (AllSides, MBFC); outside it they hung past the column. The
+   reading under the plot gives the selected source's audience as a number and the footnote says the scale is
+   logarithmic; the signed-in Sources page keeps the ticks. Why: nothing may collide or stick out, and the landing's
+   instrument is a teaser of the page's, not its replacement. */
+.landing .sp-y-tick { display: none; }
+.landing .sp-x-labels { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; color: var(--ink-2); }
+@media (max-width: 700px) {
+  .landing .sp-stage { padding-left: 6px; padding-right: 6px; } /* the marks at −1 and +1 stay inside the column on phones too */
+  .landing .sp-chart { height: 400px; }
+}
+/* DECISION(2026-10-27, Anastasia/Claude Code): the sources section's head and the instrument interlock: the section
+   is a two-column grid, the heading and the sub at the left, the instrument's mode control at the right on the sub's
+   last line (the instrument's own wrapper is display: contents so its control can take that cell); the instrument's
+   caption, "Source position × audience" with the plotted / rated / registry counts, is the one mono line directly
+   above the field, and the field's y-axis name is read by assistive technology only, since the footnote under the
+   reading says "Logarithmic audience scale" in words. Why: Anastasia, 2026-10-27: the caption and the counts took a
+   whole line of their own and read as noise though they matter; the heading and the sub felt foreign to the section. */
+.landing .lp-sources {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 40px;
+  align-items: end;
+}
+.landing .lp-sources > .lp-kick,
+.landing .lp-sources .spectrum-instrument,
+.landing .lp-sources .sp-cohorts,
+.landing .lp-sources .spectrum-modern > details,
+.landing .lp-sources > .lp-registry-lead,
+.landing .lp-sources > .lp-registry { grid-column: 1 / -1; }
+/* The section's opening hairline (main > section + section::before) is the grid's first item, so the rows are named
+   explicitly: 1 the hairline, 2 the kicker, 3 the heading, 4 the sub; everything else follows in order. */
+.landing .lp-sources::before { grid-column: 1 / -1; grid-row: 1; justify-self: stretch; margin-left: 0; margin-right: 0; }
+.landing .lp-sources > .lp-kick { grid-row: 2; }
+.landing .lp-sources > h2 { grid-column: 1; grid-row: 3; }
+.landing .lp-sources > .lp-sub { grid-column: 1; grid-row: 4; }
+.landing .lp-sources .spectrum-modern { display: contents; }
+.landing .lp-sources .spectrum-modern .section-heading { grid-column: 2; grid-row: 3 / 5; align-self: end; margin: 0; }
+.landing .lp-sources .spectrum-instrument { margin-top: 40px; }
+.landing .sp-caption { padding-top: 0; }
+.landing .sp-stage { margin-top: 14px; }
+.landing .sp-y-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .landing .lp-sources { grid-template-columns: minmax(0, 1fr); }
+  .landing .lp-sources .spectrum-modern .section-heading { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 24px; }
+  .landing .lp-sources .spectrum-instrument { margin-top: 28px; }
+}
+/* How it works: the run graph drawn (components/landing/graph.tsx, decision there) at the left, the seven captions
+   at the right in a grid whose rows are the graph's blocks, so each caption stands beside its nodes. Grey and ink
+   only: a model node on the cabinet's grey, a code node on paper with a hairline, edges in --ink-2. */
+.lp-graph { display: grid; grid-template-columns: 400px minmax(0, 1fr); column-gap: 56px; align-items: start; margin-top: 56px; }
+.lp-graph-svg { display: block; width: 400px; height: auto; overflow: visible; }
+.lp-graph-svg text { font-family: var(--mono); }
+.lp-graph-svg .lp-edge { fill: none; stroke: var(--ink-2); stroke-width: 1; }
+.lp-graph-svg .lp-edge-cond { stroke-dasharray: 3 4; }
+.lp-graph-svg .lp-arrow { fill: var(--ink-2); }
+.lp-graph-svg .lp-node rect { fill: var(--paper); stroke: var(--rule); stroke-width: 1; }
+.lp-graph-svg .lp-node-model rect { fill: var(--tray); stroke: var(--tray); }
+.lp-graph-svg .lp-node-name { font-size: 12px; font-weight: 500; fill: var(--ink); }
+.lp-graph-svg .lp-node-lane { font-size: 10px; letter-spacing: 0.02em; fill: var(--ink-2); }
+.lp-graph-svg .lp-pill rect { fill: var(--tray); }
+.lp-graph-svg .lp-pill text { font-size: 11px; letter-spacing: 0.02em; fill: var(--ink-2); }
+.lp-graph-captions { list-style: none; margin: 0; padding: 0; display: grid; }
+.lp-gc { align-self: start; padding-top: 2px; min-width: 0; max-width: 470px; } /* the measure captionHeight() in graph.tsx assumes */
+.lp-gc-head { display: flex; align-items: baseline; gap: 12px; }
+.lp-gc-n { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink-2); }
+.landing .lp-gc h3 { font-size: 20px; line-height: 1.25; }
+.landing .lp-gc-lead { margin-top: 6px; font-size: 15px; line-height: 1.45; color: var(--ink); }
+.landing .lp-gc-body { margin-top: 4px; font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+.landing .lp-gc-rule { margin-top: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--ink-2); }
+.landing .lp-gc-nodes { display: none; }
+.lp-chip { display: inline-block; white-space: nowrap; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink); border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 1px 7px; margin-right: 8px; }
+.lp-chip-mark { color: var(--ink-2); }
+@media (max-width: 900px) {
+  .lp-graph { grid-template-columns: minmax(0, 1fr); row-gap: 40px; }
+  .lp-graph-svg { width: 100%; max-width: 400px; margin: 0 auto; }
+  .lp-graph-captions { display: block; }
+  .lp-gc { margin-top: 28px; }
+  .lp-gc:first-child { margin-top: 0; }
+  .landing .lp-gc-nodes { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+}
+/* The rule under the graph, kept beside the escalate line of the caption (Anastasia, 2026-10-27: "keep the old one too"). */
+/* DECISION(2026-10-27 night, Anastasia/Claude Code): one fill for every tray on the landing, the cabinet's grey --tray
+   with 14 px corners (the key and Also today rows, the ledger's label line, the word list, the cohort table, the
+   selected-source reading, this card); the beige --paper-2 is kept for the three bands only and the sheet keeps its
+   paper with the ink rule. The 12 px of the first pass and the card's 8 px beige are superseded. Why: the page read
+   as two systems, beige boxes and grey boxes; one tray, one radius. */
+.lp-card {
+  margin-top: 48px;
+  background: var(--tray);
+  border-radius: 14px;
+  padding: 24px 28px;
+}
+.landing .lp-card p {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+/* app/instrument-polish.css (Vadim's WEB-PAPERCLIP-POLISH-01) gives the trace ledger a shadow and its label line a
+   beige bordered field; on the landing after the deck the ledger carries no frame and the label is a grey tray line,
+   so the two rules are overridden here by specificity (DECISION 2026-10-27, Anastasia/Claude Code; the polish file
+   itself is untouched, as with the reader bar). */
+.landing .lp-trace .lp-ledger { box-shadow: none; }
+.landing .lp-trace .lp-ledger-head { background: var(--tray); border: 0; padding: 12px 18px; }

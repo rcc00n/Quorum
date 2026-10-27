@@ -27,9 +27,10 @@ ROOT = "QUORUM_REASONING_EDITIONS_ROOT"
 TOPIC = re.compile(r"[a-z0-9][a-z0-9-]{0,79}")
 DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 VERSION = re.compile(r"v(\d{1,4})\.json")
-# Reasoning's roundup vocabulary (reasoning/quorum_reasoning/nodes/roundup.py: "confirmed", "disputed",
-# "statements only", "single source", "reported, not confirmed", "unverified") mapped to the portal's claim
-# statuses; the producer's own wording travels with every line as `label`. Anything unmapped is unknown.
+# Reasoning's roundup vocabulary (reasoning/quorum_reasoning/nodes/roundup.py GROUP_ORDER, lower-cased: "reported,
+# not confirmed", "confirmed", "disputed", "single source", "statements only", "unverified") mapped to the portal's
+# claim statuses: three have a counterpart, the other three are "unknown" on purpose (one source or no check is not
+# a verdict); the producer's own wording travels with every line as `label`. Anything else is unknown too.
 STATUS = {
     "confirmed": "established",
     "established": "established",
@@ -37,6 +38,9 @@ STATUS = {
     "statements only": "attributed",
     "statement": "attributed",
     "attributed": "attributed",
+    "single source": "unknown",
+    "unverified": "unknown",
+    "reported, not confirmed": "unknown",
 }
 INVALID = (SnapshotError, OSError, ValueError, TypeError, KeyError, AttributeError)
 
@@ -135,7 +139,9 @@ def edition_of(p, result):
     return {
         "topic_id": p["topic_id"],
         "date": p["edition_date"],
-        "completion": "partial" if p["status"] == "partial" or p.get("errors") else "complete",
+        # The preview's rule (reasoning_preview.present_reasoning): a declared missing source makes the edition
+        # partial too (2026-10-27, Anastasia/Claude Code; the producer writes [] today, the rule is the same).
+        "completion": "partial" if p["status"] == "partial" or p.get("errors") or p.get("sources_missing") else "complete",
         "quiet_day": bool(p["roundup"]["empty_day"]),
         "summary": p["summary"],
         "provisional": True if provisional is None else bool(provisional),
@@ -213,7 +219,13 @@ def snapshot(day, topic="", revision=None):
         partial.append(result["preview"]["status"] == "partial")
         events.extend(result["events"])
         digests.extend(result["digests"])
-        errors.extend(p.get("errors", []))
+        # DECISION(2026-10-27, Anastasia/Claude Code): a recorded failure of the producer ({node, event_id, message},
+        # ARCHITECTURE § 8, message already redacted by present_reasoning) joins the API's errors in the API's own
+        # shape ({code, message, event_id}, code "reasoning_<node>") with the edition's topic, so the web can tell
+        # whose edition failed. Why: the raw row had no `code`, and one topic's partial edition cancelled every
+        # other topic's quiet day on the board (web/lib/editorial.ts isQuietDay).
+        errors.extend({"code": "reasoning_" + str(e["node"]), "message": e["message"], "event_id": e.get("event_id"), "topic_id": name}
+                      for e in p.get("errors", []))
         editions.append(edition_of(p, result))
         for event_row in result["events"]:
             edition_of_event[event_row["id"]] = editions[-1]

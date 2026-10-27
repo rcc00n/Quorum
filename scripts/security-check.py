@@ -122,6 +122,26 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, Anastasia/Claude Code): permit only these 10 inspected review captures of the landing after the
+# deck (PR of anastasia/web-landing-polish): the public landing on the committed fixtures at 1440 and 390, each page in
+# two halves under 1 MB, after on the branch head and before on integration 1159498, and the sources section in the
+# AllSides mode before and after the night's polish; the page shows the real public headlines of the
+# evidence fixture cut at 80 characters, the registry and the FICTIONAL dry-run trace, no signed-in page, no account,
+# no installed edition. Why: Vadim's gate for review PNGs (his f3e121e pattern); arbitrary binaries stay excluded.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-web-landing/landing-after-1440-0.png': 'b8e20b718eaf4d185f83ed0aee4feeb267bfe6711a7d16dae1c0027d7db4c57e',
+    'docs/reviews/2026-10-27-web-landing/landing-after-1440-1.png': '9377f9394ab3eabe5e26bcb3224315b5544e494a5caa411a057f58ac24e80470',
+    'docs/reviews/2026-10-27-web-landing/landing-after-390-0.png': '678116a0e87ef4a76f90f2b78998726ffd56e0caf61a4a134b857a8bdccfda0e',
+    'docs/reviews/2026-10-27-web-landing/landing-after-390-1.png': '742469d8ff2d3b99b47034da4d4ffb49dd254bd2cb594f24b59e6558f7fee8b0',
+    'docs/reviews/2026-10-27-web-landing/landing-before-1440-0.png': '94eb16f5525059e5888b91982973a93354641a4929de0b7bb6e95b28fa9cd2c2',
+    'docs/reviews/2026-10-27-web-landing/landing-before-1440-1.png': '2dc6640979c4847c0aff765e2898aace88c4a2c44c86ddadb920e77e547030c2',
+    'docs/reviews/2026-10-27-web-landing/landing-before-390-0.png': '3a0f2332ce39d269b7ce91ec722514c1878b65b609d43f1ee73952b25d3fde8c',
+    'docs/reviews/2026-10-27-web-landing/landing-before-390-1.png': 'e7c6500f74bba4be7a078af42b4e16138f55dddb2c235faa2e8c5c736c9ffca0',
+    'docs/reviews/2026-10-27-web-landing/sources-allsides-after-1440.png': '5659cf32d488c75d3bc92bbd0fd8e975ecf02e834a600a45e2782562bfb34d69',
+    'docs/reviews/2026-10-27-web-landing/sources-allsides-before-1440.png': '551c5ec29368fb5c252696ab3c8384b04422320579af76fb38ca352ef38c2803',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])

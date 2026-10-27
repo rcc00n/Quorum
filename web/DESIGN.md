@@ -97,6 +97,11 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck, polish) | The landing tidied as one system: balanced headings and no orphan lines, hairlines only between paper sections, one grey tray at 14 px for every filled block (the beige card retired), one manner for disclosures, the sources field inset with the audience ticks and the cohort table left to the Sources page, phone buttons at the column's width, the tablet card capped, graph captions on the estimate's measure, one-phrase sponsor lane lines, the footer regrouped; second round the same night: one type scale read back from the served page (display 84/80/56/24/20, text 20/17/15/13, mono 12 and 11-upper-case labels), both bands alike with the hero's pair of actions, 4 px corners on every control, the SQL block and the board's card on their own corners, one rhythm (56/48/16). See › Landing after the deck › Polish. | Anastasia's brief of 2026-10-27 night: consistent, clear, not loaded with text, the identity kept; cluely.com as the reference for space, not style. |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The remaining sections in the deck's manner: the anatomy as the cabinet draws it (card, grey trays, mono labels), a glow behind the two statement bands and the deck's closing line, the trace without frame or rules, sponsors and team as columns, limits as numbered rows with the word list in a tray. | Anastasia's review of 2026-10-27: every section after the deck's devices, consistent with the hero, the sources and the graph; the blur used again, sparingly. |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The architecture section is the run graph drawn from graph.json after LangGraph Studio's graph view, in the landing's identity, with the seven captions aligned to the nodes and the loop limits as chips in them; the rule card stays. | Anastasia, 2026-10-27: the architecture as in the LangGraph Studio graphs, in our style, with captions, a redrawn graph true to the content; the old card kept too. |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The sources section carries the Sources page's spectrum instrument from the registry fixture, fitted to the page: a full-width 360 px field with the ticks inside, grey fills instead of rules, the mode control in the section's head, one mono caption line; sections divided by one hairline. | Anastasia's reviews of 2026-10-27: the same chart as the Sources tab; too many lines; the chart to the section's width with the text along its edges; the caption took a line of its own; the head felt foreign to the section. |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck, branch `anastasia/web-landing-polish`) | The landing's hero takes the deck's devices: a sentence typed once in a fixed box, a compact evidence card, three quiet running lines of real data (titles with source tags, the registry, the agents), the blurred tally at the very back of the page with faded edges. landing.cjs asserts the three lines and the field. | Anastasia's reviews of 2026-10-27: the deck's typewriter shifted the text; the lines must not pull attention; the blur back, with no visible edge, behind everything. |
 | 2026-10-27 | Anastasia / Claude Code (second cabinet pass) | The topic page as a list: stories as rows like Also today, cards only on Home; no tabs, rail or rubric dump; spectrum kept; History and Sources with pill controls; one neutral grey `--tray` for every filled element; chevrons as the disclosure sign; row labels in ink. See › Cabinet. | Anastasia's reviews of 2026-10-27: a topic page with the board's cards read as Home; the fill should be plain grey, not light brown; the diagonal arrow read as a link. |
 | 2026-10-27 | Anastasia / Claude Code (second cabinet pass, branch `anastasia/web-cabinet-pages`) | The story page after the board's rules (see › Cabinet, Story page): head above a sticky tray of round pills, Impact and the claim groups as counted rounded rows, the publication line as the foot colophon, scroll anchoring off; trays and rows on `--paper-3` everywhere. | Anastasia's review of 2026-10-27 of the whole cabinet: the title first and the menu fixed under it, rounded like Home; the five links read as random and nothing explained them; the fill should not melt into the paper; an opened row moved the page. |
 | 2026-10-27 | Anastasia / Claude Code (cabinet pass, branch `anastasia/web-cabinet`) | The signed-in pages after untitled.stream (see › Cabinet): the board carries the topic picker behind a "+ Add topics" pill and opens it inline; one mono metadata line under the title replaces the status prose; the plain publication line becomes a mono colophon at the foot (warnings stay on top); "Also today" gets a heading of the title's weight, mono kickers and low rounded rows; the settings page becomes Account (name, email, password, sign out); the menu reads Home · History · Sources · Account; interface text on the app routes in Inter with display headings and mono metadata, adopted by amending DECISIONS item 9 from Anastasia's name as look owner; the menu labels, the topic relocation and the cutoff wording are recorded canonically in docs/DECISIONS.md › User account and interface (cabinet navigation amendment). Honesty texts unchanged; the smoke test reads the picker on the board. | Anastasia's review of 2026-10-27: the home should show the title with the date and then the topics with their news, nothing else; topics are managed where they are read; "Also today" should read as the second part after Today in rows that echo the cards; the reference's discipline of one thing per section, metadata in mono and a single "+" to add. |
@@ -138,6 +143,142 @@ Adapted on the paper identity (the dark ground is not taken; the landing is unto
 ## Headline-only source bars
 
 2026-10-27 · rcc00n / Codex · Vadim requested soft colour in the landing's empty source-bar outlines. Use 25% of each existing cohort colour (neutral ink for the centre/unrated column) on paper, keeping the thin full-colour outline and explicit `headline` label. This supersedes only the transparent interior of the earlier outlined treatment; access level 2 still means headline/lead only. Exact counts, scale, widths, source order, tier/flank, absent/no-feed states and registry fields remain. Legend: solid = full text; light fill with outline = headline and lead. This is data colour in an existing cohort comparison, not a new brand accent. Today/cabinet remains with Anastasia's active branch (Issue #2 6435761422).
+
+## Landing after the deck (27 October, evening; branch `anastasia/web-landing-polish`)
+
+Anastasia's reference of 2026-10-27: the team's slide deck. Taken from it are the devices, not the slides: one precise
+sentence with the visual that proves it beside it; display headings, mono captions, hairlines; running lines of real
+data; a typed sentence; columns with a rule on top. Nothing on the page claims more than docs/DECISIONS.md, ARCHITECTURE § 5
+and the committed fixtures, which `web/tests/landing.cjs` reads back from the served HTML.
+
+- **Hero.** The headline and the kicker stay. The lead is one sentence from the deck, "Checked twice, by agents that never
+  see each other's notes.", typed once after load and left standing in a two-line box of fixed height (`components/landing/tenets.tsx`),
+  so nothing under it moves; without motion it stands at once. The evidence sheet becomes a compact card beside the title
+  (two figures, the edition line, the query details and SQL under the same disclosure, words unchanged). Under the hero,
+  the deck's wire: three running lines between hairlines, quiet (small, `--ink-2`, 72 % opacity) so they do not pull the eye
+  off the title: the window's real titles with their source tag in umber mono (the Reuters chain first and in order), the
+  forty names of the registry, the fifteen agents in run order; each track carries its items twice for a seamless loop,
+  the second half hidden from assistive technology; hover pauses; without motion the lines wrap and the duplicate is hidden.
+  A mono foot names the data. The blurred field (the window's tally as softened letterforms) returns at the very back of the
+  page: absolute on the landing root, from behind the header through the hero into the second section, its edges faded by a
+  radial mask so no border shows, the header, main and footer above it; the root clips the overflow. The blur is a device
+  to be used again, sparingly, further down.
+- **Sources.** The section shows the Sources page's instrument (`components/spectrum.tsx`) from the committed registry copy
+  (`fixtures/landing/sources.json`, extended with the three raters' values, labels and provenance) in place of the three
+  columns of the day's counts; the day's counts stay in the registry list under it. Fitted to the page: the section is a
+  two-column grid, the heading and the sub at the left, the instrument's mode control at the right on the sub's last line
+  (the instrument's wrapper is `display: contents`); one mono line above the field carries "Source position × audience"
+  and the plotted / rated / registry counts; the field spans the section's width and stands 360 px tall (400 on phones),
+  the audience ticks inside the plot on paper chips, the perspective floor off, the y-axis name for assistive technology
+  only since the footnote says "Logarithmic audience scale" in words; the instrument's rules give way to fills: the
+  selected-source reading and the cohort table on the cabinet's grey `--tray` with 14 px corners, a faint zebra and no
+  row rules, captions in the mono; the instrument's intro, instruction line, cohort footnote and ledger stay hidden as
+  restated here or carried by the registry list. Sections are divided by one column-wide hairline
+  (`main > section + section::before`), the hero's bottom padding reduced to meet it. The ledger's audience number renders
+  with a fixed locale, since the landing renders it on the server.
+- **How it works.** The seven-step timeline gives way to the run graph drawn (`components/landing/graph.tsx`, decision
+  there): the fifteen nodes of `fixtures/landing/graph.json` top to bottom in run order, the edges exactly those of
+  ARCHITECTURE § 5's mermaid, solid for the run's path and dashed for an edge that runs on a condition, the three loops
+  as arcs at the right, escalate as a box beside review_disputed returning into frame, start and end as grey pills;
+  after LangGraph Studio's graph view, in the landing's identity: rounded boxes, the node's name in the mono with its
+  lane under it (Nemotron 3.5 Lightning, Nemotron 3 Ultra 550B or code), a model node on the cabinet's grey `--tray`, a
+  code node on paper with a hairline. The seven captions stand at the right in a grid whose rows are the graph's
+  blocks, each beside its nodes (title, lead, body; the node and vendor lines are gone since the boxes say it); the
+  loop conditions in the words of § 5's edge labels and the limits `loops.key = n` as chips inside the caption, and the
+  escalation rule as a line of step 05; the card "No confirmed claim, no story." stays under the graph. On phones the
+  graph scales to the screen and the captions follow as a list with the node names. A block is as tall as its nodes
+  or its caption, estimated from the text, so the edges lengthen where a caption is long.
+- **What you get.** The anatomy as the cabinet draws it: mono margin labels without the prototype's parentheses, the
+  Home slot as the board's story card in small (the same blurred field and headline band as `app/today.css`), the
+  reading key and Also today as grey `--tray` rows, the article's one rule before the appendix and no frame; the parts
+  and their words unchanged (DECISIONS › Stories as articles).
+- **The two statement bands.** "What is truth?" loses its brackets; the closing reads the deck's line "Do not trust it.
+  Check it." with the earlier "Read the working." as its lead. Behind each a soft glow (`.lp-glow`: two warm radial
+  fields blurred 70 px, no text, no edge): the blur as a device, used twice and nowhere else.
+- **The trace.** No frame and no rules under the group heads; the fictional label and the row count as one grey tray
+  line; rows and heads inset 14 px so a loop row's ink edge stays inside the column. Two rules of
+  `app/instrument-polish.css` (the ledger's shadow, the bordered beige label) are overridden on the landing only.
+- **Sponsors, limits, team.** Sponsors as three columns with a rule on top, the lane line in mono grey; limits as two
+  columns of numbered rows (mono `01`–`07`) with no rules and the 26 forbidden words in a grey tray across both columns,
+  the quotation closing the section; the team's roles in the mono.
+
+### Polish (27 October, night; Anastasia / Claude Code, same branch)
+
+Anastasia's brief of 2026-10-27 night: consistent, clear, not loaded with text; the identity, the colours and every
+recorded decision kept; cluely.com as the reference for the feeling of space (one object per screen, few words, air),
+not for its style or palette. Each change below is one rule, so a later pass can revert one without the others.
+
+- **Type.** Headings balance their lines (`text-wrap: balance` on h1, h2, the two statement leads and the quotation);
+  running text avoids a one-word last line (`text-wrap: pretty` on every paragraph). The h2 measure is 24ch (was 20ch),
+  so most section heads stand on one line from 1024 px and the longest breaks into two even lines.
+- **Dividers.** A band (the two statement bands and the trace, on `--paper-2`) separates by its fill: no column
+  hairline at its top edge and none under its bottom edge. The hairline remains between two paper sections only
+  (hero → sources, what you get → how it works, sponsors → limits, limits → team).
+- **One tray.** Every filled block on the landing is the cabinet's grey `--tray` with 14 px corners: the key and Also
+  today rows, the ledger's label line, the word list, the selected-source reading, the card under the graph (it was
+  beige `--paper-2` at 8 px). `--paper-2` is kept for the three bands only; the evidence sheet keeps its paper with the
+  ink rule; the 12 px corners of the evening pass are superseded.
+- **Disclosures.** One manner for every closed block in the sections: 15 px at 500 in ink, a `+` in umber that turns
+  to `−` when open, the native marker hidden; the instrument's "How ratings are calculated" joins the registry's
+  "All 40 rows" (it showed the browser's triangle in mono). The sheet's "Query details and provenance" keeps Vadim's
+  layout (label left, `+` right).
+- **Sources.** The field's stage is inset 6 px so a mark at −1 or +1 (AllSides, MBFC) is centred on the frame and stays
+  inside the column. The audience ticks are not drawn on the landing: inside the plot they collided with the badges
+  of marks at −1, outside it they hung past the column; the reading gives the selected source's audience as a number
+  and the footnote says the scale is logarithmic; the signed-in Sources page keeps them. The registry cohort table is
+  not shown on the landing either (the Sources page carries it): five columns of shares were the section's heaviest
+  text; the section ends with the reading, the footnote and two disclosures. Both supersede the matching clauses of
+  the evening's sources bullet.
+- **Hero.** On phones the two buttons take the column's width, one under the other. Between 700 and 900 px the compact
+  card is capped at 560 px so it stays an object under the title rather than a band. The wire's foot is one short mono
+  line ("Real titles of the 24 October window, cut at 80 characters by the file · the 40 sources · the 15 agents in run
+  order · hover to pause").
+- **How it works.** The caption column is capped at 470 px, the measure `captionHeight()` in `graph.tsx` assumes, so
+  the estimated block heights match the rendered captions at 1440 and step 05 is no longer sparse.
+- **Sponsors.** The mono lane line under each name is one phrase ("steps 01 · 04 · every read", "3.5 Lightning ·
+  3 Ultra 550B · every step", "the provider lane"); the texts and their claims are unchanged.
+- **Trace.** The sub under the heading is `--ink-2` like every other sub (it was ink); the tray line still carries
+  the fictional label in ink.
+- **Footer.** The wordmark and its line stand together at the left, the two links at the right; on phones they stack.
+
+Second round, the same night (Anastasia: "another round of consistency; every section, every detail; what did we
+want to convey"). The page's vocabulary is written down and every element mapped to it; the font sizes in use were
+read back from the served page to check.
+
+- **Type scale.** Display: h1 84, the two bands' questions 80, h2 56, names that head a column 24 (sponsor, team
+  member, the selected source), heads inside an object 20 (a step's caption, the card under the graph), the
+  statement leads 24. Text: the sub 20, a statement of the product 17 (the limits, the standfirst), text inside an
+  object 15 (anatomy slots, captions' bodies, vendor texts, tray rows, the ledger's decisions, nav, buttons,
+  footer), a secondary line 13 (reasons, part notes, the reading's small lines). Mono: every caption, number and
+  metadata line 12 (kickers at 500 upper case; the wire's lines, the graph's numbers, the x-axis, the quotation's
+  source, the colophon, the sheet's figures block were 11–13.5); a label inside an object 11 at 500 upper case with
+  0.06 em (the anatomy's margin labels, the ledger's group heads, the reading's "Selected source", "Editorial
+  position", "Audience estimate"); the graph's lane line 10 and its pills 11 inside the drawing. The limits' chips, the
+  ledger's node names and the board card's lines in small are 12 as well; the quotation is 30 like the anatomy's
+  headline slot, one size for a headline-sized line inside a section.
+- **Statement bands.** Both bands are one question at the same size (clamp 40–80 px, wrapped greedily so "Do not
+  trust it." stays whole on a phone) and one answer line in ink at 24 px, 28 px under it. The closing band's actions
+  are the hero's pair, primary and quiet, in one row; the plain "Sign in" link under the button is gone.
+- **Sources' tail.** After the instrument's footnote comes the window's line (the registry lead, moved up by grid
+  order; static text, so the tab order is unchanged), then the two disclosures as a pair. The sheet's figures block
+  lets the label wrap and never the figures, at every width: at 1440 the compact card is 370 px and "50 · 19 · 17"
+  ran past its edge.
+- **Controls.** Every control on the landing has 4 px corners, as DESIGN › Shape says: the mode select loses the
+  pill of the evening pass and takes the buttons' corner, a `--rule` border and the body face. Pills remain only
+  as the graph's start and end nodes, which are not controls.
+- **Trays and cards.** The SQL block inside the sheet is a tray too (grey, no border, 8 px corners as a small
+  object); the board's card drawn in the anatomy keeps the board's own 20 px corners (`app/today.css`): it is the
+  board's 320 px card itself, not a miniature. Corners on the landing are therefore: 4 controls, 8 small objects
+  (graph nodes, the SQL block), 14 trays and the sheet, 20 the board's card, 999 the graph's terminal pills.
+- **Header.** Sticky again. The evening pass listed the header with main and footer under `position: relative` to
+  lift them above the blurred field, and that rule won the cascade over `app/header.css`'s `position: sticky`, so
+  the masthead scrolled away with the page; the header is left out of that rule (it is above the field at
+  z-index 10 by header.css already) and sticks as decided on 2026-10-26, clear at rest and frosted once scrolled.
+  Found by Anastasia on 2026-10-27 night.
+- **Rhythm.** 56 px from a section head to its object (the team list was 64), 48 px from an object to its closing
+  element (the card under the graph, the quotation; the sponsors' colophon already was), 16 px under a column's
+  rule (sponsors were 18), 6 and 12 px inside a column (the team's already were). The footer's full-width hairline
+  is gone: the closing band's edge separates it, like every band.
 
 ## Instrument refinement
 

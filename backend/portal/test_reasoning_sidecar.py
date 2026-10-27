@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 from django.test import SimpleTestCase
 from .reasoning_preview import SAMPLE, load_preview
+PRODUCER_SIDECAR = SAMPLE.with_name('snapshot.sample.sidecar.json')
 from .snapshot_validation import MAX_BYTES, SnapshotError
 
 class SidecarTests(SimpleTestCase):
@@ -35,6 +36,19 @@ class SidecarTests(SimpleTestCase):
                     b'\xff', b'['*30+b'0'+b']'*30, b' '* (MAX_BYTES+1)):
             with self.subTest(length=len(raw)), self.assertRaises((SnapshotError, ValueError)):
                 self.load(raw)
+
+    def test_producer_shaped_fixture_binds_as_the_hand_built_sidecars_do(self):
+        # The fixture is what reasoning/scripts/edition_sidecar.py writes (its builder and serializer), so a change on
+        # either side of the sidecar contract fails here, not at the hand-over (2026-10-27, Anastasia / Claude Code).
+        raw = PRODUCER_SIDECAR.read_bytes()
+        sidecar = json.loads(raw)
+        self.assertEqual(list(sidecar), ['snapshot', 'provisional', 'corpus_as_of_utc', 'edition_window_utc', 'producer'])
+        self.assertEqual(list(sidecar['snapshot']), ['sha256', 'topic_id', 'edition_date', 'version', 'run_id', 'status', 'bytes'])
+        self.assertEqual(list(sidecar['producer']), ['commit', 'config_sha256'])
+        self.assertEqual(sidecar['snapshot']['sha256'], hashlib.sha256(SAMPLE.read_bytes()).hexdigest())
+        result = self.load(raw)
+        self.assertEqual(result['preview']['corpus_binding'],
+                         {'provisional': True, 'corpus_as_of_utc': sidecar['corpus_as_of_utc'], 'sidecar_sha256': hashlib.sha256(raw).hexdigest()})
 
     def test_private_and_extra_metadata_never_becomes_response_fields(self):
         self.sidecar['private_evidence']={'journal':'TEST-private-file'}

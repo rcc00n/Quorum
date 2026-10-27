@@ -13,6 +13,11 @@ const stageNames: Record<string, string> = {
   critique: "Critique",
   roundup: "Roundup",
   publish: "Snapshot output",
+  // The third blind pass, the escalation and the source-memory rows (ARCHITECTURE § 5; H-MEM on for the 27 October
+  // runs) named like the others instead of their raw node names (2026-10-27, Anastasia/Claude Code).
+  review_disputed: "Third review",
+  escalate: "Escalate",
+  memory: "Source memory",
 };
 export const stageName = (node: string) =>
   stageNames[node] || node.replaceAll("_", " ");
