@@ -12,7 +12,8 @@ const views = [
   ["reading", "Read", "Reading", "The story, at your pace"],
   ["evidence", "Evidence", "Evidence", "Claims, sources and review decisions"],
   ["coverage", "Coverage", "Perspectives", "How outlets covered this event"],
-  ["map", "Map", "Source map", "Registry ratings and cited audience"],
+  // DECISION(2026-10-27, Anastasia/Claude Code): the Map holds the sources used for this story (lib/story-sources.ts). Why: Anastasia, 2026-10-27.
+  ["map", "Map", "Source map", "The sources used for this story"],
   ["trace", "Trace", "Investigation", "Recorded steps and revisions"],
   ["all", "All", "All sections", "The complete reading and investigation view"],
 ] as const;

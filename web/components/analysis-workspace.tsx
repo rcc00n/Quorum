@@ -17,6 +17,7 @@ import type {
 } from "@/lib/analysis";
 import { displayTime } from "@/lib/analysis";
 import { Spectrum } from "./spectrum";
+import { storySources, STORY_MAP_NOTE } from "@/lib/story-sources";
 import { InvestigationReader, ReaderPanel, EventReading, StoryHead } from "./investigation-reader";
 import { claimKey } from "./story";
 import { readableArticle } from "@/lib/editorial";
@@ -524,7 +525,10 @@ export function AnalysisWorkspace({
         <Comparison event={event} sources={sources} includeRegistry={false} />
       </section>
       </ReaderPanel>
-      <ReaderPanel name="map"><p className="reader-map-note">Registry context: editorial ratings and cited audience, not independent confirmation.</p><Spectrum sources={event.sources} /></ReaderPanel>
+      {/* DECISION(2026-10-27, Anastasia/Claude Code): the same Map as the installed story page (portal.tsx): the sources
+          used for this story, with the evidence's source ids when the event carries a reasoning story. Why: one Map on
+          every story page; this path already drew the event's sources, under a registry note. */}
+      <ReaderPanel name="map"><p className="reader-map-note">{STORY_MAP_NOTE}</p><Spectrum sources={storySources(event, sources.length ? sources : event.sources)} scope="story" /></ReaderPanel>
       <ReaderPanel name="trace">
       <section id="investigation-timeline" className="analysis-block">
         <div className="analysis-block-heading">
