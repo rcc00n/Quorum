@@ -730,7 +730,8 @@ label {
     gap: 6px;
   }
 }
-/* One grey for every filled element on the app routes (Anastasia, 2026-10-27): notices, status panels, the
+/* One grey for every filled element on the app routes (Anastasia, 2026-10-27; one exception since the same day, the AI
+   headline notice on --notice-yellow, at the end of this file): notices, status panels, the
    search key cap and the hover of the "+ Add topics" pill share --tray with the rows and trays above. */
 .workspace-search kbd { background: var(--tray); }
 .quiet-day { background: var(--tray); border-radius: 14px; }
@@ -755,8 +756,29 @@ label {
   box-shadow: 0 1px 0 #cfcfcf;
   color: var(--ink-2);
 }
-/* While the next date loads, the page stays and dims a little instead of blanking (second cabinet pass). */
-.workspace-main[aria-busy="true"] > :not(.publication-line, .publication-notice) {
+/* While the next date loads, the page stays and dims a little instead of blanking (second cabinet pass). The AI
+   headline notice stays at full strength (2026-10-27). */
+.workspace-main[aria-busy="true"] > :not(.publication-line, .publication-notice, .ai-notice) {
   opacity: 0.72;
   transition: opacity 160ms ease;
+}
+
+/* The AI headline notice (components/ai-notice.tsx, DECISION 2026-10-27 there): the shape of the other notices on these
+   pages (.message: a 2 px umber edge at the left, square corners) on the identity's one yellow, --notice-yellow, ink
+   text at the interface size; first in the main column, above the page's title or crumb. */
+.workspace-main > .ai-notice {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  background: var(--notice-yellow);
+  border-left: 2px solid var(--umber);
+  border-radius: 0;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: none;
+}
+.workspace-main > .ai-notice strong {
+  font-weight: 600;
+  color: var(--ink);
 }

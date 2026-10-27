@@ -21,6 +21,7 @@ import { storySources, STORY_MAP_NOTE } from "@/lib/story-sources";
 import { EditionNotes } from "./editorial";
 import { visibleStories, isQuietDay } from "@/lib/editorial";
 import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
+import { AiNotice } from "./ai-notice";
 import { ReasoningEvidence } from "./reasoning-evidence";
 import { ReasoningSpectrum } from "./reasoning-spectrum";
 import { ReasoningTimeline } from "./reasoning-timeline";
@@ -314,6 +315,8 @@ export function Portal({
             arrives; the "Preparing your workspace" state is for the first load only. Why: Anastasia's review of
             2026-10-27: every date change blanked the board and drew it again, a white flash and blocks materialising. */}
         <main id="main" className="workspace-main" aria-busy={loading && !!data ? true : undefined}>
+          {/* The AI headline notice opens every workspace page, before any state, so it never moves or goes (decision there). */}
+          <AiNotice />
           {loading && !data ? (
             <div className="loading" role="status">
               <div className="loading-line" />

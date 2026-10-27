@@ -1,5 +1,6 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const fs = require("fs");
+const assert = require("node:assert/strict");
 (async () => {
   const browser = await chromium.launch({
     headless: true,
@@ -47,6 +48,9 @@ const fs = require("fs");
   await page.getByRole("button", { name: "Continue to your brief" }).click();
   await page.waitForURL("**/dashboard");
   await page.getByText("No published events are available").waitFor();
+  // The AI headline notice opens Home too, first in the main column (2026-10-27, Anastasia/Claude Code).
+  await page.getByRole("note").filter({ hasText: "AI-written headlines." }).waitFor();
+  assert.equal(await page.locator("#main > :first-child").evaluate((e) => e.classList.contains("ai-notice")), true);
   if (hasTopics)
     await page.getByText("1 topic in your brief", { exact: true }).waitFor();
   await page.screenshot({
