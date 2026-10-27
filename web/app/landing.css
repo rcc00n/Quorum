@@ -210,9 +210,23 @@
 
 /* Sections: 128 px of air, content on the centred page column (identity.css), no hairlines across the page. */
 .landing main > section {
-  padding: 128px var(--column-gutter);
+  padding: 96px var(--column-gutter);
   scroll-margin-top: 80px;
 }
+/* DECISION(2026-10-27, Anastasia/Claude Code; landing after the deck): a hairline the width of the column opens
+   every section after the first, and the sections sit closer (96 px, the hero ending at 64 px). Supersedes the
+   "no page-wide hairlines" clause of the Air pass for this one rule: the line stays inside the column, not across
+   the page. Why: Anastasia's review of 2026-10-27, too much empty space between the hero and the sources and no
+   separator between them. */
+.landing main > section + section::before {
+  content: "";
+  display: block;
+  height: 1px;
+  max-width: var(--measure);
+  margin: -96px auto 88px;
+  background: var(--rule);
+}
+.landing .lp-hero { padding-bottom: 64px; }
 
 /* Hero: on the wider measure, 7 columns of text and 5 of sheet. */
 .landing .lp-hero {
@@ -1414,4 +1428,159 @@
 }
 @media (max-width: 900px) {
   .lp-field-wrap { top: 420px; right: -30%; width: 110%; height: 900px; opacity: 0.85; }
+}
+/* The sources section carries the Sources page's instrument (components/spectrum.tsx, app/spectrum.css): its own
+   heading is visually hidden since the section has one, its ledger too since the registry list below carries the
+   same forty rows with the window's counts; the mode select sits at the right of the section's first line. */
+.landing .spectrum-modern { margin-top: 40px; }
+.landing .spectrum-modern .section-heading > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.landing .spectrum-modern .section-heading { display: flex; justify-content: flex-end; }
+.landing .spectrum-modern .sp-ledger { display: none; }
+.landing .spectrum-modern .inline-label select {
+  min-height: 40px;
+  padding: 0 36px 0 16px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 14px;
+}
+/* One sentence above, the instrument, mono captions: the instrument's own intro, its instruction line and the cohort
+   footnote are restated or redundant here and stay hidden (Anastasia, 2026-10-27: laconic, like the deck). */
+.landing .spectrum-modern > .section-heading + p { display: none; }
+.landing .sp-instruction, .landing .sp-cohorts-note { display: none; }
+.landing .sp-caption, .landing .sp-footnote, .landing .sp-label, .landing .sp-y-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+.landing .sp-cohorts h3 { font-size: 20px; margin-top: 28px; }
+.landing .spectrum-modern > details > summary { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; }
+.landing .lp-registry-lead {
+  margin: 36px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+/* One hairline fewer inside the sources section: the instrument's heading row keeps no rule of its own; the ink
+   rule under the mode select stays (Anastasia, 2026-10-27). */
+.landing .spectrum-modern .section-heading { border-bottom: 0; padding-bottom: 0; margin-bottom: 8px; }
+.landing .spectrum-modern { border-top: 0; padding-top: 0; }
+/* DECISION(2026-10-27, Anastasia/Claude Code): inside the sources section the instrument's rules give way to fills
+   and spacing: no rule above or below the field, the selected-source reading and the cohort table on the cabinet's
+   grey --tray with 14 px corners and no row rules (a faint zebra instead), captions in the mono; the only line left
+   is the section's opening hairline and the chart's own frame. Why: Anastasia's review of 2026-10-27, too many
+   lines, the same text kept but set apart by fill rather than rule, the grey of Home's fills rather than beige. */
+.landing .spectrum-instrument { margin: 16px 0 24px; border-top: 0; border-bottom: 0; }
+.landing .sp-inspector {
+  border-top: 0;
+  padding: 22px 24px;
+  background: var(--tray);
+  border-radius: 14px;
+}
+.landing .sp-footnote { margin: 16px 0 0; }
+.landing .sp-cohorts { margin: 20px 0 0; }
+.landing .sp-cohorts h3 {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+}
+.landing .sp-cohorts table {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--tray);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.landing .sp-cohorts th, .landing .sp-cohorts td { border-bottom: 0; padding: 11px 18px; }
+.landing .sp-cohorts thead th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 14px; }
+.landing .sp-cohorts tbody tr:nth-child(even) :is(th, td) { background: rgba(0, 0, 0, 0.035); }
+.landing .sp-cohorts tbody tr:last-child :is(th, td) { padding-bottom: 14px; }
+.landing .spectrum-modern > details { margin-top: 18px; border: 0; padding: 0; }
+.landing .lp-registry { border: 0; margin-top: 10px; }
+.landing .spectrum-modern > details > summary { color: var(--ink-2); }
+.landing .lp-registry-lead { margin-top: 28px; }
+/* DECISION(2026-10-27, Anastasia/Claude Code): on the landing the field spans the section's full width and stands
+   360 px tall (400 on phones); the audience ticks move inside the plot, under their gridlines on a paper chip, the
+   lowest one above its line, so nothing hangs outside the frame; the perspective floor is off, since it would reach past the frame.
+   Every block of the section (captions, the field, the reading, the table, the registry lines) then shares the same
+   two edges. Why: Anastasia, 2026-10-27: the chart to the section's width and a little taller, the text along its
+   borders so that nothing sticks out and the section reads as one system. */
+.landing .sp-stage { padding: 26px 0 48px; }
+.landing .sp-chart { height: 360px; }
+/* The perspective floor would reach past the frame's edges at full width; the frame is enough here. */
+.landing .sp-floor { display: none; }
+.landing .sp-y-tick {
+  right: auto;
+  left: 14px; /* clear of a mark's core on the −1 edge (the AllSides mode puts marks there) */
+  transform: translateY(4px);
+  padding: 0 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.86);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.landing .sp-chart > span.sp-y-tick:last-of-type { transform: translateY(calc(-100% - 4px)); }
+.landing .sp-x-labels { font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; color: var(--ink-2); }
+@media (max-width: 700px) {
+  .landing .sp-stage { padding-left: 0; padding-right: 0; }
+  .landing .sp-chart { height: 400px; }
+  .landing .sp-y-tick { right: auto; font-size: 10px; }
+}
+/* DECISION(2026-10-27, Anastasia/Claude Code): the sources section's head and the instrument interlock: the section
+   is a two-column grid, the heading and the sub at the left, the instrument's mode control at the right on the sub's
+   last line (the instrument's own wrapper is display: contents so its control can take that cell); the instrument's
+   caption, "Source position × audience" with the plotted / rated / registry counts, is the one mono line directly
+   above the field, and the field's y-axis name is read by assistive technology only, since the footnote under the
+   reading says "Logarithmic audience scale" in words. Why: Anastasia, 2026-10-27: the caption and the counts took a
+   whole line of their own and read as noise though they matter; the heading and the sub felt foreign to the section. */
+.landing .lp-sources {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 40px;
+  align-items: end;
+}
+.landing .lp-sources > .lp-kick,
+.landing .lp-sources .spectrum-instrument,
+.landing .lp-sources .sp-cohorts,
+.landing .lp-sources .spectrum-modern > details,
+.landing .lp-sources > .lp-registry-lead,
+.landing .lp-sources > .lp-registry { grid-column: 1 / -1; }
+/* The section's opening hairline (main > section + section::before) is the grid's first item, so the rows are named
+   explicitly: 1 the hairline, 2 the kicker, 3 the heading, 4 the sub; everything else follows in order. */
+.landing .lp-sources::before { grid-column: 1 / -1; grid-row: 1; justify-self: stretch; margin-left: 0; margin-right: 0; }
+.landing .lp-sources > .lp-kick { grid-row: 2; }
+.landing .lp-sources > h2 { grid-column: 1; grid-row: 3; }
+.landing .lp-sources > .lp-sub { grid-column: 1; grid-row: 4; }
+.landing .lp-sources .spectrum-modern { display: contents; }
+.landing .lp-sources .spectrum-modern .section-heading { grid-column: 2; grid-row: 3 / 5; align-self: end; margin: 0; }
+.landing .lp-sources .spectrum-instrument { margin-top: 40px; }
+.landing .sp-caption { padding-top: 0; }
+.landing .sp-stage { margin-top: 14px; }
+.landing .sp-y-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .landing .lp-sources { grid-template-columns: minmax(0, 1fr); }
+  .landing .lp-sources .spectrum-modern .section-heading { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 24px; }
+  .landing .lp-sources .spectrum-instrument { margin-top: 28px; }
 }

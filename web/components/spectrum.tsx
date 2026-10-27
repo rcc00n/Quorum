@@ -30,7 +30,9 @@ export function Spectrum({ sources, standalone = false }: { sources: Source[]; s
           {s.name}
           {s.audience !== null && s.audience_source_url && (
             <small className="audience-value">
-              Audience: {s.audience.toLocaleString()}
+              {/* A fixed locale: the landing renders this on the server (Anastasia/Claude Code, 2026-10-27), and a locale-dependent
+                  grouping produced a hydration mismatch. */}
+              Audience: {s.audience.toLocaleString("en-US")}
             </small>
           )}
         </button>

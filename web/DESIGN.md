@@ -97,6 +97,7 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | Anastasia / Claude Code (landing after the deck) | The sources section carries the Sources page's spectrum instrument from the registry fixture, fitted to the page: a full-width 360 px field with the ticks inside, grey fills instead of rules, the mode control in the section's head, one mono caption line; sections divided by one hairline. | Anastasia's reviews of 2026-10-27: the same chart as the Sources tab; too many lines; the chart to the section's width with the text along its edges; the caption took a line of its own; the head felt foreign to the section. |
 | 2026-10-27 | Anastasia / Claude Code (landing after the deck, branch `anastasia/web-landing-polish`) | The landing's hero takes the deck's devices: a sentence typed once in a fixed box, a compact evidence card, three quiet running lines of real data (titles with source tags, the registry, the agents), the blurred tally at the very back of the page with faded edges. landing.cjs asserts the three lines and the field. | Anastasia's reviews of 2026-10-27: the deck's typewriter shifted the text; the lines must not pull attention; the blur back, with no visible edge, behind everything. |
 | 2026-10-27 | Anastasia / Claude Code (second cabinet pass) | The topic page as a list: stories as rows like Also today, cards only on Home; no tabs, rail or rubric dump; spectrum kept; History and Sources with pill controls; one neutral grey `--tray` for every filled element; chevrons as the disclosure sign; row labels in ink. See › Cabinet. | Anastasia's reviews of 2026-10-27: a topic page with the board's cards read as Home; the fill should be plain grey, not light brown; the diagonal arrow read as a link. |
 | 2026-10-27 | Anastasia / Claude Code (second cabinet pass, branch `anastasia/web-cabinet-pages`) | The story page after the board's rules (see › Cabinet, Story page): head above a sticky tray of round pills, Impact and the claim groups as counted rounded rows, the publication line as the foot colophon, scroll anchoring off; trays and rows on `--paper-3` everywhere. | Anastasia's review of 2026-10-27 of the whole cabinet: the title first and the menu fixed under it, rounded like Home; the five links read as random and nothing explained them; the fill should not melt into the paper; an opened row moved the page. |
@@ -159,6 +160,19 @@ and the committed fixtures, which `web/tests/landing.cjs` reads back from the se
   page: absolute on the landing root, from behind the header through the hero into the second section, its edges faded by a
   radial mask so no border shows, the header, main and footer above it; the root clips the overflow. The blur is a device
   to be used again, sparingly, further down.
+- **Sources.** The section shows the Sources page's instrument (`components/spectrum.tsx`) from the committed registry copy
+  (`fixtures/landing/sources.json`, extended with the three raters' values, labels and provenance) in place of the three
+  columns of the day's counts; the day's counts stay in the registry list under it. Fitted to the page: the section is a
+  two-column grid, the heading and the sub at the left, the instrument's mode control at the right on the sub's last line
+  (the instrument's wrapper is `display: contents`); one mono line above the field carries "Source position × audience"
+  and the plotted / rated / registry counts; the field spans the section's width and stands 360 px tall (400 on phones),
+  the audience ticks inside the plot on paper chips, the perspective floor off, the y-axis name for assistive technology
+  only since the footnote says "Logarithmic audience scale" in words; the instrument's rules give way to fills: the
+  selected-source reading and the cohort table on the cabinet's grey `--tray` with 14 px corners, a faint zebra and no
+  row rules, captions in the mono; the instrument's intro, instruction line, cohort footnote and ledger stay hidden as
+  restated here or carried by the registry list. Sections are divided by one column-wide hairline
+  (`main > section + section::before`), the hero's bottom padding reduced to meet it. The ledger's audience number renders
+  with a fixed locale, since the landing renders it on the server.
 
 ## Instrument refinement
 

@@ -76,10 +76,17 @@ if (exists(sourcesCsv)) {
       else cur += ch;
     }
     cells.push(cur);
-    const lvl = cells[col("access_level_default")];
+    const text = (name) => (cells[col(name)] || "").trim() || null;
+    const num = (name) => { const v = (cells[col(name)] || "").trim(); return v === "" ? null : Number(v); };
+    // The public columns the landing's spectrum reads (web/fixtures/landing/README.md); rss_urls, country and lang stay out.
     return {
       id: cells[col("id")], name: cells[col("name")], domain: cells[col("domain")], kind: cells[col("kind")],
-      flank: cells[col("flank")] || null, tier: cells[col("tier")] || null, access_level_default: lvl ? Number(lvl) : null,
+      flank: text("flank"), tier: text("tier"), access_level_default: num("access_level_default"), independence_group: text("independence_group"),
+      audience: num("audience"), audience_source_url: text("audience_source_url"),
+      allsides: num("allsides"), mbfc: num("mbfc"), adfontes: num("adfontes"),
+      rating_labels: { allsides: text("allsides_label"), mbfc: text("mbfc_label"), adfontes: null },
+      rating_provenance: { allsides: text("allsides_source_url"), mbfc: text("mbfc_source_url"), adfontes: text("adfontes_source_url") },
+      ratings_checked_at: text("ratings_checked_at"),
     };
   });
   assert.deepStrictEqual(sourcesCopy.sources, fromCsv, "web/fixtures/landing/sources.json differs from collectors/sources.csv");

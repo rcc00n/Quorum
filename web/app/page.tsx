@@ -2,6 +2,8 @@ import { Fragment } from "react";
 import { PageMotion } from "@/components/page-motion";
 import Link from "next/link";
 import { Tenets } from "@/components/landing/tenets";
+import { Spectrum } from "@/components/spectrum";
+import type { Source as RegistrySource } from "@/lib/api";
 import evidence from "@/fixtures/landing/zetaris-evidence-russia-ukraine-war-2026-10-24.json";
 import trace from "@/fixtures/landing/trace.sample.json";
 import registry from "@/fixtures/landing/sources.json";
@@ -125,17 +127,10 @@ function Kicker({ text, slug, href }: { text: string; slug?: string; href?: stri
   );
 }
 
-/* The sources spectrum: the registry in three columns by flank, the day's counts as bar length. */
+/* The day's counts per source, read by the registry list under the spectrum. */
 const docCounts = evidence.documents.by_source as Record<string, number>;
 const officialCounts = evidence.official_docs.by_source as Record<string, number>;
-const maxCount = Math.max(...Object.values(docCounts));
-const maxSource = registry.sources.find((s) => docCounts[s.id] === maxCount);
-const officialNames = registry.sources.filter((s) => officialCounts[s.id] !== undefined).map((s) => s.name);
 
-type Column = "left" | "centre" | "right";
-function columnOf(s: Source): Column {
-  return s.flank === "left" ? "left" : s.flank === "right" ? "right" : "centre";
-}
 function countOf(s: Source): number | undefined {
   return docCounts[s.id] ?? officialCounts[s.id];
 }
@@ -153,10 +148,6 @@ function sortRows(list: Source[]) {
       Number(b.tier === "major") - Number(a.tier === "major") ||
       registry.sources.indexOf(a) - registry.sources.indexOf(b),
   );
-}
-function barClass(s: Source, col: Column) {
-  const tone = col === "centre" ? "ink" : `${col}-${s.tier === "major" ? "major" : "minor"}`;
-  return `lp-src-bar lp-bar-${tone}${s.access_level_default === 2 ? " lp-bar-outline" : ""}`;
 }
 
 /* The seven steps of the graph. DECISION(2026-10-26, Anastasia/Claude Code): the vendor line per step names the
@@ -231,18 +222,6 @@ const ANATOMY: Part[] = [
 
 export default function Home() {
   const f = figures();
-  const columns: { key: Column; label: string; figure: number; line: string; rows: Source[] }[] = (["left", "centre", "right"] as Column[]).map((key) => {
-    const members = registry.sources.filter((s) => columnOf(s) === key);
-    const matched = members.filter((s) => docCounts[s.id] !== undefined).length;
-    const flank = evidence.documents.by_flank as Record<string, number>;
-    const label = key === "left" ? `Left · ${members.length} outlets` : key === "right" ? `Right · ${members.length} outlets` : `Centre and not rated · ${members.length}`;
-    const figure = key === "left" ? flank.left ?? 0 : key === "right" ? flank.right ?? 0 : flank.None ?? 0;
-    const line =
-      key === "centre"
-        ? `documents from ${matched} sources · ${f.official} official ${f.official === 1 ? "document" : "documents"}`
-        : `documents from ${matched} sources`;
-    return { key, label, figure, line, rows: sortRows(members) };
-  });
   let lastGroup = "";
 
   return (
@@ -399,50 +378,20 @@ export default function Home() {
         <section id="sources" className="lp-sources" aria-labelledby="sources-title">
           <Kicker text="Sources" slug="collectors/sources.csv" href={`${REPO}/blob/master/collectors/sources.csv`} />
           <h2 id="sources-title">Forty sources, left to right.</h2>
-          <p className="lp-sub">{`Documents matched to ${evidence.topic_id} in the ${dayLabel(evidence.edition_date)} window, by source.`}</p>
-          <div className="lp-spectrum">
-            {columns.map((col) => (
-              <div key={col.key} className={`lp-col lp-col-${col.key}`}>
-                <div className="lp-col-head">
-                  <span className="lp-col-label">{col.label}</span>
-                  <span className="lp-col-figure">{col.figure}</span>
-                  <span className="lp-col-line">{col.line}</span>
-                </div>
-                <ol className="lp-src-list" role="list" aria-label={col.label}>
-                  {col.rows.map((s) => {
-                    const n = countOf(s);
-                    const level = s.access_level_default;
-                    const mark = accessMark(level);
-                    return (
-                      <li key={s.id} className={n ? "lp-src" : "lp-src lp-src-quiet"}>
-                        <span className="lp-src-name">
-                          {s.name}
-                          {mark && <span className="lp-src-access">{` ${mark}`}</span>}
-                        </span>
-                        {n !== undefined ? (
-                          <span className="lp-src-n">{n}</span>
-                        ) : (
-                          <span className="lp-src-n lp-src-none">
-                            <span aria-hidden="true">{level === 3 ? "·" : "—"}</span>
-                            <span className="lp-sr-only">{level === 3 ? "no feed, access level 3" : "none matched"}</span>
-                          </span>
-                        )}
-                        {n ? <span className={barClass(s, col.key)} style={{ width: `${(n / maxCount) * 100}%` }} aria-hidden="true" /> : null}
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-            ))}
-          </div>
-          <p className="lp-spectrum-legend">
-            {`One scale, ${maxCount} = ${maxSource?.name ?? ""}. Solid: full text. Light fill with outline: headline and lead. — none matched. · no feed, never fetched.${officialNames.length ? ` ${officialNames.join(", ")}: counted in official_docs, queried separately.` : ""}`}
-          </p>
+          <p className="lp-sub">Three outside raters place each outlet; a cited estimate gives its audience. Ratings describe editorial position, not factual accuracy.</p>
+          {/* DECISION(2026-10-27, Anastasia/Claude Code; landing after the deck): the sources section shows the same
+              instrument as the signed-in Sources page (components/spectrum.tsx: position × cited audience under the four
+              external rating modes, the selected source, the cohort table) from the committed registry copy, instead of
+              three columns of the day's counts; the counts stay in the registry list below. Its own heading is visually
+              hidden here because the section has one. Why: Anastasia's review of 2026-10-27, "the same chart as in the
+              Sources tab, fitted to the page"; DECISIONS › Spectrum ratings and cohorts gives the formula and the raters. */}
+          <Spectrum sources={registry.sources as unknown as RegistrySource[]} />
+          <p className="lp-registry-lead">{`${dayLabel(evidence.edition_date)} window · ${evidence.documents.count} publications · ${Object.keys(evidence.documents.by_source).length} sources · ${evidence.official_docs.count} official ${evidence.official_docs.count === 1 ? "document" : "documents"}`}</p>
           <details className="lp-registry">
             <summary>{`All ${registry.count} rows of the registry`}</summary>
             <ol role="list">
               {registry.sources.map((s) => (
-                <li key={s.id}>{`${s.id} · ${s.kind}${s.flank ? " · " + s.flank : ""}${s.tier ? " · " + s.tier : ""} · ${accessWord(s.access_level_default)}`}</li>
+                <li key={s.id}>{`${s.id} · ${s.kind}${s.flank ? " · " + s.flank : ""}${s.tier ? " · " + s.tier : ""} · ${accessWord(s.access_level_default)}${countOf(s) !== undefined ? ` · ${countOf(s)} ${countOf(s) === 1 ? "document" : "documents"} in the window` : ""}`}</li>
               ))}
             </ol>
           </details>
