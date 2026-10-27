@@ -398,7 +398,10 @@
   -webkit-mask-image: radial-gradient(ellipse 62% 56% at 62% 44%, #000 18%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
   mask-image: radial-gradient(ellipse 62% 56% at 62% 44%, #000 18%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
 }
-.landing > header, .landing > main, .landing > footer {
+/* main and footer above the field. The header is not listed: it is sticky by app/header.css (clear at rest, frosted
+   paper once scrolled, DECISION 2026-10-26 there) and already above the field at z-index 10; listing it here with
+   position: relative, as the evening pass did, won the cascade and un-stuck it (found by Anastasia, 2026-10-27 night). */
+.landing > main, .landing > footer {
   position: relative;
   z-index: 1;
 }

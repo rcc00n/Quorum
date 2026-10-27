@@ -270,6 +270,11 @@ read back from the served page to check.
   object); the board's card drawn in the anatomy keeps the board's own 20 px corners (`app/today.css`): it is the
   board's 320 px card itself, not a miniature. Corners on the landing are therefore: 4 controls, 8 small objects
   (graph nodes, the SQL block), 14 trays and the sheet, 20 the board's card, 999 the graph's terminal pills.
+- **Header.** Sticky again. The evening pass listed the header with main and footer under `position: relative` to
+  lift them above the blurred field, and that rule won the cascade over `app/header.css`'s `position: sticky`, so
+  the masthead scrolled away with the page; the header is left out of that rule (it is above the field at
+  z-index 10 by header.css already) and sticks as decided on 2026-10-26, clear at rest and frosted once scrolled.
+  Found by Anastasia on 2026-10-27 night.
 - **Rhythm.** 56 px from a section head to its object (the team list was 64), 48 px from an object to its closing
   element (the card under the graph, the quotation; the sponsors' colophon already was), 16 px under a column's
   rule (sponsors were 18), 6 and 12 px inside a column (the team's already were). The footer's full-width hairline
