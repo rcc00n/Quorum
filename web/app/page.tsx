@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { PageMotion } from "@/components/page-motion";
 import Link from "next/link";
 import { Typewriter, type TypewriterLine } from "@/components/landing/typewriter";
 import evidence from "@/fixtures/landing/zetaris-evidence-russia-ukraine-war-2026-10-24.json";
@@ -241,6 +242,7 @@ export default function Home() {
 
   return (
     <div className="landing">
+      <PageMotion root=".landing main" />
       <header className="lp-head">
         <Link href="/" className="lp-masthead" aria-label="Quorum home">
           Quorum

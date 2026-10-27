@@ -1,0 +1,11 @@
+/* Enhance existing sections only; default/SSR content is always visible. */
+.q-reveal[data-revealed="true"] { animation: q-section-arrive 600ms cubic-bezier(.22, 1, .36, 1) both; animation-delay: var(--q-delay, 0ms); }
+.q-depth { transform: perspective(1100px) rotateX(var(--q-rx, 0deg)) rotateY(var(--q-ry, 0deg)); transform-origin: center; transition: transform 280ms ease-out, box-shadow 280ms ease-out; }
+@media (hover: hover) and (pointer: fine) {
+  .q-depth:hover { box-shadow: 0 22px 48px -38px #14141455; }
+}
+.spectrum-modern, .spectrum-instrument { scroll-margin-top: 144px; }
+@keyframes q-section-arrive { from { opacity: .15; translate: 0 16px; } to { opacity: 1; translate: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .q-reveal, .q-depth { animation: none !important; transition: none !important; transform: none !important; translate: none !important; }
+}
