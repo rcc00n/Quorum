@@ -729,8 +729,18 @@ label {
 .sidebar .workspace-search {
   border-radius: 999px;
   padding: 8px 10px 8px 16px;
+  border-color: #d4d4d4;
+  color: var(--ink-2);
+}
+.sidebar .workspace-search:hover:not(:disabled) {
+  border-color: #9a9a9a;
+  background: var(--tray);
 }
 .sidebar .workspace-search kbd {
   border-radius: 999px;
   padding: 3px 8px;
+  background: var(--tray);
+  border-color: #cfcfcf;
+  box-shadow: 0 1px 0 #cfcfcf;
+  color: var(--ink-2);
 }

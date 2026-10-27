@@ -1,14 +1,21 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import "@/app/page-motion.css";
 
 // DECISION(2026-10-26, rcc00n/Codex): observers only add presentation; unrevealed content stays readable.
 // Why: scrolling, reduced-motion settings or a missing observer must never hide news or block a link.
 export function PageMotion({ root, ready = true, epoch }: { root: string; ready?: boolean; epoch?: unknown }) {
+  // DECISION(2026-10-27, Anastasia/Claude Code; second cabinet pass): the arrival plays once per page (per `epoch`,
+  // the view), not again when the same page shows another date: the board re-renders its sections on every date
+  // change and they arrived anew each time, so turning the dates read as flipping pages. Why: Anastasia's review of
+  // 2026-10-27, "as if the dates were different pages".
+  const arrivedFor = useRef<unknown>(Symbol("never"));
   useEffect(() => {
     if (!ready) return;
     const parent = document.querySelector<HTMLElement>(root);
     if (!parent) return;
+    const arrive = arrivedFor.current !== epoch;
+    arrivedFor.current = epoch;
     const motion = window.matchMedia("(prefers-reduced-motion: no-preference)");
     const pointer = window.matchMedia("(hover: hover) and (pointer: fine)");
     const revealed: HTMLElement[] = [];
@@ -20,7 +27,7 @@ export function PageMotion({ root, ready = true, epoch }: { root: string; ready?
     // The board's head and the page headings (title, date control, "+ Add topics") stay still; only what sits
     // below the rule arrives (Anastasia, second cabinet pass 2026-10-27: no reveal on the head when the date changes).
     parent.querySelectorAll<HTMLElement>(".lp-hero-text, .lp-sheet, .landing main > section:not(#hero), .tb-section, .r-section, .analysis-section, .spectrum-modern").forEach(el => {
-      if (!observer || el.parentElement?.closest('.q-reveal')) return;
+      if (!observer || !arrive || el.parentElement?.closest('.q-reveal')) return;
       el.classList.add('q-reveal');el.style.setProperty('--q-delay', `${Math.min(revealed.length, 4) * 45}ms`);
       revealed.push(el);observer.observe(el);
     });

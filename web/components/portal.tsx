@@ -304,7 +304,7 @@ export function Portal({
             {dateLabel}
           </span>
         </header>
-        <PageMotion root=".workspace-main" ready={!loading && !error} epoch={data} />
+        <PageMotion root=".workspace-main" ready={!loading && !error} epoch={view} />
         <main id="main" className="workspace-main">
           {loading ? (
             <div className="loading" role="status">
