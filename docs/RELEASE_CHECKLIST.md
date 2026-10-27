@@ -2,6 +2,17 @@
 
 Owner: Vadim. Shared release tracker: [Issue #2](https://github.com/rcc00n/Quorum/issues/2). This is the canonical web technical release gate; [implementation inventory](IMPLEMENTATION_STATUS.md) records individual capabilities. Check boxes only for a particular release with its commit, environment, test outcome and rollback revision; a previous release's pass does not approve a new release.
 
+## Public demo reader acceptance — 27 October 2026 UTC
+
+Only `20261027-public-demo-r1` / `c181296bdea797c953dcb4541315afdc2bcc2cfe`.
+[Exact evidence and rollback precaution](reviews/2026-10-27-public-demo-release.md).
+
+- [x] Explicit public-account choice recorded; separate non-staff reader, no private judge credential published.
+- [x] Source/final CI, 104 backend tests, clean source-bound build/package and target guarded plan/apply PASS.
+- [x] Actual public UI login, nine stories/photos at desktop/phone, evidence/trace, read-only POST 403s, staff denial and logout PASS.
+- [x] Existing session, all 15 original users/preferences and edition files, SSH/environment and original 24 workloads preserved; exactly one new public user, final health PASS.
+- [x] About/Website updated and read back; deactivate the dedicated demo before rolling back to unguarded code.
+
 ## Complete photo coverage acceptance — 27 October 2026 UTC
 
 Only `20261027-photo-coverage-r2` / `0499866d51a65c549d3a644a6a039e24278714ca`.
