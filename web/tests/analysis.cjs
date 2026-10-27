@@ -47,8 +47,11 @@ const assert = require("node:assert/strict");
       process.env.QUORUM_SCREENSHOTS ||
       require("os").homedir() + "/.local/share/quorum/portal-screenshots";
     fs.mkdirSync(output, { recursive: true });
+    let readerChecked=false;
     async function open() {
       await page.goto(root + "/events/demo-event?date=2026-10-22");
+      if(!readerChecked){await require("./reader-checks.cjs")({page});readerChecked=true;}
+      else await page.getByRole("tab",{name:"All sections",exact:true}).click();
       await page
         .getByRole("heading", { name: "Evidence Explorer", exact: true })
         .waitFor();
@@ -256,6 +259,7 @@ const assert = require("node:assert/strict");
     fail = false;
     response = structuredClone(demo);
     await page.getByRole("button", { name: "Try again", exact: true }).click();
+    await page.getByRole("tab",{name:"All sections",exact:true}).click();
     await page
       .getByRole("heading", { name: "Evidence Explorer", exact: true })
       .waitFor();

@@ -216,6 +216,7 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     stdio: "pipe",
   });
   await page.goto(root + "/events/demo-event");
+  await require("./reader-checks.cjs")({page});
   for (const name of [
     "Evidence Explorer",
     "Perspective Comparison",
@@ -251,6 +252,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
   await page
     .getByText("No investigation trace supplied.", { exact: false })
     .waitFor();
+  await page.getByRole("tab",{name:"All sections",exact:true}).click();
   await page
     .getByRole("link", { name: "Permalink to revision demo-r2" })
     .waitFor();
@@ -265,6 +267,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
     env,
   );
   await page.reload();
+  await page.getByRole("tab",{name:"All sections",exact:true}).click();
   await page
     .getByRole("link", { name: "Permalink to revision demo-r1" })
     .waitFor();
@@ -306,7 +309,8 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
         [path.join(repo, "web/tests", file)],
         {
           env: { ...process.env, QUORUM_TEST_URL: root, ...extra },
-          stdio: file === "motion.cjs" ? "inherit" : "ignore",
+          // These two suites use public DOM or explicit DEMO interception, never account credentials.
+          stdio: ["motion.cjs", "analysis.cjs"].includes(file) ? "inherit" : "ignore",
         },
       );
       children.push(child);

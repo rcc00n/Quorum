@@ -13,9 +13,11 @@ const names = {
 export function ReasoningSpectrum({
   story,
   sources,
+  includeRegistry = true,
 }: {
   story: ReasoningStory;
   sources: Source[];
+  includeRegistry?: boolean;
 }) {
   const [mode, setMode] = useState<keyof typeof names>(
     story.spectrum.rating_mode,
@@ -164,7 +166,7 @@ export function ReasoningSpectrum({
         ) : null,
       )}
       {sp.note && <p>{sp.note}</p>}
-      <Spectrum sources={sources} />
+      {includeRegistry && <Spectrum sources={sources} />}
     </section>
   );
 }

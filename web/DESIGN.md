@@ -120,3 +120,5 @@ Interaction thesis: stagger source marks into view once, interpolate between the
 Section motion: the public evidence sheet and lead story are shallow depth surfaces; headings and independent sections reveal once as they enter the viewport. Motion never hides content; if IntersectionObserver is missing, sections keep their default appearance. The data, section order and palette are unchanged; reduced motion removes both reveals and pointer depth.
 
 The source map has a direct signed-in entry at `/sources`; the app menu is Today · History · Sources · My topics. This navigation amendment supersedes only the three-link menu in earlier entries above; see docs/DECISIONS.md › User account and interface.
+
+2026-10-27 · rcc00n / Codex · Reading workspace uses a pinned numbered navigation instrument and one active pane; graph access is immediate, complete content remains in All sections, and reduced motion disables panel entry. Existing paper/ink/umber identity and story wording stay. Why: Vadim requested a substantial interaction upgrade without model spend; canonical product scope is docs/DECISIONS.md › Reader workspace amendment.

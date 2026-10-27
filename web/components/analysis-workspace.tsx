@@ -5,9 +5,6 @@ import {
   ArrowUpRight,
   ChevronDown,
   FileText,
-  GitCompareArrows,
-  History,
-  SearchCheck,
 } from "lucide-react";
 import type { Event, Source } from "@/lib/api";
 import { rating, cohort, safeUrl } from "@/lib/api";
@@ -20,7 +17,8 @@ import type {
 } from "@/lib/analysis";
 import { displayTime } from "@/lib/analysis";
 import { Spectrum } from "./spectrum";
-import { Story, claimKey, ReviewLabel } from "./story";
+import { InvestigationReader, ReaderPanel, EventReading } from "./investigation-reader";
+import { claimKey } from "./story";
 import { readableArticle } from "@/lib/editorial";
 
 const statusNames = {
@@ -287,7 +285,7 @@ function ClaimDetail({
     </details>
   );
 }
-function Comparison({ event, sources }: { event: Event; sources: Source[] }) {
+function Comparison({ event, sources, includeRegistry = true }: { event: Event; sources: Source[]; includeRegistry?: boolean }) {
   const [mode, setMode] = useState("average");
   const a = event.analysis;
   if (!a)
@@ -456,7 +454,7 @@ function Comparison({ event, sources }: { event: Event; sources: Source[] }) {
           </div>
         )}
       </div>
-      <Spectrum sources={event.sources} />
+      {includeRegistry && <Spectrum sources={event.sources} />}
     </>
   );
 }
@@ -479,41 +477,14 @@ export function AnalysisWorkspace({
   // DECISION(2026-10-26, Anastasia/Claude Code): when the reasoning output supplied a readable article, the head
   // of the page is the story (components/story.tsx) and this workspace becomes its appendix, restyled by
   // app/story.css under .story-page; otherwise the page is unchanged. Why: web/DESIGN.md › Decisions (story page).
+  // Superseded 2026-10-27 only for continuous appendix access by the reader workspace below; article/identity retained.
+  // DECISION(2026-10-27, rcc00n/Codex): preserve the reading-first story in a dedicated pane.
+  // Why: DECISIONS › Reader workspace supersedes only the continuous appendix navigation.
   const readable = !supplementary && readableArticle(event);
   return (
-    <div className={readable ? "analysis-workspace story-page" : "analysis-workspace"}>
-      {readable ? (
-        <Story event={event} sources={sources} />
-      ) : (
-        !supplementary && (
-          <>
-            <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
-            <h1>{event.title}</h1>
-            {event.reasoning?.needs_review && <ReviewLabel />}
-            <p className="lede">{event.summary}</p>
-            {event.importance && (
-              <aside className="notice">
-                <strong>{event.importance.label}</strong>
-                <p>{event.importance.explanation}</p>
-              </aside>
-            )}
-          </>
-        )
-      )}
-      <nav className="analysis-navigation" aria-label="Analysis sections">
-        <a href="#evidence-explorer">
-          <SearchCheck size={16} />
-          Evidence
-        </a>
-        <a href="#perspective-comparison">
-          <GitCompareArrows size={16} />
-          Perspectives
-        </a>
-        <a href="#investigation-timeline">
-          <History size={16} />
-          Investigation
-        </a>
-      </nav>
+    <InvestigationReader title={event.title} className={readable ? "analysis-workspace story-page" : "analysis-workspace"}>
+      <ReaderPanel name="reading"><EventReading event={event} sources={sources} /></ReaderPanel>
+      <ReaderPanel name="evidence">
       <section id="evidence-explorer" className="analysis-block">
         <div className="analysis-block-heading">
           <p className="eyebrow">01 / FOLLOW THE EVIDENCE</p>
@@ -539,6 +510,8 @@ export function AnalysisWorkspace({
           </Unavailable>
         )}
       </section>
+      </ReaderPanel>
+      <ReaderPanel name="coverage">
       <section id="perspective-comparison" className="analysis-block">
         <div className="analysis-block-heading">
           <p className="eyebrow">02 / COMPARE THE COVERAGE</p>
@@ -548,8 +521,11 @@ export function AnalysisWorkspace({
             interpretations, side by side.
           </p>
         </div>
-        <Comparison event={event} sources={sources} />
+        <Comparison event={event} sources={sources} includeRegistry={false} />
       </section>
+      </ReaderPanel>
+      <ReaderPanel name="map"><p className="reader-map-note">Registry context: editorial ratings and cited audience, not independent confirmation.</p><Spectrum sources={event.sources} /></ReaderPanel>
+      <ReaderPanel name="trace">
       <section id="investigation-timeline" className="analysis-block">
         <div className="analysis-block-heading">
           <p className="eyebrow">03 / SEE THE SEQUENCE</p>
@@ -628,6 +604,7 @@ export function AnalysisWorkspace({
           </Link>
         )}
       </section>
-    </div>
+      </ReaderPanel>
+    </InvestigationReader>
   );
 }
