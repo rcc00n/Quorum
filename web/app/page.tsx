@@ -219,9 +219,9 @@ const LIMITS = [
 /* The anatomy of a story: every slot is a rule of docs/DECISIONS.md › Stories as articles, not a sample text. */
 type Part = { label: string; note?: string; kind: "home" | "headline" | "standfirst" | "key" | "facts" | "statements" | "open" | "appendix" | "also"; text: string };
 const ANATOMY: Part[] = [
-  // DECISION(2026-10-28, Anastasia/Claude Code): the Home slot shows a story day, schematic like the other slots ("your
+  // DECISION(2026-10-27, Anastasia/Claude Code): the Home slot shows a story day, schematic like the other slots ("your
   // topic · today's edition", "Your daily story."), not the quiet-day line with the 24 October edition. Why: Anastasia,
-  // 2026-10-28: "No story crossed the bar today" on the example card can confuse a first-time reader about what the card
+  // 2026-10-27: "No story crossed the bar today" on the example card can confuse a first-time reader about what the card
   // is for; the quiet day stays said plainly in limit 05 and on the board itself (DECISIONS › Selecting major news).
   { label: "Home", note: "One card per topic you follow.", kind: "home", text: "Your daily story." },
   { label: "Headline", kind: "headline", text: "Subject, verb, object. No adjectives." },
