@@ -12,6 +12,8 @@ account. Decisions: `web/DESIGN.md` › Cabinet (27 October, reference: untitled
 | home-topics-desktop.png, home-topics-tablet.png, home-topics-phone.png | The topic panel open on Home: pill search, the catalog as a cloud of round pills with the chosen ones filled, the pill inverted while open. |
 | also-fold-desktop.png, also-fold-phone.png | The "Also today" fold past three events. Illustration only: the fictional group's two rows were repeated to five in the browser (the feed response rewritten by the screenshot script) so the fold shows; the sample itself has two. |
 | account-desktop.png, account-tablet.png, account-phone.png | The Account page (name, email, password, sign out); the topics live on Home. |
+| before-home-desktop.png, before-home-phone.png | Before: the Today board on `integration` (f309af1), same account and date: the status prose, the native date control, the cards with topic, standfirst and meta, the plain publication line. |
+| before-settings-desktop.png, before-settings-phone.png | Before: the "My topics" settings page on `integration` with the topic picker under the profile forms. |
 
 The countdown wording ("Data cutoff in N hours", the waiting card's "A cutoff, not a publication time") appears
 only before 05:30 New York on the current day and is not pictured.
