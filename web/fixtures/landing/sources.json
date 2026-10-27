@@ -1,367 +1,1047 @@
 {
- "source": "collectors/sources.csv",
- "what": "the source registry's public columns (id, name, domain, kind, flank, tier, access_level_default) for the landing's typographic material; names only, no ratings, no feed URLs",
- "count": 40,
- "sources": [
-  {
-   "id": "ap",
-   "name": "Associated Press",
-   "domain": "apnews.com",
-   "kind": "agency",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 3
-  },
-  {
-   "id": "reuters",
-   "name": "Reuters",
-   "domain": "reuters.com",
-   "kind": "agency",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 2
-  },
-  {
-   "id": "afp",
-   "name": "Agence France-Presse",
-   "domain": "afp.com",
-   "kind": "agency",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 2
-  },
-  {
-   "id": "guardian",
-   "name": "The Guardian",
-   "domain": "theguardian.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "major",
-   "access_level_default": 1
-  },
-  {
-   "id": "nyt",
-   "name": "The New York Times",
-   "domain": "nytimes.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "major",
-   "access_level_default": 2
-  },
-  {
-   "id": "wapo",
-   "name": "The Washington Post",
-   "domain": "washingtonpost.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "major",
-   "access_level_default": 3
-  },
-  {
-   "id": "cnn",
-   "name": "CNN",
-   "domain": "cnn.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "major",
-   "access_level_default": 1
-  },
-  {
-   "id": "npr",
-   "name": "NPR",
-   "domain": "npr.org",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "major",
-   "access_level_default": 1
-  },
-  {
-   "id": "vox",
-   "name": "Vox",
-   "domain": "vox.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "mother-jones",
-   "name": "Mother Jones",
-   "domain": "motherjones.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "intercept",
-   "name": "The Intercept",
-   "domain": "theintercept.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "slate",
-   "name": "Slate",
-   "domain": "slate.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "daily-beast",
-   "name": "The Daily Beast",
-   "domain": "thedailybeast.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "new-republic",
-   "name": "The New Republic",
-   "domain": "newrepublic.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "nation",
-   "name": "The Nation",
-   "domain": "thenation.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "salon",
-   "name": "Salon",
-   "domain": "salon.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "common-dreams",
-   "name": "Common Dreams",
-   "domain": "commondreams.org",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "atlantic",
-   "name": "The Atlantic",
-   "domain": "theatlantic.com",
-   "kind": "outlet",
-   "flank": "left",
-   "tier": "minor",
-   "access_level_default": 2
-  },
-  {
-   "id": "fox-news",
-   "name": "Fox News",
-   "domain": "foxnews.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "major",
-   "access_level_default": 1
-  },
-  {
-   "id": "ny-post",
-   "name": "New York Post",
-   "domain": "nypost.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "major",
-   "access_level_default": 1
-  },
-  {
-   "id": "daily-wire",
-   "name": "The Daily Wire",
-   "domain": "dailywire.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "breitbart",
-   "name": "Breitbart",
-   "domain": "breitbart.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "washington-examiner",
-   "name": "Washington Examiner",
-   "domain": "washingtonexaminer.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "washington-times",
-   "name": "The Washington Times",
-   "domain": "washingtontimes.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 2
-  },
-  {
-   "id": "daily-caller",
-   "name": "The Daily Caller",
-   "domain": "dailycaller.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "newsmax",
-   "name": "Newsmax",
-   "domain": "newsmax.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 2
-  },
-  {
-   "id": "free-beacon",
-   "name": "The Washington Free Beacon",
-   "domain": "freebeacon.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "federalist",
-   "name": "The Federalist",
-   "domain": "thefederalist.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "blaze",
-   "name": "Blaze Media",
-   "domain": "theblaze.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "townhall",
-   "name": "Townhall",
-   "domain": "townhall.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "national-review",
-   "name": "National Review",
-   "domain": "nationalreview.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "daily-signal",
-   "name": "The Daily Signal",
-   "domain": "dailysignal.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "redstate",
-   "name": "RedState",
-   "domain": "redstate.com",
-   "kind": "outlet",
-   "flank": "right",
-   "tier": "minor",
-   "access_level_default": 1
-  },
-  {
-   "id": "wsj",
-   "name": "The Wall Street Journal",
-   "domain": "wsj.com",
-   "kind": "outlet",
-   "flank": "center",
-   "tier": null,
-   "access_level_default": 2
-  },
-  {
-   "id": "isw",
-   "name": "Institute for the Study of War",
-   "domain": "understandingwar.org",
-   "kind": "military",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 3
-  },
-  {
-   "id": "federal-register",
-   "name": "Federal Register",
-   "domain": "federalregister.gov",
-   "kind": "official",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 1
-  },
-  {
-   "id": "congress-gov",
-   "name": "Congress.gov",
-   "domain": "congress.gov",
-   "kind": "official",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 1
-  },
-  {
-   "id": "whitehouse",
-   "name": "The White House",
-   "domain": "whitehouse.gov",
-   "kind": "official",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 1
-  },
-  {
-   "id": "defense-gov",
-   "name": "U.S. Department of Defense",
-   "domain": "defense.gov",
-   "kind": "official",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 1
-  },
-  {
-   "id": "state-gov",
-   "name": "U.S. Department of State",
-   "domain": "state.gov",
-   "kind": "official",
-   "flank": null,
-   "tier": null,
-   "access_level_default": 1
-  }
- ]
+  "source": "collectors/sources.csv",
+  "what": "The registry's public columns for the 40 sources, copied from collectors/sources.csv: identity, kind, flank, tier, access level, independence group, the cited audience with its source URL, the three external ratings with their labels and source URLs, and the date the ratings were checked. web/tests/landing.cjs fails when the copy drifts.",
+  "count": 40,
+  "sources": [
+    {
+      "id": "ap",
+      "name": "Associated Press",
+      "domain": "apnews.com",
+      "kind": "agency",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 3,
+      "independence_group": "ap",
+      "audience": 71900000,
+      "audience_source_url": "https://www.similarweb.com/website/apnews.com/",
+      "allsides": -0.5,
+      "mbfc": -0.33,
+      "adfontes": -0.062,
+      "rating_labels": {
+        "allsides": "Lean Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/associated-press-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/associated-press/",
+        "adfontes": "https://adfontesmedia.com/ap-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "reuters",
+      "name": "Reuters",
+      "domain": "reuters.com",
+      "kind": "agency",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 2,
+      "independence_group": "reuters",
+      "audience": 68800000,
+      "audience_source_url": "https://www.similarweb.com/website/reuters.com/",
+      "allsides": 0,
+      "mbfc": 0,
+      "adfontes": -0.033,
+      "rating_labels": {
+        "allsides": "Center",
+        "mbfc": "LEAST BIASED",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/reuters-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/reuters/",
+        "adfontes": "https://adfontesmedia.com/reuters-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "afp",
+      "name": "Agence France-Presse",
+      "domain": "afp.com",
+      "kind": "agency",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 2,
+      "independence_group": "afp",
+      "audience": 2100000,
+      "audience_source_url": "https://www.similarweb.com/website/afp.com/",
+      "allsides": null,
+      "mbfc": -0.33,
+      "adfontes": -0.057,
+      "rating_labels": {
+        "allsides": "Not Rated",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/afp-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/afp-agence-france-presse/",
+        "adfontes": "https://adfontesmedia.com/agence-france-presse-bias-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "guardian",
+      "name": "The Guardian",
+      "domain": "theguardian.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "major",
+      "access_level_default": 1,
+      "independence_group": "guardian",
+      "audience": 272400000,
+      "audience_source_url": "https://www.similarweb.com/website/theguardian.com/",
+      "allsides": -1,
+      "mbfc": -0.33,
+      "adfontes": -0.203,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/guardian-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/the-guardian/",
+        "adfontes": "https://adfontesmedia.com/the-guardian-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "nyt",
+      "name": "The New York Times",
+      "domain": "nytimes.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "major",
+      "access_level_default": 2,
+      "independence_group": "nyt",
+      "audience": 605700000,
+      "audience_source_url": "https://www.similarweb.com/website/nytimes.com/",
+      "allsides": -0.5,
+      "mbfc": -0.33,
+      "adfontes": -0.186,
+      "rating_labels": {
+        "allsides": "Lean Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/new-york-times-news-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/new-york-times/",
+        "adfontes": "https://adfontesmedia.com/new-york-times-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "wapo",
+      "name": "The Washington Post",
+      "domain": "washingtonpost.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "major",
+      "access_level_default": 3,
+      "independence_group": "wapo",
+      "audience": 64600000,
+      "audience_source_url": "https://www.similarweb.com/website/washingtonpost.com/",
+      "allsides": -0.5,
+      "mbfc": -0.33,
+      "adfontes": -0.165,
+      "rating_labels": {
+        "allsides": "Lean Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/washington-post-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/washington-post/",
+        "adfontes": "https://adfontesmedia.com/washington-post-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "cnn",
+      "name": "CNN",
+      "domain": "cnn.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "major",
+      "access_level_default": 1,
+      "independence_group": "cnn",
+      "audience": 289200000,
+      "audience_source_url": "https://www.similarweb.com/website/cnn.com/",
+      "allsides": -0.5,
+      "mbfc": -0.33,
+      "adfontes": -0.149,
+      "rating_labels": {
+        "allsides": "Lean Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/cnn-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/cnn/",
+        "adfontes": "https://adfontesmedia.com/cnn-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "npr",
+      "name": "NPR",
+      "domain": "npr.org",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "major",
+      "access_level_default": 1,
+      "independence_group": "npr",
+      "audience": 52500000,
+      "audience_source_url": "https://www.similarweb.com/website/npr.org/",
+      "allsides": -0.5,
+      "mbfc": -0.33,
+      "adfontes": -0.104,
+      "rating_labels": {
+        "allsides": "Lean Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/npr-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/npr/",
+        "adfontes": "https://adfontesmedia.com/npr-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "vox",
+      "name": "Vox",
+      "domain": "vox.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "vox",
+      "audience": 3800000,
+      "audience_source_url": "https://www.similarweb.com/website/vox.com/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.24,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/vox-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/vox/",
+        "adfontes": "https://adfontesmedia.com/vox-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "mother-jones",
+      "name": "Mother Jones",
+      "domain": "motherjones.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "mother-jones",
+      "audience": 1900000,
+      "audience_source_url": "https://www.similarweb.com/website/motherjones.com/",
+      "allsides": -1,
+      "mbfc": -0.33,
+      "adfontes": -0.359,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/mother-jones-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/mother-jones/",
+        "adfontes": "https://adfontesmedia.com/mother-jones-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "intercept",
+      "name": "The Intercept",
+      "domain": "theintercept.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "intercept",
+      "audience": 1200000,
+      "audience_source_url": "https://www.similarweb.com/website/theintercept.com/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.339,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/intercept-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/the-intercept/",
+        "adfontes": "https://adfontesmedia.com/intercept-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "slate",
+      "name": "Slate",
+      "domain": "slate.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "slate",
+      "audience": 9600000,
+      "audience_source_url": "https://www.similarweb.com/website/slate.com/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.304,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/slate-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/slate/",
+        "adfontes": "https://adfontesmedia.com/slate-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "daily-beast",
+      "name": "The Daily Beast",
+      "domain": "thedailybeast.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "daily-beast",
+      "audience": 16700000,
+      "audience_source_url": "https://www.similarweb.com/website/thedailybeast.com/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.268,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/daily-beast-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/daily-beast/",
+        "adfontes": "https://adfontesmedia.com/daily-beast-bias-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "new-republic",
+      "name": "The New Republic",
+      "domain": "newrepublic.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "new-republic",
+      "audience": 8300000,
+      "audience_source_url": "https://www.similarweb.com/website/newrepublic.com/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.398,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/new-republic-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/new-republic/",
+        "adfontes": "https://adfontesmedia.com/new-republic-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "nation",
+      "name": "The Nation",
+      "domain": "thenation.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "nation",
+      "audience": 1100000,
+      "audience_source_url": "https://www.similarweb.com/website/thenation.com/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.45,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/nation-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/the-nation/",
+        "adfontes": "https://adfontesmedia.com/nation-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "salon",
+      "name": "Salon",
+      "domain": "salon.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "salon",
+      "audience": 3230000,
+      "audience_source_url": "https://www.semrush.com/website/salon.com/overview/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.329,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/salon-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/salon/",
+        "adfontes": "https://adfontesmedia.com/salon-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "common-dreams",
+      "name": "Common Dreams",
+      "domain": "commondreams.org",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "common-dreams",
+      "audience": 929500,
+      "audience_source_url": "https://www.similarweb.com/website/commondreams.org/",
+      "allsides": -1,
+      "mbfc": -0.67,
+      "adfontes": -0.408,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/common-dreams-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/common-dreams/",
+        "adfontes": "https://adfontesmedia.com/common-dreams-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "atlantic",
+      "name": "The Atlantic",
+      "domain": "theatlantic.com",
+      "kind": "outlet",
+      "flank": "left",
+      "tier": "minor",
+      "access_level_default": 2,
+      "independence_group": "atlantic",
+      "audience": 25300000,
+      "audience_source_url": "https://www.similarweb.com/website/theatlantic.com/",
+      "allsides": -1,
+      "mbfc": -0.33,
+      "adfontes": -0.223,
+      "rating_labels": {
+        "allsides": "Left",
+        "mbfc": "LEFT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/atlantic-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/the-atlantic/",
+        "adfontes": "https://adfontesmedia.com/the-atlantic-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "fox-news",
+      "name": "Fox News",
+      "domain": "foxnews.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "major",
+      "access_level_default": 1,
+      "independence_group": "fox-news",
+      "audience": 204300000,
+      "audience_source_url": "https://www.similarweb.com/website/foxnews.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.271,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/fox-news-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/fox-news/",
+        "adfontes": "https://adfontesmedia.com/fox-news-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "ny-post",
+      "name": "New York Post",
+      "domain": "nypost.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "major",
+      "access_level_default": 1,
+      "independence_group": "ny-post",
+      "audience": 93400000,
+      "audience_source_url": "https://www.similarweb.com/website/nypost.com/",
+      "allsides": 1,
+      "mbfc": 0.33,
+      "adfontes": 0.228,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/new-york-post-news-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/new-york-post/",
+        "adfontes": "https://adfontesmedia.com/new-york-post-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "daily-wire",
+      "name": "The Daily Wire",
+      "domain": "dailywire.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "daily-wire",
+      "audience": 7700000,
+      "audience_source_url": "https://www.similarweb.com/website/dailywire.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.315,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/daily-wire-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/the-daily-wire/",
+        "adfontes": "https://adfontesmedia.com/daily-wire-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "breitbart",
+      "name": "Breitbart",
+      "domain": "breitbart.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "breitbart",
+      "audience": 21800000,
+      "audience_source_url": "https://www.similarweb.com/website/breitbart.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.323,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/breitbart-news-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/breitbart/",
+        "adfontes": "https://adfontesmedia.com/breitbart-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "washington-examiner",
+      "name": "Washington Examiner",
+      "domain": "washingtonexaminer.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "washington-examiner",
+      "audience": 2400000,
+      "audience_source_url": "https://www.similarweb.com/website/washingtonexaminer.com/",
+      "allsides": 0.5,
+      "mbfc": 0.33,
+      "adfontes": 0.265,
+      "rating_labels": {
+        "allsides": "Lean Right",
+        "mbfc": "RIGHT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/washington-examiner-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/washington-examiner/",
+        "adfontes": "https://adfontesmedia.com/washington-examiner-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "washington-times",
+      "name": "The Washington Times",
+      "domain": "washingtontimes.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 2,
+      "independence_group": "washington-times",
+      "audience": 1900000,
+      "audience_source_url": "https://www.similarweb.com/website/washingtontimes.com/",
+      "allsides": 0.5,
+      "mbfc": 0.33,
+      "adfontes": 0.276,
+      "rating_labels": {
+        "allsides": "Lean Right",
+        "mbfc": "RIGHT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/washington-times-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/washington-times/",
+        "adfontes": "https://adfontesmedia.com/washington-times-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "daily-caller",
+      "name": "The Daily Caller",
+      "domain": "dailycaller.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "daily-caller",
+      "audience": 2000000,
+      "audience_source_url": "https://www.similarweb.com/website/dailycaller.com/",
+      "allsides": 0.5,
+      "mbfc": 0.67,
+      "adfontes": 0.305,
+      "rating_labels": {
+        "allsides": "Lean Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/daily-caller-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/daily-caller/",
+        "adfontes": "https://adfontesmedia.com/daily-caller-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "newsmax",
+      "name": "Newsmax",
+      "domain": "newsmax.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 2,
+      "independence_group": "newsmax",
+      "audience": 17200000,
+      "audience_source_url": "https://www.similarweb.com/website/newsmax.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.319,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/newsmax",
+        "mbfc": "https://mediabiasfactcheck.com/newsmax/",
+        "adfontes": "https://adfontesmedia.com/newsmax-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "free-beacon",
+      "name": "The Washington Free Beacon",
+      "domain": "freebeacon.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "free-beacon",
+      "audience": 594900,
+      "audience_source_url": "https://www.similarweb.com/website/freebeacon.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.336,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/washington-free-beacon-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/washington-free-beacon/",
+        "adfontes": "https://adfontesmedia.com/washington-free-beacon-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "federalist",
+      "name": "The Federalist",
+      "domain": "thefederalist.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "federalist",
+      "audience": 1500000,
+      "audience_source_url": "https://www.similarweb.com/website/thefederalist.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.44,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/federalist-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/the-federalist/",
+        "adfontes": "https://adfontesmedia.com/federalist-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "blaze",
+      "name": "Blaze Media",
+      "domain": "theblaze.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "blaze",
+      "audience": 3400000,
+      "audience_source_url": "https://www.similarweb.com/website/theblaze.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.323,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/blaze-media-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/the-blaze/",
+        "adfontes": "https://adfontesmedia.com/blaze-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "townhall",
+      "name": "Townhall",
+      "domain": "townhall.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "townhall",
+      "audience": 5600000,
+      "audience_source_url": "https://www.similarweb.com/website/townhall.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.462,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/townhall-bias",
+        "mbfc": "https://mediabiasfactcheck.com/townhall/",
+        "adfontes": "https://adfontesmedia.com/townhall-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "national-review",
+      "name": "National Review",
+      "domain": "nationalreview.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "national-review",
+      "audience": 3100000,
+      "audience_source_url": "https://www.similarweb.com/website/nationalreview.com/",
+      "allsides": 0.5,
+      "mbfc": 0.67,
+      "adfontes": 0.3,
+      "rating_labels": {
+        "allsides": "Lean Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/national-review-news-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/national-review/",
+        "adfontes": "https://adfontesmedia.com/national-review-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "daily-signal",
+      "name": "The Daily Signal",
+      "domain": "dailysignal.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "daily-signal",
+      "audience": 1100000,
+      "audience_source_url": "https://www.similarweb.com/website/dailysignal.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.407,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/daily-signal-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/daily-signal/",
+        "adfontes": "https://adfontesmedia.com/daily-signal-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "redstate",
+      "name": "RedState",
+      "domain": "redstate.com",
+      "kind": "outlet",
+      "flank": "right",
+      "tier": "minor",
+      "access_level_default": 1,
+      "independence_group": "redstate",
+      "audience": 6000000,
+      "audience_source_url": "https://www.similarweb.com/website/redstate.com/",
+      "allsides": 1,
+      "mbfc": 0.67,
+      "adfontes": 0.505,
+      "rating_labels": {
+        "allsides": "Right",
+        "mbfc": "RIGHT",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/redstate-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/red-state/",
+        "adfontes": "https://adfontesmedia.com/redstate-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "wsj",
+      "name": "The Wall Street Journal",
+      "domain": "wsj.com",
+      "kind": "outlet",
+      "flank": "center",
+      "tier": null,
+      "access_level_default": 2,
+      "independence_group": "wsj",
+      "audience": 77900000,
+      "audience_source_url": "https://www.similarweb.com/website/wsj.com/",
+      "allsides": 0,
+      "mbfc": 0.33,
+      "adfontes": 0.103,
+      "rating_labels": {
+        "allsides": "Center",
+        "mbfc": "RIGHT-CENTER",
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": "https://www.allsides.com/news-source/wall-street-journal-media-bias",
+        "mbfc": "https://mediabiasfactcheck.com/wall-street-journal/",
+        "adfontes": "https://adfontesmedia.com/wall-street-journal-bias-and-reliability/"
+      },
+      "ratings_checked_at": "2026-10-24"
+    },
+    {
+      "id": "isw",
+      "name": "Institute for the Study of War",
+      "domain": "understandingwar.org",
+      "kind": "military",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 3,
+      "independence_group": "isw",
+      "audience": null,
+      "audience_source_url": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "rating_labels": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "ratings_checked_at": null
+    },
+    {
+      "id": "federal-register",
+      "name": "Federal Register",
+      "domain": "federalregister.gov",
+      "kind": "official",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 1,
+      "independence_group": "us-gov",
+      "audience": null,
+      "audience_source_url": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "rating_labels": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "ratings_checked_at": null
+    },
+    {
+      "id": "congress-gov",
+      "name": "Congress.gov",
+      "domain": "congress.gov",
+      "kind": "official",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 1,
+      "independence_group": "us-gov",
+      "audience": null,
+      "audience_source_url": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "rating_labels": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "ratings_checked_at": null
+    },
+    {
+      "id": "whitehouse",
+      "name": "The White House",
+      "domain": "whitehouse.gov",
+      "kind": "official",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 1,
+      "independence_group": "us-gov",
+      "audience": null,
+      "audience_source_url": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "rating_labels": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "ratings_checked_at": null
+    },
+    {
+      "id": "defense-gov",
+      "name": "U.S. Department of Defense",
+      "domain": "defense.gov",
+      "kind": "official",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 1,
+      "independence_group": "us-gov",
+      "audience": null,
+      "audience_source_url": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "rating_labels": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "ratings_checked_at": null
+    },
+    {
+      "id": "state-gov",
+      "name": "U.S. Department of State",
+      "domain": "state.gov",
+      "kind": "official",
+      "flank": null,
+      "tier": null,
+      "access_level_default": 1,
+      "independence_group": "us-gov",
+      "audience": null,
+      "audience_source_url": null,
+      "allsides": null,
+      "mbfc": null,
+      "adfontes": null,
+      "rating_labels": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "rating_provenance": {
+        "allsides": null,
+        "mbfc": null,
+        "adfontes": null
+      },
+      "ratings_checked_at": null
+    }
+  ]
 }

@@ -1,7 +1,10 @@
 import { Fragment } from "react";
 import { PageMotion } from "@/components/page-motion";
 import Link from "next/link";
-import { Typewriter, type TypewriterLine } from "@/components/landing/typewriter";
+import { Tenets } from "@/components/landing/tenets";
+import { RunGraph } from "@/components/landing/graph";
+import { Spectrum } from "@/components/spectrum";
+import type { Source as RegistrySource } from "@/lib/api";
 import evidence from "@/fixtures/landing/zetaris-evidence-russia-ukraine-war-2026-10-24.json";
 import trace from "@/fixtures/landing/trace.sample.json";
 import registry from "@/fixtures/landing/sources.json";
@@ -61,6 +64,13 @@ function supersedeChain(rows: SampleRow[]): SampleRow[] {
   return out;
 }
 
+// The running line's titles: the Reuters chain in supersede order first, then the other rows of the sample.
+const wireTitles = (() => {
+  const rows = evidence.documents.sample as SampleRow[];
+  const ordered = supersedeChain(rows.filter((r) => r.source_id === "reuters"));
+  return [...ordered, ...rows.filter((r) => !ordered.includes(r))];
+})();
+
 // The evidence file truncates titles to 80 characters; an ellipsis marks the cut, nothing is completed.
 function cut(title: string) {
   return title.length >= 80 ? title + "…" : title;
@@ -118,17 +128,10 @@ function Kicker({ text, slug, href }: { text: string; slug?: string; href?: stri
   );
 }
 
-/* The sources spectrum: the registry in three columns by flank, the day's counts as bar length. */
+/* The day's counts per source, read by the registry list under the spectrum. */
 const docCounts = evidence.documents.by_source as Record<string, number>;
 const officialCounts = evidence.official_docs.by_source as Record<string, number>;
-const maxCount = Math.max(...Object.values(docCounts));
-const maxSource = registry.sources.find((s) => docCounts[s.id] === maxCount);
-const officialNames = registry.sources.filter((s) => officialCounts[s.id] !== undefined).map((s) => s.name);
 
-type Column = "left" | "centre" | "right";
-function columnOf(s: Source): Column {
-  return s.flank === "left" ? "left" : s.flank === "right" ? "right" : "centre";
-}
 function countOf(s: Source): number | undefined {
   return docCounts[s.id] ?? officialCounts[s.id];
 }
@@ -147,26 +150,23 @@ function sortRows(list: Source[]) {
       registry.sources.indexOf(a) - registry.sources.indexOf(b),
   );
 }
-function barClass(s: Source, col: Column) {
-  const tone = col === "centre" ? "ink" : `${col}-${s.tier === "major" ? "major" : "minor"}`;
-  return `lp-src-bar lp-bar-${tone}${s.access_level_default === 2 ? " lp-bar-outline" : ""}`;
-}
 
-/* The seven steps of the graph. DECISION(2026-10-26, Anastasia/Claude Code): the vendor line per step names the
-   lane and the code of docs/ARCHITECTURE.md § 5's node table and reasoning.toml [models] (default lane → Nemotron
-   3.5 Lightning; fact_checker and reviewer → Nemotron 3 Ultra 550B); ● marks a node that calls a model, ○ a node
-   that is code only; Meterless is named in #runs only, because the canonical runs used NVIDIA's direct route.
-   Why: the page may not claim a route the journals do not back; if Yelysei changes a node's lane, only this
-   constant changes. The nodes of the seven steps must cover graph.json in run order (checked below). */
-type Step = { n: string; title: string; nodes: string[]; nodeLine: string; vendor: string; lead: string; body: string; loop?: keyof typeof rules.loops };
+/* The seven steps of the graph: the captions beside the drawn graph (components/landing/graph.tsx, where each
+   node's lane is recorded). DECISION(2026-10-26, Anastasia/Claude Code; amended 2026-10-27): the lane per node is
+   written in the node's box of the drawing, from docs/ARCHITECTURE.md § 5's node table and reasoning.toml [models]
+   (default lane → Nemotron 3.5 Lightning; fact_checker and reviewer → Nemotron 3 Ultra 550B), ● for a node that
+   calls a model, ○ for code; Meterless is named in #runs only, because the canonical runs used NVIDIA's direct
+   route. Why: the page may not claim a route the journals do not back; if Yelysei changes a node's lane, one table
+   changes. The nodes of the seven steps must cover graph.json in run order (checked below). */
+type Step = { n: string; title: string; nodes: string[]; lead: string; body: string; loop?: keyof typeof rules.loops };
 const STEPS: Step[] = [
-  { n: "01", title: "Plan and cluster", nodes: ["plan", "cluster"], nodeLine: "○ plan · ● cluster", vendor: "Zetaris SQL · Nemotron 3.5 Lightning · merged in code", lead: "Groups the day's documents into events.", body: "The model writes one key per document: actors, action, place, date. Code merges the obvious pairs and asks the model only about the ones in between." },
-  { n: "02", title: "Score the bar", nodes: ["score_importance"], nodeLine: "● score_importance", vendor: "Nemotron 3.5 Lightning · points by code", lead: "Decides what is big enough to be a story.", body: "The model reports the legal status and the state of the act; code turns them into points. Ten stories a day is a cap, not a target." },
-  { n: "03", title: "Extract claims", nodes: ["extract_claims"], nodeLine: "● extract_claims", vendor: "Nemotron 3.5 Lightning · quotes checked by code", lead: "Breaks each event into checkable claims.", body: "Each claim keeps the sentence it came from. A quote code cannot find in the text is thrown out." },
-  { n: "04", title: "Research and verify", nodes: ["research", "verify"], nodeLine: "● research ⇄ ○ verify", vendor: "Zetaris SQL · Nemotron 3.5 Lightning · verdict by rule", lead: "Looks for evidence for and against each claim.", body: "A contradiction counts only when the model quotes it and code finds the words in the passage. A thin claim sends the event back for a second round over the rest of the day, the official documents and earlier days.", loop: "research_rounds_max" },
-  { n: "05", title: "Blind fact-check", nodes: ["fact_check", "adjudicate", "review_disputed", "escalate"], nodeLine: "● fact_check → ○ adjudicate ⇄ ● review_disputed → ○ escalate", vendor: "Nemotron 3 Ultra 550B · adjudicated in code", lead: "A second model checks again, seeing nothing from the first.", body: "Only events that can reach the bar get this check. Same corpus, no notes from the first pass. When the two disagree, a third blind pass chooses between their evidence chains and code validates the choice. Still unresolved: disputed.", loop: "review_disputed_max" },
-  { n: "06", title: "Write and critique", nodes: ["frame", "write", "critique"], nodeLine: "● frame → ● write ⇄ ○ critique", vendor: "Nemotron 3.5 Lightning · rules checked in code", lead: "Writes the story, then checks it against the rules.", body: "A draft with a forbidden word or an unattributed statement goes back to the writer. A third rejection is published flagged, never dropped and never quietly approved.", loop: "drafts_max" },
-  { n: "07", title: "Roundup and publish", nodes: ["roundup", "publish"], nodeLine: "● roundup · ● publish", vendor: "Nemotron 3.5 Lightning · one immutable snapshot", lead: "Everything else gets one line. Then one snapshot.", body: "One line per event below the bar, then one immutable snapshot per topic and day, with every trace row inside it." },
+  { n: "01", title: "Plan and cluster", nodes: ["plan", "cluster"], lead: "Groups the day's documents into events.", body: "The model writes one key per document: actors, action, place, date. Code merges the obvious pairs and asks the model only about the ones in between." },
+  { n: "02", title: "Score the bar", nodes: ["score_importance"], lead: "Decides what is big enough to be a story.", body: "The model reports the legal status and the state of the act; code turns them into points. Ten stories a day is a cap, not a target." },
+  { n: "03", title: "Extract claims", nodes: ["extract_claims"], lead: "Breaks each event into checkable claims.", body: "Each claim keeps the sentence it came from. A quote code cannot find in the text is thrown out." },
+  { n: "04", title: "Research and verify", nodes: ["research", "verify"], lead: "Looks for evidence for and against each claim.", body: "A contradiction counts only when the model quotes it and code finds the words in the passage. A thin claim sends the event back for a second round over the rest of the day, the official documents and earlier days.", loop: "research_rounds_max" },
+  { n: "05", title: "Blind fact-check", nodes: ["fact_check", "adjudicate", "review_disputed", "escalate"], lead: "A second model checks again, seeing nothing from the first.", body: "Only events that can reach the bar get this check. Same corpus, no notes from the first pass. When the two disagree, a third blind pass chooses between their evidence chains and code validates the choice. Still unresolved: disputed.", loop: "review_disputed_max" },
+  { n: "06", title: "Write and critique", nodes: ["frame", "write", "critique"], lead: "Writes the story, then checks it against the rules.", body: "A draft with a forbidden word or an unattributed statement goes back to the writer. A third rejection is published flagged, never dropped and never quietly approved.", loop: "drafts_max" },
+  { n: "07", title: "Roundup and publish", nodes: ["roundup", "publish"], lead: "Everything else gets one line. Then one snapshot.", body: "One line per event below the bar, then one immutable snapshot per topic and day, with every trace row inside it." },
 ];
 const stepNodes = STEPS.flatMap((s) => s.nodes);
 if (stepNodes.length !== graph.nodes.length || graph.nodes.some((n, i) => stepNodes[i] !== n)) {
@@ -192,11 +192,19 @@ const GROUP_OF_NODE: Record<string, string> = {
 };
 const loopByFrom = new Map(graph.loops.map((l) => [l.from, l]));
 const loops = rules.loops as Record<string, number>;
+/* The conditions of the three loops and of the escalation, in the words of docs/ARCHITECTURE.md § 5's edge labels;
+   written beside the step in the captions, since the drawing's edges carry no text (decision in graph.tsx). */
+const LOOP_WHEN: Record<keyof typeof rules.loops, string> = {
+  research_rounds_max: "a claim is thin and the event has a round left",
+  review_disputed_max: "verifier and fact-checker disagree on a claim",
+  drafts_max: "rejected and drafts < 3",
+};
+const ESCALATE_WHEN = "above the bar on points, no confirmed claim: out of the stories, into the roundup as \u201creported, not confirmed\u201d, flagged needs review";
 
 const VENDORS: { name: string; where: string; text: string }[] = [
-  { name: "Zetaris", where: "steps 01 · 04 · every read of the corpus", text: "Every read of the corpus is SQL through Zetaris: sources, publications, official documents, previous days. The query at the top of this page is one of them." },
-  { name: "NVIDIA Nemotron", where: "3.5 Lightning · steps 01–04, 06, 07 · 3 Ultra 550B · step 05", text: "Nemotron 3.5 Lightning reads, labels and writes. Nemotron 3 Ultra 550B is the blind fact-checker and the third reviewer." },
-  { name: "Meterless", where: "the provider lane · one model id per lane · a signed receipt per call", text: "Nightshift is supported as the primary provider, with an exact model id per lane and a signed receipt per call. The canonical runs so far used NVIDIA’s direct route; the Meterless engine integration is in progress." },
+  { name: "Zetaris", where: "steps 01 · 04 · every read", text: "Every read of the corpus is SQL through Zetaris: sources, publications, official documents, previous days. The query at the top of this page is one of them." },
+  { name: "NVIDIA Nemotron", where: "3.5 Lightning · 3 Ultra 550B · every step", text: "Nemotron 3.5 Lightning reads, labels and writes. Nemotron 3 Ultra 550B is the blind fact-checker and the third reviewer." },
+  { name: "Meterless", where: "the provider lane", text: "Nightshift is supported as the primary provider, with an exact model id per lane and a signed receipt per call. The canonical runs so far used NVIDIA’s direct route; the Meterless engine integration is in progress." },
 ];
 
 const LIMITS = [
@@ -224,25 +232,17 @@ const ANATOMY: Part[] = [
 
 export default function Home() {
   const f = figures();
-  const reuters = supersedeChain(evidence.documents.sample.filter((s) => s.source_id === "reuters"));
-  const chain: TypewriterLine[] = reuters.map((r) => ({ id: r.id, text: cut(r.title_80) }));
-  const chainIds = reuters.map((r) => r.id).join(" → ");
-  const columns: { key: Column; label: string; figure: number; line: string; rows: Source[] }[] = (["left", "centre", "right"] as Column[]).map((key) => {
-    const members = registry.sources.filter((s) => columnOf(s) === key);
-    const matched = members.filter((s) => docCounts[s.id] !== undefined).length;
-    const flank = evidence.documents.by_flank as Record<string, number>;
-    const label = key === "left" ? `Left · ${members.length} outlets` : key === "right" ? `Right · ${members.length} outlets` : `Centre and not rated · ${members.length}`;
-    const figure = key === "left" ? flank.left ?? 0 : key === "right" ? flank.right ?? 0 : flank.None ?? 0;
-    const line =
-      key === "centre"
-        ? `documents from ${matched} sources · ${f.official} official ${f.official === 1 ? "document" : "documents"}`
-        : `documents from ${matched} sources`;
-    return { key, label, figure, line, rows: sortRows(members) };
-  });
   let lastGroup = "";
 
   return (
     <div className="landing">
+      {/* The blurred field at the very back of the page (Anastasia, 2026-10-27): the window's tally as letterforms
+          softened into tone, reaching from behind the header into the hero and the next section, edges faded by a
+          mask so no border shows; every text node is an "id count" pair of documents.by_source and the test reads
+          them back. */}
+      <div className="lp-field-wrap" aria-hidden="true">
+        <Field id="lp-blur-hero" />
+      </div>
       <PageMotion root=".landing main" />
       <header className="lp-head">
         <Link href="/" className="lp-masthead" aria-label="Quorum home">
@@ -272,10 +272,7 @@ export default function Home() {
               <a href={HACKATHON}>Open Agent Hackathon 2026</a> · Track 03 · Reasoning Architecture
             </p>
             <h1 id="hero-title">The news, with its working shown.</h1>
-            <p className="lp-lead">
-              Quorum takes one event, reads how outlets across the spectrum and official bodies reported it,
-              separates what is known from what is claimed, and shows you the evidence under every line.
-            </p>
+            <Tenets text={"Checked twice, by agents that never see each other\u2019s notes."} />
             <div className="lp-cta-row">
               <Link href="/register" className="lp-button">
                 Choose your topics
@@ -285,14 +282,7 @@ export default function Home() {
               </a>
             </div>
           </div>
-          <figure className="lp-chain">
-            <Typewriter lines={chain} className="lp-type" />
-            <figcaption>{`Three versions of one Reuters story, doc ${chainIds}. A re-edited publication counts once.`}</figcaption>
-          </figure>
-          <div className="lp-field-wrap" aria-hidden="true">
-            <Field id="lp-blur-hero" />
-          </div>
-          <aside className="lp-sheet lp-sheet-focus" aria-labelledby="evidence-title">
+          <aside className="lp-sheet lp-sheet-focus lp-sheet-compact" aria-labelledby="evidence-title">
             <p className="lp-eyebrow">Real query · read through Zetaris</p>
             <h2 id="evidence-title" className="lp-sheet-title">
               {`${evidence.topic_id} · edition ${evidence.edition_date}`}
@@ -347,64 +337,79 @@ export default function Home() {
               </dl>
             </details>
           </aside>
+          {/* The deck's three running lines (web/DESIGN.md › Landing after the deck): the real titles of the window
+              with their source tag, the chain's three Reuters rows first and in order (the test reads them back),
+              then the registry, then the fifteen agents in run order. Each track holds its items twice for a
+              seamless loop; the second half is hidden from assistive technology, and without motion the lines
+              wrap and the duplicate is not shown. */}
+          <div className="lp-wire" aria-label="Real headlines of the window, the forty sources and the fifteen agents">
+            <div className="lp-line lp-line-big" style={{ "--d": "70s" } as React.CSSProperties}>
+              <div className="lp-track">
+                {[0, 1].map((half) => (
+                  <Fragment key={half}>
+                    {wireTitles.map((r) => (
+                      <span key={`${half}-${r.id}`} aria-hidden={half === 1 ? true : undefined}>
+                        <em>{r.source_id}</em>
+                        {cut(r.title_80)}
+                      </span>
+                    ))}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+            <div className="lp-line lp-line-reverse" style={{ "--d": "55s" } as React.CSSProperties}>
+              <div className="lp-track">
+                {[0, 1].map((half) => (
+                  <Fragment key={half}>
+                    {registry.sources.map((src) => (
+                      <span key={`${half}-${src.id}`} aria-hidden={half === 1 ? true : undefined}>{src.name}</span>
+                    ))}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+            <div className="lp-line" style={{ "--d": "48s" } as React.CSSProperties}>
+              <div className="lp-track">
+                {[0, 1].map((half) => (
+                  <Fragment key={half}>
+                    {graph.nodes.map((n, i) => (
+                      <span key={`${half}-${n}`} aria-hidden={half === 1 ? true : undefined}>{`${String(i + 1).padStart(2, "0")} · ${n}`}</span>
+                    ))}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+          <p className="lp-wire-foot">
+            {`Real titles of the ${dayLabel(evidence.edition_date)} window, cut at 80 characters by the file · the ${registry.count} sources · the ${graph.nodes.length} agents in run order · hover to pause`}
+          </p>
         </section>
 
         <section id="sources" className="lp-sources" aria-labelledby="sources-title">
           <Kicker text="Sources" slug="collectors/sources.csv" href={`${REPO}/blob/master/collectors/sources.csv`} />
           <h2 id="sources-title">Forty sources, left to right.</h2>
-          <p className="lp-sub">{`Documents matched to ${evidence.topic_id} in the ${dayLabel(evidence.edition_date)} window, by source.`}</p>
-          <div className="lp-spectrum">
-            {columns.map((col) => (
-              <div key={col.key} className={`lp-col lp-col-${col.key}`}>
-                <div className="lp-col-head">
-                  <span className="lp-col-label">{col.label}</span>
-                  <span className="lp-col-figure">{col.figure}</span>
-                  <span className="lp-col-line">{col.line}</span>
-                </div>
-                <ol className="lp-src-list" role="list" aria-label={col.label}>
-                  {col.rows.map((s) => {
-                    const n = countOf(s);
-                    const level = s.access_level_default;
-                    const mark = accessMark(level);
-                    return (
-                      <li key={s.id} className={n ? "lp-src" : "lp-src lp-src-quiet"}>
-                        <span className="lp-src-name">
-                          {s.name}
-                          {mark && <span className="lp-src-access">{` ${mark}`}</span>}
-                        </span>
-                        {n !== undefined ? (
-                          <span className="lp-src-n">{n}</span>
-                        ) : (
-                          <span className="lp-src-n lp-src-none">
-                            <span aria-hidden="true">{level === 3 ? "·" : "—"}</span>
-                            <span className="lp-sr-only">{level === 3 ? "no feed, access level 3" : "none matched"}</span>
-                          </span>
-                        )}
-                        {n ? <span className={barClass(s, col.key)} style={{ width: `${(n / maxCount) * 100}%` }} aria-hidden="true" /> : null}
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-            ))}
-          </div>
-          <p className="lp-spectrum-legend">
-            {`One scale, ${maxCount} = ${maxSource?.name ?? ""}. Solid: full text. Light fill with outline: headline and lead. — none matched. · no feed, never fetched.${officialNames.length ? ` ${officialNames.join(", ")}: counted in official_docs, queried separately.` : ""}`}
-          </p>
+          <p className="lp-sub">Three outside raters place each outlet; a cited estimate gives its audience. Ratings describe editorial position, not factual accuracy.</p>
+          {/* DECISION(2026-10-27, Anastasia/Claude Code; landing after the deck): the sources section shows the same
+              instrument as the signed-in Sources page (components/spectrum.tsx: position × cited audience under the four
+              external rating modes, the selected source, the cohort table) from the committed registry copy, instead of
+              three columns of the day's counts; the counts stay in the registry list below. Its own heading is visually
+              hidden here because the section has one. Why: Anastasia's review of 2026-10-27, "the same chart as in the
+              Sources tab, fitted to the page"; DECISIONS › Spectrum ratings and cohorts gives the formula and the raters. */}
+          <Spectrum sources={registry.sources as unknown as RegistrySource[]} />
+          <p className="lp-registry-lead">{`${dayLabel(evidence.edition_date)} window · ${evidence.documents.count} publications · ${Object.keys(evidence.documents.by_source).length} sources · ${evidence.official_docs.count} official ${evidence.official_docs.count === 1 ? "document" : "documents"}`}</p>
           <details className="lp-registry">
             <summary>{`All ${registry.count} rows of the registry`}</summary>
             <ol role="list">
               {registry.sources.map((s) => (
-                <li key={s.id}>{`${s.id} · ${s.kind}${s.flank ? " · " + s.flank : ""}${s.tier ? " · " + s.tier : ""} · ${accessWord(s.access_level_default)}`}</li>
+                <li key={s.id}>{`${s.id} · ${s.kind}${s.flank ? " · " + s.flank : ""}${s.tier ? " · " + s.tier : ""} · ${accessWord(s.access_level_default)}${countOf(s) !== undefined ? ` · ${countOf(s)} ${countOf(s) === 1 ? "document" : "documents"} in the window` : ""}`}</li>
               ))}
             </ol>
           </details>
         </section>
 
         <section id="truth" className="lp-truth" aria-labelledby="truth-title">
-          <h2 id="truth-title" className="lp-bracket">
-            <span aria-hidden="true">(</span>What is truth?<span aria-hidden="true">)</span>
-          </h2>
+          <span className="lp-glow" aria-hidden="true" />
+          <h2 id="truth-title" className="lp-truth-q">What is truth?</h2>
           <p className="lp-truth-answer">
             A signed document, or a claim confirmed by sources that do not depend on each other. Everything else is
             a statement, and is shown as one.
@@ -415,26 +420,27 @@ export default function Home() {
           <Kicker text="What you get" slug="docs/DECISIONS.md › Stories as articles" href={`${REPO}/blob/master/docs/DECISIONS.md#stories-as-articles`} />
           <h2 id="get-title">What you read each morning.</h2>
           <p className="lp-sub">One story per topic you follow. Two to four minutes, built only from verified claims, no evaluation added.</p>
-          <div className="lp-page">
+          {/* DECISION(2026-10-27, Anastasia/Claude Code; landing after the deck): the anatomy is drawn as the cabinet
+              draws it: the Home slot is the board's story card (its blurred field and headline band), the reading
+              key and Also today are the cabinet's grey tray rows, the margin labels are mono captions without the
+              prototype's parentheses, and the only rule is the article's own, before the appendix. The parts and
+              their words are unchanged (DECISIONS › Stories as articles). Why: Anastasia's review of 2026-10-27:
+              "the What you get section too", in the deck's manner, consistent with the rest. */}
+          <div className="lp-anatomy">
             {ANATOMY.map((part) => (
               <Fragment key={part.label}>
                 <div className="lp-part">
-                  <span className="lp-part-label">
-                    <span className="lp-paren" aria-hidden="true">
-                      {"( "}
-                    </span>
-                    {part.label}
-                    <span className="lp-paren" aria-hidden="true">
-                      {" )"}
-                    </span>
-                  </span>
+                  <span className="lp-part-label">{part.label}</span>
                   {part.note && <span className="lp-part-note">{part.note}</span>}
                 </div>
                 <div className={`lp-slot lp-slot-${part.kind}`}>
                   {part.kind === "home" ? (
-                    <div className="lp-home-card">
-                      <span className="lp-card-meta">{`${evidence.topic_id} · edition ${evidence.edition_date}`}</span>
-                      <span className="lp-home-line">{part.text}</span>
+                    <div className="lp-mini-card">
+                      <span className="lp-mini-note">Imagine a photo here.</span>
+                      <div className="lp-mini-text">
+                        <span className="lp-mini-meta">{`${evidence.topic_id} · edition ${evidence.edition_date}`}</span>
+                        <span className="lp-mini-line">{part.text}</span>
+                      </div>
                     </div>
                   ) : part.kind === "standfirst" ? (
                     <p>
@@ -446,8 +452,8 @@ export default function Home() {
                       <p>{part.text}</p>
                       <span className="lp-slot-trail">evidence · source · quote · status</span>
                     </>
-                  ) : part.kind === "also" ? (
-                    <div className="lp-also-card">
+                  ) : part.kind === "also" || part.kind === "key" ? (
+                    <div className={part.kind === "key" ? "lp-tray-row lp-tray-key" : "lp-tray-row"}>
                       <p>{part.text}</p>
                     </div>
                   ) : (
@@ -463,31 +469,19 @@ export default function Home() {
           <Kicker text="How it works · one run per topic per day" slug="docs/ARCHITECTURE.md § 5" href={`${REPO}/blob/master/docs/ARCHITECTURE.md`} />
           <h2 id="loop-title">Seven steps from the feeds to the story.</h2>
           <p className="lp-sub">Models read and write. Code decides. Every step leaves a row in the trace.</p>
-          <p className="lp-legend">{`${graph.nodes.length} nodes · ${graph.loops.length} loops · ● a model reads or writes · ○ code decides`}</p>
-          <ol className="lp-steps" role="list">
-            {STEPS.map((s) => (
-              <li key={s.n} className={s.loop ? "lp-step lp-step-loop" : "lp-step"}>
-                <div className="lp-step-label">
-                  <span className="lp-step-n">{s.n}</span>
-                  <h3>{s.title}</h3>
-                  <p className="lp-step-nodes">{s.nodeLine}</p>
-                  <p className="lp-step-vendor">{s.vendor}</p>
-                  {s.loop && (
-                    <span className="lp-chip">
-                      <span className="lp-chip-mark" aria-hidden="true">
-                        {"↺ "}
-                      </span>
-                      {`loops.${s.loop} = ${loops[s.loop]}`}
-                    </span>
-                  )}
-                </div>
-                <div className="lp-step-text">
-                  <p className="lp-step-lead">{s.lead}</p>
-                  <p className="lp-step-body">{s.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <p className="lp-legend">{`${graph.nodes.length} nodes · ${graph.loops.length} loops · ● a model reads or writes · ○ code decides · dashed edges run on a condition`}</p>
+          <RunGraph
+            nodes={graph.nodes}
+            startLabel={"the day\u2019s documents"}
+            endLabel="the edition snapshot"
+            steps={STEPS.map((s) => ({
+              n: s.n, title: s.title, nodes: s.nodes, lead: s.lead, body: s.body,
+              rules: [
+                ...(s.loop ? [<><span className="lp-chip"><span className="lp-chip-mark" aria-hidden="true">{"\u21ba "}</span>{`loops.${s.loop} = ${loops[s.loop]}`}</span>{LOOP_WHEN[s.loop]}</>] : []),
+                ...(s.nodes.includes("escalate") ? [<><span className="lp-chip">{"\u2192 escalate"}</span>{ESCALATE_WHEN}</>] : []),
+              ],
+            }))}
+          />
           <div className="lp-card">
             <h3>No confirmed claim, no story.</h3>
             <p>
@@ -500,7 +494,7 @@ export default function Home() {
         <section id="trace" className="lp-trace" aria-labelledby="trace-title">
           <Kicker text="The trace" slug="docs/examples/snapshot.sample.json" href={`${REPO}/blob/master/docs/examples/snapshot.sample.json`} />
           <h2 id="trace-title">Under every story, its trace.</h2>
-          <p className="lp-sub lp-sub-ink">
+          <p className="lp-sub">
             These rows come from the committed dry-run sample, not from a published edition: a second research
             round and a rejected first draft are in them.
           </p>
@@ -557,18 +551,14 @@ export default function Home() {
           <Kicker text="Limits" slug="reasoning/config/reasoning.toml" href={`${REPO}/blob/master/reasoning/config/reasoning.toml`} />
           <h2 id="limits-title">What it does not do.</h2>
           <ul className="lp-limits-list" role="list">
-            {LIMITS.map((text) => (
+            {LIMITS.map((text, i) => (
               <li key={text}>
-                <span className="lp-dash" aria-hidden="true">
-                  —
-                </span>
+                <span className="lp-limit-n">{String(i + 1).padStart(2, "0")}</span>
                 <p>{text}</p>
               </li>
             ))}
-            <li>
-              <span className="lp-dash" aria-hidden="true">
-                —
-              </span>
+            <li className="lp-limit-words">
+              <span className="lp-limit-n">{String(LIMITS.length + 1).padStart(2, "0")}</span>
               <div>
                 <p>{`${rules.forbidden_words.length} words a draft may not use.`}</p>
                 <p className="lp-forbidden-words">
@@ -610,19 +600,26 @@ export default function Home() {
         </section>
 
         <section id="final" className="lp-final" aria-labelledby="final-title">
-          <h2 id="final-title">Read the working.</h2>
-          <Link href="/register" className="lp-button">
-            Choose your topics
-          </Link>
-          <Link href="/login" className="lp-link">
-            Sign in
-          </Link>
+          <span className="lp-glow" aria-hidden="true" />
+          {/* The deck's closing line (Anastasia, 2026-10-27, the landing after the deck); the earlier headline stays as its lead. */}
+          <h2 id="final-title">Do not trust it. Check it.</h2>
+          <p className="lp-final-lead">Read the working.</p>
+          <div className="lp-cta-row">
+            <Link href="/register" className="lp-button">
+              Choose your topics
+            </Link>
+            <Link href="/login" className="lp-button lp-button-quiet">
+              Sign in
+            </Link>
+          </div>
         </section>
       </main>
 
       <footer className="lp-foot">
-        <span className="lp-masthead lp-masthead-small">Quorum</span>
-        <p>Evidence under every line.</p>
+        <div className="lp-foot-brand">
+          <span className="lp-masthead lp-masthead-small">Quorum</span>
+          <p>Evidence under every line.</p>
+        </div>
         <nav aria-label="Footer">
           <a href={REPO}>github.com/rcc00n/Quorum</a>
           <Link href="/login">Sign in</Link>

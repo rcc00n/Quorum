@@ -5,7 +5,7 @@ Data the public landing page renders. Both files are copies of committed artefac
 | File | Source | What it is |
 | --- | --- | --- |
 | `zetaris-evidence-russia-ukraine-war-2026-10-24.json` | `collectors/zetaris/evidence/russia-ukraine-war_2026-10-24.json` | A real, sanitized Zetaris query over the collected corpus (2026-10-24 edition window; counts, SQL, five title samples; no article text). Rendered as the hero artefact. |
-| `sources.json` | `collectors/sources.csv` | The registry's public columns (id, name, domain, kind, flank, tier, access_level_default) for the 40 sources; names only, no ratings or feed URLs. The tally grid. |
+| `sources.json` | `collectors/sources.csv` | The registry's public columns for the 40 sources: id, name, domain, kind, flank, tier, access_level_default, independence_group, the cited audience with its source URL, the AllSides / MBFC / Ad Fontes ratings with their labels and source URLs, ratings_checked_at (since 2026-10-27, for the landing's spectrum; rss_urls, country and lang stay out). |
 | `rules.json` | `reasoning/config/reasoning.toml` (`[loops]`, `[writing]`) | The three loop limits, the 26 forbidden words and the 9 attribution verbs the landing quotes. |
 | `graph.json` | `docs/ARCHITECTURE.md § 5` | The 15 node names in run order and the three loops with their limit keys. |
 | `trace.sample.json` | `docs/examples/snapshot.sample.json` (`trace`) | Rows of the committed dry-run sample: fictional content, real shape. The landing labels it "dry run · fictional" wherever it is shown. Replace with a public-safe excerpt of a canonical run when the reasoning owner provides one. |
