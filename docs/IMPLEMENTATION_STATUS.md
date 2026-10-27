@@ -17,7 +17,7 @@ Production `20261027-live-r3`, source `63418421c1c0909dc0d7dfa1b451da3eed1bcc76`
 | WEB-EVIDENCE / WEB-TIMELINE / WEB-SPECTRUM | DEPLOYED | Original story and exact 174 trace decisions through API/browser; 9 claims/14 evidence rows, source URLs/reviews and four rating modes |
 | WEB-CATALOG-RATINGS | DEPLOYED | Four approved demo topic IDs and 40 reviewed source definitions; fallback display labels documented |
 | WEB-ROLES / WEB-SESSION / WEB-PREFS | DEPLOYED | Eight existing account logins/roles pass; all nine old accounts preserved; ordinary judge added privately; restart preserves judge session/four topic preferences |
-| INFRA-SSH-01 | INTEGRATED, server configuration | Exact key fingerprint, dedicated deployment account and root-equivalent sudo checked; key-holder login remains unobserved |
+| INFRA-SSH-01 | INTEGRATED, server configuration | Exact key fingerprint and root-equivalent sudo checked; Anastasia confirms holder login; account remains yelysei-deploy, Yelysei has no separate key |
 | SPONSOR-CHAIN-01 | BLOCKED for full independent certification | Installed edition uses direct NVIDIA; fresh 27-Oct Nightshift/H-MEM recall originals and source/provider attestation remain owner dependencies |
 
 ## Combined integration checkpoint

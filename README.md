@@ -188,8 +188,8 @@ The fictional three are rebuilt with `python scripts/regenerate_samples.py` from
 - Paywalled outlets and sites that forbid the crawler count by headline and lead only.
 - One edition per topic per day, run by the team after the 05:30 New York cut and installed by an operator; the site itself starts nothing. Topics come from the team's catalog; the site cannot add one.
 - Positions on the spectrum come from AllSides, MBFC and Ad Fontes, not from us.
-- A quiet day has no story; the first real day (24 October) had none above the bar of 6. Yelysei lowered the bar to 4 on 26 October for the 27 October runs; that change is on `yelysei/agents` (PR #29, open), while this branch, `integration` and `docs/ARCHITECTURE.md` § 6 still say 6.
-- Live runs need the operators' machines: the Nightshift runtime on Windows, Zetaris with the collected corpus, the model credits; real editions reach the public site only behind a login once the reader (PR #31) is deployed.
+- A quiet day has no story; the first real day (24 October) had none above the bar of 6. Yelysei lowered the bar to 4 on 26 October for the 27 October runs; the change is merged through PR #29. Historical editions keep their recorded threshold.
+- Live runs need the operators' machines: the Nightshift runtime on Windows, Zetaris with the collected corpus, the model credits; real editions reach the public site behind the deployed login-only reader (PR #31); each new edition still requires acceptance and operator installation.
 
 ## Submission
 
@@ -197,12 +197,12 @@ The fictional three are rebuilt with `python scripts/regenerate_samples.py` from
 - **Repository:** this one, with this README and the module READMEs. It starts on the evening of 21 October (UTC−5; 00:37 UTC on 22 October) with eight commits of environment scripts and docs (`15fe52b` and following); the product code was written in the build window of 22–27 October.
 - **Pre-existing components:** none of our own. `smoke_test.py` is adapted from the organisers' participant setup guide; the environment scripts of 21 October predate the window by a few hours (previous bullet). Every agent, adapter and page was written in the build window; the dependencies are listed in `reasoning/pyproject.toml`, `backend/requirements.txt`, `collectors/requirements.txt` and `web/package.json`.
 - **Demo video and slides:** the organisers require a 1–4 minute video with audio that shows Meterless doing work ([Issue #2](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6393551309)), plus slides. As of 26 October only a silent 3:42 captioned draft and a seven-slide PDF exist, both private ([Issue #2](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6390833160), [26 Oct](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6428420842)); the final video and slides are linked here once they exist.
-- **Live portal:** https://quorum.raccncode.com (the landing is public; the reader behind it needs a login). It serves release `20261023-web-portals-09f5325` (`docs/RELEASE_CHECKLIST.md`, `deploy/STATUS.md`) with no real edition installed; a judges' login with real editions is planned with the submission ([Issue #2](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6426106426)).
+- **Live portal:** https://quorum.raccncode.com (the landing is public; the reader behind it needs a login). It serves `20261027-live-r3`, source `63418421c1c0909dc0d7dfa1b451da3eed1bcc76`, with the accepted genuine provisional 26-Oct immigration edition and a privately supplied ordinary judge login. Exact CI/browser/restart/rollback evidence and limits: [release report](deploy/LIVE_RELEASE.md).
 - **Sponsor use:** the section above; the rules and organiser updates in `docs/RULES_CHECK.md`.
 
 ## Web Integration: Start Here
 
-[Web handoff and owner notifications](docs/TEAM_HANDOFF.md) → [current adapter/contract](docs/PORTAL_INTEGRATION.md) → [reproducible tests](docs/PORTAL_VERIFICATION.md#current-reproducible-checks). Reasoning 1.0 preview is FICTIONAL/local-only; production publication remains disabled.
+[Web handoff and owner notifications](docs/TEAM_HANDOFF.md) → [current adapter/contract](docs/PORTAL_INTEGRATION.md) → [reproducible tests](docs/PORTAL_VERIFICATION.md#current-reproducible-checks). The development preview remains local-only; production serves the accepted genuine edition through the opt-in authenticated reader. The separate proposal publisher remains disabled.
 
 ## Stack
 
