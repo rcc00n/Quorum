@@ -3,7 +3,7 @@ export type WorkspaceItem = { id: string; label: string; detail: string; href: s
 export function workspaceItems(data: Snapshot | null, day: string, currentId?: string, revision?: string): WorkspaceItem[] {
   const items: WorkspaceItem[] = [
     { id: "today", label: "Today", detail: "Your daily brief", href: "/dashboard", keywords: "home news" },
-    { id: "history", label: "History", detail: "Return to an edition", href: "/history", keywords: "archive date" },
+    { id: "history", label: "History", detail: "Return to the viewed edition", href: `/history?date=${encodeURIComponent(data?.events.find(e => e.id === currentId)?.date || day)}`, keywords: "archive date" },
     { id: "sources", label: "Sources", detail: "Registry spectrum and audience", href: "/sources", keywords: "graph chart map political ratings" },
     { id: "topics", label: "My topics", detail: "Topics, profile and account", href: "/settings", keywords: "preferences password settings" },
   ];

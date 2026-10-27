@@ -4,6 +4,7 @@ import type { Snapshot, Topic, User, Event } from "@/lib/api";
 import type { EditionPresentation } from "@/lib/editorial";
 import { visibleStories, isQuietDay, licensedPhoto } from "@/lib/editorial";
 import { describeCut, utcLabel } from "@/lib/edition-cut.mjs";
+import { EditionNavigation } from "./edition-navigation";
 import "@/app/today.css";
 
 // DECISION(2026-10-26, Anastasia/Claude Code): the daily brief is a board of topic sections on the white page,
@@ -110,10 +111,7 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
           )}
         </div>
         <div className="tb-controls">
-          <label className="tb-date-pick">
-            <span>Edition date</span>
-            <input type="date" value={day} max={today} onChange={(e) => onDay(e.target.value || today)} />
-          </label>
+          <EditionNavigation day={day} today={today} onDay={onDay} />
           <Link href="/settings" className="tb-link">
             My topics
           </Link>

@@ -33,7 +33,7 @@ jobs:
       - run: python backend/manage.py portal_snapshot validate --file backend/portal/fixtures/analysis-demo.json
       # DECISION(2026-10-27, Anastasia/Claude Code, at Vadim's request on PR #52): the registry cohort shares' exact node test runs beside spectrum-geometry.
       # Why: it is the focused guard for the unknown-versus-cited-zero correction; no provider call, no dependency.
-      - run: bash deploy/build-web.sh && node web/tests/ratings.cjs && node web/tests/editorial.cjs && node web/tests/reasoning-trace.cjs && node web/tests/spectrum-geometry.cjs && node web/tests/spectrum-cohorts.cjs && node web/tests/workspace-nav.cjs
+      - run: bash deploy/build-web.sh && node web/tests/ratings.cjs && node web/tests/editorial.cjs && node web/tests/reasoning-trace.cjs && node web/tests/spectrum-geometry.cjs && node web/tests/workspace-nav.cjs && node web/tests/edition-navigation.cjs && node web/tests/spectrum-cohorts.cjs
       - run: QUORUM_PYTHON=python node web/tests/contract.cjs
       # DECISION(2026-10-24, rcc00n/Codex): browser checks use disposable fictional inputs and external tooling.
       # Why: integration CI must exercise auth, partial output and skipped-check UI without private corpora or provider calls.
