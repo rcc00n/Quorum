@@ -17,7 +17,9 @@ export function PageMotion({ root, ready = true, epoch }: { root: string; ready?
         if (entry.isIntersecting) { (entry.target as HTMLElement).dataset.revealed = "true"; observer?.unobserve(entry.target); }
       });
     }, { threshold: 0, rootMargin: "0px 0px -24px 0px" }) : null;
-    parent.querySelectorAll<HTMLElement>(".lp-hero-text, .lp-sheet, .landing main > section:not(#hero), .tb-head, .tb-section, .page-heading, .r-section, .analysis-section, .spectrum-modern").forEach(el => {
+    // The board's head and the page headings (title, date control, "+ Add topics") stay still; only what sits
+    // below the rule arrives (Anastasia, second cabinet pass 2026-10-27: no reveal on the head when the date changes).
+    parent.querySelectorAll<HTMLElement>(".lp-hero-text, .lp-sheet, .landing main > section:not(#hero), .tb-section, .r-section, .analysis-section, .spectrum-modern").forEach(el => {
       if (!observer || el.parentElement?.closest('.q-reveal')) return;
       el.classList.add('q-reveal');el.style.setProperty('--q-delay', `${Math.min(revealed.length, 4) * 45}ms`);
       revealed.push(el);observer.observe(el);

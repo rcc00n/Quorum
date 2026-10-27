@@ -725,3 +725,12 @@ label {
 .quiet-day { background: var(--tray); border-radius: 14px; }
 .brief-toolbar { margin-bottom: 16px; }
 .brief-columns.brief-columns-single { margin-top: 16px; }
+/* The site header's search as a pill, its key cap a small pill too (Anastasia, 2026-10-27). */
+.sidebar .workspace-search {
+  border-radius: 999px;
+  padding: 8px 10px 8px 16px;
+}
+.sidebar .workspace-search kbd {
+  border-radius: 999px;
+  padding: 3px 8px;
+}
