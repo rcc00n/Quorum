@@ -39,7 +39,7 @@ module.exports=async({page,sources})=>{
  }
  if(await spectrum.locator('.sp-point').count()){
   await page.setViewportSize({width:1440,height:1000});await page.mouse.move(0,0);
-  const minor=spectrum.locator('.sp-point:not(.sp-point-major)').first();
+  const minor=spectrum.locator('.sp-point:not(.sp-point-major):not([aria-pressed="true"])').first(); // a selected mark shows its label by design
   if(await minor.count()){assert.equal(await minor.locator('.sp-point-label').evaluate(e=>getComputedStyle(e).opacity),'0');await minor.hover();await page.waitForFunction(e=>getComputedStyle(e.querySelector('.sp-point-label')).opacity==='1',await minor.elementHandle());}
   const major=spectrum.locator('.sp-point-major').first();
   if(await major.count())assert.equal(await major.locator('.sp-point-label').evaluate(e=>getComputedStyle(e).opacity),'1');
