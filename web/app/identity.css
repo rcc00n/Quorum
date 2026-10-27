@@ -27,7 +27,12 @@
      metadata in the mono; the landing and the gate keep --body. Why: Anastasia's reference of 2026-10-27,
      untitled.stream, sets everything in one neutral UI grotesque at small sizes with mono metadata, and the
      cabinet should read as a tool rather than a front page. DECISIONS item 9 is amended once she approves. */
-  --ui: "Inter Variable", -apple-system, system-ui, sans-serif;
+  /* DECISION(2026-10-27, Anastasia/Claude Code; Vadim's review of PR #62): the interface face on the app routes stays
+     the canonical grotesque of DECISIONS › User account and interface item 9, so `--ui` aliases `--body`; the Inter
+     proposal above is deferred, not deleted: a font change follows an explicit amendment of item 9 with human
+     approval, and then this one line changes. Why: AGENTS.md §1, no code contradicting a canonical decision while
+     its amendment is pending. Deferred value: "Inter Variable", -apple-system, system-ui, sans-serif. */
+  --ui: var(--body);
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   /* DECISION(2026-10-26, Anastasia/Claude Code): one page measure for every route: content in a centred column
      of 1024 px including 22 px gutters (980 px of text), as on apple.com; a full-width bar or section reads
