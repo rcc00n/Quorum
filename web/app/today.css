@@ -7,7 +7,7 @@
 .tb {
   display: grid;
   gap: 20px;
-  font-family: var(--body);
+  font-family: var(--ui);
 }
 .tb-head {
   display: flex;
@@ -17,10 +17,19 @@
   flex-wrap: wrap;
   padding-bottom: 8px;
 }
-.tb .tb-count {
-  font-size: 15px;
-  margin: 10px 0 0;
-  color: var(--ink);
+/* One mono line of metadata under the title (cabinet pass, 2026-10-27): the topic count, then a status
+   sentence only when there is one; the smoke test's sentences are kept verbatim in their own spans. */
+.tb .tb-meta {
+  margin: 12px 0 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+  max-width: 72ch;
+}
+.tb .tb-meta > span + span::before {
+  content: " · ";
 }
 .tb h1 {
   font-family: var(--display);
@@ -35,25 +44,101 @@
   font-weight: 500;
 }
 .tb .tb-status {
-  margin: 6px 0 0;
-  font-size: 15px;
-  color: var(--ink);
-  max-width: 64ch;
+  color: var(--ink-2);
 }
 .tb-controls {
   display: flex;
-  align-items: flex-end;
-  gap: 20px;
+  align-items: center;
+  gap: 16px;
 }
-.tb .tb-link {
+/* The date control on the board as a pill (Anastasia's review of 2026-10-27: it read too square beside the
+   pills). DECISION(2026-10-27, Anastasia/Claude Code): components/edition-navigation.tsx and its stylesheet
+   are Vadim's and stay; this surface rounds the tray, the arrow buttons and the field, hides the "Edition date"
+   label visually (it stays for assistive tech) and sets "Today" as a small pill. Why: one shape family in
+   the cabinet's controls. */
+.tb .tb-controls .edition-navigation {
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.tb .tb-controls .edition-navigation label {
+  display: block;
+}
+.tb .tb-controls .edition-navigation label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  padding: 0;
+}
+.tb .tb-controls .edition-navigation input[type="date"] {
+  width: 140px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 14px;
+  text-align: center;
+}
+.tb .tb-controls .edition-navigation button {
+  min-width: 44px; /* the 44 px tap target web/tests/edition-navigation-checks.cjs asserts */
+  min-height: 44px;
+  padding: 6px;
+  border-radius: 999px;
+}
+.tb .tb-controls .edition-navigation button:hover:not(:disabled) {
+  background: var(--paper);
+  border-color: transparent;
+}
+.tb .tb-controls .edition-navigation .edition-today {
+  padding-inline: 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+/* "+ Add topics": a pill in the manner of untitled.stream's round "+" (cabinet pass, 2026-10-27). */
+.tb .tb-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 16px 0 12px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--ui);
   font-size: 14px;
   font-weight: 500;
-  color: var(--ink);
-  padding-bottom: 10px;
-  border-bottom: 2px solid transparent;
+  cursor: pointer;
 }
-.tb .tb-link:hover {
-  border-bottom-color: var(--ink);
+.tb .tb-add:hover {
+  background: var(--paper-2);
+}
+.tb .tb-add[aria-expanded="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.tb .tb-add-mark {
+  font-family: var(--mono);
+  font-size: 16px;
+  line-height: 1;
+}
+.tb .tb-topics {
+  border-top: 1px solid var(--rule);
+  padding: 20px 0 8px;
+}
+.tb .tb-topics[hidden] {
+  display: none;
 }
 
 /* Sections: no ground of their own (Anastasia, 2026-10-26: the page stays white, only the cards have weight);
@@ -80,7 +165,7 @@
 .tb .tb-section-head h2 {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 26px;
+  font-size: 24px;
   letter-spacing: -0.015em;
   margin: 0;
 }
@@ -93,8 +178,10 @@
   text-underline-offset: 5px;
 }
 .tb .tb-section-meta {
-  font-size: 14px;
-  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
   margin: 0;
 }
 .tb .tb-choose {
@@ -146,14 +233,15 @@
   display: grid;
   /* The photo slot takes the spare height, so the text sits at the foot of every card in a row, whatever the
      row's tallest card; the slot is never shorter than its aspect ratio. */
-  grid-template-rows: 1fr auto auto auto auto;
+  grid-template-rows: 1fr auto;
   align-items: start;
-  gap: 8px;
-  min-height: 320px;
+  min-height: 340px;
   height: 100%;
-  padding: 0 0 18px;
+  padding: 0;
   border-radius: 20px;
   overflow: hidden;
+  position: relative;
+  isolation: isolate;
   /* DECISION(2026-10-26, Anastasia/Claude Code): black at 60 % over the page, blurred, so the paper shows
      through and white type keeps 5:1. Anastasia asked for about 20 %; at 20 % the card is #d1d1d1 and white
      type reads at 1.4:1, so 60 % is the most transparent legible value; she confirmed 60 % for the cards
@@ -165,17 +253,75 @@
   box-sizing: border-box;
 }
 .tb .tb-card-lead .tb-card-link {
-  min-height: 420px;
+  min-height: 460px;
 }
-/* The reserved photo area: the picture of the day with its credit when the snapshot carries a licensed one,
-   otherwise an empty field of the same translucent black, a little lighter. Its minimum height comes from a
-   padding pseudo-element (16:9, 2:1 on the lead), not from `aspect-ratio`: a stretched grid item with an
-   aspect ratio derives its width from the stretched height and widens the column. */
+/* The foot of the card: the review label and the headline on a translucent band that darkens the same
+   picture or blurred field, which runs under the whole card and fades into the band over its last 128 px.
+   DECISION(2026-10-27, Anastasia/Claude Code): black at 46 % over the card's own 60 % (about 78 % black over
+   the paper, white type above 9:1; 58 % over a real photograph), as translucent as dark glass laid over the
+   field, which still shows through; the fade is the band's ::before over the picture's foot with eased stops,
+   since a short linear ramp reads as a hard edge (Mach bands) and looked like two darkenings laid over each
+   other; a pane with a crisp rim and a backdrop blur was tried and declined, the gradient stays. The "Imagine
+   a photo here." note sits centred in the picture area, above the fade. Why: Anastasia's reviews of 2026-10-27: "the lower
+   part darker, more contrast", "the whole background blurred, the headline part just darker", "a little more
+   transparent, the transition is harsh", "close to a matte black", "more transparent, as if dark glass were
+   laid over the background", "bring the gradient back, the glass only said how transparent". */
+.tb .tb-card-text {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px 24px;
+  background: rgba(0, 0, 0, 0.46);
+}
+.tb .tb-card-text::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 128px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.02) 12%,
+    rgba(0, 0, 0, 0.07) 28%,
+    rgba(0, 0, 0, 0.18) 45%,
+    rgba(0, 0, 0, 0.31) 62%,
+    rgba(0, 0, 0, 0.41) 80%,
+    rgba(0, 0, 0, 0.46) 100%
+  );
+  pointer-events: none;
+}
+.tb .tb-card-link:not(.tb-card-link-blank) .tb-card-text {
+  background: rgba(0, 0, 0, 0.58);
+}
+.tb .tb-card-link:not(.tb-card-link-blank) .tb-card-text::before {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.02) 12%,
+    rgba(0, 0, 0, 0.09) 28%,
+    rgba(0, 0, 0, 0.23) 45%,
+    rgba(0, 0, 0, 0.39) 62%,
+    rgba(0, 0, 0, 0.52) 80%,
+    rgba(0, 0, 0, 0.58) 100%
+  );
+}
+/* The review label on a flagged story (Yelysei's rule), small, white at 80 %, above the headline. */
+.tb .tb-card-review {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+/* The reserved photo area holds the credit or the note; the picture itself (`.tb-card-photo`) or the blurred
+   field covers the whole card behind both rows. Its minimum height comes from a padding pseudo-element (16:9,
+   2:1 on the lead), not from `aspect-ratio`: a stretched grid item with an aspect ratio derives its width
+   from the stretched height and widens the column. */
 .tb .tb-card-media {
   position: relative;
   align-self: stretch;
-  background: rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .tb .tb-card-media::before {
   content: "";
@@ -185,9 +331,10 @@
 .tb .tb-card-lead .tb-card-media::before {
   padding-top: 50%;
 }
-.tb .tb-card-media img {
+.tb .tb-card-photo {
   position: absolute;
   inset: 0;
+  z-index: -1;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -201,15 +348,13 @@
   color: rgba(255, 255, 255, 0.8);
 }
 /* No licensed picture: the same blurred field as the story page's lead slot (app/story.css), in white and
-   umber over the card's black, and the sentence small in the credit's place. Decorative: the card's media
-   area is aria-hidden without a picture. */
-.tb .tb-card-media-missing {
-  overflow: hidden;
-}
-.tb .tb-card-media-missing::after {
+   umber over the card's black, under the whole card, and the sentence small in the credit's place.
+   Decorative: the card's media area is aria-hidden without a picture. */
+.tb .tb-card-link-blank::before {
   content: "";
   position: absolute;
   inset: -48px;
+  z-index: -1;
   background:
     radial-gradient(44% 60% at 24% 36%, rgba(201, 162, 126, 0.34), transparent 70%),
     radial-gradient(34% 52% at 78% 30%, rgba(255, 255, 255, 0.2), transparent 70%),
@@ -218,11 +363,16 @@
   filter: blur(26px);
   pointer-events: none;
 }
+/* Centred in the picture area, where the photograph would be, at the credit's size (Anastasia, 2026-10-27;
+   it sat in the credit's corner before). */
 .tb .tb-card-note {
   position: absolute;
-  left: 14px;
-  bottom: 10px;
+  inset: 0;
   z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 0 20px;
+  text-align: center;
   font-size: 12px;
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.92);
@@ -233,6 +383,10 @@
 .tb .tb-card-link > *:not(.tb-card-media) {
   margin-inline: 20px;
 }
+.tb .tb-card-link > .tb-card-text,
+.tb .tb-card-link > .tb-card-photo {
+  margin-inline: 0;
+}
 .tb .tb-card-topic {
   margin-top: 12px;
   font-size: 12px;
@@ -242,8 +396,8 @@
 .tb .tb-card h3 {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 24px;
+  line-height: 1.12;
   letter-spacing: -0.015em;
   color: inherit;
   margin: 0;
@@ -253,7 +407,8 @@
   overflow: hidden;
 }
 .tb .tb-card-lead h3 {
-  font-size: 30px;
+  font-size: 36px;
+  letter-spacing: -0.02em;
   -webkit-line-clamp: 3;
 }
 .tb .tb-card p {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Event, Snapshot } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
 import { isQuietDay, licensedPhoto, readableArticle } from "@/lib/editorial";
+import { RoundupGroup } from "./roundup-group";
 import type { EditorialPhoto, EditionPresentation } from "@/lib/editorial";
 function Photo({ photo }: { photo: EditorialPhoto }) {
   const [failed, setFailed] = useState(false);
@@ -159,8 +160,8 @@ function EditionNote({
             <p className="help">This roundup is incomplete.</p>
           )}
           {e.roundup.map((group, index) => (
-            <div key={index} className="roundup-group">
-              <h4>{group.name}</h4>
+            // The group folds past three events (components/roundup-group.tsx, Anastasia's cabinet pass 2026-10-27).
+            <RoundupGroup key={index} name={group.name}>
               {group.items.map((item, i) => (
                 <div className="roundup-item" key={i}>
                   <p>{item.text}</p>
@@ -204,7 +205,7 @@ function EditionNote({
                   </div>
                 </div>
               ))}
-            </div>
+            </RoundupGroup>
           ))}
         </section>
       )}

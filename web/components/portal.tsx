@@ -195,7 +195,7 @@ export function Portal({
     dashboard: "Your daily perspective",
     topic: data?.topics.find((t) => t.id === id)?.name || "Topic brief",
     history: "History",
-    settings: "My topics",
+    settings: "Account",
     onboarding: "What matters to you?",
     event: "Event analysis",
   };
@@ -230,10 +230,10 @@ export function Portal({
             // DECISION(2026-10-26, Anastasia/Claude Code): the menu reads Today · History · My topics and sits
             // in the top bar (styled by app/workspace.css); settings stay behind "My topics". Why: Anastasia's
             // brief for the personal page. Navigation expanded by Vadim on 2026-10-26: see DECISIONS › User account and interface.
-            [LayoutDashboard, "Today", "/dashboard"],
+            [LayoutDashboard, "Home", "/dashboard"],
             [History, "History", "/history"],
             [FileSearch, "Sources", "/sources"],
-            [Settings, "My topics", "/settings"],
+            [Settings, "Account", "/settings"],
           ].map(([Icon, label, url]) => {
             const I = Icon as typeof History;
             return (
@@ -325,7 +325,7 @@ export function Portal({
                     : view === "history"
                       ? "Editions by day."
                       : view === "settings"
-                        ? "Your topics, name and password."
+                        ? "Your name, email and password. Topics are chosen on Home."
                         : view === "onboarding"
                           ? "Start with your interests. Keep an open perspective."
                           : ""}
@@ -375,7 +375,7 @@ export function Portal({
                       </button>
                     </form>
                   </section>
-                  {topicsPanel}
+                  {/* Topics moved to the board (components/today-board.tsx, cabinet pass 2026-10-27); the picker here was the same component. */}
                   <section>
                     <h2>Change password</h2>
                     <form onSubmit={(e) => saveForm(e, "password")}>
