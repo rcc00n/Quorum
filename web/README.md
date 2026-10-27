@@ -35,6 +35,8 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · The readable article appendix reuses ImpactAssessment in place of the former raw importance paragraph, preserving its position and all producer fields; article text/source marks stay untouched. Why: consistent readable emphasis, within Anastasia’s scope agreement in Issue #2 comment6434849474; look approval remains a merge condition.
+
 2026-10-27 · rcc00n / Codex · The hero evidence sheet retains its exact fixture counts/date/context and existing hero/type composition, with count breakdowns, SQL and full route/source provenance under one native disclosure. Why: Vadim requested emphasis without clutter; Anastasia approved the scope in Issue #2 and requires before/after look review before merge. No fixture, source URL or sponsor-route wording changes.
 
 2026-10-27 · rcc00n / Codex · Impact is a compact native disclosure; a complete supplied rubric uses the canonical 2/3/2/2 dimension ranges and a matching supplied total, with rationales/original notes on demand. Partial/inconsistent rubrics retain the original label/notes without an invented numeric diagram. Why: Vadim requested clear accents rather than raw rubric text; source fields and scoring stay unchanged (docs/DECISIONS.md › Selecting major news).
