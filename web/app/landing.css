@@ -438,6 +438,14 @@
   gap: 6px 16px;
   font-size: 13px;
 }
+.lp-kv-figures dd {
+  white-space: nowrap; /* "50 · 19 · 17" is one figure; tests/landing.cjs reads it as one string */
+}
+@media (max-width: 700px) {
+  .lp-kv-figures {
+    grid-template-columns: minmax(0, 1fr) auto; /* the label wraps, the figures do not */
+  }
+}
 .lp-sql {
   margin: 20px 0 16px;
   border-top: 1px solid var(--rule);
