@@ -20,7 +20,9 @@ module.exports=async({page})=>{
  const claim=reader.locator('.r-claim,.claim-detail').first();
  if(await claim.count()){
   const id=await claim.getAttribute('id'),url=new URL(page.url());url.hash=id;
-  await page.goto(url.href);await page.waitForFunction(()=>document.querySelector('#reader-tab-evidence')?.getAttribute('aria-selected')==='true');
+  await page.goto(url.href);
+  try { await page.waitForFunction(()=>document.querySelector('#reader-tab-evidence')?.getAttribute('aria-selected')==='true'); }
+  catch { throw Error('Deep-link state: '+JSON.stringify(await page.evaluate(id=>({hash:location.hash,target:!!document.getElementById(id),panel:document.getElementById(id)?.closest('[data-reader-panel]')?.getAttribute('data-reader-panel'),view:document.querySelector('.investigation-reader')?.getAttribute('data-reader-view')}),id))); }
   const target=page.locator(`[id="${id}"]`);assert.notEqual(await target.getAttribute('open'),null);
   await page.waitForFunction(id=>document.getElementById(id)?.querySelector(':scope > summary')===document.activeElement,id);
  }

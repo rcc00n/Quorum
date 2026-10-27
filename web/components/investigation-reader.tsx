@@ -18,6 +18,7 @@ export function ReaderPanel({ children }: { name: Exclude<View, "all">; children
 
 export function InvestigationReader({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
   const [active, setActive] = useState<View>("reading");
+  const [hashEpoch, setHashEpoch] = useState(0);
   const root = useRef<HTMLDivElement>(null), bar = useRef<HTMLElement>(null);
   const pendingTarget = useRef<HTMLElement | null>(null);
   const tabs = useRef(new Map<View, HTMLButtonElement>());
@@ -31,6 +32,7 @@ export function InvestigationReader({ title, children, className = "" }: { title
     const panel = target?.closest<HTMLElement>("[data-reader-panel]");
     if (!target || !panel || !root.current?.contains(panel)) return;
     pendingTarget.current = target;
+    setHashEpoch(value => value + 1);
     setActive(panel.dataset.readerPanel as View);
   }
   useEffect(() => {
@@ -44,6 +46,9 @@ export function InvestigationReader({ title, children, className = "" }: { title
   }, []);
   useEffect(() => {
     const target = pendingTarget.current; if (!target) return;
+    // DECISION(2026-10-27, rcc00n/Codex): consume a deep link only after its pane is visible.
+    // Why: initial mount can queue the pane change before this effect runs; premature consumption loses focus.
+    if (active !== "all" && target.closest<HTMLElement>("[data-reader-panel]")?.dataset.readerPanel !== active) return;
     pendingTarget.current = null;
     const frame = requestAnimationFrame(() => {
       for (let el: HTMLElement | null = target; el && el !== root.current; el = el.parentElement) if (el instanceof HTMLDetailsElement) el.open = true;
@@ -52,7 +57,7 @@ export function InvestigationReader({ title, children, className = "" }: { title
       target.scrollIntoView({ block: "start" });
     });
     return () => cancelAnimationFrame(frame);
-  }, [active]);
+  }, [active, hashEpoch]);
   function select(view: View) {
     pendingTarget.current = null; setActive(view);
     history.pushState(null, "", `#reader-${view}`);
