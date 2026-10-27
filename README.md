@@ -1,5 +1,7 @@
 # Quorum — AI-powered news intelligence & fact verification
 
+> **Track:** 03 Reasoning Architecture · **User:** a reader who wants the day's events on their topics with the evidence under every line · **Sponsor technology:** Zetaris (data), Meterless Nightshift (model runtime), NVIDIA Nemotron (models) · **Run:** [Run it](#run-it) · **Samples:** [Samples](#samples-inputs-and-outputs) · **Logs:** [Logs and traces](#logs-and-traces)
+
 **Shared release tracker: [GitHub Issue #2](https://github.com/rcc00n/Quorum/issues/2). All developers and coding assistants must follow [AGENTS.md — Shared Project Tracking and Cross-Agent Handoff](AGENTS.md#shared-project-tracking-and-cross-agent-handoff).**
 
 Quorum is a multi-agent system that takes one news event, gathers coverage from sources across the political spectrum and official government documents, separates what is actually known from what is claimed, verifies statements against evidence, and shows how each part of the spectrum frames the same event. It does not ask the user to trust its answer: every substantive conclusion links to the sources it rests on.
@@ -17,6 +19,99 @@ Built by team **Quorum** for the [Open Agent Hackathon 2026](https://hackathon.g
 - **A simple reader** — topics chosen by the user, one card per topic in the manner of Apple News, text instead of metrics; coverage, silence, evidence and reasoning traces one link away.
 
 The full set of decisions — scope, principles, source list, cohort rules, UI, stack, demo plan, open questions — is in [docs/DECISIONS.md](docs/DECISIONS.md). That file is the source of truth; code that contradicts it is a bug.
+
+## Agents
+
+One LangGraph graph per topic and day (`reasoning/quorum_reasoning/graph.py`); every node reads and writes the same run state (claims, events, evidence, drafts, trace rows) and appends its trace row. Roles, from `docs/ARCHITECTURE.md` § 5:
+
+| Node | Responsibility | Model? | Can block, loop or retry |
+| --- | --- | --- | --- |
+| `plan` | Loads the day's corpus through Zetaris and gives every event the same research budget (which sources failed today is not computed yet; `sources_missing` stays empty) | no | — |
+| `cluster` | Groups the day's documents into events by structured keys (actors, action, object, place, date) | yes | — |
+| `score_importance` | Reports the legal status and the state of the act; code maps them to rubric points; `above_bar` by code | yes (facts), code (points) | Its rubric decides the bar gate |
+| `extract_claims` | Atomic claims with their origin quote and offsets, from fetched text (access level 1) or leads (level 2) | yes | — |
+| `research` | Evidence per claim: round 1 the event's own documents, round 2 the rest of the day's corpus, official documents and previous days, all through Zetaris | yes | Loops: `verify` sends thin claims back (2 rounds max) |
+| `verify` | The confirmation rule: independent source groups behind a claim | no (rule) | Sends back |
+| `fact_check` | A blind second check with its own evidence; sees nothing from `research` or `verify` | yes | Independent authority; skipped with no call for an event whose rubric cannot reach the bar |
+| `adjudicate` | The final status; disputed when the two checks disagree; confirmation points per event | no | Routes disputes to `review_disputed`, flags to `escalate` |
+| `review_disputed` | A third blind pass on claims the two checks disagree on, with both evidence chains as data | yes | One call per claim, never repeated |
+| `escalate` | A flagged story leaves the stories and goes to the roundup as `needs_review` | no | Blocks a story |
+| `frame` | Per outlet: what it highlighted, omitted and how it worded the story | yes (labels) | — |
+| `write` | The article from confirmed claims, statements with their speaker, open items; rewrites on critique | yes | Loops with `critique` |
+| `critique` | The writing rules; rejects a draft with each violation and the offending text | no (rules) | Blocks: up to 3 drafts; a story still rejected at the third is published with the critic's notes, flagged `needs_review`, with any unconfirmed fact block demoted to "not confirmed" |
+| `roundup` | One line per event below the bar, with source and status | yes (line text) | — |
+| `publish` | The immutable snapshot (stories, roundup, trace), version +1, the topic summary | yes (summary) | — |
+
+## What makes this an agent system
+
+- **Blind independence.** The fact-checker re-verifies every claim without seeing the researcher's or the verifier's output; when the two disagree, a third blind reviewer decides from both evidence chains, and an unresolved disagreement stays `disputed` in print.
+- **Critique loop.** The critic rejects a draft with the rule and the offending text; the writer fixes only that; a story still rejected after three drafts is published with the critic's notes, flagged `needs_review`, and any fact block whose claims are not all confirmed is demoted to "not confirmed", never silently.
+- **Dynamic delegation.** Research round 2 runs only for claims that are still thin, and widens to the rest of the day's corpus, the official documents and the previous days.
+- **Role authority.** The bar gate denies the expensive blind check to events that cannot become a story; `escalate` removes a flagged story from print; `critique` can hold a draft.
+- **Shared state.** Every node reads and writes one run state (`reasoning/quorum_reasoning/state.py`) and leaves a trace row; nothing is passed by prompt alone.
+- **Retry and resume.** One explicit retry per model call on 429/5xx/timeouts, honouring `Retry-After` (the SDK's own retries are off, so every attempt is in the ledger); a run that dies mid-way continues with `--resume` from its last completed node, replaying its own journal so no paid call repeats.
+- **Honest failure.** A node that fails after its retry leaves a public error row; the edition is published as `partial`, never patched; a day with no event above the bar is a quiet day, said in so many words.
+
+## Architecture
+
+The graph as LangGraph draws it from the code (`python -m quorum_reasoning.run --mermaid`; dotted edges are the conditional ones), with the data layer, the model runtime and the portal added around it:
+
+```mermaid
+graph TD
+	C[Collectors: RSS, APIs, official records into PostgreSQL] --> Z[(Zetaris: one SQL layer over documents, official records and previous days)]
+	Z --> plan
+	__start__([__start__]) --> plan
+	plan(plan)
+	cluster(cluster)
+	score_importance(score_importance)
+	extract_claims(extract_claims)
+	research(research)
+	verify(verify)
+	fact_check(fact_check)
+	adjudicate(adjudicate)
+	review_disputed(review_disputed)
+	escalate(escalate)
+	frame(frame)
+	write(write)
+	critique(critique)
+	roundup(roundup)
+	publish(publish)
+	__end__([__end__])
+	adjudicate -.-> escalate;
+	adjudicate -.-> frame;
+	adjudicate -.-> review_disputed;
+	cluster --> score_importance;
+	critique -.-> roundup;
+	critique -.-> write;
+	escalate --> frame;
+	extract_claims --> research;
+	fact_check --> adjudicate;
+	frame --> write;
+	plan --> cluster;
+	research --> verify;
+	review_disputed -.-> escalate;
+	review_disputed -.-> frame;
+	roundup --> publish;
+	score_importance --> extract_claims;
+	verify -.-> fact_check;
+	verify -.-> research;
+	write --> critique;
+	publish --> __end__;
+	M[Meterless Nightshift: NVIDIA Nemotron, a receipt per call] -.-> cluster
+	M -.-> score_importance
+	M -.-> extract_claims
+	M -.-> research
+	M -.-> fact_check
+	M -.-> review_disputed
+	M -.-> frame
+	M -.-> write
+	M -.-> roundup
+	M -.-> publish
+	publish --> S[(snapshot: stories, roundup, trace; journal and ledger beside it)]
+	S --> P[Portal: Django checks the bytes read-only; installing an edition and the login-only reader are PR #31, open]
+```
+
+The loops: `verify → research` (at most 2 research rounds, round 2 only for thin claims), `critique → write` (at most 3 drafts), `adjudicate → review_disputed` (one third-reviewer call per claim the two checks disagree on; a claim both call disputed is not reviewed); the node contract and the limits in `docs/ARCHITECTURE.md` § 5. `langgraph dev` opens the same graph in LangGraph Studio.
 
 ## How the sponsor technologies are used
 
@@ -59,10 +154,43 @@ The fictional three are rebuilt with `python scripts/regenerate_samples.py` from
 - **Real runs.** Their files stay outside the public repository (`AGENTS.md` § 3): the journal holds full request payloads with article passages, the snapshots raw error diagnostics and verbatim quotes. Per edition the counts are posted in Issue #2: five editions of 26 October on NVIDIA's direct route, 0 failed calls ([comment](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6418787032)); the Nightshift showcase with receipts ([comment](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6423850385)).
 - **Collector and data layer.** `docker compose -f collectors/docker-compose.yml logs -f collector`; sanitised Zetaris query evidence files via `collectors/zetaris/evidence.py` (written to `collectors/zetaris/evidence/<topic>_<date>.json`).
 
+## Failure handling
+
+| Failure | Behaviour |
+| --- | --- |
+| A model call returns 429, 5xx or times out | One explicit retry honouring `Retry-After` (`reasoning/quorum_reasoning/llm.py`); then the node records a public error, the run goes on and the snapshot is `partial` with the gap named in `errors`; on the paced NVIDIA-direct route a second call refused on 429 within ten minutes stops the run instead (exit 3, no snapshot), continued later with `--resume`; Nightshift never aborts |
+| A run dies mid-way | `python -m quorum_reasoning.run … --resume` continues from the last completed node and replays the run's own journal, so no paid call is repeated |
+| The Nightshift route misbehaves (4xx or 5xx, a lane answered by another model, an injected memory, a Traceback) | The runner's Meterless stop rule (`reasoning/scripts/run_editions.py` on `yelysei/agents`, PR #29, not merged) kills that run at its first such error, marks the topic `failed`, leaves the topics after it queued and prints the manual NVIDIA-direct fallback command without running it; a rerun resumes the stopped run only if its journal holds no call the rule rejects and nothing was published, otherwise the topic runs again as a fresh attempt |
+| A source forbids the crawler or is paywalled | Access level 2: headline and lead only, disclosed per quote in the reasoning preview; level 3: the fact of coverage only, no claims from it |
+| Zetaris is unreachable | The run fails before any model call and no edition is produced |
+| A claim rests on one source group | `verify` sends it to research round 2; still single-sourced, it is not confirmed |
+| The two blind checks disagree | `review_disputed` decides; otherwise the claim stays `disputed` |
+| A draft breaks a writing rule | `critique` rejects it with the offending text; after three drafts the story is published with the notes attached |
+| A story is flagged | `escalate` moves it to the roundup as `needs_review`; the development preview marks it "Needs review" (the public site shows no reasoning output yet) |
+| No event crosses the bar | A quiet day: `status: empty`, every event in the roundup, the brief says so |
+| Fictional or demo data | Labelled: `provenance.fictional: true`, the DEMO banner on every page that shows it |
+
+## Data and licensing
+
+- Collected publications keep URL, title, lead, source, times, access level and a content hash; **no article text is stored** (`collectors/README.md`). Reasoning fetches text at analysis time through `collectors.common.fetch_text`, which honours robots.txt and the source's access level, and stores only the quotes it cites, with character offsets.
+- Official records (Federal Register, Congress.gov, White House releases) are public documents and are stored in full.
+- No photo tool is built: `photo` is null in every edition. The rule for when it comes (US federal sites and openly licensed Wikimedia Commons only, with credit and caption) is in `docs/DECISIONS.md` › Stories as articles.
+- The three files in `docs/examples/` are fictional (`provenance.fictional: true`). Real editions are not in the repository; their counts are posted in Issue #2, and Yelysei's hand-over plans to publish each installed edition with its public trace under `docs/examples/editions/<date>/` (planned, not recorded as a decision yet). Ledgers and journals stay private.
+
+## Limitations
+
+- Forty sources in English: US outlets plus three European agencies and papers; no social networks.
+- Paywalled outlets and sites that forbid the crawler count by headline and lead only.
+- One edition per topic per day, run by the team after the 05:30 New York cut and installed by an operator; the site itself starts nothing. Topics come from the team's catalog; the site cannot add one.
+- Positions on the spectrum come from AllSides, MBFC and Ad Fontes, not from us.
+- A quiet day has no story; the first real day (24 October) had none above the bar of 6. Yelysei lowered the bar to 4 on 26 October for the 27 October runs; that change is on `yelysei/agents` (PR #29, open), while this branch, `integration` and `docs/ARCHITECTURE.md` § 6 still say 6.
+- Live runs need the operators' machines: the Nightshift runtime on Windows, Zetaris with the collected corpus, the model credits; real editions reach the public site only behind a login once the reader (PR #31) is deployed.
+
 ## Submission
 
 - **Event:** Open Agent Hackathon 2026, Track 03 Reasoning Architecture; team Quorum: Vadim (@rcc00n), Anastasia (@AnastasiaShkirpan), Yelysei (@Sor1na). Submissions close 27 October 2026, 23:45 UTC.
 - **Repository:** this one, with this README and the module READMEs. It starts on the evening of 21 October (UTC−5; 00:37 UTC on 22 October) with eight commits of environment scripts and docs (`15fe52b` and following); the product code was written in the build window of 22–27 October.
+- **Pre-existing components:** none of our own. `smoke_test.py` is adapted from the organisers' participant setup guide; the environment scripts of 21 October predate the window by a few hours (previous bullet). Every agent, adapter and page was written in the build window; the dependencies are listed in `reasoning/pyproject.toml`, `backend/requirements.txt`, `collectors/requirements.txt` and `web/package.json`.
 - **Demo video and slides:** the organisers require a 1–4 minute video with audio that shows Meterless doing work ([Issue #2](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6393551309)), plus slides. As of 26 October only a silent 3:42 captioned draft and a seven-slide PDF exist, both private ([Issue #2](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6390833160), [26 Oct](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6428420842)); the final video and slides are linked here once they exist.
 - **Live portal:** https://quorum.raccncode.com (the landing is public; the reader behind it needs a login). It serves release `20261023-web-portals-09f5325` (`docs/RELEASE_CHECKLIST.md`, `deploy/STATUS.md`) with no real edition installed; a judges' login with real editions is planned with the submission ([Issue #2](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6426106426)).
 - **Sponsor use:** the section above; the rules and organiser updates in `docs/RULES_CHECK.md`.
