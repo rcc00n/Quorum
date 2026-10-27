@@ -107,6 +107,10 @@
   .sp-source-heading h3 { font-size: 26px; }
   .spectrum-modern .source-row { grid-template-columns: minmax(100px, 1fr) minmax(40px, .65fr) 90px; gap: 8px 12px; }
 }
+/* A story's Map (scope "story", lib/story-sources.ts, DECISION 2026-10-27 there): how each source was used, under its name
+   in the inspector and in the ledger, in the instrument's small grey. */
+.sp-source-used { display: block; margin-top: 6px; font-size: 12px; color: var(--ink-2); }
+.sp-source-button .used-value { display: block; margin-top: 2px; font-size: 11px; color: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) {
   .sp-stage { transform: none !important; transition: none; }
   .sp-point, .sp-point-core, .sp-point-halo, .sp-point-label, .sp-reading, .spectrum-modern .spectrum-track > span { animation: none !important; transition: none !important; }

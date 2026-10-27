@@ -82,7 +82,10 @@ module.exports = async ({browser, root, password, temp, build}) => {
       await page.getByLabel('Rating mode', {exact: true}).first().selectOption(mode);
       await page.getByLabel('Cohort rating context', {exact: true}).selectOption(mode);
     }
-    await require('./spectrum-checks.cjs')({page, sources:feed.sources});
+    // The Map draws the sources used for this story, not the registry (story source map amendment, 2026-10-27).
+    const {storySources} = require('../lib/story-sources.ts');
+    const used = storySources(result.events[0], result.sources || feed.sources);
+    await require('./spectrum-checks.cjs')({page, sources:used, scope:'story'});
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({width, height: 900});
       assert.equal(await page.locator('body').evaluate(e => e.scrollWidth > innerWidth), false);

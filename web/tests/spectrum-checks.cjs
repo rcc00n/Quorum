@@ -1,17 +1,37 @@
 // Compare UI positions to the supplied source model; never generates live source facts.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-module.exports=async({page,sources})=>{
+module.exports=async({page,sources,scope='registry'})=>{
  const spectrum=page.locator('.spectrum').first();
+ // DECISION(2026-10-27, Anastasia/Claude Code): a story's Map (scope 'story', lib/story-sources.ts) draws the sources used
+ // for the story: its title and caption say so, each listed source says how it was used, and no registry cohort table is
+ // drawn. Why: the story source map amendment, docs/DECISIONS.md › Stories as articles.
+ if(scope==='story'){
+  assert.equal((await spectrum.locator('.section-heading :is(h1,h2)').first().textContent()).trim(),'Sources used for this story');
+  assert.ok((await spectrum.locator('.sp-caption').textContent()).includes(`${sources.length} used for this story`),'story caption counts the used sources');
+  // Page-side: every listed source says how it was used, in the ledger and, for the selected one, in the inspector.
+  const {usedLabel}=require('../lib/story-sources.ts');
+  const ledger=spectrum.locator('details.sp-ledger');const wasOpen=await ledger.evaluate(d=>d.open);
+  if(!wasOpen)await ledger.locator(':scope > summary').click();
+  assert.equal(await ledger.locator('.source-row').count(),sources.length,'the ledger lists exactly the used sources');
+  for(const s of sources){
+   const row=ledger.locator('.source-row').filter({has:page.locator('.sp-source-button',{hasText:s.name})}).first();
+   assert.equal((await row.locator('.used-value').textContent()).trim(),usedLabel(s),'ledger says how '+s.id+' was used');
+  }
+  if(!wasOpen)await ledger.locator(':scope > summary').click();
+  const name=(await spectrum.locator('.sp-inspector h3').textContent()).trim();
+  const selected=sources.find(s=>s.name===name);
+  if(selected)assert.equal((await spectrum.locator('.sp-inspector .sp-source-used').textContent()).trim(),usedLabel(selected),'the inspector says how the selected source was used');
+ }
  const rating=(s,m)=>{const v=m==='average'?[s.allsides,s.mbfc,s.adfontes].filter(v=>v!==null):[s[m]].filter(v=>v!==null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
  for(const mode of ['allsides','mbfc','adfontes','average']){
   await spectrum.getByLabel('Rating mode',{exact:true}).selectOption(mode);
   // WEB-SPECTRUM-POLISH-02: the registry cohort table's outlet counts equal the tiered sources rated under the
   // mode at the agreed thresholds; the table is absent when no tiered source is rated.
   const tiered=sources.filter(s=>rating(s,mode)!==null&&(s.tier==='major'||s.tier==='minor'));
-  const table=spectrum.locator('.sp-cohorts');assert.equal(await table.count(),tiered.length?1:0,'cohort table presence under '+mode);
+  const table=spectrum.locator('.sp-cohorts');assert.equal(await table.count(),scope==='registry'&&tiered.length?1:0,'cohort table presence under '+mode);
   for(const tier of ['major','minor'])for(const side of ['left','right']){
    const n=tiered.filter(s=>s.tier===tier&&(side==='left'?rating(s,mode)<=-0.25:rating(s,mode)>=0.25)).length;
-   if(tiered.length)assert.equal(Number(await table.locator(`[data-cohort="${tier}-${side}"] [data-outlets]`).getAttribute('data-outlets')),n,`cohort ${tier}-${side} under ${mode}`);
+   if(scope==='registry'&&tiered.length)assert.equal(Number(await table.locator(`[data-cohort="${tier}-${side}"] [data-outlets]`).getAttribute('data-outlets')),n,`cohort ${tier}-${side} under ${mode}`);
   }
   const expected=sources.filter(s=>rating(s,mode)!==null&&s.audience>0&&/^https?:/.test(s.audience_source_url||''));
   const points=spectrum.locator('.sp-point');assert.equal(await points.count(),expected.length);

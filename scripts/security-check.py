@@ -142,6 +142,15 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, Anastasia/Claude Code): permit only these 2 inspected review captures of the story page's Map
+# (anastasia/web-story-map): the DEMO analysis fixture's fictional chart sources under the harness's local DEMO account;
+# no real edition, no credential. Why: Vadim's gate for review PNGs (his f3e121e pattern); arbitrary binaries stay excluded.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-web-story-map/story-map-demo-1440.png': '78e2f2af5284cf54fb9ca14f8953d5024519c949d64e56e4046ed6ec2d976b3e',
+    'docs/reviews/2026-10-27-web-story-map/story-map-demo-390.png': '5e730ac779570b590acea6bcc374a76733e798f5966f7b54ff4eb5ae1491ec66',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])
