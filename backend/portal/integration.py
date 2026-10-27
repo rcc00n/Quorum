@@ -110,7 +110,13 @@ class PublishedAdapter:
     def snapshot(self, day: str = "", topic: str = "", revision: str | None = None):
         from .snapshot_store import SnapshotStore
         from .snapshot_projection import project
+        from . import reasoning_editions
 
+        # Installed reasoning 1.0 editions answer first when the login-only reader is switched on
+        # (decision at the top of reasoning_editions.py); otherwise the published store as before.
+        installed = reasoning_editions.feed(day, topic, revision)
+        if installed is not None:
+            return installed
         catalog = CatalogAdapter().snapshot()
         payload, publication = SnapshotStore().read(day, revision)
         if payload:
@@ -126,7 +132,11 @@ class PublishedAdapter:
 
     def event(self, event_id: str, day: str = "", revision: str | None = None):
         from .snapshot_store import SnapshotStore
+        from . import reasoning_editions
 
+        installed = reasoning_editions.event(event_id, day, revision)
+        if installed is not None:
+            return installed
         if day or revision:
             result = self.snapshot(day, revision=revision)
         else:
