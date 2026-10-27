@@ -28,6 +28,11 @@ for (const status of ["pending", "error", "partial", "stale"]) {
   assert.equal(isQuietDay({ ...snapshot, status }, edition), false);
 }
 assert.equal(isQuietDay({ ...snapshot, events: [event] }, edition), false);
+// Errors count per topic (2026-10-27): another topic's recorded failure leaves this quiet day; an error without
+// a topic (the proposal store's) or of this topic cancels it.
+assert.equal(isQuietDay({ ...snapshot, errors: [{ code: "reasoning_frame", message: "TEST", event_id: null, topic_id: "TEST-other" }] }, edition), true);
+assert.equal(isQuietDay({ ...snapshot, errors: [{ code: "reasoning_frame", message: "TEST", event_id: null, topic_id: "TEST-topic" }] }, edition), false);
+assert.equal(isQuietDay({ ...snapshot, errors: [{ code: "TEST", message: "TEST", event_id: null }] }, edition), false);
 assert.equal(
   isQuietDay(snapshot, { ...edition, completion: "partial" }),
   false,

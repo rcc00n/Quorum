@@ -5,6 +5,7 @@ import type { Event, Snapshot } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
 import { isQuietDay, licensedPhoto, readableArticle } from "@/lib/editorial";
 import { RoundupGroup } from "./roundup-group";
+import { ReviewLabel } from "./story";
 import type { EditorialPhoto, EditionPresentation } from "@/lib/editorial";
 function Photo({ photo }: { photo: EditorialPhoto }) {
   const [failed, setFailed] = useState(false);
@@ -182,6 +183,14 @@ function EditionNote({
                           ? "Disputed"
                           : "Unknown"}
                   </small>
+                  {/* The producer's flags on a roundup line (2026-10-27, Anastasia/Claude Code; master's consistency
+                      check of the edition output path): an escalated event reaches the roundup flagged needs_review
+                      (ARCHITECTURE § 5) and is shown with the story's label, never silently; a raw-title fallback line
+                      says so in the preview's words (reasoning-preview.tsx), since the producer marks it (B10). */}
+                  {item.needs_review && <ReviewLabel />}
+                  {item.line_source === "title" && (
+                    <p className="help">Source headline fallback; no generated roundup line was supplied.</p>
+                  )}
                   <div className="article-references">
                     {item.sources.map(
                       (s, j) =>

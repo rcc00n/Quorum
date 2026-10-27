@@ -10,6 +10,9 @@ module.exports=async({page})=>{
  await tab('Source map').click();await reader.locator('[data-reader-panel="map"]').waitFor({state:'visible'});
  await page.waitForFunction(()=>(document.querySelector('[data-reader-panel="map"] .sp-chart')||document.querySelector('[data-reader-panel="map"] .spectrum-instrument'))?.getBoundingClientRect().top<innerHeight);
  await reader.getByRole('heading',{name:'Source spectrum',exact:true}).waitFor();
+ // A chosen view starts at the bar under the site header (the head scrolled away), as far as the page can scroll (2026-10-27, Anastasia/Claude Code).
+ const start=await page.evaluate(()=>{const bar=document.querySelector('.reader-bar'),header=document.querySelector('.sidebar')?.getBoundingClientRect().height||0;const target=bar.getBoundingClientRect().top+scrollY-header;return {scrollY,expected:Math.min(Math.max(0,target),document.documentElement.scrollHeight-innerHeight)};});
+ assert.ok(Math.abs(start.scrollY-start.expected)<=1,'a chosen view starts at the bar: '+JSON.stringify(start));
  if(needsReview)await reader.getByText('Requires editorial review',{exact:true}).first().waitFor();
  assert.equal(new URL(page.url()).search,search);assert.equal(new URL(page.url()).hash,'#reader-map');
  assert.equal(await reader.locator('[data-reader-panel="evidence"]').isVisible(),false);

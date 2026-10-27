@@ -291,6 +291,38 @@ class ReasoningEditionsTests(TestCase):
         self.assertEqual([r["status"] for r in rows], [expected[l] for l in labels])
         self.assertTrue(all(r["line_source"] == "title" and r["needs_review"] is True for r in rows))
 
+    def test_recorded_failures_carry_code_and_topic_and_leave_other_quiet_days(self):
+        # A partial edition of one topic and a quiet edition of another on the same day: the failures reach the API
+        # in its own shape with their topic, and the quiet topic stays complete and quiet (2026-10-27).
+        partial = genuine("snapshot.partial.sample.json")
+        quiet = genuine("snapshot.empty-day.sample.json", "climate-policy")
+        self.assertTrue(partial["errors"])
+        self.accept(self.write(partial, "partial"), install=True)
+        self.accept(self.write(quiet, "quiet"), install=True)
+        self.client.force_login(self.reader)
+        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        self.assertEqual(len(data["errors"]), len(partial["errors"]))
+        for row in data["errors"]:
+            self.assertEqual(set(row), {"code", "message", "event_id", "topic_id"})
+            self.assertTrue(row["code"].startswith("reasoning_"))
+            self.assertEqual(row["topic_id"], "russia-ukraine-war")
+            self.assertNotIn("node", row)
+        self.assertEqual({r["code"] for r in data["errors"]}, {"reasoning_" + e["node"] for e in partial["errors"]})
+        editions = {e["topic_id"]: e for e in data["editions"]}
+        self.assertEqual(editions["russia-ukraine-war"]["completion"], "partial")
+        self.assertEqual(editions["climate-policy"]["completion"], "complete")
+        self.assertTrue(editions["climate-policy"]["quiet_day"])
+        self.assertEqual(data["publication"]["status"], "available")
+
+    def test_a_declared_missing_source_makes_the_edition_partial(self):
+        p = genuine("snapshot.sample.json")
+        p["sources_missing"] = ["TEST-source"]
+        self.accept(self.write(p, "missing"), install=True)
+        self.client.force_login(self.reader)
+        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        self.assertEqual(data["editions"][0]["completion"], "partial")
+        self.assertEqual(data["publication"]["status"], "partial")
+
     def test_producer_config_file_replaces_the_git_lookup(self):
         story = genuine("snapshot.sample.json")
         options = self.write(story, "story")

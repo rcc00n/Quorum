@@ -1,0 +1,2 @@
+# TEST producer config for the FICTIONAL sample's sidecar: only its sha256 matters (snapshot.sample.sidecar.json, producer.config_sha256).
+# Not reasoning/config/reasoning.toml and not a live configuration.

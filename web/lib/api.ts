@@ -66,7 +66,7 @@ export type Snapshot = {
   preview?: ReasoningPreview;
   editions?: EditionPresentation[];
   publication?: Publication;
-  errors?: { code: string; message: string; event_id: string | null }[];
+  errors?: { code: string; message: string; event_id: string | null; topic_id?: string | null }[];
   catalog_revision?: string | null;
   status: string;
   topics: Topic[];

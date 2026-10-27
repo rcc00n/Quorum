@@ -227,11 +227,15 @@ export function ClaimChains({ claim: c }: { claim: ReasoningClaim }) {
             ))}
           </section>
         )}
+        {/* The sentence follows the rows (2026-10-27, Anastasia/Claude Code; master's consistency check): when the
+            producer bound its quotes (document ids, offsets, content hashes, achieved access levels, as the rows
+            above show), it no longer says they are unavailable; they remain the producer's records, not verified here. */}
         <p className="help">
-          Review independence is separate from source independence. Original
-          document IDs, content hashes, quote offsets, achieved access levels
-          and review timestamps are unavailable in this preview. Separate review
-          reasons are not supplied.
+          Review independence is separate from source independence.{" "}
+          {c.evidence.some((e) => e.document_id || e.official_doc_id || e.content_hash_at_quote)
+            ? "Original document IDs, content hashes, quote offsets and achieved access levels are shown as the producer recorded them, not independently verified here; review timestamps are not supplied."
+            : "Original document IDs, content hashes, quote offsets, achieved access levels and review timestamps are unavailable in this preview."}{" "}
+          Separate review reasons are not supplied.
         </p>
         <a className="r-return-link" href="#reasoning-article">
           Back to article ↑

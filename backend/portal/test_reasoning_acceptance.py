@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 from django.core.management import call_command, CommandError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from .reasoning_preview import SAMPLE
 
 class ReasoningAcceptanceTests(SimpleTestCase):
@@ -43,6 +43,21 @@ class ReasoningAcceptanceTests(SimpleTestCase):
         self.assertTrue(report['compatible']);self.assertTrue(report['metadata_valid'])
         self.assertEqual((self.root/'snapshot.json').read_bytes(),self.raw)
         self.assertEqual((self.root/'sidecar.json').read_bytes(),self.sidecar)
+
+    @override_settings(DEBUG=True)
+    def test_producer_shaped_fixture_is_accepted_with_its_config_file(self):
+        # The bundled sample with the sidecar the producer's own code wrote for it (fixtures/reasoning-demo/README.md),
+        # accepted the way a release without .git accepts: --producer-config with the hashed bytes. Fictional, so DEBUG
+        # and --allow-fictional, never installed here (2026-10-27, Anastasia / Claude Code).
+        sidecar = SAMPLE.with_name('snapshot.sample.sidecar.json'); config = SAMPLE.with_name('producer-config.sample.toml')
+        out = io.StringIO()
+        call_command('reasoning_snapshot', stdout=out, file=str(SAMPLE), sha256=hashlib.sha256(SAMPLE.read_bytes()).hexdigest(),
+                     sidecar=str(sidecar), sidecar_sha256=hashlib.sha256(sidecar.read_bytes()).hexdigest(),
+                     producer_commit=json.loads(sidecar.read_bytes())['producer']['commit'], producer_config=str(config), allow_fictional=True)
+        report = json.loads(out.getvalue())
+        self.assertEqual(report['issues'], []); self.assertTrue(report['compatible']); self.assertTrue(report['metadata_valid'])
+        self.assertEqual(report['config_source'], 'file'); self.assertTrue(report['fictional']); self.assertTrue(report['provisional'])
+        self.assertFalse(report['execution_verified']); self.assertFalse(report['published']); self.assertNotIn('installed', report)
 
     def test_config_discrepancy_remains_blocked_without_disabling_presentation(self):
         report=self.run_report(config=b'TEST different config',blocked=True)
