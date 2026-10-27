@@ -19,6 +19,7 @@ import { visibleStories, isQuietDay } from "@/lib/editorial";
 import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
 import type { Publication } from "@/lib/analysis";
 import { Brand } from "./brand";
+import { TopicPicker, FirstSetup } from "./topic-picker";
 import {
   api,
   session,
@@ -231,54 +232,26 @@ export function Portal({
     event: "Event analysis",
   };
   const topicsPanel = (
-    <section className="topic-picker">
-      <div className="section-heading">
-        <h2>Your topics</h2>
-        <span className="muted">{selected.length} selected</span>
-      </div>
-      <p>Choose the topics you want in your daily brief.</p>
-      {data?.catalog_revision && (
-        <p className="help">
-          Team catalog snapshot · definitions only. Live analysis is pending.
-        </p>
-      )}
-      {data?.topics.length ? (
-        <div className="topic-options">
-          {data.topics.map((t) => (
-            <label key={t.id} className="topic-option">
-              <input
-                type="checkbox"
-                checked={selected.includes(t.id)}
-                onChange={(e) =>
-                  setSelected(
-                    e.target.checked
-                      ? [...selected, t.id]
-                      : selected.filter((x) => x !== t.id),
-                  )
-                }
-              />
-              <span>{t.name}</span>
-            </label>
-          ))}
-        </div>
-      ) : (
-        <aside className="notice">
-          <Bookmark size={20} />
-          <div>
-            <strong>The topic catalog is not connected yet.</strong>
-            <p>
-              You can return here to choose topics once the catalog is
-              available.
-            </p>
-          </div>
-        </aside>
-      )}
-      <button className="button" disabled={busy} onClick={saveTopics}>
-        {view === "onboarding" ? "Continue to your brief" : "Save topics"}
-        <ArrowRight size={16} />
-      </button>
-    </section>
+    <TopicPicker
+      topics={data?.topics ?? []}
+      catalogRevision={data?.catalog_revision ?? null}
+      selected={selected}
+      onChange={setSelected}
+      busy={busy}
+      onSave={saveTopics}
+      saveLabel={view === "onboarding" ? "Continue to your brief" : "Save topics"}
+    />
   );
+  // DECISION(2026-10-26, Anastasia/Claude Code): first setup is its own full screen (the prototype's night
+  // screen), not a page inside the workspace layout; the session, catalog and preferences logic above is
+  // unchanged. Why: WEB-UX-02; the API and the workspace stay Vadim's.
+  if (view === "onboarding") {
+    return (
+      <FirstSetup loading={loading} error={error} onRetry={load} message={message} demo={data?.status === "demo"}>
+        {topicsPanel}
+      </FirstSetup>
+    );
+  }
   return (
     <div className="app-layout">
       <aside className="sidebar">
