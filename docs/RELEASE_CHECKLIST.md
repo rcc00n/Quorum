@@ -2,6 +2,20 @@
 
 Owner: Vadim. Shared release tracker: [Issue #2](https://github.com/rcc00n/Quorum/issues/2). This is the canonical web technical release gate; [implementation inventory](IMPLEMENTATION_STATUS.md) records individual capabilities. Check boxes only for a particular release with its commit, environment, test outcome and rollback revision; a previous release's pass does not approve a new release.
 
+## Sources and motion production acceptance — 27 October 2026 UTC
+
+Only `20261027-spectrum-r1` / `6f16bd7feda9a8e3c1c105ddd3510b2dce9d27fa`.
+[Exact evidence](../deploy/FRONTEND_RELEASE.md); earlier release checks remain historical.
+
+- [x] Tracker, contracts, owner coordination and reviews rechecked; PRs #44/#45 normally merged after green exact-head CI.
+- [x] Clean build/typecheck, source geometry, HTTP/browser and genuine installed-edition checks; source/artifact-bound archive verified locally and on target.
+- [x] Actual VPS preflight/private backups, target-host tests/checks and guarded Quorum-only switch; no migrations or new dependencies.
+- [x] Actual r3 code/static rollback and guarded reapply; original edition, accounts, SSH, reader flags and 24 unrelated containers preserved.
+- [x] Public authenticated Sources, exact catalog/positions/four modes, keyboard, depth, reduced motion, observer fallback and three widths pass.
+- [x] Genuine feed/story/19 roundup/174 exact traces, evidence/review, anonymous/staff/CSRF boundaries and UI login/logout pass.
+- [x] Restart preserves judge session/four preferences/exact feed; final HTTPS/TLS/service/SQLite checks and desktop/mobile visual inspection pass.
+- [ ] Fresh 27-Oct original editions and full sponsor/recall/submission gates remain with owners in Issue #2.
+
 ## Production acceptance — 27 October 2026 UTC
 
 These checks apply only to `20261027-live-r3` / `63418421c1c0909dc0d7dfa1b451da3eed1bcc76`.

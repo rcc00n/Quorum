@@ -47,13 +47,20 @@ new Function(
   await page
     .getByRole("link", { name: /DEMO · A fictional community meeting/ })
     .click();
-  await page.getByRole("heading", { name: "What is established" }).waitFor();
+  const facts=page.locator("#claims-established");
+  await facts.locator(":scope > summary").click();
+  await facts.getByText("No information supplied for this section.",{exact:true}).waitFor();
+  await page.locator("#claims-statements > summary").click();
+  await page.getByText("DEMO · An attributed statement would appear here.",{exact:true}).waitFor();
+  await page.locator("#claims-unknown > summary").click();
+  await page.getByText("Uncertainty stays visible.",{exact:true}).waitFor();
   await page
     .getByText(
       "DEMO · Fictional interface fixture. Not verified news or live findings.",
       { exact: true },
     )
     .waitFor();
+  await page.getByRole("tab",{name:"Source map",exact:true}).click();
   for (const mode of ["allsides", "mbfc", "adfontes", "average"])
     await page.getByLabel("Rating mode").selectOption(mode);
   for (const width of [1440, 390]) {

@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { PageMotion } from "./page-motion";
+import { WorkspaceNavigator } from "./workspace-navigator";
+import { InvestigationReader, ReaderPanel, EventReading, LegacyClaims } from "./investigation-reader";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -26,7 +28,7 @@ import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
 import { BriefStatus } from "./brief-status";
 import { TodayBoard } from "./today-board";
-import { StoryCrumb, Story, storyReadable, ReviewLabel } from "./story";
+import { StoryCrumb, storyReadable, ReviewLabel } from "./story";
 import {
   api,
   session,
@@ -37,9 +39,6 @@ import {
   Snapshot,
   Event,
   Source,
-  rating,
-  cohort,
-  safeUrl,
 } from "@/lib/api";
 const today = () => new Date().toLocaleDateString("en-CA");
 function Empty({
@@ -66,99 +65,21 @@ function Analysis({
   publication?: Publication;
   sources: Source[];
 }) {
-  if (event.analysis)
-    return (
-      <AnalysisWorkspace
-        event={event}
-        publication={publication}
-        sources={sources}
-      />
-    );
-  // The story layout also on the claims-only page when the reasoning story carries a readable article
-  // (components/story.tsx); the claim sections below become its appendix.
+  if (event.analysis || !event.reasoning || !event.reasoning_context)
+    return <AnalysisWorkspace event={event} publication={publication} sources={sources} />;
   const readable = storyReadable(event, sources);
-  return (
-    <div className={readable ? "story-page story-page-plain" : undefined}>
-      {readable ? (
-        <Story event={event} sources={sources} />
-      ) : (
-        <>
-          <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
-          <h1>{event.title}</h1>
-          {event.reasoning?.needs_review && <ReviewLabel />}
-          <p className="lede">{event.summary}</p>
-          {event.importance && (
-            <aside className="notice">
-              <strong>{event.importance.label}</strong>
-              <p>{event.importance.explanation}</p>
-            </aside>
-          )}
-        </>
-      )}
-      {(
-        [
-          "established",
-          "statements",
-          "disputed",
-          "unknown",
-          "coverage",
-        ] as const
-      ).map((key, i) => (
-        <section className="analysis-section" id={`claims-${key}`} key={key}>
-          <p className="eyebrow">0{i + 1}</p>
-          <h2>
-            {
-              [
-                "What is established",
-                "Attributed statements",
-                "Disputed claims",
-                "What remains unknown",
-                "Coverage differences",
-              ][i]
-            }
-          </h2>
-          {event[key].length ? (
-            event[key].map((item, j) => (
-              <article key={j}>
-                <h3>{item.text}</h3>
-                <p>{item.explanation}</p>
-                {item.sources.map(
-                  (s, k) =>
-                    safeUrl(s.url) && (
-                      <a
-                        key={k}
-                        className="source-link"
-                        href={safeUrl(s.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {s.title}
-                        <ArrowUpRight size={14} />
-                      </a>
-                    ),
-                )}
-              </article>
-            ))
-          ) : (
-            <p className="muted">No information supplied for this section.</p>
-          )}
-        </section>
-      ))}
-      {event.reasoning && event.reasoning_context ? (
-        <>
-          <ReasoningEvidence story={event.reasoning} fictional={publication?.mode === 'demo'} />
-          <ReasoningSpectrum story={event.reasoning} sources={sources} />
-          <ReasoningTimeline run={event.reasoning_context} currentEvent={event.id} installed />
-        </>
-      ) : (
-        <>
-          <Spectrum sources={event.sources} />
-          <AnalysisWorkspace event={event} publication={publication} sources={sources} supplementary />
-        </>
-      )}
-    </div>
-  );
+  return <InvestigationReader title={event.title} needsReview={event.reasoning.needs_review} className={readable ? "story-page story-page-plain" : ""}>
+    <ReaderPanel name="reading"><EventReading event={event} sources={sources} /></ReaderPanel>
+    <ReaderPanel name="evidence">
+      {readable && <LegacyClaims event={event} />}
+      <ReasoningEvidence story={event.reasoning} fictional={publication?.mode === 'demo'} />
+    </ReaderPanel>
+    <ReaderPanel name="coverage"><ReasoningSpectrum story={event.reasoning} sources={sources} includeRegistry={false} /></ReaderPanel>
+    <ReaderPanel name="map"><p className="reader-map-note">Registry context: editorial ratings and cited audience, not which sources covered this event.</p><Spectrum sources={sources} /></ReaderPanel>
+    <ReaderPanel name="trace"><ReasoningTimeline run={event.reasoning_context} currentEvent={event.id} installed /></ReaderPanel>
+  </InvestigationReader>;
 }
+
 export function Portal({
   view,
   id,
@@ -261,8 +182,8 @@ export function Portal({
   const names: Record<string, string> = {
     dashboard: "Your daily perspective",
     topic: data?.topics.find((t) => t.id === id)?.name || "Topic brief",
-    history: "The perspective archive",
-    settings: "Your workspace",
+    history: "History",
+    settings: "My topics",
     onboarding: "What matters to you?",
     event: "Event analysis",
   };
@@ -314,6 +235,7 @@ export function Portal({
               </Link>
             );
           })}
+          <WorkspaceNavigator data={data} day={day} currentId={view === "event" ? id : undefined} revision={initialRevision} disabled={!user || loading || !!error} />
         </nav>
         <div className="sidebar-topics">
           <p className="nav-label">FOLLOWING</p>
@@ -379,16 +301,18 @@ export function Portal({
                 <p className="eyebrow">
                   {view === "dashboard"
                     ? "CURATED AROUND YOUR INTERESTS"
-                    : view.toUpperCase()}
+                    : view === "history"
+                      ? "ARCHIVE"
+                      : view.toUpperCase()}
                 </p>
                 {view !== "event" && <h1>{names[view]}</h1>}
                 <p>
                   {view === "dashboard"
                     ? "A considered view of the stories that matter to you."
                     : view === "history"
-                      ? "Return to a day. Revisit the evidence."
+                      ? "Editions by day."
                       : view === "settings"
-                        ? "A few details. A more personal brief."
+                        ? "Your topics, name and password."
                         : view === "onboarding"
                           ? "Start with your interests. Keep an open perspective."
                           : ""}
@@ -401,7 +325,8 @@ export function Portal({
                   findings.
                 </p>
               )}
-              <PublicationNotice publication={data?.publication} />
+              {/* The settings page shows no edition, so it carries no publication notice (polish, 2026-10-27). */}
+              {view !== "settings" && <PublicationNotice publication={data?.publication} />}
               {message && (
                 <p className="message" role="status">
                   {message}
@@ -584,7 +509,7 @@ export function Portal({
                       </Link>
                     </div>
                   )}
-                  <div className="brief-columns">
+                  <div className={view === "history" ? "brief-columns brief-columns-single" : "brief-columns"}>
                     <section>
                       <div className="section-heading">
                         <h2>
@@ -701,6 +626,8 @@ export function Portal({
                         />
                       )}
                     </section>
+                    {/* History lists the digests themselves; the reading-room rail would repeat the latest one. */}
+                    {view !== "history" && (
                     <aside className="brief-aside">
                       <p className="eyebrow">THE READING ROOM</p>
                       <h3>Understanding takes perspective.</h3>
@@ -732,6 +659,7 @@ export function Portal({
                               : "Source data supplied"}
                       </span>
                     </aside>
+                    )}
                   </div>
                   {view === "topic" && (
                     <Spectrum sources={data?.sources || []} />
@@ -741,9 +669,11 @@ export function Portal({
             </>
           )}
         </main>
+        {/* The landing's footer line and repository link, so every route ends the same way (polish, 2026-10-27). */}
         <footer className="workspace-footer">
-          <span>QUORUM</span>
-          <span>Follow the evidence. Keep the questions.</span>
+          <span>Quorum</span>
+          <span>Evidence under every line.</span>
+          <a href="https://github.com/rcc00n/Quorum">github.com/rcc00n/Quorum</a>
         </footer>
       </div>
     </div>

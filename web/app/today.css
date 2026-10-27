@@ -122,15 +122,27 @@
 }
 
 /* The row: horizontal, snapping, keyboard-reachable through the cards' links */
+/* DECISION(2026-10-27, Anastasia/Claude Code): the row of cards runs to the viewport's edges, as Apple News'
+   rows do, while the first card stays on the page column; a second card is then cut by the screen's edge,
+   not by the column's, and reads as more to scroll. The board clips the row's box (overflow-x: clip) so a
+   classic scrollbar's width never widens the page (web/tests/browser.cjs refuses any horizontal overflow).
+   Why: Anastasia's review of 2026-10-27: a card cut at the column edge with white paper beyond it looked
+   like a bug. */
+.tb {
+  overflow-x: clip;
+}
 .tb-row {
   list-style: none;
-  margin: 0;
-  padding: 4px 0 10px;
+  margin: 0 calc(50% - 50vw);
+  padding: 4px calc(50vw - 50%) 10px;
   display: flex;
   gap: 16px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: 0;
+  /* The snap padding equals the row's padding; here 100% is the scrollport (the viewport), so the column
+     gutter of identity.css gives the same value (calc(50vw - 50%) would resolve against the viewport twice
+     and snap the first card 20 px off the column). */
+  scroll-padding-inline: var(--column-gutter);
   scrollbar-width: thin;
   scrollbar-color: var(--rule) transparent;
 }
@@ -207,6 +219,36 @@
   bottom: 10px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.8);
+}
+/* No licensed picture: the same blurred field as the story page's lead slot (app/story.css), in white and
+   umber over the card's black, and the sentence small in the credit's place. Decorative: the card's media
+   area is aria-hidden without a picture. */
+.tb .tb-card-media-missing {
+  overflow: hidden;
+}
+.tb .tb-card-media-missing::after {
+  content: "";
+  position: absolute;
+  inset: -48px;
+  background:
+    radial-gradient(44% 60% at 24% 36%, rgba(201, 162, 126, 0.34), transparent 70%),
+    radial-gradient(34% 52% at 78% 30%, rgba(255, 255, 255, 0.2), transparent 70%),
+    radial-gradient(48% 46% at 62% 84%, rgba(255, 255, 255, 0.14), transparent 70%),
+    radial-gradient(28% 40% at 10% 86%, rgba(0, 0, 0, 0.3), transparent 70%);
+  filter: blur(26px);
+  pointer-events: none;
+}
+.tb .tb-card-note {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  z-index: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.92);
+}
+.tb .tb-card-lead .tb-card-note {
+  font-size: 13px;
 }
 .tb .tb-card-link > *:not(.tb-card-media) {
   margin-inline: 20px;
