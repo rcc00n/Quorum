@@ -1126,6 +1126,16 @@
     display: block;
   }
 }
+/* DECISION(2026-10-27, Anastasia/Claude Code): under 900 px the sources spectrum stacks its three cohort
+   columns (Left, Centre and not rated, Right) one under another. Why: at tablet width three columns left
+   232 px each and the outlet names wrapped under their bars; approved by Vadim for the landing's own list
+   (Issue #2, 2026-10-27), separate from the app's registry map. */
+@media (max-width: 900px) {
+  .lp-spectrum {
+    grid-template-columns: 1fr;
+    row-gap: 40px;
+  }
+}
 @media (max-width: 1000px) {
   .landing main > section {
     padding-block: 80px;
