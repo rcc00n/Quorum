@@ -216,12 +216,24 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
               )}
               {edition && (
                 <li className="tb-card tb-card-roundup">
-                  <Link href={`/topics/${encodeURIComponent(t.id)}?date=${day}`} className="tb-card-link">
-                    <span className="tb-card-topic">Also today</span>
-                    <h3>{`${below} ${below === 1 ? "event" : "events"} below the bar`}</h3>
-                    <p>{edition.roundup.map((g) => g.name).filter(Boolean).join(" · ")}</p>
-                    {edition.completion === "partial" && <span className="tb-card-meta">partial edition</span>}
-                  </Link>
+                  {/* DECISION(2026-10-27, Anastasia/Claude Code): the card leads to this topic's "Also today" block on
+                      this page (components/editorial.tsx, anchor also-today-<topic id>), not to the topic page, which
+                      carries no roundup since the second cabinet pass; an edition without roundup lines keeps the topic
+                      link. Why: Anastasia, 27 October: the card's "12 events below the bar" opened a page without them. */}
+                  {below ? (
+                    <a href={`#also-today-${encodeURIComponent(t.id)}`} className="tb-card-link">
+                      <span className="tb-card-topic">Also today</span>
+                      <h3>{`${below} ${below === 1 ? "event" : "events"} below the bar`}</h3>
+                      <p>{edition.roundup.map((g) => g.name).filter(Boolean).join(" · ")}</p>
+                      {edition.completion === "partial" && <span className="tb-card-meta">partial edition</span>}
+                    </a>
+                  ) : (
+                    <Link href={`/topics/${encodeURIComponent(t.id)}?date=${day}`} className="tb-card-link">
+                      <span className="tb-card-topic">Also today</span>
+                      <h3>{`${below} events below the bar`}</h3>
+                      {edition.completion === "partial" && <span className="tb-card-meta">partial edition</span>}
+                    </Link>
+                  )}
                 </li>
               )}
               {!own.length && !quiet && !edition && (
