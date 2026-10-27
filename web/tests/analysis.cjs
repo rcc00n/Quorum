@@ -64,6 +64,10 @@ const assert = require("node:assert/strict");
       audience: 1000 * 10 ** i, audience_source_url: `https://example.com/demo-audience-${i}`,
     }));
     response.events[0].sources.push(...chartSources);
+    // A rated registry row that no source of the story uses: the story Map must not draw it (story source map amendment,
+    // 2026-10-27, Anastasia/Claude Code); spectrum-checks counts the drawn points and the ledger rows.
+    (response.sources ||= []).push({ id: 'DEMO-unused', name: 'DEMO unused registry source', domain: 'example.com', kind: 'outlet',
+      allsides: .25, mbfc: .25, adfontes: .25, audience: 5000, audience_source_url: 'https://example.com/demo-audience-unused' });
 
     response.events[0].article = {
       paragraphs: claims
@@ -136,7 +140,9 @@ const assert = require("node:assert/strict");
         .getByLabel("Cohort rating mode", { exact: true })
         .selectOption(mode);
     }
-    await require('./spectrum-checks.cjs')({page, sources:response.events[0].sources});
+    // The Map draws the sources used for this story (story source map amendment, 2026-10-27; lib/story-sources.ts).
+    const {storySources}=require('../lib/story-sources.ts');
+    await require('./spectrum-checks.cjs')({page, sources:storySources(response.events[0],(response.sources||[]).length?response.sources:response.events[0].sources), scope:'story'});
     const suppliedArticle=response.events[0].article,suppliedImportance=response.events[0].importance;
     response.events[0].importance={label:"DEMO Impact 6 / 9",explanation:"DEMO original selection notes, unchanged."};
     delete response.events[0].article;

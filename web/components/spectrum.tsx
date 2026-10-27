@@ -3,6 +3,8 @@ import { useState } from "react";
 import { SpectrumField } from "./spectrum-field";
 import { Source, rating, cohort, safeUrl } from "@/lib/api";
 import { cohortShares } from "@/lib/spectrum-cohorts";
+import { usedLabel } from "@/lib/story-sources";
+import type { SpectrumScope } from "@/lib/story-sources";
 const MODE_LABEL: Record<string, string> = { allsides: "AllSides", mbfc: "MBFC", adfontes: "Ad Fontes", average: "the averaged rating" };
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
 const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -14,7 +16,13 @@ const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact"
 // derived from `kind`, never from a typed list; the other rows keep the registry's order. Why: Anastasia's review
 // (Issue #2, 2026-10-27): forty open rows made the Sources page six screens long on a phone.
 const institutional = (s: Source) => s.kind === "official" || s.kind === "military";
-export function Spectrum({ sources, standalone = false }: { sources: Source[]; standalone?: boolean }) {
+// DECISION(2026-10-27, Anastasia/Claude Code; lib/story-sources.ts, docs/DECISIONS.md › Stories as articles, story source
+// map amendment): `scope="story"` draws the sources used for one story with the same instrument: the title "Sources used
+// for this story", the caption counts them instead of the registry, each source says how it was used (the story's own
+// source, quoted in its evidence), and the registry cohort table is not drawn, since cohort shares of a story's few
+// sources are not registry shares and coverage counts belong to the Coverage tab. The default scope, the registry, is
+// unchanged for the Sources page. Why: Anastasia, 2026-10-27: the Map on a story must show the sources used for it.
+export function Spectrum({ sources, standalone = false, scope = "registry" }: { sources: Source[]; standalone?: boolean; scope?: SpectrumScope }) {
   const Heading = standalone ? "h1" : "h2";
   const [mode, setMode] = useState("average");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -28,6 +36,7 @@ export function Spectrum({ sources, standalone = false }: { sources: Source[]; s
       <div className="source-row" key={s.id}>
         <button type="button" className="sp-source-button" aria-pressed={selectedId === s.id} onClick={() => setSelectedId(s.id)}>
           {s.name}
+          {usedLabel(s) && <small className="used-value">{usedLabel(s)}</small>}
           {s.audience !== null && s.audience_source_url && (
             <small className="audience-value">
               {/* A fixed locale: the landing renders this on the server (Anastasia/Claude Code, 2026-10-27), and a locale-dependent
@@ -64,7 +73,7 @@ export function Spectrum({ sources, standalone = false }: { sources: Source[]; s
   return (
     <section className={`spectrum spectrum-modern${standalone ? " spectrum-standalone" : ""}`}>
       <div className="section-heading">
-        <Heading>Source spectrum</Heading>
+        <Heading>{scope === "story" ? "Sources used for this story" : "Source spectrum"}</Heading>
         <label className="inline-label">
           Rating mode
           <select
@@ -84,8 +93,8 @@ export function Spectrum({ sources, standalone = false }: { sources: Source[]; s
         accuracy. Average = mean of available normalized ratings. Missing
         ratings are excluded, never treated as zero.
       </p>
-      <SpectrumField sources={sources} mode={mode} selectedId={selectedId} onSelect={setSelectedId} />
-      {shares.tiered > 0 && (
+      <SpectrumField sources={sources} mode={mode} selectedId={selectedId} onSelect={setSelectedId} scope={scope} />
+      {scope === "registry" && shares.tiered > 0 && (
         <section className="sp-cohorts" aria-labelledby="sp-cohorts-head" data-mode={mode}>
           <h3 id="sp-cohorts-head">{`Registry cohorts under ${MODE_LABEL[mode] ?? mode}`}</h3>
           <table>

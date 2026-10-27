@@ -17,6 +17,7 @@ import {
   FileSearch,
 } from "lucide-react";
 import { Spectrum } from "./spectrum";
+import { storySources, STORY_MAP_NOTE } from "@/lib/story-sources";
 import { EditionNotes } from "./editorial";
 import { visibleStories, isQuietDay } from "@/lib/editorial";
 import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
@@ -78,7 +79,10 @@ function Analysis({
       <ReasoningEvidence story={event.reasoning} fictional={publication?.mode === 'demo'} />
     </ReaderPanel>
     <ReaderPanel name="coverage"><ReasoningSpectrum story={event.reasoning} sources={sources} includeRegistry={false} /></ReaderPanel>
-    <ReaderPanel name="map"><p className="reader-map-note">Registry context: editorial ratings and cited audience, not which sources covered this event.</p><Spectrum sources={sources} /></ReaderPanel>
+    {/* DECISION(2026-10-27, Anastasia/Claude Code): the Map draws the sources used for this story (lib/story-sources.ts),
+        superseding the registry map of the Reader workspace amendment (Vadim / rcc00n, 2026-10-27, kept as history in
+        docs/DECISIONS.md); the registry stays on the Sources page. Why: Anastasia, 2026-10-27. */}
+    <ReaderPanel name="map"><p className="reader-map-note">{STORY_MAP_NOTE}</p><Spectrum sources={storySources(event, sources)} scope="story" /></ReaderPanel>
     <ReaderPanel name="trace"><ReasoningTimeline run={event.reasoning_context} currentEvent={event.id} installed /></ReaderPanel>
   </InvestigationReader>;
 }

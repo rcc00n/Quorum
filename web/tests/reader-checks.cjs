@@ -9,7 +9,8 @@ module.exports=async({page})=>{
  let requests=0;const count=r=>{if(/\/api\//.test(r.url()))requests++};page.on('request',count);
  await tab('Source map').click();await reader.locator('[data-reader-panel="map"]').waitFor({state:'visible'});
  await page.waitForFunction(()=>(document.querySelector('[data-reader-panel="map"] .sp-chart')||document.querySelector('[data-reader-panel="map"] .spectrum-instrument'))?.getBoundingClientRect().top<innerHeight);
- await reader.getByRole('heading',{name:'Source spectrum',exact:true}).waitFor();
+ // The Map holds the sources used for this story (story source map amendment, 2026-10-27, Anastasia/Claude Code).
+ await reader.getByRole('heading',{name:'Sources used for this story',exact:true}).waitFor();
  // A chosen view starts at the bar (2026-10-27, Anastasia/Claude Code; tightened after review): its first visible pane
  // begins right under the bar, which sits under the site header, unless the page cannot scroll that far; checked
  // after the scroll frame, from the top of the page and again with the bar stuck deep in the All view.
