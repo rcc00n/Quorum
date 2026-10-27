@@ -133,3 +133,5 @@ Content plan: Impact label → supplied score and four rubric dimensions → opt
 Interaction thesis: native disclosures expose detail deliberately; the existing shallow hero depth remains the only surface motion. No extra ambient animation or dependency.
 
 2026-10-27 · rcc00n / Codex · Impact uses a compact title, a large supplied total and four restrained segmented point scales after expansion; raw rationales remain in a secondary disclosure. Why: Vadim's screenshot review requested readable accents with less clutter; numeric data stays behind the reader's deliberate link, consistent with DECISIONS › User account and interface.
+
+2026-10-27 · rcc00n / Codex · Hero evidence-sheet refinement keeps the existing 12-column hero/wire line and type, emphasizing the two recorded counts and folding technical detail under Query details and provenance. Why: Vadim’s screenshot review; scope approved by Anastasia in Issue #2 comment6434672425, subject to before/after look approval in the PR. Existing source/date/context stay visible and all original proof fields remain present.
