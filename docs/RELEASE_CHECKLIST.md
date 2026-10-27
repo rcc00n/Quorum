@@ -2,6 +2,18 @@
 
 Owner: Vadim. Shared release tracker: [Issue #2](https://github.com/rcc00n/Quorum/issues/2). This is the canonical web technical release gate; [implementation inventory](IMPLEMENTATION_STATUS.md) records individual capabilities. Check boxes only for a particular release with its commit, environment, test outcome and rollback revision; a previous release's pass does not approve a new release.
 
+## Source-spectrum polish acceptance — 27 October 2026 UTC
+
+Only `20261027-spectrum-polish-r1` / `f3e121e46179b307e937658a4bc5ab508a396825`.
+[Exact evidence](reviews/2026-10-27-spectrum-polish-release.md).
+
+- [x] Owner review and normal #52/#61/#63 merges; exact source/compatibility/final CI pass.
+- [x] Source-bound clean build/typecheck, geometry/cohort/null checks, isolated and genuine HTTP/browser checks.
+- [x] Public registry counts/shares in four modes, complete keyboard ledger, 1440/768/390/320 and visual inspection.
+- [x] Guarded target-host tests/private backup, Quorum-only switch, actual tint rollback/reapply and existing-session persistence.
+- [x] All 12 existing users/preferences, installed original/metadata, SSH/env and 24 original unrelated containers preserved; final HTTPS/TLS/services/SQLite pass.
+- [ ] Cabinet #62 and fresh 27-Oct editions/full sponsor/recall/human submission gates remain independent owner work.
+
 ## Sources and motion production acceptance — 27 October 2026 UTC
 
 Only `20261027-spectrum-r1` / `6f16bd7feda9a8e3c1c105ddd3510b2dce9d27fa`.

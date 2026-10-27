@@ -4,6 +4,13 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. The latest production milestone is below; older tables remain historical evidence.
 
+## Source-spectrum polish release — 27 October 2026 UTC
+
+WEB-SPECTRUM-POLISH-02 DEPLOYED: `20261027-spectrum-polish-r1`, source `f3e121e`, normal #52/#61/#63.
+Registry labels, complete grouped ledger, phone sizing and explicit cohort shares preserve formulas/nulls.
+[Exact source/artifact, review/CI, genuine public browser, session persistence, actual rollback/reapply and preservation evidence](reviews/2026-10-27-spectrum-polish-release.md).
+Landing tint retained; active cabinet #62 and fresh-edition/sponsor/submission dependencies stay separate.
+
 ## Source-bar tint release — 27 October 2026 UTC
 
 WEB-LANDING-TINT-01 DEPLOYED: `20261027-source-tints-r1`, source `b4f05f6`, normal PRs #59/#60.
