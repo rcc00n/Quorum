@@ -179,6 +179,14 @@ export function Portal({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // DECISION(2026-10-26, rcc00n/Codex): format the local header date after mount.
+  // Why: server and reader time zones can have different dates and break hydration.
+  const [dateLabel, setDateLabel] = useState("");
+  useEffect(() => {
+    setDateLabel(new Intl.DateTimeFormat("en", {
+      month: "long", day: "numeric", year: "numeric",
+    }).format(new Date()));
+  }, []);
   const [day, setDay] = useState(initialDay || today());
   const [topic, setTopic] = useState(view === "topic" ? id || "" : "");
   const [selected, setSelected] = useState<string[]>([]);
@@ -337,11 +345,7 @@ export function Portal({
         <header className="workspace-header">
           <span>THE QUORUM BRIEF</span>
           <span>
-            {new Intl.DateTimeFormat("en", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            }).format(new Date())}
+            {dateLabel}
           </span>
         </header>
         <main id="main" className="workspace-main">

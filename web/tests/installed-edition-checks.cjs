@@ -13,7 +13,7 @@ module.exports = async ({browser, root, password, temp, build}) => {
   const original = JSON.parse(raw);
   assert.equal(original.provenance.fictional, false);
   const day = original.edition_date;
-  const context = await browser.newContext();
+  const context = await browser.newContext({timezoneId: 'Pacific/Honolulu'});
   assert.equal((await context.request.get(`${root}/api/feed/?date=${day}`)).status(), 401);
   const session = await (await context.request.get(root + '/api/session/')).json();
   assert.equal((await context.request.post(root + '/api/login/', {
@@ -41,6 +41,10 @@ module.exports = async ({browser, root, password, temp, build}) => {
   })).status(), 200);
   await page.goto(`${root}/dashboard?date=${day}`);
   await page.locator('.tb-card h3').first().waitFor();
+  const localLabel = await page.evaluate(() => new Intl.DateTimeFormat('en', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  }).format(new Date()));
+  assert.equal(await page.locator('.workspace-header span').last().textContent(), localLabel);
   assert.equal(await page.locator('input[type="date"]').inputValue(), day);
   assert.equal(await page.locator('.tb-card h3').first().textContent(), original.stories[0].headline);
   if (original.stories[0].needs_review)
