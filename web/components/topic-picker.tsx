@@ -75,7 +75,7 @@ export function TopicPicker({ topics, catalogRevision, selected, onChange, busy,
               Enter adds the first match. One at a time: a war, a country, a court case, a company, an industry.
             </p>
           )}
-          {selected.length > 0 && (
+          {selected.length > 0 && !compact && (
             <ul className="tp-chips" role="list" aria-label="Chosen topics">
               {selected.map((id) => (
                 <li key={id}>
