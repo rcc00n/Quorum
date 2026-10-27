@@ -713,6 +713,17 @@ label {
 .topic-story .story-review {
   margin: 10px 0 0;
 }
+/* DECISION(2026-10-27, Anastasia/Claude Code): the review label on a roundup line (components/editorial.tsx) is the
+   story's tag: 12 px, its own width, the line height it has on the topic page and the story head, in the text column.
+   Why: `.roundup-item p` (0,1,1) restyled it to 16 px across the column (review of 09fdb55). The fallback sentence
+   needs no rule: `.edition-notes .help` already outranks `.roundup-item p` and styles it like its section's help. */
+.roundup-item .story-review {
+  grid-column: 1;
+  justify-self: start;
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: inherit;
+}
 @media (max-width: 700px) {
   .topic-story-link {
     grid-template-columns: minmax(0, 1fr);

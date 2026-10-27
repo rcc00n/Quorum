@@ -202,6 +202,8 @@ def snapshot(day, topic="", revision=None):
                     "code": "reasoning_edition_invalid",
                     "message": f"The installed edition for {name} could not be read or validated.",
                     "event_id": None,
+                    # The topic whose installed edition failed (2026-10-27, Anastasia/Claude Code; see isQuietDay).
+                    "topic_id": name,
                 }
             )
             partial.append(True)
@@ -219,13 +221,16 @@ def snapshot(day, topic="", revision=None):
         partial.append(result["preview"]["status"] == "partial")
         events.extend(result["events"])
         digests.extend(result["digests"])
-        # DECISION(2026-10-27, Anastasia/Claude Code): a recorded failure of the producer ({node, event_id, message},
-        # ARCHITECTURE § 8, message already redacted by present_reasoning) joins the API's errors in the API's own
-        # shape ({code, message, event_id}, code "reasoning_<node>") with the edition's topic, so the web can tell
-        # whose edition failed. Why: the raw row had no `code`, and one topic's partial edition cancelled every
-        # other topic's quiet day on the board (web/lib/editorial.ts isQuietDay).
-        errors.extend({"code": "reasoning_" + str(e["node"]), "message": e["message"], "event_id": e.get("event_id"), "topic_id": name}
-                      for e in p.get("errors", []))
+        # DECISION(2026-10-27, Anastasia/Claude Code): a recorded failure of the producer joins the API's errors in the
+        # API's own shape ({code, message, event_id}) with the edition's topic, so the web can tell whose edition
+        # failed: a row {node, event_id, message} (ARCHITECTURE § 8) gets code "reasoning_<node>"; an older plain
+        # string, which the parser still accepts (reasoning_preview.parse_reasoning), gets "reasoning_error" with no
+        # event. Messages are as present_reasoning redacted them. Why: the raw row had no `code`, and one topic's
+        # partial edition cancelled every other topic's quiet day on the board (web/lib/editorial.ts isQuietDay).
+        for e in p.get("errors", []):
+            row = e if isinstance(e, dict) else {"node": "error", "event_id": None, "message": e}
+            errors.append({"code": "reasoning_" + str(row["node"]), "message": row["message"],
+                           "event_id": row.get("event_id"), "topic_id": name})
         editions.append(edition_of(p, result))
         for event_row in result["events"]:
             edition_of_event[event_row["id"]] = editions[-1]

@@ -10,9 +10,22 @@ module.exports=async({page})=>{
  await tab('Source map').click();await reader.locator('[data-reader-panel="map"]').waitFor({state:'visible'});
  await page.waitForFunction(()=>(document.querySelector('[data-reader-panel="map"] .sp-chart')||document.querySelector('[data-reader-panel="map"] .spectrum-instrument'))?.getBoundingClientRect().top<innerHeight);
  await reader.getByRole('heading',{name:'Source spectrum',exact:true}).waitFor();
- // A chosen view starts at the bar under the site header (the head scrolled away), as far as the page can scroll (2026-10-27, Anastasia/Claude Code).
- const start=await page.evaluate(()=>{const bar=document.querySelector('.reader-bar'),header=document.querySelector('.sidebar')?.getBoundingClientRect().height||0;const target=bar.getBoundingClientRect().top+scrollY-header;return {scrollY,expected:Math.min(Math.max(0,target),document.documentElement.scrollHeight-innerHeight)};});
- assert.ok(Math.abs(start.scrollY-start.expected)<=1,'a chosen view starts at the bar: '+JSON.stringify(start));
+ // A chosen view starts at the bar (2026-10-27, Anastasia/Claude Code; tightened after review): its first visible pane
+ // begins right under the bar, which sits under the site header, unless the page cannot scroll that far; checked
+ // after the scroll frame, from the top of the page and again with the bar stuck deep in the All view.
+ const startsAtBar=async(label)=>{
+  // Two frames first, so select()'s scroll frame has run; then the pane must sit right under the bar with no arrival
+  // animation running (its 220 ms translate), or the page must be at its end with the pane below the bar.
+  await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  try{await page.waitForFunction(()=>{const bar=document.querySelector('.reader-bar')?.getBoundingClientRect(),el=[...document.querySelectorAll('[data-reader-panel]')].find(e=>!e.hidden),header=document.querySelector('.sidebar')?.getBoundingClientRect().height||0,max=document.documentElement.scrollHeight-innerHeight;if(!bar||!el||el.getAnimations().some(a=>a.playState==='running'))return false;const pane=el.getBoundingClientRect();return Math.abs(bar.top-header)<=1&&Math.abs(pane.top-bar.bottom)<=1||Math.abs(scrollY-max)<=1&&pane.top>=bar.bottom-1;},undefined,{timeout:5000});}
+  catch{throw Error('a chosen view starts at the bar ('+label+'): '+JSON.stringify(await page.evaluate(()=>({scrollY,max:document.documentElement.scrollHeight-innerHeight,bar:document.querySelector('.reader-bar')?.getBoundingClientRect().toJSON()??null,pane:[...document.querySelectorAll('[data-reader-panel]')].find(e=>!e.hidden)?.getBoundingClientRect().top??null}))));}
+ };
+ await startsAtBar('Source map from the top');
+ await tab('All sections').click();await startsAtBar('All sections');
+ const stickDeep=async(label)=>assert.equal(await page.evaluate(()=>{window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'});const header=document.querySelector('.sidebar')?.getBoundingClientRect().height||0;return Math.abs(document.querySelector('.reader-bar').getBoundingClientRect().top-header)<=1&&scrollY>0;}),true,'the bar is stuck deep in the All view ('+label+')');
+ // With the bar stuck, choosing All again keeps the page height, so only a real scroll to the bar passes.
+ await stickDeep('before All');await tab('All sections').click();await startsAtBar('All sections with the bar stuck');
+ await stickDeep('before Source map');await tab('Source map').click();await startsAtBar('Source map with the bar stuck');
  if(needsReview)await reader.getByText('Requires editorial review',{exact:true}).first().waitFor();
  assert.equal(new URL(page.url()).search,search);assert.equal(new URL(page.url()).hash,'#reader-map');
  assert.equal(await reader.locator('[data-reader-panel="evidence"]').isVisible(),false);

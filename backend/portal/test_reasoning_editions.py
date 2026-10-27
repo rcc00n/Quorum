@@ -216,6 +216,8 @@ class ReasoningEditionsTests(TestCase):
         self.client.force_login(self.reader)
         data = self.client.get("/api/feed/?date=2026-10-22").json()
         self.assertEqual([e["code"] for e in data["errors"]], ["reasoning_edition_invalid"])
+        self.assertEqual([e["topic_id"] for e in data["errors"]], ["russia-ukraine-war"])
+        self.assertEqual(set(data["errors"][0]), {"code", "message", "event_id", "topic_id"})
         self.assertEqual(data["events"], [])
         self.assertEqual([e["topic_id"] for e in data["editions"]], ["climate-policy"])
         self.assertEqual(data["publication"]["status"], "available")
@@ -313,6 +315,35 @@ class ReasoningEditionsTests(TestCase):
         self.assertEqual(editions["climate-policy"]["completion"], "complete")
         self.assertTrue(editions["climate-policy"]["quiet_day"])
         self.assertEqual(data["publication"]["status"], "available")
+
+    def test_a_legacy_string_failure_is_coded_and_never_breaks_the_day(self):
+        # The parser still accepts plain-string errors from older producers; the feed and the event route keep
+        # answering, with the row coded and scoped to its topic (review of 2026-10-27).
+        partial = genuine("snapshot.sample.json")
+        partial["status"] = "partial"
+        partial["errors"] = ["model route returned HTTP 502", "TEST-secret token=abc at /srv/TEST-private.log"]
+        quiet = genuine("snapshot.empty-day.sample.json", "climate-policy")
+        self.accept(self.write(partial, "legacy"), install=True)
+        self.accept(self.write(quiet, "quiet"), install=True)
+        self.client.force_login(self.reader)
+        response = self.client.get("/api/feed/?date=2026-10-22")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # The allow-listed transport line passes through; anything else is the preview's withheld sentence.
+        self.assertEqual(data["errors"], [
+            {"code": "reasoning_error", "message": "model route returned HTTP 502", "event_id": None, "topic_id": "russia-ukraine-war"},
+            {"code": "reasoning_error", "message": "Recorded upstream failure; internal details withheld.", "event_id": None,
+             "topic_id": "russia-ukraine-war"},
+        ])
+        self.assertNotIn("TEST-secret", response.content.decode())
+        self.assertNotIn("TEST-private", response.content.decode())
+        editions = {e["topic_id"]: e for e in data["editions"]}
+        self.assertEqual(editions["russia-ukraine-war"]["completion"], "partial")
+        self.assertTrue(editions["climate-policy"]["quiet_day"])
+        event_id = partial["stories"][0]["event_id"]
+        for url in (f"/api/events/{event_id}/?date=2026-10-22", f"/api/events/{event_id}/"):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_a_declared_missing_source_makes_the_edition_partial(self):
         p = genuine("snapshot.sample.json")
