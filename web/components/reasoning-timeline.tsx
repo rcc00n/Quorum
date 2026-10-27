@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import type { ReasoningRun } from "@/lib/reasoning";
+import type { ReasoningRun, ReasoningStory } from "@/lib/reasoning";
 import { recordedLoops, loopPairs, stageName } from "@/lib/reasoning-trace";
-export function previewHref(run: ReasoningRun, event?: string) {
+export function previewHref(run: Pick<ReasoningRun, "edition_date" | "version">, event?: string) {
   return (
     "/preview/reasoning?" +
     new URLSearchParams({
@@ -16,9 +16,13 @@ export function previewHref(run: ReasoningRun, event?: string) {
 export function ReasoningTimeline({
   run,
   currentEvent = "",
+  installed = false,
 }: {
-  run: ReasoningRun;
+  run: Pick<ReasoningRun, "edition_date" | "version" | "trace" | "roundup"> & {
+    stories: Pick<ReasoningStory, "event_id" | "headline">[];
+  };
   currentEvent?: string;
+  installed?: boolean;
 }) {
   // DECISION(2026-10-24, rcc00n/Codex): an event deep-link starts with that event's trace.
   // Why: the roundup investigation link must not initially mix other events' checks.
@@ -306,7 +310,14 @@ export function ReasoningTimeline({
                     {s.model || "Not supplied"}
                   </small>
                   {s.event_id ? (
-                    <Link href={previewHref(run, s.event_id)}>
+                    <Link
+                      href={installed
+                        ? run.stories.some((story) => story.event_id === s.event_id)
+                          ? `/events/${encodeURIComponent(s.event_id)}?date=${run.edition_date}`
+                          : '#reasoning-trace-results'
+                        : previewHref(run, s.event_id)}
+                      onClick={installed ? () => selectEvent(s.event_id!) : undefined}
+                    >
                       Event {s.event_id} →
                     </Link>
                   ) : (

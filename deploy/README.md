@@ -51,6 +51,10 @@ The first-install commands are captured in `install-release.sh`. It refuses occu
 
 ## Decisions
 
+2026-10-26 · rcc00n / Codex · Hosted portal CI uses Ubuntu 24.04's preinstalled Google Chrome through the existing executable override; absence fails the job, and all authenticated suites still run. Why: repeated Playwright OS/font installation stalls on the Ubuntu package mirror prevented tests from starting. Official support: https://playwright.dev/docs/browsers and https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md. This changes tooling acquisition, not test expectations.
+
+2026-10-26 · rcc00n / Codex · Teammate SSH keys require exact SHA256 verification and additive atomic installation with a private backup; `install-ssh-key.py` targets an existing dedicated account by default and grants no sudo itself. Why: a fingerprint cannot authenticate a user, and provisioning must preserve the owner's existing access. Actual login must be confirmed from the teammate's private-key holder.
+
 2026-10-24 · rcc00n / Codex · Package only a clean commit and a successful source-bound external build receipt; export tracked portal/deploy files and reject private runtime paths. Why: stale builds must not inherit a newer revision label, and untracked local data must never enter a release archive. `QUORUM_WEB_BUILD` selects the reviewed build; older builds without `.quorum-build.json` require rebuilding. This adds no deployment authority.
 
 | Date | Who | What | Why |

@@ -17,6 +17,9 @@ import { Spectrum } from "./spectrum";
 import { EditionNotes } from "./editorial";
 import { visibleStories, isQuietDay } from "@/lib/editorial";
 import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
+import { ReasoningEvidence } from "./reasoning-evidence";
+import { ReasoningSpectrum } from "./reasoning-spectrum";
+import { ReasoningTimeline } from "./reasoning-timeline";
 import type { Publication } from "@/lib/analysis";
 import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
@@ -140,13 +143,18 @@ function Analysis({
           )}
         </section>
       ))}
-      <Spectrum sources={event.sources} />
-      <AnalysisWorkspace
-        event={event}
-        publication={publication}
-        sources={sources}
-        supplementary
-      />
+      {event.reasoning && event.reasoning_context ? (
+        <>
+          <ReasoningEvidence story={event.reasoning} fictional={publication?.mode === 'demo'} />
+          <ReasoningSpectrum story={event.reasoning} sources={sources} />
+          <ReasoningTimeline run={event.reasoning_context} currentEvent={event.id} installed />
+        </>
+      ) : (
+        <>
+          <Spectrum sources={event.sources} />
+          <AnalysisWorkspace event={event} publication={publication} sources={sources} supplementary />
+        </>
+      )}
     </div>
   );
 }

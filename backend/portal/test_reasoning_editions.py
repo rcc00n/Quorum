@@ -4,6 +4,7 @@ import io
 import json
 import os
 import tempfile
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import patch
 from django.contrib.auth.models import User
@@ -39,6 +40,9 @@ class ReasoningEditionsTests(TestCase):
         self.env = patch.dict(os.environ, {ENABLE: "1", ROOT: str(self.root), "QUORUM_CATALOG_PATH": ""})
         self.env.start()
         self.addCleanup(self.env.stop)
+        self.clock = patch('portal.reasoning_editions._now', return_value=datetime(2026, 10, 22, 12, tzinfo=timezone.utc))
+        self.clock.start()
+        self.addCleanup(self.clock.stop)
 
     def write(self, p, label, provisional=False):
         raw = json.dumps(p).encode()
@@ -132,12 +136,28 @@ class ReasoningEditionsTests(TestCase):
                 self.assertEqual([e["id"] for e in data["events"]], [event_id])
                 self.assertEqual(data["events"][0]["reasoning"]["reading_minutes"], story["stories"][0]["reading_minutes"])
                 self.assertEqual(data["publication"]["revision"], "editions-2026-10-22")
+                context = data['events'][0]['reasoning_context']
+                self.assertEqual(context['trace'], story['trace'])
+                self.assertEqual(context['roundup'], story['roundup'])
+                self.assertEqual(context['stories'], [{k: s[k] for k in ('event_id', 'headline')} for s in story['stories']])
         unknown = self.client.get("/api/events/TEST-unknown/?date=2026-10-22").json()
         self.assertEqual(unknown["events"], [])
         self.assertEqual(unknown["publication"]["revision"], "editions-2026-10-22")
         nowhere = self.client.get("/api/events/TEST-unknown/").json()
         self.assertEqual(nowhere["events"], [])
         self.assertEqual(nowhere["publication"]["status"], "pending")
+
+    def test_expired_installed_editions_keep_content_under_a_stale_notice(self):
+        story, _ = self.install_two_topics()
+        expiry = datetime.fromisoformat(story['expires_at'].replace('Z', '+00:00'))
+        self.client.force_login(self.reader)
+        with patch('portal.reasoning_editions._now', return_value=expiry + timedelta(seconds=1)):
+            feed = self.client.get('/api/feed/?date=2026-10-22').json()
+            self.assertEqual(feed['publication']['status'], 'stale')
+            self.assertEqual(len(feed['events']), len(story['stories']))
+            detail = self.client.get(f"/api/events/{story['stories'][0]['event_id']}/?date=2026-10-22").json()
+            self.assertEqual(detail['publication']['status'], 'stale')
+            self.assertEqual(detail['events'][0]['reasoning'], story['stories'][0])
 
     def test_fictional_installs_only_in_debug_and_reads_as_demo(self):
         sample = json.loads(SAMPLE.read_bytes())
@@ -154,10 +174,39 @@ class ReasoningEditionsTests(TestCase):
         self.assertTrue((self.root / "russia-ukraine-war/2026-10-22/v1.json").is_file())
         self.assertEqual((self.root / "russia-ukraine-war/2026-10-22/v1.json").stat().st_mode & 0o777, 0o600)
         self.client.force_login(self.reader)
-        data = self.client.get("/api/feed/?date=2026-10-22").json()
+        with override_settings(DEBUG=True):
+            data = self.client.get("/api/feed/?date=2026-10-22").json()
         self.assertEqual(data["status"], "demo")
         self.assertEqual(data["publication"]["mode"], "demo")
         self.assertEqual(len(data["events"]), len(sample["stories"]))
+        with override_settings(DEBUG=False):
+            data = self.client.get("/api/feed/?date=2026-10-22").json()
+        self.assertEqual(data['status'], 'error')
+        self.assertEqual(data['events'], [])
+
+    def test_missing_or_changed_install_triplet_fails_closed(self):
+        story = genuine('snapshot.sample.json')
+        self.accept(self.write(story, 'integrity'), install=True)
+        folder = self.root / story['topic_id'] / story['edition_date']
+        self.client.force_login(self.reader)
+        for filename in ('v1.sidecar.json', 'v1.meta.json', 'v1.json'):
+            path = folder / filename
+            original = path.read_bytes()
+            changed_bytes = (json.dumps({**json.loads(original), 'snapshot_sha256': '0' * 64}).encode()
+                             if filename == 'v1.meta.json' else original + b' ')
+            for changed in (None, changed_bytes):
+                with self.subTest(filename=filename, missing=changed is None):
+                    if changed is None:
+                        path.unlink()
+                    else:
+                        path.write_bytes(changed)
+                    # A missing snapshot is a genuinely absent install; other broken triplet members are errors.
+                    data = self.client.get('/api/feed/?date=2026-10-22').json()
+                    self.assertEqual(data['events'], [])
+                    if filename != 'v1.json' or changed is not None:
+                        self.assertEqual(data['status'], 'error')
+                        self.assertEqual(data['publication']['status'], 'error')
+                    path.write_bytes(original)
 
     def test_versions_are_immutable_and_a_broken_file_becomes_an_error_row(self):
         story, _ = self.install_two_topics()
@@ -184,6 +233,25 @@ class ReasoningEditionsTests(TestCase):
         report = self.accept(options)
         self.assertNotIn("installed", report)
         self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_install_enforces_private_directories_and_refuses_links(self):
+        story = genuine('snapshot.sample.json')
+        options = self.write(story, 'permissions')
+        topic = self.root / story['topic_id']
+        topic.mkdir(mode=0o755)
+        self.accept(options, install=True)
+        day = topic / story['edition_date']
+        for path in (self.root, topic, day):
+            self.assertEqual(path.stat().st_mode & 0o777, 0o700)
+        for path in day.iterdir():
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        other = genuine('snapshot.sample.json', 'linked-topic')
+        outside = Path(self.temp.name) / 'outside'
+        outside.mkdir()
+        (self.root / 'linked-topic').symlink_to(outside, target_is_directory=True)
+        report = self.accept(self.write(other, 'linked'), blocked=True, install=True)
+        self.assertIn('linked_editions_directory', report['issues'])
+        self.assertEqual(list(outside.iterdir()), [])
 
     def test_honesty_labels_travel_with_the_edition(self):
         story = genuine("snapshot.sample.json")

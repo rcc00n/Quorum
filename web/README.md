@@ -35,6 +35,10 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-26 · rcc00n / Codex · Dashboard links accept an explicit edition date, with the same date format check as topic/story routes. Why: judges can open the accepted historical edition without relabelling it as today's news; the default remains the current day.
+
+2026-10-26 · rcc00n / Codex · Installed events reuse the recorded evidence, spectrum and timeline components with the exact optional `reasoning_context` trace/roundup and story-title index; trace links remain on authenticated portal routes. Why: the story-only projection otherwise loses all investigation records and shows empty structured-analysis panels. The reasoning-owned schema and types are unchanged; this is the portal projection.
+
 2026-10-24 · rcc00n / Codex · Roundup verdicts are producer-attributed; exact event-scoped skipped-check trace rows show “not double-checked”, while absent claim evidence establishes no independent verification. Preserve original status/grouping and show all partial errors behind a counted disclosure. Why: below-bar cost gating must not silently weaken verification claims or bury the reading journey under diagnostics.
 
 2026-10-24 · rcc00n / Codex · Display joined registry provider labels/links/check dates and four calculated source-rating modes separately from recorded producer coverage cohorts; provenance is a keyboard-accessible disclosure. Why: source position calculations must not silently rewrite fixed cohort evidence or turn missing ratings into zero.

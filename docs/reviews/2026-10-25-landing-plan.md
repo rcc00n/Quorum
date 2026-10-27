@@ -82,7 +82,7 @@ H2: **One card per topic. Then the article, then the appendix.**
 Eyebrow: `THE GRAPH · ONE RUN PER TOPIC PER DAY`
 H2: **Code decides. Models read. Every step leaves a row.**
 Numbered steps, each with "model / code" and the loop it belongs to:
-01 **Plan and cluster** — documents of the day grouped into events; the model writes one structured key per document, code buckets them. 
+01 **Plan and cluster** — documents of the day grouped into events; the model writes one structured key per document, code buckets them.
 02 **Score the bar** — the model reports the legal status and the state of the act; code maps them to points and sets `above_bar`. Cap of ten by code.
 03 **Extract claims** — atomic, checkable, each with the sentence it came from.
 04 **Research ⇄ verify** — passages for and against each claim; a contradiction counts only when the model quotes it verbatim and code finds the words in the passage. A thin claim sends the event back for a second round. At most two.

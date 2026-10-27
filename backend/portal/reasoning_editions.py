@@ -12,10 +12,13 @@ that shows the day's real editions with the same labels the preview shows.
 Layout under the root: <topic>/<date>/v<N>.json (the original bytes), v<N>.sidecar.json, v<N>.meta.json
 (install record). The highest N of a topic and date is current. Nothing here writes; the command does.
 """
+import hashlib
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
+from django.conf import settings
 from .snapshot_store import read_bounded
 from .snapshot_validation import SnapshotError
 
@@ -36,6 +39,10 @@ STATUS = {
     "attributed": "attributed",
 }
 INVALID = (SnapshotError, OSError, ValueError, TypeError, KeyError, AttributeError)
+
+
+def _now():
+    return datetime.now(timezone.utc)
 
 
 def root():
@@ -94,18 +101,26 @@ def installed(base):
 
 def load(path, catalog):
     """Present one installed edition exactly as the preview does; bind its sidecar when installed with one."""
-    from .reasoning_preview import present_reasoning, bind_preview_sidecar
+    from .reasoning_preview import present_reasoning, bind_preview_sidecar, parse_preview_json
+    from .snapshot_validation import require
 
     raw = read_bounded(path)
     result = present_reasoning(raw, catalog=catalog if catalog and catalog["catalog_revision"] else None)
     stem = path.name[: -len(".json")]
     sidecar = path.with_name(stem + ".sidecar.json")
-    if sidecar.is_file():
-        bind_preview_sidecar(read_bounded(sidecar), raw, result)
+    # DECISION(2026-10-26, rcc00n/Codex): serve only complete, hash-bound install triplets.
+    # Why: removing a sidecar or replacing accepted bytes must not silently bypass the installer's gates.
+    sidecar_raw = read_bounded(sidecar)
+    bind_preview_sidecar(sidecar_raw, raw, result)
     meta_path = path.with_name(stem + ".meta.json")
-    meta = json.loads(read_bounded(meta_path, 65536)) if meta_path.is_file() else {}
-    if not isinstance(meta, dict):
-        meta = {}
+    meta = parse_preview_json(read_bounded(meta_path, 65536))
+    require(isinstance(meta, dict), 'invalid_install_record')
+    require(meta.get('snapshot_sha256') == hashlib.sha256(raw).hexdigest()
+            and meta.get('sidecar_sha256') == hashlib.sha256(sidecar_raw).hexdigest(), 'install_hash_mismatch')
+    p = result['reasoning']
+    require(all(type(meta.get(k)) is type(p[k]) and meta[k] == p[k]
+                for k in ('topic_id', 'edition_date', 'version', 'run_id')), 'install_identity_mismatch')
+    require(settings.DEBUG or p['provenance']['fictional'] is False, 'fictional_edition_requires_debug')
     return result, meta
 
 
@@ -186,6 +201,13 @@ def snapshot(day, topic="", revision=None):
             partial.append(True)
             continue
         p = result["reasoning"]
+        # DECISION(2026-10-26, rcc00n/Codex): carry exact recorded run context to the installed story page.
+        # Why: the story projection alone drops the edition trace, leaving judges with empty evidence panels.
+        context = {k: p[k] for k in ('edition_date', 'version', 'roundup')}
+        context['trace'] = p.get('trace', [])
+        context['stories'] = [{k: story[k] for k in ('event_id', 'headline')} for story in p['stories']]
+        for event_row in result['events']:
+            event_row['reasoning_context'] = context
         seen.append(name)
         fictional = fictional or p["provenance"]["fictional"]
         partial.append(result["preview"]["status"] == "partial")
@@ -203,13 +225,20 @@ def snapshot(day, topic="", revision=None):
         if not catalog:
             sources.update({s["id"]: s for s in result["sources"]})
     if not seen:
-        return None
+        # A configured, broken installed day is an error; never fall through to a successful pending feed.
+        catalog = catalog or {'catalog_revision': None, 'topics': [], 'sources': []}
+        return {**catalog, 'status': 'error', 'events': [], 'digests': [], 'editions': [], 'errors': errors,
+                'publication': {'status': 'error', 'error_code': 'reasoning_edition_invalid',
+                                'revision': revision_id(day), 'edition': day}}
     topics = [dict(t) for t in (catalog["topics"] if catalog else [])]
     topics.extend({"id": name, "name": names.get(name, name)} for name in seen if name not in names)
     # DECISION(2026-10-26, Anastasia/Claude Code): a day is "partial" for the brief only when every edition read
     # for it is partial (or the one topic asked for is); other gaps stay per edition (`completion`) and in
     # `errors`, so one incomplete topic never hides the others' stories. Why: the brief's empty state is per
     # publication, the reasoning contract's partial status is per edition.
+    # DECISION(2026-10-26, rcc00n/Codex): retain installed content while marking expired producer deadlines stale.
+    # Why: an installation timestamp must not make an old edition look freshly verified.
+    stale = _now() >= min(datetime.fromisoformat(value.replace('Z', '+00:00')) for value in expires)
     return {
         "status": "demo" if fictional else "available",
         "catalog_revision": catalog["catalog_revision"] if catalog else None,
@@ -219,7 +248,7 @@ def snapshot(day, topic="", revision=None):
         "digests": digests,
         "editions": editions,
         "publication": {
-            "status": "partial" if all(partial) else "available",
+            "status": "stale" if stale else "partial" if all(partial) else "available",
             "revision": revision_id(day),
             "edition": day,
             "run_id": ", ".join(run_ids),
