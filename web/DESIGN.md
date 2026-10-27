@@ -112,6 +112,12 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 | 2026-10-25 | Anastasia / Claude Code | This file holds the portal's tokens; the identity decision stays in DECISIONS.md item 9. Look taken from Yelysei's prototype canvas (white, rounded display, crimson accent, 20 px photo cards, pills, dark sign-up); flows from DECISIONS where the prototype is older than them. Light theme only for the hackathon. Structure borrowed from GreenTrace and Saphan (real artifact up front, numbered loop, sponsors by job, honest limits); their dark palette and typefaces are not. | One place for the values, so the landing, the forms and the brief pages stop drifting; the prototype is the team's agreed look and matches item 9; changing it would need a new DECISIONS row. |
 
 
+## Instrument refinement
+
+2026-10-27 · rcc00n / Codex · WEB-PAPERCLIP-POLISH-01, requested by Vadim. Visual reference inspected at [Paperclip](https://paperclip.ing/) at 1440 and 390 px: thin framed surfaces, inset task panels, subtle nested divisions and clearly grouped controls. Adopt those construction details in Quorum's existing paper/ink/umber tokens. Keep the current typefaces/weights, hero/grid/wireline, page measure, card silhouettes, content, status wording and political data colours. No third-party assets/code, rainbow accents, dark-page conversion, rounded-pill system or button lift is adopted; earlier identity decisions remain in force.
+
+Visual thesis: a paper reading surface with quietly framed, precise instruments. Content plan: retain existing landing and reading sections; refine only existing sheets, ledgers, tab/date controls, search and topic rows. Interaction thesis: restrained hover/selection highlights, the existing search entrance and reader transition; all new transitions stop under reduced motion. Implementation: `app/instrument-polish.css`; one import is the feature boundary and can be reverted independently of navigation/data.
+
 ## Spectrum instrument
 
 Visual thesis: an editorial measuring instrument on paper, with precise colour-coded source positions and a shallow physical presence.
