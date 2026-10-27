@@ -39,37 +39,35 @@ function roundupCount(edition?: EditionPresentation) {
   return edition ? edition.roundup.reduce((n, g) => n + g.items.length, 0) : 0;
 }
 
-function StoryCard({ event, topicName, day, lead }: { event: Event; topicName: string; day: string; lead: boolean }) {
-  const minutes = event.article?.reading_minutes;
+function StoryCard({ event, day, lead }: { event: Event; day: string; lead: boolean }) {
   const photo = event.article?.photo;
   const picture = photo && licensedPhoto(photo) ? photo : null;
-  const meta = [
-    event.importance?.label ?? "Importance not supplied",
-    `${event.sources.length} ${event.sources.length === 1 ? "source" : "sources"}`,
-    typeof minutes === "number" ? `${minutes} min` : null,
-    // Yelysei's rule (Issue #2 6418787032): a story the producer flagged is never shown silently approved.
-    event.reasoning?.needs_review ? "Requires editorial review" : null,
-  ].filter(Boolean);
   return (
     <li className={lead ? "tb-card tb-card-lead" : "tb-card"}>
-      <Link href={`/events/${encodeURIComponent(event.id)}?date=${day}`} className="tb-card-link">
+      <Link href={`/events/${encodeURIComponent(event.id)}?date=${day}`} className={picture ? "tb-card-link" : "tb-card-link tb-card-link-blank"}>
+        {/* The picture, or the blurred field without one, covers the whole card (app/today.css); the media slot
+            only reserves the picture's height and holds the credit or the note. */}
+        {picture && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="tb-card-photo" src={picture.url} alt={picture.caption} />
+        )}
         <div className={picture ? "tb-card-media" : "tb-card-media tb-card-media-missing"} aria-hidden={picture ? undefined : true}>
           {picture ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={picture.url} alt={picture.caption} />
-              <span className="tb-card-credit">{`Photo: ${picture.credit}`}</span>
-            </>
+            <span className="tb-card-credit">{`Photo: ${picture.credit}`}</span>
           ) : (
             // The quieter version of the story page's missing-photo line (components/story.tsx PhotoMissing);
             // the whole area is decorative on a card, whose link text is the headline.
             <span className="tb-card-note">Imagine a photo here.</span>
           )}
         </div>
-        <span className="tb-card-topic">{topicName}</span>
-        <h3>{event.title}</h3>
-        <p>{event.summary}</p>
-        <span className="tb-card-meta">{meta.join(" · ")}</span>
+        {/* DECISION(2026-10-27, Anastasia/Claude Code; cabinet pass): the card is the picture and the headline,
+            nothing else; the review label stays when the producer flagged the story (Yelysei's rule), the
+            topic name, standfirst, importance, source count and minutes are read on the story page. Why:
+            her review of 2026-10-27: more picture, a larger headline at the foot, no other text. */}
+        <div className="tb-card-text">
+          {event.reasoning?.needs_review && <span className="tb-card-review">Requires editorial review</span>}
+          <h3>{event.title}</h3>
+        </div>
       </Link>
     </li>
   );
@@ -200,7 +198,7 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
             </div>
             <ul className="tb-row" role="list" aria-label={`${t.name}: stories of the ${day} edition`}>
               {own.map((e, k) => (
-                <StoryCard key={e.id} event={e} topicName={t.name} day={day} lead={k === 0} />
+                <StoryCard key={e.id} event={e} day={day} lead={k === 0} />
               ))}
               {quiet && (
                 <li className="tb-card tb-card-quiet">

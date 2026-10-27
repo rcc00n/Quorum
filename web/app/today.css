@@ -233,14 +233,15 @@
   display: grid;
   /* The photo slot takes the spare height, so the text sits at the foot of every card in a row, whatever the
      row's tallest card; the slot is never shorter than its aspect ratio. */
-  grid-template-rows: 1fr auto auto auto auto;
+  grid-template-rows: 1fr auto;
   align-items: start;
-  gap: 8px;
-  min-height: 320px;
+  min-height: 340px;
   height: 100%;
-  padding: 0 0 18px;
+  padding: 0;
   border-radius: 20px;
   overflow: hidden;
+  position: relative;
+  isolation: isolate;
   /* DECISION(2026-10-26, Anastasia/Claude Code): black at 60 % over the page, blurred, so the paper shows
      through and white type keeps 5:1. Anastasia asked for about 20 %; at 20 % the card is #d1d1d1 and white
      type reads at 1.4:1, so 60 % is the most transparent legible value; she confirmed 60 % for the cards
@@ -252,17 +253,73 @@
   box-sizing: border-box;
 }
 .tb .tb-card-lead .tb-card-link {
-  min-height: 420px;
+  min-height: 460px;
 }
-/* The reserved photo area: the picture of the day with its credit when the snapshot carries a licensed one,
-   otherwise an empty field of the same translucent black, a little lighter. Its minimum height comes from a
-   padding pseudo-element (16:9, 2:1 on the lead), not from `aspect-ratio`: a stretched grid item with an
-   aspect ratio derives its width from the stretched height and widens the column. */
+/* The foot of the card: the review label and the headline on a translucent band that darkens the same
+   picture or blurred field, which runs under the whole card and fades into the band over its last 56 px.
+   DECISION(2026-10-27, Anastasia/Claude Code): black at 30 % over the card's own 60 % (about 72 % black over
+   the paper in all, white type above 7:1; 50 % over a real photograph), so the headline band reads darker
+   than the picture while the field still shows through; the fade is the band's ::before over the picture's
+   last 128 px with eased stops, since a short linear ramp reads as a hard edge (Mach bands) and looked like
+   two darkenings laid over each other; the "Imagine a photo here." note keeps its z-index above it. Why:
+   Anastasia's review of 2026-10-27: "the lower part darker, more contrast", then "the whole background
+   blurred, the headline part just darker", then "a little more transparent, the transition is harsh". */
+.tb .tb-card-text {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px 24px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.tb .tb-card-text::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 128px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.01) 12%,
+    rgba(0, 0, 0, 0.05) 28%,
+    rgba(0, 0, 0, 0.12) 45%,
+    rgba(0, 0, 0, 0.2) 62%,
+    rgba(0, 0, 0, 0.27) 80%,
+    rgba(0, 0, 0, 0.3) 100%
+  );
+  pointer-events: none;
+}
+.tb .tb-card-link:not(.tb-card-link-blank) .tb-card-text {
+  background: rgba(0, 0, 0, 0.5);
+}
+.tb .tb-card-link:not(.tb-card-link-blank) .tb-card-text::before {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.02) 12%,
+    rgba(0, 0, 0, 0.08) 28%,
+    rgba(0, 0, 0, 0.2) 45%,
+    rgba(0, 0, 0, 0.33) 62%,
+    rgba(0, 0, 0, 0.45) 80%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+}
+/* The review label on a flagged story (Yelysei's rule), small, white at 80 %, above the headline. */
+.tb .tb-card-review {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+/* The reserved photo area holds the credit or the note; the picture itself (`.tb-card-photo`) or the blurred
+   field covers the whole card behind both rows. Its minimum height comes from a padding pseudo-element (16:9,
+   2:1 on the lead), not from `aspect-ratio`: a stretched grid item with an aspect ratio derives its width
+   from the stretched height and widens the column. */
 .tb .tb-card-media {
   position: relative;
   align-self: stretch;
-  background: rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .tb .tb-card-media::before {
   content: "";
@@ -272,9 +329,10 @@
 .tb .tb-card-lead .tb-card-media::before {
   padding-top: 50%;
 }
-.tb .tb-card-media img {
+.tb .tb-card-photo {
   position: absolute;
   inset: 0;
+  z-index: -1;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -288,15 +346,13 @@
   color: rgba(255, 255, 255, 0.8);
 }
 /* No licensed picture: the same blurred field as the story page's lead slot (app/story.css), in white and
-   umber over the card's black, and the sentence small in the credit's place. Decorative: the card's media
-   area is aria-hidden without a picture. */
-.tb .tb-card-media-missing {
-  overflow: hidden;
-}
-.tb .tb-card-media-missing::after {
+   umber over the card's black, under the whole card, and the sentence small in the credit's place.
+   Decorative: the card's media area is aria-hidden without a picture. */
+.tb .tb-card-link-blank::before {
   content: "";
   position: absolute;
   inset: -48px;
+  z-index: -1;
   background:
     radial-gradient(44% 60% at 24% 36%, rgba(201, 162, 126, 0.34), transparent 70%),
     radial-gradient(34% 52% at 78% 30%, rgba(255, 255, 255, 0.2), transparent 70%),
@@ -320,6 +376,10 @@
 .tb .tb-card-link > *:not(.tb-card-media) {
   margin-inline: 20px;
 }
+.tb .tb-card-link > .tb-card-text,
+.tb .tb-card-link > .tb-card-photo {
+  margin-inline: 0;
+}
 .tb .tb-card-topic {
   margin-top: 12px;
   font-size: 12px;
@@ -329,8 +389,8 @@
 .tb .tb-card h3 {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 24px;
+  line-height: 1.12;
   letter-spacing: -0.015em;
   color: inherit;
   margin: 0;
@@ -340,7 +400,8 @@
   overflow: hidden;
 }
 .tb .tb-card-lead h3 {
-  font-size: 30px;
+  font-size: 36px;
+  letter-spacing: -0.02em;
   -webkit-line-clamp: 3;
 }
 .tb .tb-card p {

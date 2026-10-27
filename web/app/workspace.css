@@ -540,6 +540,47 @@ label {
   color: var(--ink);
   text-decoration-color: var(--umber);
 }
+/* A folded group (components/roundup-group.tsx, decision there): the fourth event on is hidden, the third is
+   cut to its first line and fades into the page under the "Show N more" pill. */
+.roundup-item[hidden] {
+  display: none;
+}
+.roundup-group[data-collapsed] > .roundup-item:nth-of-type(3) {
+  position: relative;
+  max-height: 58px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+.roundup-group[data-collapsed] > .roundup-item:nth-of-type(3)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 20%, var(--paper) 100%);
+  pointer-events: none;
+}
+.roundup-more {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin: -14px 0 0 18px;
+  padding: 0 16px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.roundup-more:hover {
+  border-color: var(--ink);
+}
+.roundup-group:not([data-collapsed]) > .roundup-more {
+  margin-top: 4px;
+}
 
 @media (max-width: 700px) {
   .roundup-item {
