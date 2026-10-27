@@ -34,6 +34,17 @@ module.exports = async ({browser, root, password, temp, build}) => {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', () => errors.push('page_error'));
+  const preferenceSession = await (await context.request.get(root + '/api/session/')).json();
+  assert.equal((await context.request.post(root + '/api/preferences/', {
+    headers: {'X-CSRFToken': preferenceSession.csrfToken, Origin: root},
+    data: {topics: [original.topic_id]},
+  })).status(), 200);
+  await page.goto(`${root}/dashboard?date=${day}`);
+  await page.locator('.tb-card h3').first().waitFor();
+  assert.equal(await page.locator('input[type="date"]').inputValue(), day);
+  assert.equal(await page.locator('.tb-card h3').first().textContent(), original.stories[0].headline);
+  if (original.stories[0].needs_review)
+    await page.getByText(/Requires editorial review/).first().waitFor();
   for (const story of original.stories) {
     const result = await (await context.request.get(`${root}/api/events/${story.event_id}/?date=${day}`)).json();
     assert.deepEqual(result.events[0].reasoning, story);
@@ -75,5 +86,5 @@ module.exports = async ({browser, root, password, temp, build}) => {
   assert.deepEqual(errors, []);
   assert.equal(crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex'), hash);
   await context.close();
-  console.log(`PASS: genuine installed edition → authenticated Django/Next/browser; ${original.stories.length} stories, ${original.roundup.count} roundup, ${original.trace.length} exact trace rows; evidence/review/rating modes/three widths/logout; original unchanged`);
+  console.log(`PASS: genuine installed edition → authenticated Django/Next/browser; dated board, ${original.stories.length} stories, ${original.roundup.count} roundup, ${original.trace.length} exact trace rows; evidence/review/rating modes/three widths/logout; original unchanged`);
 };
