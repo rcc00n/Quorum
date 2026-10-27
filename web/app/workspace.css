@@ -744,3 +744,8 @@ label {
   box-shadow: 0 1px 0 #cfcfcf;
   color: var(--ink-2);
 }
+/* While the next date loads, the page stays and dims a little instead of blanking (second cabinet pass). */
+.workspace-main[aria-busy="true"] > :not(.publication-line, .publication-notice) {
+  opacity: 0.72;
+  transition: opacity 160ms ease;
+}

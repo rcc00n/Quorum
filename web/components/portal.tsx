@@ -305,8 +305,12 @@ export function Portal({
           </span>
         </header>
         <PageMotion root=".workspace-main" ready={!loading && !error} epoch={view} />
-        <main id="main" className="workspace-main">
-          {loading ? (
+        {/* DECISION(2026-10-27, Anastasia/Claude Code; second cabinet pass): a page that already has data keeps it on
+            screen while the next date (or story) loads, dimmed and marked busy, and updates in place when the answer
+            arrives; the "Preparing your workspace" state is for the first load only. Why: Anastasia's review of
+            2026-10-27: every date change blanked the board and drew it again, a white flash and blocks materialising. */}
+        <main id="main" className="workspace-main" aria-busy={loading && !!data ? true : undefined}>
+          {loading && !data ? (
             <div className="loading" role="status">
               <div className="loading-line" />
               <h1>Preparing your workspace…</h1>
