@@ -476,6 +476,21 @@ label {
   letter-spacing: -0.02em;
   margin: 0 0 6px;
 }
+/* Home's per-topic "Also today" blocks (components/editorial.tsx, 2026-10-27, Anastasia/Claude Code): the heading
+   names the topic in the secondary ink after "Also today", the digest sentence sits under it, and the block clears
+   the sticky site header when the board's card jumps to it. */
+.also-today {
+  scroll-margin-top: 128px;
+}
+.also-today-topic {
+  color: var(--ink-2);
+}
+.also-today > .edition-digest {
+  font-size: 17px;
+  line-height: 1.5;
+  max-width: 64ch;
+  margin: 10px 0 14px;
+}
 .edition-notes .help {
   font-family: var(--mono);
   font-size: 12px;

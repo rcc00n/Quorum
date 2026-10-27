@@ -259,9 +259,20 @@ const assert = require("node:assert/strict");
       0,
     );
     await page.goto(root + "/dashboard?date=2026-10-22");
-    await page
-      .getByRole("heading", { name: "Also today", exact: true })
-      .waitFor();
+    // On Home the block is named for its topic, the board's card jumps to it, and the quiet-day panel is not repeated
+    // under the board (2026-10-27, Anastasia/Claude Code; web/DESIGN.md › Cabinet).
+    const alsoToday = page.getByRole("heading", { name: /^Also today · / });
+    await alsoToday.first().waitFor();
+    assert.equal(await alsoToday.count(), 1);
+    assert.equal(
+      await page
+        .getByRole("heading", { name: "A quiet day for major stories", exact: true })
+        .count(),
+      0,
+    );
+    await page.locator('a.tb-card-link[href="#also-today-demo-topic"]').click();
+    await page.waitForFunction(() => location.hash === "#also-today-demo-topic");
+    assert.equal(new URL(page.url()).pathname, "/dashboard");
     await page.goto(root + "/topics/demo-topic?date=2026-10-22");
     await page
       .getByRole("heading", {
