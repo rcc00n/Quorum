@@ -100,6 +100,12 @@ export type Publication = {
   fallback?: boolean;
   error_code?: string | null;
   mode?: "live" | "demo";
+  // The login-only reader's honesty labels (backend/portal/reasoning_editions.py): the sidecar's
+  // provisional flag and corpus capture time, the install time, the preview warnings.
+  provisional?: boolean;
+  corpus_as_of_utc?: string | null;
+  installed_at?: string | null;
+  warnings?: string[];
 };
 export function displayTime(value: string | null | undefined) {
   if (!value) return "Not supplied";

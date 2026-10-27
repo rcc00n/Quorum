@@ -4,6 +4,8 @@ import "@fontsource-variable/schibsted-grotesk";
 import "./globals.css";
 import "./identity.css";
 import "./workspace.css";
+import "./header.css";
+import { ScrollState } from "@/components/scroll-state";
 export const metadata: Metadata = {
   title: { default: "Quorum — The news, with its working shown", template: "%s · Quorum" },
   description:
@@ -20,6 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               "try{var t=localStorage.getItem('quorum-theme');if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t}}catch(e){}",
           }}
         />
+        <ScrollState />
         <a className="skip" href="#main">
           Skip to content
         </a>

@@ -23,4 +23,30 @@
   --display: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
   --body: "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* DECISION(2026-10-26, Anastasia/Claude Code): one page measure for every route: content in a centred column
+     of 1024 px including 22 px gutters (980 px of text), as on apple.com; a full-width bar or section reads
+     --column-gutter so its content lines up with the column, a centred block reads --measure and --gutter.
+     16 px gutters under 700 px. Why: Anastasia's review of 2026-10-26 (the hero of apple.com/apple-news sits
+     close to the centre; the same should hold here, on the landing and in the app). */
+  --measure: 1024px;
+  --gutter: 22px;
+  --column-gutter: max(var(--gutter), calc((100% - var(--measure)) / 2 + var(--gutter)));
+  /* DECISION(2026-10-26, Anastasia/Claude Code): the landing hero alone sits on a wider measure, 1200 px, so its
+     content starts 88 px outside the header's and the sections' column; corners on the landing are 8 px on
+     containers and 4 px on controls (the 2 px of the morning is superseded for the landing only); the four
+     cohort colours of web/DESIGN.md become tokens for the one place the landing shows them, the bars of the
+     sources spectrum. Why: Anastasia's review of the centred page (the hero should feel wider than what follows;
+     slightly rounded corners page-wide; a little colour by lean on the sources, as data). */
+  --measure-hero: 1200px;
+  --radius: 8px;
+  --radius-s: 4px;
+  --cohort-left: #1d4ed8;
+  --cohort-left-minor: #93c5fd;
+  --cohort-right: #b91c1c;
+  --cohort-right-minor: #fca5a5;
+}
+@media (max-width: 700px) {
+  :root {
+    --gutter: 16px;
+  }
 }
