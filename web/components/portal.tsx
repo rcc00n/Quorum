@@ -83,6 +83,12 @@ function Analysis({
   </InvestigationReader>;
 }
 
+// The view the reader was on before the current one, across client navigations (module scope survives them;
+// a fresh load starts at null). The story page's crumb reads it to lead back to Home (components/story.tsx).
+// Two variables, so a repeated effect run (React's development double-invoke) does not count as a navigation.
+let currentView: string | null = null;
+let previousView: string | null = null;
+
 export function Portal({
   view,
   id,
@@ -102,6 +108,15 @@ export function Portal({
   const path = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<Snapshot | null>(null);
+  // Set after mount so the server-rendered crumb (the topic) and the first client render agree.
+  const [fromHome, setFromHome] = useState(false);
+  useEffect(() => {
+    if (currentView !== view) {
+      previousView = currentView;
+      currentView = view;
+    }
+    setFromHome(view === "event" && previousView === "dashboard");
+  }, [view]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -209,6 +224,9 @@ export function Portal({
       busy={busy}
       onSave={saveTopics}
       saveLabel={view === "onboarding" ? "Continue to your brief" : "Save topics"}
+      // The first setup's picker looks like the board's (pill search, the catalog as a cloud of round pills,
+      // chosen ones filled): one picker everywhere (Anastasia, second cabinet pass 2026-10-27).
+      compact
     />
   );
   // DECISION(2026-10-26, Anastasia/Claude Code): first setup is its own full screen (the prototype's night
@@ -309,6 +327,7 @@ export function Portal({
                 <StoryCrumb
                   topic={data?.topics.find((t) => t.id === data?.events.find((e) => e.id === id)?.topic_id) ?? null}
                   date={data?.events.find((e) => e.id === id)?.date ?? initialDay}
+                  fromHome={fromHome}
                 />
               ) : view !== "dashboard" && view !== "sources" && (
               <div className="page-heading">

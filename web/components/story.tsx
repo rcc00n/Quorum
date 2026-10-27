@@ -173,15 +173,29 @@ export function ReviewLabel() {
   );
 }
 
-export function StoryCrumb({ topic, date }: { topic: Topic | null; date?: string }) {
-  const href = topic ? `/topics/${encodeURIComponent(topic.id)}${date ? `?date=${date}` : ""}` : "/dashboard";
+// DECISION(2026-10-27, Anastasia/Claude Code; second cabinet pass): the crumb leads back to where the reader came
+// from. From Home (a client navigation from the board) it reads "Home" and steps back in history, so the board and
+// its scroll return; otherwise, as before, it names the topic and leads to its page. Why: Anastasia's report of
+// 2026-10-27: opening a story from Home and pressing the crumb landed on the topic page, not on Home.
+export function StoryCrumb({ topic, date, fromHome = false }: { topic: Topic | null; date?: string; fromHome?: boolean }) {
+  const href = fromHome
+    ? `/dashboard${date ? `?date=${date}` : ""}`
+    : topic ? `/topics/${encodeURIComponent(topic.id)}${date ? `?date=${date}` : ""}` : "/dashboard";
   return (
-    <nav className="story-crumb" aria-label="Topic">
-      <Link href={href}>
+    <nav className="story-crumb" aria-label={fromHome ? "Home" : "Topic"}>
+      <Link
+        href={href}
+        onClick={(e) => {
+          if (fromHome && typeof history !== "undefined" && history.length > 1) {
+            e.preventDefault();
+            history.back();
+          }
+        }}
+      >
         <span className="story-crumb-glyph" aria-hidden="true">
           ‹
         </span>
-        {topic ? topic.name : CRUMB_FALLBACK}
+        {fromHome ? "Home" : topic ? topic.name : CRUMB_FALLBACK}
       </Link>
     </nav>
   );
