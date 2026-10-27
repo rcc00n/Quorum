@@ -59,7 +59,8 @@ export function BriefStatus({ day, topic, topics, followed, status, publicationS
       <p className="bs-lead">No published events are available for this edition.</p>
       {nextStep && (
         <dl className="bs-facts">
-          <dt>Edition cut</dt>
+          {/* "Data cutoff", not "Edition cut": see the DECISION in today-board.tsx (Vadim's reading of 2026-10-27). */}
+          <dt>Data cutoff</dt>
           <dd>
             {`05:30 New York · ${utcLabel(cut)}${local ? ` · ${local} on your clock` : ""} · ${passed ? "passed" : `in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}`}
           </dd>
