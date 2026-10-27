@@ -30,6 +30,39 @@
 .sp-point[aria-pressed="true"] .sp-point-core, .sp-point:hover .sp-point-core { transform: scale(1.45); box-shadow: 0 3px 10px #14141433; }
 .sp-point[aria-pressed="true"] .sp-point-halo { opacity: .45; transform: scale(1); }
 .sp-point:focus-visible { outline: 2px solid var(--ink); outline-offset: 0; }
+/* Labels on the marks (components/spectrum-field.tsx markLabel/labelLayout, decision there): a paper chip above
+   the mark, anchored away from the plot's edges; badges (major tier) always on from 701 px, names on hover,
+   focus and selection. */
+.sp-point-label { position: absolute; left: 50%; bottom: calc(100% - 9px); transform: translateX(-50%); padding: 1px 5px; border-radius: 3px; background: rgba(255, 255, 255, .88); color: var(--ink); font-size: 11px; line-height: 1.3; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 120ms; z-index: 4; }
+.sp-point-label[data-side="left"] { left: 50%; transform: none; }
+.sp-point-label[data-side="right"] { left: auto; right: 50%; transform: none; }
+.sp-point-label[data-pos="below"] { bottom: auto; top: calc(100% - 9px); }
+.sp-point-major .sp-point-label { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .04em; }
+.sp-point-major .sp-point-label, .sp-point:hover .sp-point-label, .sp-point:focus-visible .sp-point-label, .sp-point[aria-pressed="true"] .sp-point-label { opacity: 1; }
+.sp-point:hover, .sp-point:focus-visible, .sp-point[aria-pressed="true"] { z-index: 5; }
+/* Registry cohort shares (lib/spectrum-cohorts.ts, decision there): a plain table with its denominators. */
+.sp-cohorts { margin: 0 0 28px; }
+.sp-cohorts h3 { font-size: 15px; font-weight: 500; margin: 0 0 10px; }
+.sp-cohorts table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sp-cohorts th, .sp-cohorts td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.sp-cohorts thead th { font-size: 11px; font-weight: 500; color: var(--ink-2); }
+.sp-cohorts tbody th { font-weight: 500; }
+.sp-cohorts td small { display: block; font-size: 11px; color: var(--ink-2); }
+.sp-cohorts-note { font-size: 11px; color: var(--ink-2); margin: 10px 0 0; max-width: 650px; }
+@media (max-width: 700px) {
+  .sp-cohorts table { font-size: 12px; }
+  .sp-cohorts th, .sp-cohorts td { padding: 6px 8px 6px 0; }
+  .sp-cohorts thead th:nth-child(4), .sp-cohorts td:nth-child(4) { display: none; } /* the cited audience sum stays in the ledger */
+}
+/* The ledger disclosure (components/spectrum.tsx, decision there), in the landing's "+ All 40 rows" manner. */
+.sp-ledger { margin: 8px 0 24px; }
+.sp-ledger > summary { cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center; font-size: 15px; font-weight: 500; color: var(--ink); }
+.sp-ledger > summary::-webkit-details-marker { display: none; }
+.sp-ledger > summary::before { content: "+ "; font-family: var(--mono); color: var(--umber); white-space: pre; }
+.sp-ledger[open] > summary::before { content: "− "; }
+.sp-ledger > summary:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+.sp-ledger-group { margin-top: 28px; }
+.sp-ledger-group-head { margin: 0; padding: 0 0 10px; border-bottom: 1px solid var(--ink); font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
 .sp-floor { position: absolute; bottom: 26px; left: 65px; right: 26px; height: 22px; transform: perspective(200px) rotateX(65deg); transform-origin: top; border-bottom: 1px solid var(--rule); background: repeating-linear-gradient(90deg, transparent 0, transparent calc(25% - 1px), var(--rule) calc(25% - 1px), var(--rule) 25%); opacity: .35; pointer-events: none; }
 .sp-inspector { display: grid; grid-template-columns: minmax(180px, 1fr) 1fr; gap: 28px; padding: 24px 0; border-top: 1px solid var(--rule); }
 .sp-label { display: block; color: var(--ink-2); font-size: 11px; margin-bottom: 8px; }
@@ -62,7 +95,11 @@
   .spectrum-modern .section-heading { align-items: flex-start; }
   .sp-caption { flex-direction: column; gap: 5px; }
   .sp-stage { padding-left: 46px; padding-right: 22px; }
-  .sp-chart { height: 260px; }
+  /* Phones (WEB-SPECTRUM-POLISH-02): a taller field spreads the log-audience axis so clusters separate under a
+     finger; badges show only on the selected mark, since seven always-on badges collide on a 320 px plot. */
+  .sp-chart { height: 340px; }
+  .sp-point-major .sp-point-label { opacity: 0; }
+  .sp-point[aria-pressed="true"] .sp-point-label { opacity: 1; }
   .sp-floor { left: 46px; right: 22px; }
   .sp-y-tick { font-size: 10px; right: calc(100% + 8px); }
   .sp-x-labels { font-size: 11px; }
@@ -72,7 +109,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .sp-stage { transform: none !important; transition: none; }
-  .sp-point, .sp-point-core, .sp-point-halo, .sp-reading, .spectrum-modern .spectrum-track > span { animation: none !important; transition: none !important; }
+  .sp-point, .sp-point-core, .sp-point-halo, .sp-point-label, .sp-reading, .spectrum-modern .spectrum-track > span { animation: none !important; transition: none !important; }
   .sp-floor { display: none; }
 }
 
