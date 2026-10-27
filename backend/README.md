@@ -17,6 +17,28 @@ export DJANGO_DEBUG=1
 
 SQLite and collected static assets default to `~/.local/share/quorum/portal`; override with `QUORUM_PORTAL_DATA`. Production uses `QUORUM_STATIC_ROOT=/opt/quorum/static` so Nginx never needs access to the private data directory. Development uses a process-local random secret unless one is provided; restarting signs users out. Production requires `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_ORIGINS`, HTTPS and `DJANGO_DEBUG=0`. Environment files are not automatically sourced. Use the service environment file in deployment.
 
+## Curated lead photos
+
+`editorial_photos.py` attaches separately reviewed lead-photo
+metadata to the installed reader's optional article presentation, only after the original/sidecar/install
+triplet validates and the exact snapshot SHA256 + topic/date/event matches. Canonical scope/licences:
+docs/DECISIONS.md › Stories as articles › Photos. No network/model call, original rewrite or producer contract.
+
+The private `DATA_DIR/editorial-photos/current.json` contains schema `quorum.editorial-photos.v1`,
+`reviewed_by`, timezone-aware `reviewed_at`, and `entries`; each has `topic_id`, `edition_date`,
+`snapshot_sha256`, `event_id`, and `photo` (`url`, `source_url`, `license_url`, `license`, `credit`,
+`caption`, `rights_confirmed: true`). HTTPS origins and licence values match the existing frontend guard.
+Verify the actual image's licence, author, subject/date and loading before marking it reviewed; a file photo's
+caption must say so. No photo is preferable to a misleading image. Real manifests/assets stay outside Git.
+
+`manage.py editorial_photos --file <private.json> --sha256 <hash>` validates exact installed bindings and
+reports the current manifest SHA256 (or `none`). Add `--install --expected-current <reported hash|none>`
+to atomically publish as the Quorum service account; stale writers are refused. Root 0700, files 0600.
+Each manifest's exact bytes are also saved under `<sha256>.json`; rollback republishes a previous reviewed
+manifest with the current expected hash. Removing `current.json` disables all curated photos. A new edition
+version cannot inherit an old photo by its title. Invalid/unavailable media retains readable news and the
+existing placeholder; reader/auth/publication rules and all original edition bytes stay unchanged.
+
 ## Web API
 
 All JSON; `/api/` is same-origin. GET `/session/` returns `{user, csrfToken}`. Send that token as `X-CSRFToken` for every POST, including login/register. The token rotates after login. HttpOnly session and CSRF cookies; no JWTs. Private responses use `Cache-Control: no-store`.
@@ -52,6 +74,12 @@ DJANGO_DEBUG=1 ~/.local/share/quorum/portal-venv/bin/python backend/manage.py te
 Reasoning 1.0 editions for signed-in readers: `reasoning_snapshot --file … --sha256 … --sidecar … --sidecar-sha256 … --producer-commit … --install` copies an accepted edition into `QUORUM_REASONING_EDITIONS_ROOT/<topic>/<date>/v<N>.json` with its sidecar and an install record (mode 0600; a version is never overwritten); `--allow-fictional` works in DEBUG only, for a rehearsal with the bundled sample. The producer's config is read with `git show <commit>:reasoning/config/reasoning.toml`, so run `git fetch origin` first (reasoning pushes every producer commit before handing files over); on a release without `.git`, pass `--producer-config <reasoning.toml>` with the matching file instead. Each edition row of the feed carries the preview's honesty labels (`provisional`, `corpus_as_of_utc`, `edition_window_utc`, `warnings`) and every roundup line keeps the producer's `label`, `line_source` and `needs_review`; `publication.provisional` is true when any edition of the day is, with `publication.corpus_as_of_utc` the earliest capture time among those editions; an event page narrows both to the event's own edition. The acceptance report and the install record say where the producer's config came from (`config_source`: git or file). With `QUORUM_ENABLE_REASONING_READER=1`, `/api/feed/` and `/api/events/<id>/` answer from the installed editions of a date before the proposal store, for signed-in users only; nothing changes for anonymous visitors or while the flag is off. See `portal/reasoning_editions.py`.
 
 ## Decisions
+
+2026-10-27 · rcc00n / Codex · WEB-MEDIA-01: reviewed lead photos live in an atomic private manifest,
+bound to exact accepted snapshot SHA256/topic/date/event; immutable manifest copies and expected-current
+hashes protect rollback/concurrent operators. Missing/invalid media preserves readable news; no model call
+or original/sidecar/metadata rewrite. Why: Vadim requested real images while teammates already process the
+topics. Operation: › Curated lead photos; canonical scope: docs/DECISIONS.md › Stories as articles › Photos.
 
 2026-10-26 · rcc00n / Codex · The installed reader honors producer expires_at as a stale publication notice while retaining original content. Why: installation time must not reset a recorded freshness deadline; existing frontend stale handling remains applicable.
 

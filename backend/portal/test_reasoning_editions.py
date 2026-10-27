@@ -89,6 +89,35 @@ class ReasoningEditionsTests(TestCase):
                 self.assertEqual(data["events"], [])
                 self.assertEqual(data["publication"]["status"], "pending")
 
+    def test_reviewed_photo_reaches_authenticated_reader_without_changing_original(self):
+        from .test_editorial_photos import manifest
+        p, quiet = self.install_two_topics()
+        installed = self.root / p['topic_id'] / p['edition_date'] / 'v1.json'
+        raw = installed.read_bytes()
+        before = {str(f): f.read_bytes() for f in self.root.rglob('*') if f.is_file()}
+        m = manifest(); entry = m['entries'][0]
+        entry.update(topic_id=p['topic_id'], edition_date=p['edition_date'],
+                     snapshot_sha256=hashlib.sha256(raw).hexdigest(), event_id=p['stories'][0]['event_id'])
+        source = self.work / 'photos.json'; source.write_text(json.dumps(m))
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        with override_settings(DATA_DIR=self.work):
+            out = io.StringIO()
+            call_command('editorial_photos', file=str(source), sha256=digest, install=True,
+                         expected_current='none', stdout=out)
+            self.assertTrue(json.loads(out.getvalue())['installed'])
+            self.assertEqual(self.client.get('/api/feed/?date=2026-10-22').status_code, 401)
+            self.client.force_login(self.reader)
+            data = self.client.get('/api/feed/?date=2026-10-22').json()
+            row = next(e for e in data['events'] if e['id'] == entry['event_id'])
+            self.assertEqual(row['article']['photo'], entry['photo'])
+            self.assertEqual(row['reasoning']['photo'], p['stories'][0]['photo'])
+            # A newer/different original can never inherit this photo based on its title alone.
+            m['entries'][0]['snapshot_sha256'] = 'b' * 64
+            source.write_text(json.dumps(m))
+            with self.assertRaises(CommandError):
+                call_command('editorial_photos', file=str(source), sha256=hashlib.sha256(source.read_bytes()).hexdigest())
+        self.assertEqual({str(f): f.read_bytes() for f in self.root.rglob('*') if f.is_file()}, before)
+
     def test_installed_editions_reach_only_signed_in_readers(self):
         story, quiet = self.install_two_topics()
         self.assertEqual(self.client.get("/api/feed/?date=2026-10-22").status_code, 401)

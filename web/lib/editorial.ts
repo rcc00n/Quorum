@@ -121,7 +121,10 @@ export function licensedPhoto(photo: EditorialPhoto) {
     const allowed = (host: string) =>
       host.endsWith(".gov") ||
       host === "commons.wikimedia.org" ||
-      host === "upload.wikimedia.org";
+      host === "upload.wikimedia.org" ||
+      // DECISION(2026-10-27, rcc00n/Codex): Commons imageinfo now returns this official thumbnail CDN.
+      // Why: use verified 1280px images rather than multi-megabyte originals; retain exact-origin checks.
+      host === "thumb.wikimedia.org";
     return (
       allowed(urls[0].hostname) &&
       allowed(urls[1].hostname) &&

@@ -125,6 +125,8 @@ def load(path, catalog):
     require(all(type(meta.get(k)) is type(p[k]) and meta[k] == p[k]
                 for k in ('topic_id', 'edition_date', 'version', 'run_id')), 'install_identity_mismatch')
     require(settings.DEBUG or p['provenance']['fictional'] is False, 'fictional_edition_requires_debug')
+    from .editorial_photos import attach
+    attach(result['events'], meta)
     return result, meta
 
 
