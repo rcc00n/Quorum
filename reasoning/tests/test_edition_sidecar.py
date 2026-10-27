@@ -1237,6 +1237,14 @@ def command_handle(portal) -> ast.FunctionDef:
     return find_function(portal.command_tree, "handle")
 
 
+def genuine_assignment(handle: ast.FunctionDef) -> ast.Assign:
+    """The command's `genuine = ...` statement, which its genuine_model_output_required check names (PR #31)."""
+    for node in ast.walk(handle):
+        if isinstance(node, ast.Assign) and [ast.unparse(t) for t in node.targets] == ["genuine"]:
+            return node
+    raise AssertionError(SHAPE_CHANGED.format(what=f"{COMMAND} (no `genuine = ...` assignment in handle)"))
+
+
 def test_parity_reasoning_snapshot_checks_are_the_ones_mirrored(portal):
     handle = command_handle(portal)
     checks = {(ast.unparse(n.args[0]), n.args[1].value) for n in ast.walk(handle) if isinstance(n, ast.Call)
@@ -1244,10 +1252,11 @@ def test_parity_reasoning_snapshot_checks_are_the_ones_mirrored(portal):
     expected = {
         ("re.fullmatch('[0-9a-f]{64}', options[key])", "expected_full_sha256_required"),
         ("re.fullmatch('[0-9a-f]{40}', commit)", "expected_full_producer_commit_required"),
+        # --allow-fictional (PR #31) is a DEBUG-only rehearsal switch of the portal; the sidecar never uses it
+        ("not options['allow_fictional'] or settings.DEBUG", "allow_fictional_requires_debug"),
         ("hashlib.sha256(raw).hexdigest() == options['sha256']", "snapshot_sha256_mismatch"),
         ("hashlib.sha256(sidecar_raw).hexdigest() == options['sidecar_sha256']", "sidecar_sha256_mismatch"),
-        ("p['provenance']['fictional'] is False and p['provenance']['model'] != 'stand-ins' and "
-         "(p['provenance'].get('model_calls', 0) > 0)", "genuine_model_output_required"),
+        ("genuine or options['allow_fictional']", "genuine_model_output_required"),
         ("prefix is not None and commit.startswith(prefix[1])", "producer_commit_mismatch"),
         ("isinstance(declared, str) and re.fullmatch('[0-9a-f]{64}', declared)", "invalid_config_sha256"),
         ("actual == declared", "producer_config_mismatch"),
@@ -1258,6 +1267,10 @@ def test_parity_reasoning_snapshot_checks_are_the_ones_mirrored(portal):
     }
     assert checks == expected, SHAPE_CHANGED.format(what=f"{COMMAND} (require calls now {sorted(checks - expected)}, "
                                                          f"gone {sorted(expected - checks)})")
+    # the genuine rule itself is the `genuine = ...` assignment the require names (PR #31 moved it out of the call)
+    assert ast.unparse(genuine_assignment(handle).value) == (
+        "p['provenance']['fictional'] is False and p['provenance']['model'] != 'stand-ins' and "
+        "(p['provenance'].get('model_calls', 0) > 0)"), SHAPE_CHANGED.format(what="the genuine rule (genuine = ...)")
     producer_keys = {n.slice.value for n in ast.walk(handle) if isinstance(n, ast.Subscript)
                      and isinstance(n.value, ast.Name) and n.value.id == "producer" and isinstance(n.slice, ast.Constant)}
     assert producer_keys == {"commit", "config_sha256", "commit_of_the_publishing_process"}, \
@@ -1265,7 +1278,14 @@ def test_parity_reasoning_snapshot_checks_are_the_ones_mirrored(portal):
     assert set(es.PRODUCER_KEYS) == producer_keys - {"commit_of_the_publishing_process"}
     source = ast.unparse(handle)
     assert "'commit_of_the_publishing_process' in producer" in source
-    assert f"f'{{commit}}:{es.CONFIG_PATH}'" in source, SHAPE_CHANGED.format(what="the config path read with git show")
+    # since PR #31 the config bytes come from producer_config: --producer-config when given (a release without .git),
+    # else `git show <commit>:<CONFIG_PATH>` in the portal's own checkout, which is what the sidecar's --repo check mirrors
+    assert source.count("config = producer_config(options, commit)") == 2, \
+        SHAPE_CHANGED.format(what="the config bytes (producer_config) in both producer branches")
+    config_reader = ast.unparse(find_function(portal.command_tree, "producer_config"))
+    assert f"f'{{commit}}:{es.CONFIG_PATH}'" in config_reader, SHAPE_CHANGED.format(what="the config path read with git show")
+    assert "options.get('producer_config')" in config_reader and "'producer_config_unavailable'" in config_reader, \
+        SHAPE_CHANGED.format(what="producer_config (the --producer-config file or git show, else producer_config_unavailable)")
     assert "artifact_review_issues(options['sha256'], p['run_id'])" in source
     matches = {n.args[0].value for n in ast.walk(handle) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
                and n.func.attr == "match" and n.args and isinstance(n.args[0], ast.Constant)}
@@ -1281,30 +1301,49 @@ def test_parity_reasoning_snapshot_checks_are_the_ones_mirrored(portal):
     {"fictional": False, "model": "test-model"},
 ], ids=["genuine", "fictional", "stand-ins", "zero-calls", "no-count"])
 def test_parity_genuine_output_rule_evaluates_like_the_portal(portal, provenance):
+    """The command's own `genuine = ...` statement, then its require, on `p` alone and without --allow-fictional."""
     handle = command_handle(portal)
     condition = next(n.args[0] for n in ast.walk(handle) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                      and n.func.id == "require" and isinstance(n.args[1], ast.Constant)
                      and n.args[1].value == "genuine_model_output_required")
-    portal_ok = eval(compile(ast.Expression(body=condition), COMMAND, "eval"), {"p": {"provenance": provenance}})
-    assert bool(portal_ok) is (es.genuine_problem({"provenance": provenance}) is None)
+    rule = compile(ast.Module(body=[genuine_assignment(handle)], type_ignores=[]), COMMAND, "exec")
+    check = compile(ast.Expression(body=condition), COMMAND, "eval")
+
+    def portal_accepts(allow_fictional: bool) -> bool:
+        ns = {"p": {"provenance": provenance}, "options": {"allow_fictional": allow_fictional}}
+        exec(rule, ns)  # binds `genuine` from p, nothing else
+        return bool(eval(check, ns))
+
+    assert portal_accepts(False) is (es.genuine_problem({"provenance": provenance}) is None)
+    assert portal_accepts(True), "--allow-fictional (DEBUG only) is the portal's rehearsal bypass; the sidecar has none"
 
 
 def test_parity_the_portal_producer_check_accepts_our_sidecar_and_repo(portal, edition, producer, tmp_path):
-    """Runs the command's own non-closed producer statements (prefix, config hash via git show) on our sidecar."""
+    """Runs the command's own non-closed producer statements (prefix, config hash through producer_config's git show)
+    on our sidecar: since PR #31 they are the else branch of `if 'commit_of_the_publishing_process' in producer`."""
     handle = command_handle(portal)
-    body = next(n for n in ast.walk(handle) if isinstance(n, ast.Try)).body
+    branches = [n for n in ast.walk(handle) if isinstance(n, ast.If)
+                and ast.unparse(n.test) == "'commit_of_the_publishing_process' in producer"]
+    assert len(branches) == 1 and branches[0].orelse, SHAPE_CHANGED.format(what=f"{COMMAND} (the producer branches)")
+    body = branches[0].orelse
     start = next(i for i, n in enumerate(body) if isinstance(n, ast.Assign) and ast.unparse(n.targets[0]) == "prefix")
     end = next(i for i, n in enumerate(body) if i > start and "artifact_review_issues" in ast.unparse(n))
     statements = ast.Module(body=body[start:end], type_ignores=[])
     assert "report['metadata_valid'] = True" in ast.unparse(statements), SHAPE_CHANGED.format(what=COMMAND)
+    assert "config = producer_config(options, commit)" in ast.unparse(statements), SHAPE_CHANGED.format(what=COMMAND)
     code = compile(statements, COMMAND, "exec")
+    # the command's own producer_config, verbatim; without --producer-config it reaches `git show` and never read_bounded
+    config_reader = compile(ast.Module(body=[find_function(portal.command_tree, "producer_config")], type_ignores=[]),
+                            COMMAND, "exec")
 
     def run(producer_block: dict, commit: str) -> dict:
         report: dict = {}
         ns = {"re": re, "hashlib": hashlib, "subprocess": subprocess, "Path": Path,
               "SnapshotError": portal.validation["SnapshotError"], "require": portal.validation["require"],
               "producer": producer_block, "commit": commit, "report": report,
+              "options": {"producer_config": None},  # argparse's value when --producer-config is not given
               "__file__": str(producer.repo / "backend" / "portal" / "management" / "commands" / "x.py")}
+        exec(config_reader, ns)
         exec(code, ns)  # parents[4] of __file__ is the temporary producer repository
         return report
 
