@@ -2,6 +2,19 @@
 
 Owner: Vadim. Shared release tracker: [Issue #2](https://github.com/rcc00n/Quorum/issues/2). This is the canonical web technical release gate; [implementation inventory](IMPLEMENTATION_STATUS.md) records individual capabilities. Check boxes only for a particular release with its commit, environment, test outcome and rollback revision; a previous release's pass does not approve a new release.
 
+## Reviewed lead-photo acceptance — 27 October 2026 UTC
+
+Only `20261027-editorial-photos-r2` / `169b0fc744e8dac8225c2f3e198712d858d110c1`.
+[Exact evidence and limits](reviews/2026-10-27-editorial-photos-release.md).
+
+- [x] Owner/tracker coordination, canonical photo amendment and normal #86–#89 merges; source/final CI PASS.
+- [x] Full backend/media tests, clean build/typecheck and isolated browser fallback/rights regression PASS.
+- [x] Real source/author/licence/date/visual checks; private exact-snapshot/event-bound seven-photo manifest validated and atomically installed.
+- [x] Genuine public UI login/logout, seven story and Home photos/captions/source/licence links, 1440/390, no errors/overflow PASS.
+- [x] Actual Quorum-only code/static rollback/reapply, explicit media reactivation and existing-session/preferences/exact-event persistence PASS.
+- [x] All 15 users/preferences, 15 installed edition files, SSH/environment and 24 unrelated containers preserved; SQLite/services/HTTPS/TLS PASS.
+- [ ] Two ceasefire photos remain unreviewed; automatic photo tool and full sponsor/recall/submission gates remain separate.
+
 ## Source-spectrum polish acceptance — 27 October 2026 UTC
 
 Only `20261027-spectrum-polish-r1` / `f3e121e46179b307e937658a4bc5ab508a396825`.
