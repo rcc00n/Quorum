@@ -62,7 +62,7 @@
   padding: 2px;
   border: 1px solid var(--rule);
   border-radius: 999px;
-  background: var(--paper-2);
+  background: var(--paper-3);
 }
 .tb .tb-controls .edition-navigation label {
   display: block;

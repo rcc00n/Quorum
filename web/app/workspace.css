@@ -198,12 +198,13 @@ summary:focus-visible {
 /* The publication line (components/analysis-workspace.tsx PublicationNotice, words unchanged) as a quiet
    dateline above the title: grey, 12 px, no bold (2026-10-27). The warning version keeps its panel.
    On the board (cabinet pass, 2026-10-27) the plain line moves to the foot of the page as a mono colophon,
-   so the title is the first thing read; the warning panel stays at the top. */
-.workspace-main:has(.tb) {
+   so the title is the first thing read; the warning panel stays at the top. The story page follows (cabinet pages
+   pass, 2026-10-27). */
+.workspace-main:has(.tb, .investigation-reader) {
   display: flex;
   flex-direction: column;
 }
-.workspace-main:has(.tb) > .publication-line {
+.workspace-main:has(.tb, .investigation-reader) > .publication-line {
   order: 99;
   margin: 48px 0 0;
   padding-top: 16px;
@@ -502,7 +503,7 @@ label {
   margin: 0 0 8px;
   border-bottom: 0;
   border-radius: 14px;
-  background: var(--paper-2);
+  background: var(--paper-3);
 }
 .roundup-item p {
   grid-column: 1;

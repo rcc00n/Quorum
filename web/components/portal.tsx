@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PageMotion } from "./page-motion";
 import { WorkspaceNavigator } from "./workspace-navigator";
-import { InvestigationReader, ReaderPanel, EventReading, LegacyClaims } from "./investigation-reader";
+import { InvestigationReader, ReaderPanel, EventReading, LegacyClaims, StoryHead } from "./investigation-reader";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -70,8 +70,8 @@ function Analysis({
   if (event.analysis || !event.reasoning || !event.reasoning_context)
     return <AnalysisWorkspace event={event} publication={publication} sources={sources} />;
   const readable = storyReadable(event, sources);
-  return <InvestigationReader title={event.title} needsReview={event.reasoning.needs_review} className={readable ? "story-page story-page-plain" : ""}>
-    <ReaderPanel name="reading"><EventReading event={event} sources={sources} /></ReaderPanel>
+  return <InvestigationReader head={<StoryHead event={event} />} className={readable ? "story-page story-page-plain" : ""}>
+    <ReaderPanel name="reading"><EventReading event={event} sources={sources} headless /></ReaderPanel>
     <ReaderPanel name="evidence">
       {readable && <LegacyClaims event={event} />}
       <ReasoningEvidence story={event.reasoning} fictional={publication?.mode === 'demo'} />

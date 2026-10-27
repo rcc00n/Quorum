@@ -12,7 +12,7 @@ export function ImpactAssessment({ event }: { event: Event }) {
     && Number.isInteger(rubric.total) && rubric.total === dimensions.reduce((sum, [key]) => sum + rubric[key], 0);
   if (!record && !complete) return null;
   return <details className="impact-assessment">
-    <summary><strong>Impact</strong><span className="impact-summary-note">Selection rubric</span><span className="impact-toggle" aria-hidden="true">+</span></summary>
+    <summary><strong>Impact</strong><span className="impact-summary-note">{complete ? `${rubric.total} / 9` : "Selection rubric"}</span><span className="impact-toggle" aria-hidden="true">+</span></summary>
     {complete ? <div className="impact-overview">
       <div className="impact-total"><span>Recorded points</span><div><strong className="impact-total-value">{rubric.total}</strong><span> / 9</span></div><p>From this edition’s selection rubric.</p></div>
       <dl className="impact-dimensions">{dimensions.map(([key, label, max]) => <div className="impact-dimension" key={key} data-dimension={key}>

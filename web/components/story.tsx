@@ -77,7 +77,7 @@ export function claimKey(index: number) {
   return String(index + 1).padStart(2, "0");
 }
 
-function formatDate(iso: string) {
+export function formatDate(iso: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   return new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {
     weekday: "long",
@@ -434,7 +434,7 @@ function runIn(text: string): [string | null, string] {
   return m ? [m[1], text.slice(m[0].length)] : [null, text];
 }
 
-export function Story({ event, sources }: { event: Event; sources: Source[] }) {
+export function Story({ event, sources, headless = false }: { event: Event; sources: Source[]; headless?: boolean }) {
   const claims = claimsOf(event, sources);
   if (!claims || !storyReadable(event, sources)) return null;
   const article = event.article!;
@@ -453,13 +453,19 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
     <>
       <article className="story" aria-label="Source-backed article">
         {article.photo ? <Photo photo={article.photo} /> : <PhotoMissing />}
-        <time className="story-date" dateTime={event.date}>
-          {formatDate(event.date)}
-        </time>
-        <h1 className="story-headline">{event.title}</h1>
-        <p className="story-standfirst">{event.summary}</p>
+        {/* In the reader the date, headline, standfirst and review label are the head above the view bar
+            (components/investigation-reader.tsx StoryHead); the article keeps its photo, meta and body. */}
+        {!headless && (
+          <>
+            <time className="story-date" dateTime={event.date}>
+              {formatDate(event.date)}
+            </time>
+            <h1 className="story-headline">{event.title}</h1>
+            <p className="story-standfirst">{event.summary}</p>
+          </>
+        )}
         {meta.length > 0 && <p className="story-meta">{meta.join(" · ")}</p>}
-        {event.reasoning?.needs_review && <ReviewLabel />}
+        {!headless && event.reasoning?.needs_review && <ReviewLabel />}
         <p className="story-key">{KEY_LINE}</p>
         {article.paragraphs.map((p, i) => {
           let lead: string | null = null;
