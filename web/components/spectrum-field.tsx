@@ -103,10 +103,10 @@ export function SpectrumField({ sources, mode, selectedId, onSelect }: {
         <div className="sp-source-heading"><span className="sp-label">Selected source</span><h3>{selected.name}</h3><span className="sp-source-domain">{selected.domain}</span></div>
         <div className="sp-reading" key={`${selected.id}-${mode}`}>
           <div><span className="sp-label">Editorial position</span><strong className={score === null ? "" : `sp-value-${cohort(score).toLowerCase()}`}>{score === null ? "Unrated" : `${score > 0 ? "+" : ""}${score.toFixed(2)}`}</strong><span>{score === null ? "Rating not supplied" : cohort(score)}</span></div>
-          <div><span className="sp-label">Audience estimate</span><strong>{selected.audience !== null && selected.audience > 0 && audienceUrl ? compact(selected.audience) : "Not supplied"}</strong>{audienceUrl && <a href={audienceUrl} target="_blank" rel="noopener noreferrer">Audience source ↗</a>}<span>{selected.audience_as_of ? `As of ${selected.audience_as_of}` : "Reporting date not supplied"}</span></div>
+          <div><span className="sp-label">Audience estimate</span><strong>{selected.audience !== null && selected.audience >= 0 && audienceUrl ? compact(selected.audience) : "Not supplied"}</strong>{audienceUrl && <a href={audienceUrl} target="_blank" rel="noopener noreferrer">Audience source ↗</a>}<span>{selected.audience_as_of ? `As of ${selected.audience_as_of}` : "Reporting date not supplied"}</span></div>
         </div>
       </div>}
-      <p className="sp-footnote">Logarithmic audience scale · supplied estimates only. {sources.length - geometry.points.length} {sources.length - geometry.points.length === 1 ? "source lacks" : "sources lack"} a rating or cited audience estimate for this plot.</p>
+      <p className="sp-footnote">Logarithmic audience scale · supplied estimates only. {sources.length - geometry.points.length} {sources.length - geometry.points.length === 1 ? "source is" : "sources are"} not plotted; inspect their supplied values below.</p>
     </div>
   );
 }

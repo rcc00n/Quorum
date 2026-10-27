@@ -134,6 +134,14 @@ const assert = require("node:assert/strict");
         .selectOption(mode);
     }
     await require('./spectrum-checks.cjs')({page, sources:response.events[0].sources});
+    chartSources[0].audience = 0;
+    await open();
+    await page.locator('.sp-source-button').filter({hasText:chartSources[0].name}).click();
+    assert.equal(await page.locator('.sp-inspector .sp-reading strong').last().textContent(), '0');
+    assert.equal(await page.locator(`.sp-point[data-source-id="${chartSources[0].id}"]`).count(), 0);
+    chartSources[0].audience = 1000;
+    await open();
+
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.locator("#evidence-explorer").scrollIntoViewIfNeeded();
