@@ -6,6 +6,7 @@ Historical description (superseded by the combined integration checks below): `w
 
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | Anastasia / Claude Code (covering Vadim's items this week, Issue #2 6426106426) | This file moved from `.github/README.md` to `.github/workflows/README.md`; its content is unchanged. | GitHub renders `.github/README.md` on the repository's front page in place of the root `README.md`, so judges opening github.com/rcc00n/Quorum saw "Portal CI" instead of the project README (seen 2026-10-27 01:40Z). |
 | 2026-10-23 | rcc00n / Codex | One branch-filtered, read-only-permissions Ubuntu CI job; no sponsor calls/browser suite | Protect the real supported Python/runtime contract with compact deterministic checks; browser HTTP boundary remains reproducible locally |
 
 Reference: [GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax), [public runner billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
