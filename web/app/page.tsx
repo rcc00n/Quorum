@@ -389,7 +389,7 @@ export default function Home() {
             ))}
           </div>
           <p className="lp-spectrum-legend">
-            {`One scale, ${maxCount} = ${maxSource?.name ?? ""}. Filled: full text. Outlined: headline and lead. — none matched. · no feed, never fetched.${officialNames.length ? ` ${officialNames.join(", ")}: counted in official_docs, queried separately.` : ""}`}
+            {`One scale, ${maxCount} = ${maxSource?.name ?? ""}. Solid: full text. Light fill with outline: headline and lead. — none matched. · no feed, never fetched.${officialNames.length ? ` ${officialNames.join(", ")}: counted in official_docs, queried separately.` : ""}`}
           </p>
           <details className="lp-registry">
             <summary>{`All ${registry.count} rows of the registry`}</summary>

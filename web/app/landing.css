@@ -586,7 +586,9 @@
   --bar: var(--ink);
 }
 .lp-bar-outline {
-  background: transparent;
+  /* DECISION(2026-10-27, rcc00n/Codex): lightly fill headline-only bars in their existing cohort colour.
+     Why: Vadim found the empty outlines weak; keep the outline and headline label as the access distinction. */
+  background: color-mix(in srgb, var(--bar) 25%, var(--paper));
   border: 1px solid var(--bar);
 }
 .landing .lp-spectrum-legend {

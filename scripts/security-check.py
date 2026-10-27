@@ -55,6 +55,16 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, rcc00n/Codex): permit only these inspected public source-tint comparison bytes.
+# Why: document the requested colour-only change without allowing arbitrary binaries or private captures.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-source-tints/sources-before-1440.png': 'e3f82eec39b024156d8ccec10536702a6b33ac0bb871291bb2655196306b7979',
+    'docs/reviews/2026-10-27-source-tints/sources-after-1440.png': 'ce99a5ea0dad451fafbdcdff8b2e69e26dd2e68e5586fa9d26028babb18a3e0b',
+    'docs/reviews/2026-10-27-source-tints/sources-before-390.png': '11dd680549d866751488470aa1b0d46c8d811d06e6c2027366eaee761bd11d9b',
+    'docs/reviews/2026-10-27-source-tints/sources-after-390.png': '5a61409bb9da176c60b18e59ffa053eb8578112499e7425f949a88b79bd334e9',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])
