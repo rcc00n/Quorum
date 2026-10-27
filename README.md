@@ -8,6 +8,11 @@ Quorum is a multi-agent system that takes one news event, gathers coverage from 
 
 Built by team **Quorum** for the [Open Agent Hackathon 2026](https://hackathon.genai.works/event/open-agent-hackathon-2026), Track 03 — **Reasoning Architecture**. Build window 22–27 October 2026; submissions close 27 October 2026, 23:45 UTC.
 
+**Live authenticated demo:** https://quorum.raccncode.com/dashboard?date=2026-10-26 —
+the genuine provisional immigration edition (1 story, 19 roundup entries, 174 trace steps).
+Sign in with the privately supplied judge account, or register under the existing open-registration flow.
+[Exact production release, browser/CI evidence and remaining limits](deploy/LIVE_RELEASE.md).
+
 ## What it does
 
 - **Multi-source intelligence** — RSS, news APIs and official publications, federated through Zetaris so agents query everything as one SQL layer; publications are grouped by event.
@@ -108,7 +113,7 @@ graph TD
 	M -.-> roundup
 	M -.-> publish
 	publish --> S[(snapshot: stories, roundup, trace; journal and ledger beside it)]
-	S --> P[Portal: Django checks the bytes read-only; installing an edition and the login-only reader are PR #31, open]
+	S --> P[Portal: Django accepts original bytes; installed editions served to signed-in readers]
 ```
 
 The loops: `verify → research` (at most 2 research rounds, round 2 only for thin claims), `critique → write` (at most 3 drafts), `adjudicate → review_disputed` (one third-reviewer call per claim the two checks disagree on; a claim both call disputed is not reviewed); the node contract and the limits in `docs/ARCHITECTURE.md` § 5. `langgraph dev` opens the same graph in LangGraph Studio.
@@ -133,7 +138,7 @@ One path through the whole system; each step is documented in its module. The co
 1. **Collect** (`collectors/README.md`): `docker compose -f collectors/docker-compose.yml up -d --build` starts PostgreSQL and the collector (one pass over every topic, then a 15-minute pause); with the official Zetaris platform running, `python3 collectors/zetaris/register.py` registers that database as `QUORUM_COLLECT`.
 2. **Reason** (`reasoning/README.md`): from `reasoning/`, `pip install -e ".[dev]"`; a dry run with no credits, `python -m quorum_reasoning.run --topic russia-ukraine-war --date 2026-10-22 --dry-run`; a live edition over the collected corpus (model route and `ZETARIS_*` settings in `.env`), `python -m quorum_reasoning.run --topic <topic> --date <date> --model live --corpus zetaris --out snapshots/_private`. The snapshot lands as the next immutable `v<N>.json`.
 3. **Serve** (`backend/README.md`, `web/README.md`): Django on `127.0.0.1:8017`; then `bash deploy/build-web.sh` and, from `~/.local/share/quorum/portal-web-build`, `npm run dev -- --hostname 127.0.0.1 --port 3017`.
-4. **Check an edition** (`backend/README.md`, `docs/PORTAL_INTEGRATION.md`, `docs/SNAPSHOT_PROPOSAL.md`): a reasoning 1.0 snapshot with its sidecar is checked read-only with `python backend/manage.py reasoning_snapshot --file … --sha256 … --sidecar … --sidecar-sha256 … --producer-commit …` (it never publishes; with `--install`, from the open PR #31, not merged at the time of writing, it copies the accepted edition into the login-only reader's directory) and viewed in the development-only preview (`QUORUM_ENABLE_REASONING_PREVIEW=1`, `QUORUM_REASONING_PREVIEW_FILE=<snapshot>`, `DJANGO_DEBUG=1`, localhost, route `/preview/reasoning`). The portal's own store takes proposal-format snapshots: `portal_snapshot validate --file <candidate.json>`, then `portal_snapshot prepare` and `portal_snapshot publish --file $QUORUM_SNAPSHOT_ROOT/staging/<file> --sha256 <sha256>` behind the `QUORUM_ENABLE_SNAPSHOT_PUBLICATION` flag.
+4. **Check an edition** (`backend/README.md`, `docs/PORTAL_INTEGRATION.md`, `docs/SNAPSHOT_PROPOSAL.md`): a reasoning 1.0 snapshot with its sidecar is checked read-only with `python backend/manage.py reasoning_snapshot --file … --sha256 … --sidecar … --sidecar-sha256 … --producer-commit …` (the acceptance command does not publish; merged PR #31 adds `--install` to copy cleanly accepted bytes into the login-only reader's directory) and viewed in the development-only preview (`QUORUM_ENABLE_REASONING_PREVIEW=1`, `QUORUM_REASONING_PREVIEW_FILE=<snapshot>`, `DJANGO_DEBUG=1`, localhost, route `/preview/reasoning`). The portal's own store takes proposal-format snapshots: `portal_snapshot validate --file <candidate.json>`, then `portal_snapshot prepare` and `portal_snapshot publish --file $QUORUM_SNAPSHOT_ROOT/staging/<file> --sha256 <sha256>` behind the `QUORUM_ENABLE_SNAPSHOT_PUBLICATION` flag.
 
 ## Samples: inputs and outputs
 
