@@ -3,6 +3,9 @@
 Owner: rcc00n / Codex. Canonical shared tracking: [Issue #2](https://github.com/rcc00n/Quorum/issues/2).
 This is release evidence, not a second rulebook. Earlier milestones remain historical.
 
+Latest portal release: [Sources and accessible motion, production 6f16bd7](FRONTEND_RELEASE.md).
+The pinned `20261027-live-r3` evidence below remains the original-edition milestone.
+
 ## Live access and exact release
 
 - Public URL: https://quorum.raccncode.com
