@@ -763,22 +763,79 @@ label {
   transition: opacity 160ms ease;
 }
 
-/* The AI headline notice (components/ai-notice.tsx, DECISION 2026-10-27 there): the shape of the other notices on these
-   pages (.message: a 2 px umber edge at the left, square corners) on the identity's one yellow, --notice-yellow, ink
-   text at the interface size; first in the main column, above the page's title or crumb. */
+/* The notices at the top of the workspace (2026-10-27, Anastasia/Claude Code; components/dismissible-notice.tsx and
+   ai-notice.tsx, decisions there): the AI headline notice on --notice-yellow and every .message (DEMO, saved, status) on
+   --tray, all with the trays' 14 px corners and no edge at the left; the two closable notices hold their text and a
+   close button side by side, so on a phone the text wraps beside the button and never under it. The first version's
+   2 px umber edge and square corners are superseded the same day. */
+.workspace-main .message {
+  border-left: 0;
+  border-radius: 14px;
+}
+.workspace-main > .notice-dismissible {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: start;
+  padding: 10px 10px 10px 16px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--ink);
+}
+.workspace-main > .notice-dismissible .notice-body p {
+  margin: 0;
+  padding-top: 5px;
+  color: var(--ink);
+}
 .workspace-main > .ai-notice {
   margin: 0 0 20px;
-  padding: 12px 16px;
   background: var(--notice-yellow);
-  border-left: 2px solid var(--umber);
-  border-radius: 0;
-  color: var(--ink);
   font-family: var(--ui);
   font-size: 14px;
   line-height: 1.5;
-  max-width: none;
 }
 .workspace-main > .ai-notice strong {
   font-weight: 600;
   color: var(--ink);
+}
+.workspace-main > .demo-notice {
+  margin: 20px 0;
+  background: var(--tray);
+}
+/* The main column takes focus when a notice closes (its button leaves the page); it is not a control, so no ring. */
+.workspace-main:focus {
+  outline: none;
+}
+/* The close button: a 24 px ink circle with a white ×, inside a 32 px target; the focus ring per --focus. */
+.notice-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.notice-close > span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  transition: background-color 160ms ease;
+}
+.notice-close:hover > span {
+  background: var(--umber-ink);
+}
+.notice-close:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-close > span { transition: none; }
 }
