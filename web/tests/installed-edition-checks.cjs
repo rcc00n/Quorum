@@ -41,6 +41,11 @@ module.exports = async ({browser, root, password, temp, build}) => {
   })).status(), 200);
   await page.goto(`${root}/dashboard?date=${day}`);
   await page.locator('.tb-card h3').first().waitFor();
+  await page.locator('.tb-head[data-revealed="true"]').waitFor();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await page.locator('.tb-head').evaluate(e=>getComputedStyle(e).animationName),'none');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+
   const localLabel = await page.evaluate(() => new Intl.DateTimeFormat('en', {
     month: 'long', day: 'numeric', year: 'numeric',
   }).format(new Date()));
@@ -72,6 +77,7 @@ module.exports = async ({browser, root, password, temp, build}) => {
       await page.getByLabel('Rating mode', {exact: true}).first().selectOption(mode);
       await page.getByLabel('Cohort rating context', {exact: true}).selectOption(mode);
     }
+    await require('./spectrum-checks.cjs')({page, sources:feed.sources});
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({width, height: 900});
       assert.equal(await page.locator('body').evaluate(e => e.scrollWidth > innerWidth), false);
@@ -82,6 +88,7 @@ module.exports = async ({browser, root, password, temp, build}) => {
   await page.goto(`${root}/topics/${original.topic_id}?date=${day}`);
   await page.getByRole('heading', {name: 'Also today', exact: true}).waitFor();
   assert.equal(await page.locator('.roundup-item').count(), original.roundup.count);
+  await require('./sources-route-checks.cjs')({page,browser,root});
   const next = await (await context.request.get(root + '/api/session/')).json();
   assert.equal((await context.request.post(root + '/api/logout/', {
     headers: {'X-CSRFToken': next.csrfToken, Origin: root}, data: {},

@@ -273,6 +273,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
     if (await page.locator("body").evaluate((e) => e.scrollWidth > innerWidth))
       throw Error("overflow");
   }
+  await require('./sources-route-checks.cjs')({page,browser,root});
   const denied = await page.request.get(root + "/staff/", { maxRedirects: 0 });
   if (denied.status() !== 302) throw Error("regular staff denial failed");
   const adminContext = await browser.newContext();
@@ -305,7 +306,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
         [path.join(repo, "web/tests", file)],
         {
           env: { ...process.env, QUORUM_TEST_URL: root, ...extra },
-          stdio: "ignore",
+          stdio: file === "motion.cjs" ? "inherit" : "ignore",
         },
       );
       children.push(child);
@@ -315,6 +316,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
       );
     });
   }
+  await browserScript("motion.cjs");
   await browserScript("analysis.cjs", { QUORUM_ANALYSIS_FIXTURE: output });
   await browserScript("demo.cjs", {
     TYPESCRIPT_MODULE: path.join(build, "node_modules/typescript"),
