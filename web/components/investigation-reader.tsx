@@ -66,23 +66,31 @@ export function InvestigationReader({ head, children, className = "" }: { title?
     for (let el: HTMLElement | null = target; el && el !== root.current; el = el.parentElement) if (el instanceof HTMLDetailsElement) el.open = true;
       const focus = target instanceof HTMLDetailsElement ? target.querySelector<HTMLElement>(":scope > summary") : target;
       if (focus) { if (!focus.hasAttribute("tabindex") && !focus.matches("a,button,input,select,summary")) focus.tabIndex = -1; focus.focus({ preventScroll: true }); }
-    target.scrollIntoView({ block: "start" });
+    // A hash that names a pane itself (#reader-map from the app search, Back and Forward between views) starts at the
+    // bar like a tab click; a deep link to something inside a pane keeps scrolling to it (review of 0c130c2).
+    if (target.matches("[data-reader-panel]")) scrollToBar(); else target.scrollIntoView({ block: "start" });
   }, [active, hashEpoch]);
+  // DECISION(2026-10-27, Anastasia/Claude Code): a chosen view starts at the bar, which then sits under the site
+  // header, with the story's head scrolled away. Why: since the cabinet pages pass the head (date, headline, review
+  // label, standfirst) sits inside the reader above the bar; scrolling to the reader's top left the whole head between
+  // the header and the panel, and on the real 26 October edition the Source map's chart fell 14 px below the fold at
+  // 390 px (master's installed-edition check, reader-checks.cjs). The head remains one scroll away. The bar is measured
+  // where it sits in the flow (the content right under it, minus its height): a stuck bar reports where it is drawn,
+  // under the header, so its own rectangle left the page where it was (review of 09fdb55).
+  function scrollToBar() {
+    const b = bar.current, content = b?.nextElementSibling;
+    const top = b && content ? content.getBoundingClientRect().top + scrollY - b.offsetHeight
+      : root.current ? root.current.getBoundingClientRect().top + scrollY : null;
+    if (top === null) return;
+    const header = document.querySelector<HTMLElement>(".sidebar")?.getBoundingClientRect().height || 0;
+    window.scrollTo({ top: Math.max(0, top - header), behavior: "instant" });
+  }
   // DECISION(2026-10-27, rcc00n/Codex; race traced by Anastasia/Claude Code): preserve Next's history state.
   // Why: its patched pushState otherwise re-syncs the router and may replace a subsequent claim hash with the old tab URL.
   function select(view: View) {
     pendingTarget.current = null; setActive(view);
     history.pushState(history.state, "", `#reader-${view}`);
-    requestAnimationFrame(() => {
-      // DECISION(2026-10-27, Anastasia/Claude Code): a chosen view starts at the bar, which then sits under the site
-      // header, with the story's head scrolled away. Why: since the cabinet pages pass the head (date, headline, review
-      // label, standfirst) sits inside the reader above the bar; scrolling to the reader's top left the whole head
-      // between the header and the panel, and on the real 26 October edition the Source map's chart fell 14 px below
-      // the fold at 390 px (master's installed-edition check, reader-checks.cjs). The head remains one scroll away.
-      const el = bar.current ?? root.current; if (!el) return;
-      const header = document.querySelector<HTMLElement>(".sidebar")?.getBoundingClientRect().height || 0;
-      window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - header), behavior: "instant" });
-    });
+    requestAnimationFrame(scrollToBar); // decision at scrollToBar
   }
   function navigate(e: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next: number;
