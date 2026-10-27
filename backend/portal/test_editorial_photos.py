@@ -45,7 +45,7 @@ class EditorialPhotoTests(SimpleTestCase):
                            ("url", "https://thumb.wikimedia.org.evil.example/a.jpg"),
                            ("source_url", "https://reuters.com/a"),
                            ("license_url", "https://evil.example/licence"),
-                           ("url", "https://user:pass@upload.wikimedia.org/a.jpg"),
+                           ("url", "https://{}@upload.wikimedia.org/a.jpg".format("TEST-user:TEST-pass")),
                            ("url", "https://upload.wikimedia.org:443/a.jpg")):
             q = deepcopy(p); q["entries"][0]["photo"][key] = value
             with self.subTest(key=key, value=value), self.assertRaises(SnapshotError):
