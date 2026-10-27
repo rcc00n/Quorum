@@ -252,6 +252,11 @@ summary:focus-visible {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* The 404 page's button: `.empty a` above outranks `.button`, which left ink text on the ink button. */
+.empty a.button {
+  color: #fff;
+  text-decoration: none;
+}
 .brief-aside {
   border-left: 1px solid var(--rule);
 }
