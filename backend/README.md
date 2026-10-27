@@ -53,6 +53,8 @@ Reasoning 1.0 editions for signed-in readers: `reasoning_snapshot --file … --s
 
 ## Decisions
 
+2026-10-26 · rcc00n / Codex · The installed reader honors producer expires_at as a stale publication notice while retaining original content. Why: installation time must not reset a recorded freshness deadline; existing frontend stale handling remains applicable.
+
 2026-10-26 · rcc00n / Codex · Installed event projections add `reasoning_context` with exact edition trace/roundup/date/version and the story ID/title index. Why: preserve real investigation/evidence navigation without fabricating structured analysis or returning duplicated full stories. Canonical upstream output remains unchanged.
 
 2026-10-26 · rcc00n / Codex · The reasoning installer sets root, topic and date directories to 0700 and rejects linked edition directories; files stay 0600. Why: private immutable editions must retain their permissions when installed into an existing hierarchy under the service user.

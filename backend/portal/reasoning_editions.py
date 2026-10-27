@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from django.conf import settings
 from .snapshot_store import read_bounded
@@ -38,6 +39,10 @@ STATUS = {
     "attributed": "attributed",
 }
 INVALID = (SnapshotError, OSError, ValueError, TypeError, KeyError, AttributeError)
+
+
+def _now():
+    return datetime.now(timezone.utc)
 
 
 def root():
@@ -231,6 +236,9 @@ def snapshot(day, topic="", revision=None):
     # for it is partial (or the one topic asked for is); other gaps stay per edition (`completion`) and in
     # `errors`, so one incomplete topic never hides the others' stories. Why: the brief's empty state is per
     # publication, the reasoning contract's partial status is per edition.
+    # DECISION(2026-10-26, rcc00n/Codex): retain installed content while marking expired producer deadlines stale.
+    # Why: an installation timestamp must not make an old edition look freshly verified.
+    stale = _now() >= min(datetime.fromisoformat(value.replace('Z', '+00:00')) for value in expires)
     return {
         "status": "demo" if fictional else "available",
         "catalog_revision": catalog["catalog_revision"] if catalog else None,
@@ -240,7 +248,7 @@ def snapshot(day, topic="", revision=None):
         "digests": digests,
         "editions": editions,
         "publication": {
-            "status": "partial" if all(partial) else "available",
+            "status": "stale" if stale else "partial" if all(partial) else "available",
             "revision": revision_id(day),
             "edition": day,
             "run_id": ", ".join(run_ids),

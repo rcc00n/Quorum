@@ -4,6 +4,7 @@ import io
 import json
 import os
 import tempfile
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import patch
 from django.contrib.auth.models import User
@@ -39,6 +40,9 @@ class ReasoningEditionsTests(TestCase):
         self.env = patch.dict(os.environ, {ENABLE: "1", ROOT: str(self.root), "QUORUM_CATALOG_PATH": ""})
         self.env.start()
         self.addCleanup(self.env.stop)
+        self.clock = patch('portal.reasoning_editions._now', return_value=datetime(2026, 10, 22, 12, tzinfo=timezone.utc))
+        self.clock.start()
+        self.addCleanup(self.clock.stop)
 
     def write(self, p, label, provisional=False):
         raw = json.dumps(p).encode()
@@ -142,6 +146,18 @@ class ReasoningEditionsTests(TestCase):
         nowhere = self.client.get("/api/events/TEST-unknown/").json()
         self.assertEqual(nowhere["events"], [])
         self.assertEqual(nowhere["publication"]["status"], "pending")
+
+    def test_expired_installed_editions_keep_content_under_a_stale_notice(self):
+        story, _ = self.install_two_topics()
+        expiry = datetime.fromisoformat(story['expires_at'].replace('Z', '+00:00'))
+        self.client.force_login(self.reader)
+        with patch('portal.reasoning_editions._now', return_value=expiry + timedelta(seconds=1)):
+            feed = self.client.get('/api/feed/?date=2026-10-22').json()
+            self.assertEqual(feed['publication']['status'], 'stale')
+            self.assertEqual(len(feed['events']), len(story['stories']))
+            detail = self.client.get(f"/api/events/{story['stories'][0]['event_id']}/?date=2026-10-22").json()
+            self.assertEqual(detail['publication']['status'], 'stale')
+            self.assertEqual(detail['events'][0]['reasoning'], story['stories'][0])
 
     def test_fictional_installs_only_in_debug_and_reads_as_demo(self):
         sample = json.loads(SAMPLE.read_bytes())
