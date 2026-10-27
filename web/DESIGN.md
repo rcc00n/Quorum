@@ -1,0 +1,88 @@
+# Quorum portal — design system
+
+Owner: Anastasia (portal look and UX, `anastasia/web-ux`), 2026-10-25. The identity itself is decided in [docs/DECISIONS.md › User account and interface](../docs/DECISIONS.md#user-account-and-interface) item 9; this file turns that decision into named tokens so pages use names, never raw values. Product and wording stay with Yelysei, the web platform with Vadim.
+
+Direction, in one line (Anastasia's brief, 2026-10-25: newspaper aesthetics, a journalist's words about honest information, truth assembled from facts): a newspaper that shows its working. White paper, black ink, warm greys, one umber mark, rounded display type over a system body face. Calm and legible like Apple News; honest and inspectable like a trace.
+
+Starting point (2026-10-25, Anastasia): Yelysei's prototype "Quorum — app screens" (Claude Design canvas, claude.ai/artifact/GxiEuhPNPSzH9SUjKjvYLX; sign-up → home → topic → story, plus "Also today"). Read in the browser, five frames. What it fixes: white page, rounded display face (Nunito-like) at about 56 px for page titles and 40 px on cards, a crimson date line above the title, grey secondary text, full-bleed photo cards with 20 px corners, white type and a small credit over the photo, "3 stories today" style one-liners, pill chips and a pill input, a light-grey rounded panel for "Also today", a dark near-black sign-up screen with a three-circle logo. Its screen logic predates the newest decisions (one edition a day prepared after the cut; topic search over existing names; the waiting state for a new topic; four rating modes), so the look is taken from it and the flows from DECISIONS.
+
+Anastasia's references (2026-10-25, seven images: Peter Jellitsch's site, Les Garçons Sauvages, 5pm.fr, the MOMAT Takashi Homma poster, the Dutch Design Week "(In No Particular Order)" poster, RM's puzzle tracklist): black ink on white or cream paper, type as the picture, hairline rules and narrow columns like a printed page, a typewriter cadence (letters arriving one by one, a line rewriting itself), brackets and puzzle pieces as "truth assembled from facts", photographs small and documentary. Their grotesque typefaces are not adopted: the display face stays rounded per DECISIONS item 9 and the prototype; the newspaper structure, the rules, the columns, the typewriter motion and the bracket motif are.
+
+Two of the reference sites were also opened live (2026-10-25): peterjellitsch.com sets everything in one grotesque at one weight, navigation at 60 px as the page's picture, body 18 px, black on paper; 5pm.fr the same idea in Neue Haas Grotesk at 17 px. The lesson kept: one display face, few sizes, type as the image; the grotesque itself is not adopted (item 9). lesgarconssauvages.com could not be opened.
+
+What was compared besides it (2026-10-25, looked at in the browser, UXKIN not connected): the two sites Yelysei named as the quality bar, GreenTrace (greentrace-eudr.higgsfield.app) and Saphan (saphan.ai). Both are dark, one typeface each (Geist; IBM Plex Sans with Schibsted Grotesk headings), a 64–72 px headline that states the product's question, monospace eyebrows, and a real artifact as the hero visual: a verdict with its data, a trace walked step by step, a "do not trust it, check it" section. We keep the light identity already decided and borrow the structure: the real artifact up front, the loop steps numbered, each sponsor named by the job it does, limits said plainly.
+
+## Color
+
+Light theme only. No dark mode in this phase (the portal has none; add tokens under `prefers-color-scheme: dark` when it does). A newspaper's palette, chosen by Anastasia on 2026-10-26: black ink on white paper, warm greys, one brown accent. No red in the identity (DECISIONS item 9, amended 2026-10-26); the prototype's crimson is superseded here.
+
+| Token | Value | Role |
+| --- | --- | --- |
+| `--paper` | `#ffffff` | Page background. |
+| `--paper-2` | `#f4f1eb` | Warm grey panels, alternating sections, code and trace blocks. |
+| `--ink` | `#141414` | Headlines, body text, the primary button, the masthead's double rule. |
+| `--ink-2` | `#5f5a53` | Secondary text, captions, muted labels, eyebrows (6.4:1 on paper). |
+| `--rule` | `#dcd6cc` | Hairlines, borders, table rules. |
+| `--umber` | `#7b5634` | The one accent: the date line, step numbers and markers, the caret, link underlines on hover, the brackets (6.6:1 on paper). Never a fill behind white text smaller than 15 px. |
+| `--umber-ink` | `#5a3e25` | Button hover, accent text at small sizes. |
+| `--night` | `#141414` | The dark sign-up and first-setup screens from the prototype (white type, ink button inverted to paper, white pill input). Nowhere else. |
+| `--cohort-left` | `#1d4ed8` | Left cohort, major outlets. Data colour in cohort views only. |
+| `--cohort-left-minor` | `#93c5fd` | Left cohort, minor outlets. |
+| `--cohort-right` | `#b91c1c` | Right cohort, major outlets. Data colour in cohort views only. |
+| `--cohort-right-minor` | `#fca5a5` | Right cohort, minor outlets. |
+| `--ok` | `#1d6b3a` | Confirmed (status word underlined, never a pill). |
+| `--warn` | `#8a5a00` | Disputed, needs review. |
+| `--focus` | `#141414` | Focus ring, 3 px, offset 3 px (sits on the paper around dark buttons). |
+
+Status is said in words ("Confirmed", "Disputed", "Statements only"); colour only underlines, never replaces the word. Cohort colours appear only where cohorts are compared, never as decoration; the landing shows none.
+
+## Typography
+
+Amended 2026-10-26 (Anastasia's second review: "stricter, like a well-known news agency"). The earlier rows (rounded display face `ui-rounded`/Nunito, system body) are superseded for the landing and kept below as history; the app routes keep them until WEB-UX-04.
+
+| Role | Family | Notes |
+| --- | --- | --- |
+| Display and body (landing) | `"Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif` | One grotesque drawn for a news group (Schibsted), packaged from npm (`@fontsource-variable/schibsted-grotesk`, one variable file, weights 400–900). Weights used: 400 body and lists, 500 every headline, nav, buttons, figures, 700 the masthead only. Sentence case; tracking 0 to −0.02 em; no uppercase outside the mono kickers. Reuters sets everything in Knowledge at 500, AP in its own sans at 700/500; this is that register. |
+| Trace, code, ids, kickers, wire line, Key: Value blocks | `ui-monospace, "SF Mono", Menlo, Consolas, monospace` | 12–13 px, tracking 0.02–0.04 em, tabular figures; uppercase only for kickers and column heads. |
+| Superseded 2026-10-26 (landing), kept for the app routes until WEB-UX-04 | Display `ui-rounded, "Nunito Variable"`; body `-apple-system, system-ui, "Inter Variable"` | The prototype's rounded face; Nunito is no longer packaged, Inter stays for the other routes. |
+
+Scale (px / line height): 12/1.5 mono meta · 13/1.5 caption · 15/1.55 small, nav, buttons · 17/1.6 body (16 under 700 px) · 20/1.45 lead and the deck · 20/1.3 labels (h3, tally names at 15) · 26–28/1.1 figures, tabular · clamp(28, 3.4vw, 40)/1.1 h2 · clamp(42, 5.6vw, 68)/1.04 h1 at 500 · clamp(40, 6.5vw, 76) the bracket statement. Body text never below 15 px; measure 56–66 characters.
+
+## Spacing and layout
+
+8-point scale: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128. Section padding 96 px desktop, 64 px tablet, 48 px phone. Content width 1120 px; reading column 38 rem. Side gutter 6% desktop, 24 px tablet, 16 px phone. Grid: 12 columns, 24 px gap.
+
+## Shape and depth
+
+Radius on the landing (2026-10-26): 2 px everywhere, buttons included, like a wire service's controls; the prototype's 20 px photo cards and pills stay for the app routes until WEB-UX-04 decides. Depth: hairlines, a 2 px ink rule on the evidence sheet, a 3 px double rule under the masthead; no shadows. No shadows; depth comes from `--paper-2` panels and hairlines. One exception: the sticky header gets a 1 px rule, not a shadow.
+
+## Motion
+
+Transitions 180 ms ease-out on colour and transform only. Entrance animations 500 ms, once, on the hero. One typewriter: a headline that rewrites itself letter by letter (about 40 ms per character, a 1.6 s hold per line) over real titles only, with the finished line always present in the DOM for readers and screen readers. Everything off under `prefers-reduced-motion: reduce`.
+
+## Components
+
+- **Primary button**: `--ink` background, white text, 2 px radius, 48 px tall (42 in the masthead), 15 px 500, no arrow, no lift. Hover `--umber-ink`; focus ring `--focus` at 3 px offset so it sits on the paper around the dark button; disabled 50% opacity, cursor default.
+- **Secondary button**: `--ink` text, 1 px `--ink` border, transparent background. Hover: `--paper-2` background.
+- **Quiet link**: `--ink` text, underline on hover in `--umber`.
+- **Kicker row**: a 1 px ink rule, the running head left in 12 px mono uppercase `--ink-2`, the section's committed source file right as a link (slug in lowercase). The hero's eyebrow is the same mono line without the rule.
+- **Trace row**: monospace 13 px, three columns (node · decision · reason), hairline below, `--paper-2` background for the block.
+- **Sheet** (the evidence card): `--paper`, 1 px `--rule` border with a 2 px ink top rule, 2 px radius, 24 px padding; figures at 28 px tabular, SQL behind a disclosure, then a Key: Value block in 12 px mono (Run, Window, Route, Datasource, Commit, File).
+- **Tally grid**: the registry as cells with 1 px seams (`gap: 1px` over `--rule`), name 15 px 500, count 26 px 500 tabular, a dash in `--ink-2` where the query matched nothing, a middle dot where the source has no feed (access level 3), id · kind · flank · tier in 12 px mono; six columns, four on tablets, two on phones. Split by the query each kind goes through: outlets and agencies against `documents`, official bodies and specialists against `official_docs`.
+- **Field**: the day's by-source tally set as 60–120 px letterforms, blurred (SVG `feGaussianBlur` 26) in `--umber` at .18 and `--ink-2` at .14, masked to fade before the headline column; shown at 1000 px and wider only, behind the hero's sheet and beside the final statement; `aria-hidden`, every text node an id–count pair of the evidence file (tested).
+- **Wire line**: the first row of the hero in 12 px mono: slug, edition and window, run time and commit.
+- **Input**: 48 px tall, 1 px `--rule` border, 4 px radius, label above, error in `--umber-ink` below, said in words.
+- **Header**: 72 px, brand left, links centre, primary button last, a 3 px double rule below (the masthead rule of a printed paper); collapses to brand + button under 1000 px.
+- **Footer**: hairline, brand, one line, links.
+
+## Icons and imagery
+
+No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 1.75, `--ink-2`. Photos only where the product shows them (topic cards, stories) and always with a credit; the landing uses no stock photography and no illustration. Diagrams are the product's own artifacts: trace rows, cohort grids, the graph.
+
+## Decisions
+
+| Date | Who | What | Why |
+| --- | --- | --- | --- |
+| 2026-10-26 | Anastasia / Claude Code; a design panel (four independent directions: wire service, Swiss poster, text as material, magazine spread; three judges: fidelity, craft and accessibility, honesty and feasibility; one completeness critic) scored "Wire desk" and "The Spread" equal first | Landing typography and composition as built: Schibsted Grotesk at 400/500/700, headlines at 500, square corners, no icons; the hero as a 12-column front page with a wire line, the sheet, the revisions typewriter ordered by `supersedes_id` with a `rev n · doc id` counter and a staircase for reduced motion; the field made of the blurred tally (behind the sheet and the final statement, ≥ 1000 px only, nothing in `--ink-2` under 18 px over it); the registry tally split by query with real gaps and access-level-3 marks; kicker rows with the section's source file; number · label · body rows; loop limits and the critic's word lists from tested copies of `reasoning.toml`; the graph line from a tested copy of ARCHITECTURE § 5. Taken from the losing directions: the magazine spread's file slugs and margin notes, the Swiss poster's underline hover, the material direction's finite word lists at 15 px. Rejected with the judges: page-number folios, outline type, forbidden words at poster size, gradient blobs, any label saying a source "reported" or "did not report", any photo. | Anastasia's second review (2026-10-26). The references (5pm.fr, peterjellitsch.com, the MOMAT and Dutch Design Week posters, the text-figure, the spread) share one grotesque, a huge jump between display and detail sizes, metadata at the corners and empty paper as the material; Reuters and AP add the discipline of few weights and small grey timestamps. The soft material cannot be a photo (none we may use), so it is the page's own data softened. |
+| 2026-10-26 | Anastasia / Claude Code | Palette without red: ink, paper, warm greys, one umber accent; primary button in ink; cohort colours leave the landing. Supersedes the crimson `--red` of the row below. | Anastasia's review of the first landing build: the red read as a mobile-carrier line; a newspaper's palette is strict and matches the direction. |
+| 2026-10-25 | Anastasia / Claude Code | This file holds the portal's tokens; the identity decision stays in DECISIONS.md item 9. Look taken from Yelysei's prototype canvas (white, rounded display, crimson accent, 20 px photo cards, pills, dark sign-up); flows from DECISIONS where the prototype is older than them. Light theme only for the hackathon. Structure borrowed from GreenTrace and Saphan (real artifact up front, numbered loop, sponsors by job, honest limits); their dark palette and typefaces are not. | One place for the values, so the landing, the forms and the brief pages stop drifting; the prototype is the team's agreed look and matches item 9; changing it would need a new DECISIONS row. |

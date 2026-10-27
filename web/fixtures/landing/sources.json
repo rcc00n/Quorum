@@ -1,0 +1,367 @@
+{
+ "source": "collectors/sources.csv",
+ "what": "the source registry's public columns (id, name, domain, kind, flank, tier, access_level_default) for the landing's typographic material; names only, no ratings, no feed URLs",
+ "count": 40,
+ "sources": [
+  {
+   "id": "ap",
+   "name": "Associated Press",
+   "domain": "apnews.com",
+   "kind": "agency",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 3
+  },
+  {
+   "id": "reuters",
+   "name": "Reuters",
+   "domain": "reuters.com",
+   "kind": "agency",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 2
+  },
+  {
+   "id": "afp",
+   "name": "Agence France-Presse",
+   "domain": "afp.com",
+   "kind": "agency",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 2
+  },
+  {
+   "id": "guardian",
+   "name": "The Guardian",
+   "domain": "theguardian.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "access_level_default": 1
+  },
+  {
+   "id": "nyt",
+   "name": "The New York Times",
+   "domain": "nytimes.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "access_level_default": 2
+  },
+  {
+   "id": "wapo",
+   "name": "The Washington Post",
+   "domain": "washingtonpost.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "access_level_default": 3
+  },
+  {
+   "id": "cnn",
+   "name": "CNN",
+   "domain": "cnn.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "access_level_default": 1
+  },
+  {
+   "id": "npr",
+   "name": "NPR",
+   "domain": "npr.org",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "major",
+   "access_level_default": 1
+  },
+  {
+   "id": "vox",
+   "name": "Vox",
+   "domain": "vox.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "mother-jones",
+   "name": "Mother Jones",
+   "domain": "motherjones.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "intercept",
+   "name": "The Intercept",
+   "domain": "theintercept.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "slate",
+   "name": "Slate",
+   "domain": "slate.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "daily-beast",
+   "name": "The Daily Beast",
+   "domain": "thedailybeast.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "new-republic",
+   "name": "The New Republic",
+   "domain": "newrepublic.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "nation",
+   "name": "The Nation",
+   "domain": "thenation.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "salon",
+   "name": "Salon",
+   "domain": "salon.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "common-dreams",
+   "name": "Common Dreams",
+   "domain": "commondreams.org",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "atlantic",
+   "name": "The Atlantic",
+   "domain": "theatlantic.com",
+   "kind": "outlet",
+   "flank": "left",
+   "tier": "minor",
+   "access_level_default": 2
+  },
+  {
+   "id": "fox-news",
+   "name": "Fox News",
+   "domain": "foxnews.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "major",
+   "access_level_default": 1
+  },
+  {
+   "id": "ny-post",
+   "name": "New York Post",
+   "domain": "nypost.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "major",
+   "access_level_default": 1
+  },
+  {
+   "id": "daily-wire",
+   "name": "The Daily Wire",
+   "domain": "dailywire.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "breitbart",
+   "name": "Breitbart",
+   "domain": "breitbart.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "washington-examiner",
+   "name": "Washington Examiner",
+   "domain": "washingtonexaminer.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "washington-times",
+   "name": "The Washington Times",
+   "domain": "washingtontimes.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 2
+  },
+  {
+   "id": "daily-caller",
+   "name": "The Daily Caller",
+   "domain": "dailycaller.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "newsmax",
+   "name": "Newsmax",
+   "domain": "newsmax.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 2
+  },
+  {
+   "id": "free-beacon",
+   "name": "The Washington Free Beacon",
+   "domain": "freebeacon.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "federalist",
+   "name": "The Federalist",
+   "domain": "thefederalist.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "blaze",
+   "name": "Blaze Media",
+   "domain": "theblaze.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "townhall",
+   "name": "Townhall",
+   "domain": "townhall.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "national-review",
+   "name": "National Review",
+   "domain": "nationalreview.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "daily-signal",
+   "name": "The Daily Signal",
+   "domain": "dailysignal.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "redstate",
+   "name": "RedState",
+   "domain": "redstate.com",
+   "kind": "outlet",
+   "flank": "right",
+   "tier": "minor",
+   "access_level_default": 1
+  },
+  {
+   "id": "wsj",
+   "name": "The Wall Street Journal",
+   "domain": "wsj.com",
+   "kind": "outlet",
+   "flank": "center",
+   "tier": null,
+   "access_level_default": 2
+  },
+  {
+   "id": "isw",
+   "name": "Institute for the Study of War",
+   "domain": "understandingwar.org",
+   "kind": "military",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 3
+  },
+  {
+   "id": "federal-register",
+   "name": "Federal Register",
+   "domain": "federalregister.gov",
+   "kind": "official",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 1
+  },
+  {
+   "id": "congress-gov",
+   "name": "Congress.gov",
+   "domain": "congress.gov",
+   "kind": "official",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 1
+  },
+  {
+   "id": "whitehouse",
+   "name": "The White House",
+   "domain": "whitehouse.gov",
+   "kind": "official",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 1
+  },
+  {
+   "id": "defense-gov",
+   "name": "U.S. Department of Defense",
+   "domain": "defense.gov",
+   "kind": "official",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 1
+  },
+  {
+   "id": "state-gov",
+   "name": "U.S. Department of State",
+   "domain": "state.gov",
+   "kind": "official",
+   "flank": null,
+   "tier": null,
+   "access_level_default": 1
+  }
+ ]
+}
