@@ -4,6 +4,14 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. The latest production milestone is below; older tables remain historical evidence.
 
+## Public demo reader — 27 October 2026 UTC
+
+WEB-PUBLIC-DEMO-01 DEPLOYED: `20261027-public-demo-r1`, source `c181296`, normal #101/#102.
+Repository About/Website links the site and a dedicated public non-staff reader. Its shared password,
+profile and four topic preferences are protected by server-side 403s; reading/login/logout work.
+All 15 existing accounts/preferences and installed editions are preserved; only the new public reader
+was added. [Exact release, CI, genuine browser, preservation and rollback precaution](reviews/2026-10-27-public-demo-release.md).
+
 ## Complete photo coverage — 27 October 2026 UTC
 
 WEB-MEDIA-02 DEPLOYED: `20261027-photo-coverage-r2`, source `0499866`, normal #93/#95/#94.
