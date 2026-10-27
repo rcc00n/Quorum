@@ -395,6 +395,9 @@ label {
 .edition-notes {
   border-top: 1px solid var(--rule);
 }
+.edition-notes > section {
+  margin-top: 28px; /* the digest sentence and the "Also today" head touched */
+}
 
 @media (max-width: 700px) {
   .sidebar {
