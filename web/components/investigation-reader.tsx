@@ -108,7 +108,7 @@ export function EventReading({ event, sources }: { event: Event; sources: Source
   if (storyReadable(event, sources)) return <Story event={event} sources={sources} />;
   return <div className="reader-opening"><p className="eyebrow">EVENT ANALYSIS / {event.date}</p><h1>{event.title}</h1>
     {event.reasoning?.needs_review && <ReviewLabel />}<p className="lede">{event.summary}</p>
-    {event.importance && <aside className="notice"><strong>{event.importance.label}</strong><p>{event.importance.explanation}</p></aside>}
+    {event.importance && <details className="reader-selection"><summary>Story selection<span aria-hidden="true">+</span></summary><strong>{event.importance.label}</strong><p>{event.importance.explanation}</p></details>}
     <LegacyClaims event={event} />
   </div>;
 }
