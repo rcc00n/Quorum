@@ -9,7 +9,7 @@ or 'release' (introduced / in committee), because an unpassed bill is a statemen
 from __future__ import annotations
 
 import logging
-from collectors.common import Fetcher, env, parse_dt, upsert_official_doc
+from collectors.common import Fetcher, claimed_by_older, env, parse_dt, upsert_official_doc
 
 log = logging.getLogger("collectors.congress")
 API = "https://api.congress.gov/v3"
@@ -60,7 +60,7 @@ def _discover(fetcher: Fetcher, topic: dict, key: str, *, pages: int = 4, page_s
     return found
 
 
-def collect(conn, fetcher: Fetcher, topic: dict) -> dict:
+def collect(conn, fetcher: Fetcher, topic: dict, *, older_topics: list[dict] | None = None) -> dict:
     key = env("CONGRESS_API_KEY")
     stats = {"seen": 0, "inserted": 0}
     if not key:
@@ -74,6 +74,9 @@ def collect(conn, fetcher: Fetcher, topic: dict) -> dict:
             continue
         bill = detail.json().get("bill", {})
         title = bill.get("title") or f"{btype.upper()}{number}"
+        if claimed_by_older(title, None, older_topics):
+            stats["older_topic"] = stats.get("older_topic", 0) + 1  # run.py --topic: an older topic owns it
+            continue
         latest = bill.get("latestAction", {})
         summary = ""
         summaries = fetcher.get(f"{base}/summaries", respect_robots=False, params={"api_key": key, "format": "json"})
