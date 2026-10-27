@@ -14,6 +14,7 @@ from .. import config, llm, untrusted
 from ..rules.confirmation import DOCUMENT_TYPES_THAT_ESTABLISH, is_thin, origin_group
 from ..state import Claim, DocRef, Evidence, RunState, StepError
 from ..text import best_passage, clip_sentences, containment, frequent_stems, keeps_full_stems, passage_window, tokens
+from ..tools import memory
 from ..tools.corpus import OFFICIAL_ID_OFFSET
 from ..tools.fetch_text import FetchResult, fetch_result, find_quote
 from ..trace import finish, step
@@ -266,7 +267,12 @@ def run(state: RunState) -> dict:
             for c in targets:
                 pool = [d for d in _candidates(state, e["document_ids"], round_no) if not (d["id"] == c["origin_document_id"] and not d.get("official")) and not already_seen(c, d, "researcher")]
                 # round 1 judges every document of the event; round 2 ranks the wider corpus and keeps the top candidates
-                candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"])
+                candidates = pool if round_no <= 1 else rank_candidates(c["text"], pool, dry_run=state["dry_run"], cap=0 if memory.enabled(state) else None)
+                if round_no > 1 and memory.enabled(state):
+                    candidates, memory_steps, memory_errors = memory.prioritize(state | {"steps": state.get("steps", []) + steps}, e["id"], c["text"], candidates)
+                    steps.extend(memory_steps); errors.extend(memory_errors)
+                    cap = int(config.get("research", "candidates_per_claim", 0) or 0)
+                    if cap > 0: candidates = candidates[:cap]
                 for d in candidates:
                     fetched = fetch_result(d, dry_run=state["dry_run"])
                     before, passage, after = stance_window(c["text"], fetched)

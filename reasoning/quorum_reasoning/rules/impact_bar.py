@@ -62,14 +62,16 @@ def confirmation_points(independent_groups: int, has_document: bool) -> int:
     return 0
 
 
+# DECISION(2026-10-26, Yelysei; committed by Anastasia/Claude Code on his hand-over, Issue #2 6430304098): the bar is 4 of 9
+# with confirmation >= 1 and the cap of 10 unchanged; it was 6 until 2026-10-26. Why: on 26 Oct 1 of 50 events crossed 6.
 def crosses_bar(rubric: Rubric) -> bool:
-    return rubric["total"] >= config.get("impact_bar", "threshold", 6) and rubric["confirmation"] >= config.get(
+    return rubric["total"] >= threshold() and rubric["confirmation"] >= config.get(
         "impact_bar", "confirmation_min", 1
     )
 
 
 def threshold() -> int:
-    return int(config.get("impact_bar", "threshold", 6))
+    return int(config.get("impact_bar", "threshold", 4))
 
 
 def judged_points(rubric: Rubric) -> int:

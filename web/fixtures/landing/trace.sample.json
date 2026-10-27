@@ -1,0 +1,125 @@
+{
+  "source": "docs/examples/snapshot.sample.json",
+  "what": "a subset of the trace rows of the committed dry-run sample; fictional content, real shape; shown on the landing only with a visible fictional label until a canonical run's public-safe excerpt replaces it",
+  "fictional": true,
+  "schema_version": "1.0",
+  "rows": [
+    {
+      "node": "plan",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "14 documents from 12 sources, 3 official; research budget 2 rounds per event",
+      "reason": "corpus: fixture, edition window ending 05:30 America/New_York; model: stand-ins (dry run); every event gets the same budget",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "cluster",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "4 events from 14 documents; 7 key merges in code, model: 6 pair / 1 singleton / 2 chain questions, 3 merged, 0 split, 0 kept unconfirmed",
+      "reason": "event keys from the fast lane; code buckets by stemmed key overlap; the model answers only the in-between",
+      "model": "stand-ins",
+      "duration_ms": 1
+    },
+    {
+      "node": "score_importance",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "legal_force 2, reach 2, irreversibility 2 (confirmation pending)",
+      "reason": "legal_force: adopted_or_ruled: an adopted document is in the corpus; reach: national scope in the headlines; irreversibility: executed_irreversible: completed or signed act",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "extract_claims",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "10 claims extracted",
+      "reason": "from 7 documents; level-2 sources contribute leads only, level-3 nothing",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "research",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "round 1: 28 passages with a stance for 10 claims; 14 passages below relevance",
+      "reason": "event documents only; topic-frequent exclusion off (14 documents)",
+      "model": "stand-ins",
+      "duration_ms": 5
+    },
+    {
+      "node": "verify",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "7 confirmed, 0 disputed, 3 unverified; 3 thin",
+      "reason": "thin claims and 1 research round(s) left: back to research",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "research",
+      "iteration": 2,
+      "event_id": "84b6dd5f95fe",
+      "decision": "round 2: 0 passages with a stance for 3 claims; 5 passages below relevance",
+      "reason": "widened to the rest of the day, official documents and 0 earlier-day documents for thin claims; topic-frequent exclusion off (14 documents)",
+      "model": "stand-ins",
+      "duration_ms": 1
+    },
+    {
+      "node": "fact_check",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "6 confirmed, 0 disputed, 4 unverified from 19 own passages; 21 passages below relevance",
+      "reason": "blind: own passages and own stance calls, nothing from the researcher or the verifier; topic-frequent exclusion off (14 documents)",
+      "model": "stand-ins",
+      "duration_ms": 11
+    },
+    {
+      "node": "adjudicate",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "6 confirmed, 1 disputed, 3 unverified; 1 disagreement(s); rubric total 8 (confirmation 2)",
+      "reason": "above the bar; 1 disagreement(s) go to the third blind reviewer",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "write",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "draft 1: 7 blocks from 6 confirmed, 4 statements, 0 open",
+      "reason": "first draft",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "critique",
+      "iteration": 1,
+      "event_id": "84b6dd5f95fe",
+      "decision": "draft 1 rejected: 1 violation(s)",
+      "reason": "standfirst: forbidden wording 'sweeping'; back to the writer",
+      "model": null,
+      "duration_ms": 0
+    },
+    {
+      "node": "roundup",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "2 events in 2 group(s); empty day: False",
+      "reason": "everything below the bar, ordered by rubric total; lines from the model, labels from code",
+      "model": "stand-ins",
+      "duration_ms": 0
+    },
+    {
+      "node": "publish",
+      "iteration": 1,
+      "event_id": null,
+      "decision": "snapshot ok: 2 stories, roundup of 2",
+      "reason": "built from state; the store versions it",
+      "model": "stand-ins",
+      "duration_ms": 0
+    }
+  ]
+}

@@ -468,6 +468,10 @@ export function ReasoningPreviewPage({
                         {e.reasoning?.reading_minutes} min read ·{" "}
                         {e.reasoning?.claims.length} supplied claims
                         {e.reasoning?.needs_review ? " · needs review" : ""}
+                        {" · "}
+                        <Link href={`/events/${encodeURIComponent(e.id)}?date=${run.edition_date}&preview=1`}>
+                          Read it as a story
+                        </Link>
                       </p>
                     </article>
                   ))}

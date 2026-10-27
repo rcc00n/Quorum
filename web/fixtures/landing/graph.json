@@ -1,0 +1,38 @@
+{
+ "source": "docs/ARCHITECTURE.md § 5 The graph",
+ "what": "the graph's node names in run order and its three loops; checked against the architecture document by web/tests/landing.cjs",
+ "nodes": [
+  "plan",
+  "cluster",
+  "score_importance",
+  "extract_claims",
+  "research",
+  "verify",
+  "fact_check",
+  "adjudicate",
+  "review_disputed",
+  "escalate",
+  "frame",
+  "write",
+  "critique",
+  "roundup",
+  "publish"
+ ],
+ "loops": [
+  {
+   "from": "verify",
+   "to": "research",
+   "limit_key": "research_rounds_max"
+  },
+  {
+   "from": "adjudicate",
+   "to": "review_disputed",
+   "limit_key": "review_disputed_max"
+  },
+  {
+   "from": "critique",
+   "to": "write",
+   "limit_key": "drafts_max"
+  }
+ ]
+}

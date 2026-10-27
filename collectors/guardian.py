@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 
-from collectors.common import Doc, Fetcher, env, extract_text, parse_dt, upsert_document, topic_match_of
+from collectors.common import Doc, Fetcher, claimed_by_older, env, extract_text, parse_dt, upsert_document, topic_match_of
 
 log = logging.getLogger("collectors.guardian")
 API = "https://content.guardianapis.com/search"
@@ -14,7 +14,7 @@ API = "https://content.guardianapis.com/search"
 
 # DECISION(2026-10-22, Anastasia/Claude): one page of 50, US-facing sections only. Why: the corpus is US-centred;
 # two pages of Guardian outweighed every US outlet combined in the first live run (100 vs 2–3 each).
-def collect(conn, fetcher: Fetcher, topic: dict, *, pages: int = 1) -> dict:
+def collect(conn, fetcher: Fetcher, topic: dict, *, pages: int = 1, older_topics: list[dict] | None = None) -> dict:
     key = env("GUARDIAN_API_KEY")
     stats = {"seen": 0, "inserted": 0}
     if not key:
@@ -34,6 +34,9 @@ def collect(conn, fetcher: Fetcher, topic: dict, *, pages: int = 1) -> dict:
         for item in payload.get("results", []):
             stats["seen"] += 1
             fields = item.get("fields", {})
+            if claimed_by_older(item["webTitle"], fields.get("trailText"), older_topics):
+                stats["older_topic"] = stats.get("older_topic", 0) + 1  # run.py --topic: an older topic owns it
+                continue
             # DECISION(2026-10-24, Anastasia/Claude Code): the hash body is extract_text() of the article PAGE, fetched
             # like every other level-1 source, not the API's bodyText. Why: fetch_text() hashes extract_text(page), so
             # with the API text every Guardian row compared as "changed" (hash_mismatch on reasoning's first live run).

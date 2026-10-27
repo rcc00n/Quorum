@@ -24,12 +24,22 @@ export type EditionPresentation = {
   completion: "complete" | "partial";
   quiet_day: boolean;
   summary: string;
+  // Supplied by the login-only reader for installed reasoning editions; absent on the proposal store.
+  provisional?: boolean;
+  corpus_as_of_utc?: string | null;
+  edition_window_utc?: [string, string];
+  closed_edition?: boolean;
+  warnings?: string[];
+  missing_provenance?: string[];
   roundup: {
     name: string;
     items: {
       event_id: string | null;
       text: string;
       status: "attributed" | "disputed" | "unknown" | "established";
+      label?: string;
+      line_source?: string | null;
+      needs_review?: boolean | null;
       sources: { title: string; url: string }[];
     }[];
   }[];

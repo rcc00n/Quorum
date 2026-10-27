@@ -24,7 +24,12 @@ DJANGO_CSRF_ORIGINS=https://quorum.raccncode.com
 QUORUM_PORTAL_DATA=/var/lib/quorum
 QUORUM_STATIC_ROOT=/opt/quorum/static
 QUORUM_CATALOG_PATH=/etc/quorum/catalog.json
+# Optional, the judges' reader of installed reasoning editions (backend/README.md › Control and checks):
+# QUORUM_ENABLE_REASONING_READER=1
+# QUORUM_REASONING_EDITIONS_ROOT=/var/lib/quorum/editions
 ```
+
+The two reader variables are optional and outside `upgrade-release.py`'s publication checks: the proposal store and `QUORUM_ENABLE_SNAPSHOT_PUBLICATION` stay off. To show real editions to signed-in readers, create the editions directory (mode 0700, owned by the service user), set both variables, restart `quorum-api`, and install each accepted edition from the release's venv with `manage.py reasoning_snapshot … --install --producer-config <reasoning.toml of the producer commit>` (a release tarball has no `.git`, so the producer's config is hashed from that file; its sha256 must match the sidecar); or run `--install` on a full clone after `git fetch origin` and copy `<root>/<topic>/<date>/` to the VPS editions directory (directories 0700, files 0600, owned by the service user). Anonymous visitors see nothing new.
 
 Install `backend/requirements.txt` in the isolated venv, load the private environment without printing it, then run `manage.py migrate`, `check --deploy`, `collectstatic --noinput`, and optionally `createsuperuser` interactively. Source/migrations create no default administrator. The authorized production account provisioning is recorded in [status](STATUS.md#account-and-email-follow-up). Keep auth database backups private and take one before every subsequent migration. Stop only Quorum API briefly for a consistent SQLite copy, or use SQLite's backup API.
 
@@ -45,6 +50,12 @@ Rollback: stop only Quorum services, restore the previous release symlink and ba
 The first-install commands are captured in `install-release.sh`. It refuses occupied ports, existing Quorum releases/units and any vhost other than the exact isolated bootstrap. Run only after uploading the release, provisioning the dedicated user/venv/private environment, and obtaining the certificate. Updates require database backup and an explicit release switch; the first-install script intentionally refuses to guess.
 
 ## Decisions
+
+2026-10-26 · rcc00n / Codex · Guarded-upgrade Django tests use a private system temporary directory outside `/var/lib/quorum`, an independent secret and disabled external reader/preview/publication roots. Why: the target-host run correctly rejected preview requests when its test auth directory lived under production data; isolate tests instead of relaxing the preview guard or reading installed production editions.
+
+2026-10-26 · rcc00n / Codex · Hosted portal CI uses Ubuntu 24.04's preinstalled Google Chrome through the existing executable override; absence fails the job, and all authenticated suites still run. Why: repeated Playwright OS/font installation stalls on the Ubuntu package mirror prevented tests from starting. Official support: https://playwright.dev/docs/browsers and https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md. This changes tooling acquisition, not test expectations.
+
+2026-10-26 · rcc00n / Codex · Teammate SSH keys require exact SHA256 verification and additive atomic installation with a private backup; `install-ssh-key.py` targets an existing dedicated account by default and grants no sudo itself. Why: a fingerprint cannot authenticate a user, and provisioning must preserve the owner's existing access. Actual login must be confirmed from the teammate's private-key holder.
 
 2026-10-24 · rcc00n / Codex · Package only a clean commit and a successful source-bound external build receipt; export tracked portal/deploy files and reject private runtime paths. Why: stale builds must not inherit a newer revision label, and untracked local data must never enter a release archive. `QUORUM_WEB_BUILD` selects the reviewed build; older builds without `.quorum-build.json` require rebuilding. This adds no deployment authority.
 

@@ -2,6 +2,22 @@
 
 Owner: Vadim. Shared release tracker: [Issue #2](https://github.com/rcc00n/Quorum/issues/2). This is the canonical web technical release gate; [implementation inventory](IMPLEMENTATION_STATUS.md) records individual capabilities. Check boxes only for a particular release with its commit, environment, test outcome and rollback revision; a previous release's pass does not approve a new release.
 
+## Production acceptance — 27 October 2026 UTC
+
+These checks apply only to `20261027-live-r3` / `63418421c1c0909dc0d7dfa1b451da3eed1bcc76`.
+Earlier checklists below remain historical. [Full evidence and limitations](../deploy/LIVE_RELEASE.md).
+
+- [x] Current master/tracker/contracts and all owner reviews rechecked; dependency order and decision history preserved.
+- [x] Source and final integration CI green, build/typecheck, target-host Django, focused release/security tests and source/artifact-bound package verified.
+- [x] Existing VPS preflight, private consistent backups, exact original/sidecar/config hashes, quorum-owned 0700/0600 installed edition checked.
+- [x] Guarded Quorum-only cutover; actual previous-code/static rollback and reapply; auth preserved without DB restoration; all 24 unrelated containers unchanged.
+- [x] Public HTTPS judge login/logout, restricted anonymous/staff/CSRF boundaries, genuine feed/story/roundup/evidence/reviewer/174 trace, four ratings and three widths pass with no page errors.
+- [x] All eight previously issued credentials authenticate with expected roles; all nine pre-existing users/preferences preserved; ordinary judge added through Django, password private.
+- [x] Both services restarted; existing judge session, four preferences and exact edition/feed persist; final external HTTPS and service health checked.
+- [x] Reader enabled, proposal publisher disabled, historical v4 not installed, provisional/editorial review/freshness limits preserved.
+- [ ] Receive/accept/install genuine 27-Oct editions from owners, including Nightshift route and live H-MEM recall evidence.
+- [ ] Independently close source-text/provider/sponsor certification and human hackathon submission/workspace/rights gates.
+
 ## Current proposal review
 
 Historical gates below refer to their pinned milestone in [PORTAL_VERIFICATION.md](PORTAL_VERIFICATION.md) and PR #1; latest results are in its current compatibility section. No deployment is approved by these local checks; production/contract gates remain open.
@@ -35,6 +51,7 @@ Historical gates below refer to their pinned milestone in [PORTAL_VERIFICATION.m
 - [ ] Agreed versioned contract and narrowly scoped transport/auth; genuine securely published result displayed on the portal with provenance/revision and failure handling (all).
 - [ ] Repeatable real end-to-end demo and auditable public-safe trace; fixture tests are separately labelled (all).
 - [ ] Confirm Track 03 workspace selection and organizer-rule evidence, including unresolved human-reported Cursor update (all).
+- [ ] Judges' reader on the VPS: `QUORUM_ENABLE_REASONING_READER=1` and `QUORUM_REASONING_EDITIONS_ROOT` in `/etc/quorum/portal.env`, each 27 October edition installed with `reasoning_snapshot … --install` after acceptance, checked signed-in on the site (Anastasia, covering Vadim's items).
 - [ ] Final 1–4 minute video, slides, source/setup/usage/dependencies, sponsor-use explanation and verified submission before 2026-10-27 23:45 UTC (all).
 
 ## Rollback
