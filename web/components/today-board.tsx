@@ -187,7 +187,12 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
                     : "No edition for this topic on this date"
                   : passed
                     ? "Waiting for the edition"
-                    : `Cut in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
+                    // DECISION(2026-10-27, Anastasia/Claude Code): the countdown names the data cutoff ("Data cutoff in
+                    // 3 hours"), never a bare "Cut in", and the waiting card says it is not a publication time. Why:
+                    // Vadim read "Cut in 3 hours" as a promise that the edition appears then (Issue #2, comment
+                    // 6436182315); the number is ceil(hours until 05:30 New York), the end of data collection; the
+                    // run, the dump and the installation follow on the team's machines, with no time this page can know.
+                    : `Data cutoff in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
         return (
           <section key={t.id} className={`tb-section tb-tint-${(i % 4) + 1}`} aria-labelledby={`tb-${t.id}`}>
             <div className="tb-section-head">
@@ -227,7 +232,11 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
                     {/* DECISION(2026-10-26, Anastasia/Claude Code): on a past date a topic without an edition says so; the cut
                         promise ("the team prepares the edition after the cut") is for today only. Why: once other topics
                         of that day are installed, "waiting" would be false for the missing one. */}
-                    <p>{isPast ? `Nothing was installed for ${t.name} on ${longDate(day)}.` : `Edition cut 05:30 New York, ${utcLabel(cut)}${passed ? "" : `, in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}. The team prepares the edition after the cut.`}</p>
+                    <p>
+                      {isPast
+                        ? `Nothing was installed for ${t.name} on ${longDate(day)}.`
+                        : `Data cutoff 05:30 New York, ${utcLabel(cut)}${passed ? "" : `, in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`}. A cutoff, not a publication time: the team runs the processing afterwards and installs the edition when it is ready.`}
+                    </p>
                   </div>
                 </li>
               )}
