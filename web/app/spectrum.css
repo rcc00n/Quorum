@@ -59,6 +59,7 @@
 @keyframes sp-point-in { from { opacity: 0; scale: .2; } to { opacity: 1; scale: 1; } }
 @keyframes sp-reading-in { from { opacity: .3; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
 @media (max-width: 700px) {
+  .spectrum-modern .section-heading { align-items: flex-start; }
   .sp-caption { flex-direction: column; gap: 5px; }
   .sp-stage { padding-left: 46px; padding-right: 22px; }
   .sp-chart { height: 260px; }
