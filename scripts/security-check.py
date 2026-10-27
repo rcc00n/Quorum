@@ -151,6 +151,22 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, Anastasia/Claude Code): permit only these 8 inspected review captures of the AI headline notice
+# (anastasia/web-ux-ai-notice): Home and a story page before and after, desktop and phone, on the FICTIONAL 22 October
+# preview sample under a DEMO reader served by Playwright routes; no real edition, no credential. Why: Vadim's gate for
+# review PNGs (his f3e121e pattern); arbitrary binaries stay excluded.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-web-ai-notice/home-after-desktop.png': '874245e4f220aac95655724870f205c75efc5ce5063007f64c7f44e9792aa766',
+    'docs/reviews/2026-10-27-web-ai-notice/home-after-phone.png': 'b366cc495b2cc9626e855d9f241bf129b0723fa7e353a9f48e04a01f5265f0c3',
+    'docs/reviews/2026-10-27-web-ai-notice/home-before-desktop.png': 'ee64697ebf0b8f99c8ce20b3afbb9f6b8c9403160247c113bac85a1f32b3ee4e',
+    'docs/reviews/2026-10-27-web-ai-notice/home-before-phone.png': '51e384c753628d32a37899edac239f4f74c507033428c2ad3747906f85a4a279',
+    'docs/reviews/2026-10-27-web-ai-notice/story-after-desktop.png': '54afe3ae5ebfde87f705a91580f258d1f53b66be41d828c4b060905a7022ada3',
+    'docs/reviews/2026-10-27-web-ai-notice/story-after-phone.png': 'bdef6d7baed222e4e8e7a0b048aeadaec00da28f607fa2cea4b4087fae296c83',
+    'docs/reviews/2026-10-27-web-ai-notice/story-before-desktop.png': 'a38187a486ca2501a17654e704525b769eb05153b280cd4421f3eb607796cfcd',
+    'docs/reviews/2026-10-27-web-ai-notice/story-before-phone.png': '53b702bfa3c0a9377d580fe1e1bae5c52e89601a044aa5cedcc144343ce46e68',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])
