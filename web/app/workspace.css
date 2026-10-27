@@ -252,9 +252,10 @@ summary:focus-visible {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-/* The 404 page's button: `.empty a` above outranks `.button`, which left ink text on the ink button. */
+/* The 404 page's button: `.empty a` above outranks `.button`, which left ink text on the ink button. On the
+   gate surface the button follows the gate's theme (paper on ink by day, ink on paper on the dark switch). */
 .empty a.button {
-  color: #fff;
+  color: var(--g-btn-fg, #fff);
   text-decoration: none;
 }
 .brief-aside {
