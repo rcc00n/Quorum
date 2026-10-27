@@ -1,0 +1,78 @@
+/* Source geometry remains the agreed rating × logarithmic audience plane. Depth is presentation only. */
+.spectrum-modern { --sp-left: var(--cohort-left); --sp-right: var(--cohort-right); }
+.spectrum-modern .section-heading { align-items: end; gap: 24px; }
+.spectrum-modern .section-heading :is(h1, h2) { font-size: clamp(28px, 4vw, 40px); letter-spacing: -.04em; }
+.spectrum-modern .inline-label { font-size: 12px; color: var(--ink-2); }
+.spectrum-modern .inline-label select { min-height: 42px; border-radius: 4px; background: var(--paper); padding: 8px 12px; }
+.spectrum-instrument { margin: 28px 0 36px; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.sp-caption { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-top: 18px; font-size: 13px; }
+.sp-caption > :first-child { font-weight: 500; }
+.sp-caption > :last-child { font-size: 12px; color: var(--ink-2); }
+.sp-instruction { font-size: 12px; color: var(--ink-2); margin: 8px 0 0; }
+.sp-stage { position: relative; margin: 30px 0 32px; padding: 26px 26px 48px 65px; transform: perspective(1100px) rotateX(var(--sp-rx, 0deg)) rotateY(var(--sp-ry, 0deg)); transform-origin: center; transition: transform 250ms ease-out; }
+.sp-chart { position: relative; height: 280px; isolation: isolate; }
+.sp-grid { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.sp-grid line { vector-effect: non-scaling-stroke; stroke: var(--rule); stroke-width: 1; }
+.sp-grid .sp-boundary { stroke-dasharray: 3 5; opacity: .7; }
+.sp-zone-left { fill: var(--sp-left); opacity: .045; }
+.sp-zone-right { fill: var(--sp-right); opacity: .045; }
+.sp-grid .sp-crosshair line { stroke: var(--ink-2); stroke-dasharray: 3 4; opacity: .65; }
+.sp-y-label { position: absolute; top: -8px; left: 0; font-size: 11px; color: var(--ink-2); }
+.sp-y-tick { position: absolute; right: calc(100% + 13px); transform: translateY(-50%); font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.sp-x-labels { display: flex; justify-content: space-between; position: absolute; inset: calc(100% + 26px) 0 auto; font-size: 12px; white-space: nowrap; }
+.sp-x-labels span:nth-child(2) { position: absolute; left: 50%; transform: translateX(-50%); }
+.sp-point { --sp-color: var(--ink-2); position: absolute; z-index: 1; width: 44px; height: 44px; padding: 0; min-height: 0; border: 0; border-radius: 50%; background: transparent; transform: translate(-50%, -50%); cursor: pointer; transition: left 550ms cubic-bezier(.22, 1, .36, 1), top 550ms cubic-bezier(.22, 1, .36, 1); }
+.sp-point-left { --sp-color: var(--sp-left); }
+.sp-point-right { --sp-color: var(--sp-right); }
+.sp-point-core { position: absolute; inset: 17px; border-radius: 50%; background: var(--sp-color); box-shadow: 0 2px 5px #14141422; transition: transform 180ms, box-shadow 180ms; }
+.sp-point-halo { position: absolute; inset: 6px; border: 1px solid var(--sp-color); border-radius: 50%; opacity: 0; transform: scale(.6); transition: opacity 200ms, transform 250ms; }
+.sp-point[aria-pressed="true"] { z-index: 3; }
+.sp-point[aria-pressed="true"] .sp-point-core, .sp-point:hover .sp-point-core { transform: scale(1.45); box-shadow: 0 3px 10px #14141433; }
+.sp-point[aria-pressed="true"] .sp-point-halo { opacity: .45; transform: scale(1); }
+.sp-point:focus-visible { outline: 2px solid var(--ink); outline-offset: 0; }
+.sp-floor { position: absolute; bottom: 26px; left: 65px; right: 26px; height: 22px; transform: perspective(200px) rotateX(65deg); transform-origin: top; border-bottom: 1px solid var(--rule); background: repeating-linear-gradient(90deg, transparent 0, transparent calc(25% - 1px), var(--rule) calc(25% - 1px), var(--rule) 25%); opacity: .35; pointer-events: none; }
+.sp-inspector { display: grid; grid-template-columns: minmax(180px, 1fr) 1fr; gap: 28px; padding: 24px 0; border-top: 1px solid var(--rule); }
+.sp-label { display: block; color: var(--ink-2); font-size: 11px; margin-bottom: 8px; }
+.sp-source-heading h3 { font-size: 24px; margin: 0 0 5px; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.sp-source-domain { font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.sp-reading { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; animation: sp-reading-in 220ms ease-out; }
+.sp-reading > div { display: flex; flex-direction: column; align-items: start; }
+.sp-reading strong { font-size: 30px; line-height: 1.2; letter-spacing: -.04em; font-weight: 500; }
+.sp-reading > div > span:not(.sp-label), .sp-reading a { font-size: 11px; margin-top: 5px; }
+.sp-reading a { color: var(--ink); text-underline-offset: 3px; }
+.sp-reading .sp-value-left { color: var(--sp-left); }
+.sp-reading .sp-value-right { color: var(--sp-right); }
+.sp-footnote { font-size: 11px; color: var(--ink-2); margin: 0 0 20px; max-width: 650px; }
+.sp-empty { padding: 48px 0; }
+.sp-empty strong { font-size: 24px; font-weight: 500; }
+.sp-empty p { font-size: 13px; max-width: 480px; margin: 10px 0 0; }
+.spectrum-modern .source-row { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(70px, 1.1fr) 105px; gap: 10px 24px; padding: 14px 0; margin: 0; border-bottom: 1px solid var(--rule); font-size: 12px; }
+.sp-source-button { border: 0; border-radius: 0; padding: 0; min-height: 44px; font: inherit; text-align: left; background: none; color: var(--ink); cursor: pointer; overflow-wrap: anywhere; }
+.sp-source-button[aria-pressed="true"] { text-decoration: underline; text-underline-offset: 5px; }
+.spectrum-modern .source-score { grid-column: 3; text-align: right; white-space: nowrap; }
+.spectrum-modern .rating-provenance { grid-column: 1 / -1; margin: 0; }
+.spectrum-modern .rating-provenance summary { font-size: 11px; min-height: 32px; }
+.spectrum-modern .rating-provenance p { font-size: 12px; }
+.spectrum-modern .spectrum-track { width: 100%; }
+.spectrum-modern .spectrum-track > span { transition: left 550ms cubic-bezier(.22, 1, .36, 1); background: var(--ink-2); }
+.spectrum-instrument[data-entered="true"] .sp-point-core { animation: sp-point-in 550ms cubic-bezier(.22, 1, .36, 1) both; animation-delay: var(--sp-delay); }
+@keyframes sp-point-in { from { opacity: 0; scale: .2; } to { opacity: 1; scale: 1; } }
+@keyframes sp-reading-in { from { opacity: .3; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
+@media (max-width: 700px) {
+  .sp-caption { flex-direction: column; gap: 5px; }
+  .sp-stage { padding-left: 46px; padding-right: 22px; }
+  .sp-chart { height: 260px; }
+  .sp-floor { left: 46px; right: 22px; }
+  .sp-y-tick { font-size: 10px; right: calc(100% + 8px); }
+  .sp-x-labels { font-size: 11px; }
+  .sp-inspector { grid-template-columns: 1fr; gap: 20px; }
+  .sp-source-heading h3 { font-size: 26px; }
+  .spectrum-modern .source-row { grid-template-columns: minmax(100px, 1fr) minmax(40px, .65fr) 90px; gap: 8px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-stage { transform: none !important; transition: none; }
+  .sp-point, .sp-point-core, .sp-point-halo, .sp-reading, .spectrum-modern .spectrum-track > span { animation: none !important; transition: none !important; }
+  .sp-floor { display: none; }
+}
+
+.spectrum-standalone { margin-top: 8px; border-top: 0; padding-top: 0; }
