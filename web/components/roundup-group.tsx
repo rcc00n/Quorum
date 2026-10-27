@@ -19,7 +19,8 @@ export function RoundupGroup({ name, children, limit = 3 }: { name: string; chil
   const unseen = items.length - (limit - 1);
   return (
     <div className="roundup-group" data-collapsed={collapsed ? "true" : undefined}>
-      <h4>{name}</h4>
+      {/* h5 under the topic's h4 in Home's single "Also today" section (2026-10-27). */}
+      <h5>{name}</h5>
       {items.map((item, i) =>
         collapsed && i >= limit ? cloneElement(item, { hidden: true }) : collapsed && i === limit - 1 ? cloneElement(item, { inert: true }) : item,
       )}
