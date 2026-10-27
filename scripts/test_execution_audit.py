@@ -90,8 +90,17 @@ class ExecutionAuditTests(unittest.TestCase):
             with self.assertRaises(audit.AuditError):audit.checked_inputs(root,[entry | {'path':'../TEST.json'}])
             p.write_bytes(b'[]')
             with self.assertRaises(audit.AuditError):audit.checked_inputs(root,[entry])
-            link=root/'LINK.json';link.symlink_to(p)
-            with self.assertRaises(audit.AuditError):audit.checked_inputs(root,[entry | {'path':link.name}])
+
+    def test_receipts_reject_linked_inputs_when_symlinks_are_available(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);p=root/'TEST.json';p.write_bytes(b'{}')
+            entry=dict(path='LINK.json',size_bytes=2,sha256=audit.digest(b'{}'))
+            link=root/entry['path']
+            try:
+                link.symlink_to(p)
+            except OSError:
+                self.skipTest('Symlink creation is unavailable without Windows privilege')
+            with self.assertRaises(audit.AuditError):audit.checked_inputs(root,[entry])
 
     def test_cli_refuses_existing_reports_and_never_prints_input_values(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -120,7 +129,7 @@ class ExecutionAuditTests(unittest.TestCase):
                 (root/f'2026-10-24-closed-v{version}.snapshot.json').write_text(json.dumps(snap))
             for attempt in (5,6,7):
                 data=log(restored=len(rows[attempt])-1).decode().replace('war-5:',f'war-{attempt}:')
-                (root/f'live_2026-10-24_attempt{attempt}.log').write_text(data)
+                (root/f'live_2026-10-24_attempt{attempt}.log').write_text(data, encoding='utf-8')
             def receipts():
                 return [dict(path=p.name,size_bytes=p.stat().st_size,sha256=audit.digest(p.read_bytes())) for p in root.iterdir()]
             report=audit.audit_bundle(root,receipts())
