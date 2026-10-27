@@ -1617,9 +1617,12 @@ def argv_holders(value):
                            capture_output=True, text=True, timeout=120)
         return p.stdout.strip() if p.returncode == 0 else f"scan failed: {p.returncode}"
     hits = []
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): /proc/<pid>/cmdline separates arguments with NUL, not spaces;
+    # compare against the space-joined line as Windows' CommandLine shows it. Why: the multi-word control value never
+    # matched on Linux CI (PR #29, combined-python at d57bd6f), while the one-token key value did.
     for f in Path("/proc").glob("[0-9]*/cmdline"):
         try:
-            if value.encode() in f.read_bytes():
+            if value.encode() in f.read_bytes().replace(b"\0", b" "):
                 hits.append(f.parent.name)
         except OSError:
             pass
