@@ -179,6 +179,8 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
   if (reasoningMode) {
     if (process.argv.includes("--roundup-checks")) {
       await require("./roundup-checks.cjs")({ browser, root, env, password });
+      // The board's "Also today" fold on a five-row TEST group (Anastasia's cabinet pass, PR #62).
+      await require("./fold-checks.cjs")({ browser, root, env, password });
       return;
     }
     if (process.argv.includes("--catalog")) {
