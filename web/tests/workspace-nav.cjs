@@ -5,6 +5,7 @@ new Function('exports',ts.transpileModule(fs.readFileSync(path.join(__dirname,'.
 assert.equal(m.workspaceItems(null,'2026-10-26').length,4);
 const data={topics:[{id:'topic/one',name:'Café policy'}],events:[{id:'event/one',title:'DEMO exact title',date:'2026-10-26',reasoning:{needs_review:true}}]};
 const items=m.workspaceItems(data,'2026-10-25','event/one','revision & 1');
+assert.equal(items.find(x=>x.id==='history').href,'/history?date=2026-10-26');
 assert.equal(items.find(x=>x.id==='topic:topic/one').href,'/topics/topic%2Fone?date=2026-10-25');
 assert.equal(items.find(x=>x.id==='view:map').href,'/events/event%2Fone?date=2026-10-26&revision=revision%20%26%201#reader-map');
 assert.equal(items.find(x=>x.id==='event:event/one').needsReview,true);

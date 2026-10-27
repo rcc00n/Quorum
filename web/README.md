@@ -35,6 +35,8 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · Edition controls share `EditionNavigation` and UTC calendar arithmetic; route search parameters own the selected day/topic, through normal Next navigation. Sign-in return validation is restricted to local workspace routes. Why: restore refresh/Back/Forward and shared-story continuity found in the production audit, without new APIs or dependencies; canonical behavior is docs/DECISIONS.md › Edition navigation continuity. Existing typography, cards and motion remain; narrow controls reuse identity tokens and 44 px targets. Browser regression: `tests/edition-navigation-checks.cjs` runs through the real isolated HTTP boundary; pure calendar/redirect guards: `node web/tests/edition-navigation.cjs`.
+
 2026-10-27 · rcc00n / Codex · The readable article appendix reuses ImpactAssessment in place of the former raw importance paragraph, preserving its position and all producer fields; article text/source marks stay untouched. Why: consistent readable emphasis, within Anastasia’s scope agreement in Issue #2 comment6434849474; look approval remains a merge condition.
 
 2026-10-27 · rcc00n / Codex · The hero evidence sheet retains its exact fixture counts/date/context and existing hero/type composition, with count breakdowns, SQL and full route/source provenance under one native disclosure. Why: Vadim requested emphasis without clutter; Anastasia approved the scope in Issue #2 and requires before/after look review before merge. No fixture, source URL or sponsor-route wording changes.

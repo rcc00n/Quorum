@@ -172,6 +172,10 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     await require('./installed-edition-checks.cjs')({browser, root, password, temp, build});
     return;
   }
+  if (!reasoningMode && process.argv.includes("--edition-navigation")) {
+    await require('./edition-navigation-checks.cjs')({browser,root,password});
+    return;
+  }
   if (reasoningMode) {
     if (process.argv.includes("--roundup-checks")) {
       await require("./roundup-checks.cjs")({ browser, root, env, password });
@@ -278,6 +282,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
       throw Error("overflow");
   }
   await require('./sources-route-checks.cjs')({page,browser,root});
+  await require('./edition-navigation-checks.cjs')({browser,root,password});
   const denied = await page.request.get(root + "/staff/", { maxRedirects: 0 });
   if (denied.status() !== 302) throw Error("regular staff denial failed");
   const adminContext = await browser.newContext();

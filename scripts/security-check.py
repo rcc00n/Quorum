@@ -36,6 +36,15 @@ REVIEWED_IMAGES = {'docs/reviews/2026-10-27-visual-hierarchy/impact-after-1440.p
  'docs/reviews/2026-10-27-web-polish/today-phone.png': '39c3001e392f51508c11fa36267a8fe47d3b7815740dc8066a9677eed042ac93'}
 
 
+# DECISION(2026-10-27, rcc00n/Codex): permit only these three inspected local navigation-review PNGs.
+# Why: show pending-date controls with a disposable account; no production account, original news or credentials.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-edition-navigation/dashboard-phone.png': 'e8bd1ca5f05de2d4fe7dfa1a470ce1d7ea4e3a78ddd40ba107e6000a66f7787c',
+    'docs/reviews/2026-10-27-edition-navigation/history-desktop.png': 'a3f63385faba1e1375a8d648ede7c754ad3d862bbd5e42ba53c71afb8dad31e4',
+    'docs/reviews/2026-10-27-edition-navigation/history-phone.png': '896f59d0510a61ae9ab4858d6dac89ce3c9521a514f57ad307a75a1486254f0a',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])

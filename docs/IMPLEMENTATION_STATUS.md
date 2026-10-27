@@ -4,6 +4,14 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. The latest production milestone is below; older tables remain historical evidence.
 
+## Production UX audit — 27 October 2026 UTC
+
+Production UX audit follow-up: WEB-EDITION-NAV-01 / WEB-AUTH-RETURN-01, owner Vadim / Codex,
+`feature/web-edition-navigation`, TESTED locally, not DEPLOYED. Date/topic URLs, contextual History,
+calendar-day/recovery controls and bounded exact sign-in return preserve the existing design and content.
+[Audit, prioritized gaps, checks and review captures](reviews/2026-10-27-production-ux.md).
+Production observations and local fixture evidence are distinguished there; #52/#53 remain separate.
+
 ## Sources and motion release — 27 October 2026 UTC
 
 Owner Vadim / Codex; branch `feature/web-spectrum-motion`; production `20261027-spectrum-r1`,
