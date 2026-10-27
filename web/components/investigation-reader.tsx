@@ -57,7 +57,13 @@ export function InvestigationReader({ title, children, className = "", needsRevi
   }, [active, hashEpoch]);
   function select(view: View) {
     pendingTarget.current = null; setActive(view);
-    history.pushState(null, "", `#reader-${view}`);
+    // DECISION(2026-10-27, Anastasia/Claude Code, in Vadim's reader with a note to him): the tab's pushState carries
+    // the current history state, which holds Next's own marker, so Next's patched pushState leaves the router
+    // alone. Why: a pushState without it makes the app router re-sync and, a few milliseconds later, write its
+    // canonical URL back with replaceState; a hash navigation landing in that window (reader-checks.cjs's deep
+    // link right after Home) was overwritten and the pane never opened. The race was lost on a heavier page and
+    // is timing-dependent on any machine; reasoning-evidence.tsx already passes history.state for the same reason.
+    history.pushState(history.state, "", `#reader-${view}`);
     requestAnimationFrame(() => {
       const el = root.current; if (!el) return;
       const header = document.querySelector<HTMLElement>(".sidebar")?.getBoundingClientRect().height || 0;
