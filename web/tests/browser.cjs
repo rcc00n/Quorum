@@ -1,5 +1,6 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const fs = require("fs");
+const assert = require("node:assert/strict");
 (async () => {
   const browser = await chromium.launch({
     headless: true,
@@ -47,6 +48,30 @@ const fs = require("fs");
   await page.getByRole("button", { name: "Continue to your brief" }).click();
   await page.waitForURL("**/dashboard");
   await page.getByText("No published events are available").waitFor();
+  // The AI headline notice opens Home too, first in the main column (2026-10-27, Anastasia/Claude Code).
+  await page.getByRole("note").filter({ hasText: "AI-written headlines." }).waitFor();
+  assert.equal(await page.locator("#main > :first-child").evaluate((e) => e.classList.contains("ai-notice")), true);
+  // It closes for the visit and shows again in a fresh browser context (2026-10-27, Anastasia/Claude Code;
+  // components/dismissible-notice.tsx): the named close button hides it, a reload in the same tab keeps it hidden
+  // (sessionStorage), and a new context, given the signed-in cookies but no sessionStorage, sees it again.
+  const aiNote = (p) => p.getByRole("note").filter({ hasText: "AI-written headlines." });
+  await page.getByRole("button", { name: "Close AI headline notice", exact: true }).click();
+  assert.equal(await aiNote(page).count(), 0, "the AI notice hides when closed");
+  // A full load paints it hidden from the start: the pre-paint script marks <html> before hydration (app/layout.tsx).
+  await page.reload({ waitUntil: "domcontentloaded" });
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-notice-ai-headlines")), "closed");
+  assert.ok(["none", "absent"].includes(await page.evaluate(() => { const n = document.querySelector(".ai-notice"); return n ? getComputedStyle(n).display : "absent"; })), "hidden before hydration");
+  await page.getByText("No published events are available").waitFor();
+  assert.equal(await aiNote(page).count(), 0, "it stays hidden for the visit");
+  {
+    const fresh = await browser.newContext({ storageState: await page.context().storageState() });
+    const tab = await fresh.newPage();
+    await tab.goto(page.url());
+    // After hydration and the client fetch, so the storage read has run: the notice is there again.
+    await tab.getByText("No published events are available").waitFor();
+    assert.equal(await aiNote(tab).count(), 1, "a fresh context shows the AI notice again");
+    await fresh.close();
+  }
   if (hasTopics)
     await page.getByText("1 topic in your brief", { exact: true }).waitFor();
   await page.screenshot({

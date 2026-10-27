@@ -302,6 +302,42 @@ const assert = require("node:assert/strict");
     await page
       .getByRole("heading", { name: "Evidence Explorer", exact: true })
       .waitFor();
+    // The DEMO notice closes for the visit and shows again in a fresh context (2026-10-27, Anastasia/Claude Code;
+    // components/dismissible-notice.tsx): its wording stays, a click on its named close button hides it, a reload in the
+    // same tab keeps it hidden (sessionStorage), and a new browser context sees it again.
+    // A click on text deep in the page focuses nothing, so Tab goes on from there, not back to a notice's close button
+    // or to the main column (2026-10-27: #main is focusable only for the moment a notice closes).
+    {
+      const text = page.locator("#evidence-explorer .analysis-block-heading p:not(.eyebrow)").first();
+      await text.scrollIntoViewIfNeeded();
+      await text.click();
+      await page.keyboard.press("Tab");
+      const where = await page.evaluate(() => {
+        const a = document.activeElement, t = document.querySelector("#evidence-explorer .analysis-block-heading p:not(.eyebrow)");
+        return { close: !!(a && a.classList && a.classList.contains("notice-close")), main: a === document.getElementById("main"), body: a === document.body,
+          after: !!(a && t && (t.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING)), mainTabindex: document.getElementById("main").hasAttribute("tabindex") };
+      });
+      assert.deepEqual(where, { close: false, main: false, body: false, after: true, mainTabindex: false }, "Tab continues from the clicked text");
+    }
+    const demoNote = (p) => p.getByText("DEMO · Fictional interface fixture. Not verified news or live findings.", { exact: true });
+    await demoNote(page).waitFor();
+    await page.getByRole("button", { name: "Close DEMO notice", exact: true }).click();
+    assert.equal(await demoNote(page).count(), 0, "the DEMO notice hides when closed");
+    await page.reload();
+    await page.locator(".investigation-reader").waitFor();
+    assert.equal(await demoNote(page).count(), 0, "it stays hidden for the visit");
+    {
+      const fresh = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+      const page2 = await fresh.newPage();
+      await page2.route("**/api/session/", (r) => r.fulfill({ json: { csrfToken: "demo-only", user: { username: "DEMO reader", name: "DEMO reader", email: "", topics: ["demo-topic"], is_staff: false } } }));
+      await page2.route("**/api/feed/**", (r) => r.fulfill({ json: response }));
+      await page2.route("**/api/events/**", (r) => r.fulfill({ json: response }));
+      await page2.goto(root + "/events/demo-event?date=2026-10-22");
+      // The reader renders with the data, in the same render as the DEMO notice, after the storage read has run.
+      await page2.locator(".investigation-reader").waitFor();
+      assert.equal(await demoNote(page2).count(), 1, "a fresh context shows the DEMO notice again");
+      await fresh.close();
+    }
     assert.deepEqual(errors, []);
     console.log(
       "PASS: DEMO evidence, keyboard disclosures, sources/access/nulls, verifier disagreement, comparison modes, timeline/missing trace, stale/fallback, revision link, retry recovery; desktop/tablet/mobile no overflow",

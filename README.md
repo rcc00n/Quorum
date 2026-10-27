@@ -173,7 +173,7 @@ The fictional three are rebuilt with `python scripts/regenerate_samples.py` from
 | A draft breaks a writing rule | `critique` rejects it with the offending text; after three drafts the story is published with the notes attached |
 | A story is flagged | `escalate` moves it to the roundup as `needs_review`; the development preview marks it "Needs review" (the public site shows no reasoning output yet) |
 | No event crosses the bar | A quiet day: `status: empty`, every event in the roundup, the brief says so |
-| Fictional or demo data | Labelled: `provenance.fictional: true`, the DEMO banner on every page that shows it |
+| Fictional or demo data | Labelled: `provenance.fictional: true`, the DEMO banner on every page that shows it (a reader may close it for the browser session since 2026-10-27; it returns on the next visit; see docs/DECISIONS.md › User account and interface, item 12) |
 
 ## Data and licensing
 
