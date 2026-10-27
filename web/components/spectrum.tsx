@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { SpectrumField } from "./spectrum-field";
 import { Source, rating, cohort, safeUrl } from "@/lib/api";
-export function Spectrum({ sources }: { sources: Source[] }) {
+export function Spectrum({ sources, standalone = false }: { sources: Source[]; standalone?: boolean }) {
+  const Heading = standalone ? "h1" : "h2";
   const [mode, setMode] = useState("average");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   return (
-    <section className="spectrum spectrum-modern">
+    <section className={`spectrum spectrum-modern${standalone ? " spectrum-standalone" : ""}`}>
       <div className="section-heading">
-        <h2>Source spectrum</h2>
+        <Heading>Source spectrum</Heading>
         <label className="inline-label">
           Rating mode
           <select

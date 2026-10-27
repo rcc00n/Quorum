@@ -296,9 +296,10 @@ export function Portal({
           {[
             // DECISION(2026-10-26, Anastasia/Claude Code): the menu reads Today · History · My topics and sits
             // in the top bar (styled by app/workspace.css); settings stay behind "My topics". Why: Anastasia's
-            // brief for the personal page.
+            // brief for the personal page. Navigation expanded by Vadim on 2026-10-26: see DECISIONS › User account and interface.
             [LayoutDashboard, "Today", "/dashboard"],
             [History, "History", "/history"],
+            [FileSearch, "Sources", "/sources"],
             [Settings, "My topics", "/settings"],
           ].map(([Icon, label, url]) => {
             const I = Icon as typeof History;
@@ -373,7 +374,7 @@ export function Portal({
                   topic={data?.topics.find((t) => t.id === data?.events.find((e) => e.id === id)?.topic_id) ?? null}
                   date={data?.events.find((e) => e.id === id)?.date ?? initialDay}
                 />
-              ) : view !== "dashboard" && (
+              ) : view !== "dashboard" && view !== "sources" && (
               <div className="page-heading">
                 <p className="eyebrow">
                   {view === "dashboard"
@@ -406,7 +407,9 @@ export function Portal({
                   {message}
                 </p>
               )}
-              {view === "settings" ? (
+              {view === "sources" ? (
+                <Spectrum sources={data?.sources || []} standalone />
+              ) : view === "settings" ? (
                 <div className="settings-grid">
                   <section>
                     <h2>Profile</h2>

@@ -88,6 +88,7 @@ module.exports = async ({browser, root, password, temp, build}) => {
   await page.goto(`${root}/topics/${original.topic_id}?date=${day}`);
   await page.getByRole('heading', {name: 'Also today', exact: true}).waitFor();
   assert.equal(await page.locator('.roundup-item').count(), original.roundup.count);
+  await require('./sources-route-checks.cjs')({page,browser,root});
   const next = await (await context.request.get(root + '/api/session/')).json();
   assert.equal((await context.request.post(root + '/api/logout/', {
     headers: {'X-CSRFToken': next.csrfToken, Origin: root}, data: {},

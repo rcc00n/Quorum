@@ -118,3 +118,5 @@ Content plan: one rating selector and scope line; the rating × log-audience fie
 Interaction thesis: stagger source marks into view once, interpolate between the four rating modes, and use restrained pointer depth plus a focused crosshair to connect a source to its values. Fine-pointer depth and transitions stop under reduced motion. Source colours keep their existing data meaning; no new political dimension or inferred audience is introduced.
 
 Section motion: the public evidence sheet and lead story are shallow depth surfaces; headings and independent sections reveal once as they enter the viewport. Motion never hides content; if IntersectionObserver is missing, sections keep their default appearance. The data, section order and palette are unchanged; reduced motion removes both reveals and pointer depth.
+
+The source map has a direct signed-in entry at `/sources`; the app menu is Today · History · Sources · My topics. This navigation amendment supersedes only the three-link menu in earlier entries above; see docs/DECISIONS.md › User account and interface.

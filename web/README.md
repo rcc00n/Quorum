@@ -15,7 +15,7 @@ npm run dev -- --hostname 127.0.0.1 --port 3017
 
 Start Django on `127.0.0.1:8017` first (see [backend setup](../backend/README.md)). Development rewrites `/api/`, `/staff/` and `/staff-static/` to Django. Open `http://127.0.0.1:3017`. In production Nginx provides same-origin routing. `npm run build` and `npm run typecheck` run in the external build directory.
 
-Routes: `/`, `/login`, `/register`, `/onboarding`, `/dashboard`, `/topics/[slug]`, `/events/[id]`, `/history`, `/settings`. Protected routes render no private data until Django verifies the session; every protected API request independently enforces authentication. A stale session receives a recoverable error. No credentials are stored in browser storage.
+Routes: `/`, `/login`, `/register`, `/onboarding`, `/dashboard`, `/topics/[slug]`, `/events/[id]`, `/history`, `/sources`, `/settings`. Protected routes render no private data until Django verifies the session; every protected API request independently enforces authentication. A stale session receives a recoverable error. No credentials are stored in browser storage.
 
 ## Integration contract
 
