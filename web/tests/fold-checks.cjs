@@ -83,8 +83,22 @@ module.exports = async ({browser, root, env, password}) => {
       assert.deepEqual(await rows.evaluateAll((els) => els.map((el) => el.querySelector('p').textContent)), items.map((it) => it.text));
       assert.deepEqual(await rows.locator('.story-review').allTextContents(), ['Requires editorial review']);
       assert.equal(await rows.nth(1).locator('.story-review').count(), 1);
+      // The label is the 12 px tag at its own width, never stretched across the text column (review of 2026-10-27).
+      assert.deepEqual(await rows.nth(1).locator('.story-review').evaluate((e) => {
+        const w = e.getBoundingClientRect().width; e.style.width = 'max-content';
+        const natural = e.getBoundingClientRect().width; e.style.width = '';
+        return [getComputedStyle(e).fontSize, w <= natural + 1];
+      }), ['12px', true]);
       assert.deepEqual(await rows.locator('p.help').allTextContents(), ['Source headline fallback; no generated roundup line was supplied.']);
       assert.equal(await rows.nth(2).locator('p.help').count(), 1);
+      // The fallback line is styled like its section's own help line, not like the row text (review of 0c130c2).
+      const [fallback, sectionHelp] = await rows.nth(2).locator('p.help').evaluate((e) => {
+        const style = (el) => { const s = getComputedStyle(el); return [s.fontSize, s.fontFamily, s.color]; };
+        const sibling = e.closest('section')?.querySelector(':scope > p.help');
+        return [style(e), sibling ? style(sibling) : null];
+      });
+      assert.ok(sectionHelp, 'the Also today section has its own help line');
+      assert.deepEqual(fallback, sectionHelp);
       assert.deepEqual(await rows.locator('small').allTextContents(),
         items.map((it) => it.label.charAt(0).toUpperCase() + it.label.slice(1)));
       for (let i = 0; i < 5; i++) {

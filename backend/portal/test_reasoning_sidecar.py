@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 from django.test import SimpleTestCase
 from .reasoning_preview import SAMPLE, load_preview
-PRODUCER_SIDECAR = SAMPLE.with_name('snapshot.sample.sidecar.json')
 from .snapshot_validation import MAX_BYTES, SnapshotError
+PRODUCER_SIDECAR = SAMPLE.with_name('snapshot.sample.sidecar.json')
 
 class SidecarTests(SimpleTestCase):
     def setUp(self):
@@ -38,8 +38,11 @@ class SidecarTests(SimpleTestCase):
                 self.load(raw)
 
     def test_producer_shaped_fixture_binds_as_the_hand_built_sidecars_do(self):
-        # The fixture is what reasoning/scripts/edition_sidecar.py writes (its builder and serializer), so a change on
-        # either side of the sidecar contract fails here, not at the hand-over (2026-10-27, Anastasia / Claude Code).
+        # The fixture is the bytes the producer's build_sidecar + serialize write for the bundled sample; reasoning's
+        # suite regenerates them (reasoning/tests/test_portal_sidecar_fixture.py) and the portal binds them here, so
+        # a change to the producer's builder or to the portal's binding fails a test before a hand-over. The script
+        # is not loaded here: a release archive ships backend/ and deploy/ only, and the VPS upgrade runs this suite
+        # there (2026-10-27, Anastasia / Claude Code; review of 0c130c2).
         raw = PRODUCER_SIDECAR.read_bytes()
         sidecar = json.loads(raw)
         self.assertEqual(list(sidecar), ['snapshot', 'provisional', 'corpus_as_of_utc', 'edition_window_utc', 'producer'])
