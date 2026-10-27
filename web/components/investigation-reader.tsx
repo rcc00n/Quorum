@@ -3,8 +3,9 @@ import { Children, isValidElement, useEffect, useLayoutEffect, useRef, useState 
 import type { KeyboardEvent, ReactNode } from "react";
 import type { Event, Source } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
-import { Story, storyReadable, ReviewLabel } from "./story";
+import { Story, storyReadable, ReviewLabel, formatDate } from "./story";
 import { ImpactAssessment } from "./impact-assessment";
+import { ChevronDown } from "lucide-react";
 
 const views = [
   ["reading", "Read", "Reading", "The story, at your pace"],
@@ -17,7 +18,10 @@ const views = [
 type View = typeof views[number][0];
 export function ReaderPanel({ children }: { name: Exclude<View, "all">; children: ReactNode }) { return <>{children}</>; }
 
-export function InvestigationReader({ title, children, className = "", needsReview = false }: { title: string; children: ReactNode; className?: string; needsReview?: boolean }) {
+// DECISION(2026-10-27, Anastasia/Claude Code; cabinet pages pass): the story's head (date, headline, review label, standfirst)
+// sits above the view bar and scrolls away; the bar stays sticky as a tray of round pills without numbers or caption. Why:
+// Anastasia's review of 2026-10-27, "the title on top, the menu under it, fixed while scrolling, rounded like Home".
+export function InvestigationReader({ head, children, className = "" }: { title?: string; needsReview?: boolean; head?: ReactNode; children: ReactNode; className?: string }) {
   const [active, setActive] = useState<View>("reading");
   const [hashEpoch, setHashEpoch] = useState(0);
   const root = useRef<HTMLDivElement>(null), bar = useRef<HTMLElement>(null);
@@ -84,16 +88,15 @@ export function InvestigationReader({ title, children, className = "", needsRevi
     if (!target || !panel || !root.current?.contains(panel) || panel.dataset.readerPanel === active) return;
     e.preventDefault(); history.pushState(history.state, "", a.hash); pendingTarget.current = target; setActive(panel.dataset.readerPanel as View);
   }}>
+    {head}
     <nav className="reader-bar" ref={bar} aria-label="Story workspace">
-      <div className="reader-bar-caption"><span>Read. Compare. Verify.</span><span>{views.find(v => v[0] === active)?.[3]}</span></div>
       <div role="tablist" aria-label="Story views" className="reader-tabs">
         {views.map(([id, label, name], i) => <button key={id} type="button" role="tab" id={`reader-tab-${id}`}
           aria-label={name} aria-selected={active === id} aria-controls={id === "all" ? "reader-content" : `reader-${id}`}
           tabIndex={active === id ? 0 : -1} onClick={() => select(id)} onKeyDown={e => navigate(e, i)}
-          ref={el => { if (el) tabs.current.set(id, el); else tabs.current.delete(id); }}><span className="reader-tab-number">0{i + 1}</span>{label}</button>)}
+          ref={el => { if (el) tabs.current.set(id, el); else tabs.current.delete(id); }}>{label}</button>)}
       </div>
     </nav>
-    {active !== "reading" && active !== "all" && <><h1 className="reader-story-context">{title}</h1>{needsReview && <ReviewLabel />}</>}
     <div id="reader-content">{panels.map(panel => <div key={panel.props.name} id={`reader-${panel.props.name}`} data-reader-panel={panel.props.name}
       role="tabpanel" aria-labelledby={active === "all" ? "reader-tab-all" : `reader-tab-${panel.props.name}`} tabIndex={0}
       hidden={active !== "all" && active !== panel.props.name}>{panel.props.children}</div>)}</div>
@@ -101,17 +104,29 @@ export function InvestigationReader({ title, children, className = "", needsRevi
 }
 
 export function LegacyClaims({ event }: { event: Event }) {
-  return <div className="reader-brief">{(["established", "statements", "disputed", "unknown", "coverage"] as const).map((key, i) =>
+  // The five groups as rounded rows under one mono kicker, each with its count (cabinet pages pass, 2026-10-27):
+  // the rows read as one list with a purpose instead of five unexplained links. Labels unchanged.
+  return <div className="reader-brief"><p className="reader-brief-kicker">Claims and coverage</p>{(["established", "statements", "disputed", "unknown", "coverage"] as const).map((key, i) =>
     <details className="reader-brief-group" id={`claims-${key}`} key={key}>
-      <summary>{["What is established", "Attributed statements", "Disputed claims", "What remains unknown", "Coverage differences"][i]}<span aria-hidden="true">↗</span></summary>
+      <summary>{["What is established", "Attributed statements", "Disputed claims", "What remains unknown", "Coverage differences"][i]}<span className="reader-brief-count">{event[key].length}</span><ChevronDown size={16} className="reader-brief-chevron" aria-hidden="true" /></summary>
       {event[key].length ? event[key].map((item, j) => <article key={j}><h3>{item.text}</h3><p>{item.explanation}</p>{item.sources.map((s, k) => safeUrl(s.url) && <a className="source-link" key={k} href={safeUrl(s.url)} target="_blank" rel="noopener noreferrer">{s.title} ↗</a>)}</article>) : <p className="muted">No information supplied for this section.</p>}
     </details>)}</div>;
 }
-export function EventReading({ event, sources }: { event: Event; sources: Source[] }) {
-  if (storyReadable(event, sources)) return <Story event={event} sources={sources} />;
-  return <div className="reader-opening"><p className="eyebrow">EVENT ANALYSIS / {event.date}</p><h1>{event.title}</h1>
-    {event.reasoning?.needs_review && <ReviewLabel />}<p className="lede">{event.summary}</p>
+export function EventReading({ event, sources, headless = false }: { event: Event; sources: Source[]; headless?: boolean }) {
+  if (storyReadable(event, sources)) return <Story event={event} sources={sources} headless={headless} />;
+  return <div className="reader-opening">{!headless && <><p className="eyebrow">EVENT ANALYSIS / {event.date}</p><h1>{event.title}</h1>
+    {event.reasoning?.needs_review && <ReviewLabel />}<p className="lede">{event.summary}</p></>}
     <ImpactAssessment event={event} />
     <LegacyClaims event={event} />
   </div>;
+}
+// The story's head above the view bar: the date in the mono, the headline in the display face, the review label when
+// the producer flagged the story (words unchanged), the standfirst.
+export function StoryHead({ event }: { event: Event }) {
+  return <header className="reader-head">
+    <p className="reader-head-date">{formatDate(event.date)}</p>
+    <h1>{event.title}</h1>
+    {event.reasoning?.needs_review && <ReviewLabel />}
+    {event.summary && <p className="reader-head-lede">{event.summary}</p>}
+  </header>;
 }

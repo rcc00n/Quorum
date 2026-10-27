@@ -102,6 +102,26 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, Anastasia/Claude Code): permit only these 13 inspected PR review captures of the second cabinet pass:
+# the story, topic, History, Account and Sources pages on the committed FICTIONAL 22 October sample under a disposable local
+# account; no real edition, no credential. Why: Vadim's gate for review PNGs (his f3e121e pattern); arbitrary binaries stay excluded.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-web-cabinet-pages/account-desktop.png': 'c908f19d3f8fabea053e27dc98bbc4b0f57e79d8e882b8ce5eb5d7dd2b91ec7e',
+    'docs/reviews/2026-10-27-web-cabinet-pages/account-phone.png': '1ea0b79c850eb0379c7ca14fd73778a8edd56ff9929661a3a3f5e17043f686b3',
+    'docs/reviews/2026-10-27-web-cabinet-pages/history-desktop.png': 'fbcaa7b02c4a36c2466b3cf80d0ad7a3977080088ee228d7c472fb3c99a83ea6',
+    'docs/reviews/2026-10-27-web-cabinet-pages/history-phone.png': '5ee789769ac9b51b751f9495cd98437566d628a550c81037eb03f45136778881',
+    'docs/reviews/2026-10-27-web-cabinet-pages/sources-desktop.png': 'bbb89492691ea67431770695a3ad6f541545a369f0628fe9851d8a79c2bd6139',
+    'docs/reviews/2026-10-27-web-cabinet-pages/sources-phone.png': '25a0d1efba7eded6fddb91205ecbcb96cece36f9ac4eafa6105913b280a160d1',
+    'docs/reviews/2026-10-27-web-cabinet-pages/story-claims-desktop.png': 'dfe951890917ddb33ae5948dd02145bb268a27c4a9323f1a17ad20f6742f8ecd',
+    'docs/reviews/2026-10-27-web-cabinet-pages/story-desktop.png': '11e3cbada3152dfb0cc701ff9eac98a9bb70fe10864e484c13a63318a21562a2',
+    'docs/reviews/2026-10-27-web-cabinet-pages/story-phone.png': 'f81ac3b549da0b744bf76c3748631098f463205ba8d2c459f16c7a6795232199',
+    'docs/reviews/2026-10-27-web-cabinet-pages/story-stuck-desktop.png': '282d1e8b2efbc8c1af0e15d34d1154708ba8f7d2c251f9ecbd397667de124311',
+    'docs/reviews/2026-10-27-web-cabinet-pages/story-stuck-phone.png': '2fa255400682986925a6cda9a7aad078540bb3d1f3b0792ca374170b3abedd3f',
+    'docs/reviews/2026-10-27-web-cabinet-pages/topic-desktop.png': 'eb89bff637e9246e6e84d61f8f876554aa24e69ed7dccfb76b6c19e70447865e',
+    'docs/reviews/2026-10-27-web-cabinet-pages/topic-phone.png': '05eed573b1db0c103e00178603f1109c7d393595038d058a3f43ca56d3c2c852',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])

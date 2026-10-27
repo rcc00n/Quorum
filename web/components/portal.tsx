@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PageMotion } from "./page-motion";
 import { WorkspaceNavigator } from "./workspace-navigator";
-import { InvestigationReader, ReaderPanel, EventReading, LegacyClaims } from "./investigation-reader";
+import { InvestigationReader, ReaderPanel, EventReading, LegacyClaims, StoryHead } from "./investigation-reader";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -28,6 +28,7 @@ import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
 import { BriefStatus } from "./brief-status";
 import { TodayBoard } from "./today-board";
+import { TopicStories } from "./topic-stories";
 import { EditionNavigation } from "./edition-navigation";
 import { editionHref, validEditionDate } from "@/lib/edition-navigation.mjs";
 import { StoryCrumb, storyReadable, ReviewLabel } from "./story";
@@ -70,8 +71,8 @@ function Analysis({
   if (event.analysis || !event.reasoning || !event.reasoning_context)
     return <AnalysisWorkspace event={event} publication={publication} sources={sources} />;
   const readable = storyReadable(event, sources);
-  return <InvestigationReader title={event.title} needsReview={event.reasoning.needs_review} className={readable ? "story-page story-page-plain" : ""}>
-    <ReaderPanel name="reading"><EventReading event={event} sources={sources} /></ReaderPanel>
+  return <InvestigationReader head={<StoryHead event={event} />} className={readable ? "story-page story-page-plain" : ""}>
+    <ReaderPanel name="reading"><EventReading event={event} sources={sources} headless /></ReaderPanel>
     <ReaderPanel name="evidence">
       {readable && <LegacyClaims event={event} />}
       <ReasoningEvidence story={event.reasoning} fictional={publication?.mode === 'demo'} />
@@ -81,6 +82,12 @@ function Analysis({
     <ReaderPanel name="trace"><ReasoningTimeline run={event.reasoning_context} currentEvent={event.id} installed /></ReaderPanel>
   </InvestigationReader>;
 }
+
+// The view the reader was on before the current one, across client navigations (module scope survives them;
+// a fresh load starts at null). The story page's crumb reads it to lead back to Home (components/story.tsx).
+// Two variables, so a repeated effect run (React's development double-invoke) does not count as a navigation.
+let currentView: string | null = null;
+let previousView: string | null = null;
 
 export function Portal({
   view,
@@ -101,6 +108,15 @@ export function Portal({
   const path = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<Snapshot | null>(null);
+  // Set after mount so the server-rendered crumb (the topic) and the first client render agree.
+  const [fromHome, setFromHome] = useState(false);
+  useEffect(() => {
+    if (currentView !== view) {
+      previousView = currentView;
+      currentView = view;
+    }
+    setFromHome(view === "event" && previousView === "dashboard");
+  }, [view]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -208,6 +224,9 @@ export function Portal({
       busy={busy}
       onSave={saveTopics}
       saveLabel={view === "onboarding" ? "Continue to your brief" : "Save topics"}
+      // The first setup's picker looks like the board's (pill search, the catalog as a cloud of round pills,
+      // chosen ones filled): one picker everywhere (Anastasia, second cabinet pass 2026-10-27).
+      compact
     />
   );
   // DECISION(2026-10-26, Anastasia/Claude Code): first setup is its own full screen (the prototype's night
@@ -285,9 +304,13 @@ export function Portal({
             {dateLabel}
           </span>
         </header>
-        <PageMotion root=".workspace-main" ready={!loading && !error} epoch={data} />
-        <main id="main" className="workspace-main">
-          {loading ? (
+        <PageMotion root=".workspace-main" ready={!loading && !error} epoch={view} />
+        {/* DECISION(2026-10-27, Anastasia/Claude Code; second cabinet pass): a page that already has data keeps it on
+            screen while the next date (or story) loads, dimmed and marked busy, and updates in place when the answer
+            arrives; the "Preparing your workspace" state is for the first load only. Why: Anastasia's review of
+            2026-10-27: every date change blanked the board and drew it again, a white flash and blocks materialising. */}
+        <main id="main" className="workspace-main" aria-busy={loading && !!data ? true : undefined}>
+          {loading && !data ? (
             <div className="loading" role="status">
               <div className="loading-line" />
               <h1>Preparing your workspace…</h1>
@@ -308,17 +331,17 @@ export function Portal({
                 <StoryCrumb
                   topic={data?.topics.find((t) => t.id === data?.events.find((e) => e.id === id)?.topic_id) ?? null}
                   date={data?.events.find((e) => e.id === id)?.date ?? initialDay}
+                  fromHome={fromHome}
                 />
               ) : view !== "dashboard" && view !== "sources" && (
               <div className="page-heading">
-                <p className="eyebrow">
-                  {view === "dashboard"
-                    ? "CURATED AROUND YOUR INTERESTS"
-                    : view === "history"
-                      ? "ARCHIVE"
-                      : view.toUpperCase()}
-                </p>
+                {/* No capital kickers on the cabinet pages (second cabinet pass, 2026-10-27); the first setup keeps its. */}
+                {view === "onboarding" && <p className="eyebrow">{view.toUpperCase()}</p>}
                 {view !== "event" && <h1>{names[view]}</h1>}
+                {view === "topic" && (() => {
+                  const n = visibleStories(data?.events || [], day, topic, user?.topics || []).length;
+                  return n ? <p className="page-meta">{`${n} ${n === 1 ? "story" : "stories"} today`}</p> : null;
+                })()}
                 <p>
                   {view === "dashboard"
                     ? "A considered view of the stories that matter to you."
@@ -479,16 +502,10 @@ export function Portal({
                 })()
               ) : (
                 <>
+                  {/* The tabs ("The daily edition / Evidence first", "Past digests") are gone: Evidence lives on the story
+                      page; the date control and the topic filter are pills in the board's manner (second cabinet pass). */}
                   <div className="brief-toolbar">
-                    <div className="tabs">
-                      <span className="selected">
-                        {view === "history"
-                          ? "Past digests"
-                          : "The daily edition"}
-                      </span>
-                      <span>Evidence first</span>
-                    </div>
-                    <div className="filters">
+                    <div className="filters tb-controls">
                       <EditionNavigation day={day} today={today()} onDay={selectEdition} />
                       {view === "history" && (
                         <label>
@@ -523,18 +540,14 @@ export function Portal({
                       </Link>
                     </div>
                   )}
-                  <div className={view === "history" ? "brief-columns brief-columns-single" : "brief-columns"}>
+                  <div className="brief-columns brief-columns-single">
                     <section>
-                      <div className="section-heading">
-                        <h2>
-                          {view === "history"
-                            ? "Daily digests"
-                            : view === "topic"
-                              ? "Important stories"
-                              : "Today’s important stories"}
-                        </h2>
-                        <span className="edition-label">{day}</span>
-                      </div>
+                      {view === "history" && (
+                        <div className="section-heading">
+                          <h2>Daily digests</h2>
+                          <span className="edition-label">{day}</span>
+                        </div>
+                      )}
                       {view === "history" ? (
                         digests.length ? (
                           digests.map((d, i) => (
@@ -574,30 +587,10 @@ export function Portal({
                                 : !!user?.topics.includes(e.topic_id)) &&
                               isQuietDay(data, e),
                           );
+                          // The topic's stories as rows (components/topic-stories.tsx); the standfirst, the rubric and its
+                          // rationale are read on the story page (second cabinet pass, 2026-10-27).
                           return events.length ? (
-                            events.map((e, i) => (
-                              <article className="event-row" key={e.id}>
-                                <p className="eyebrow">
-                                  {String(i + 1).padStart(2, "0")} /{" "}
-                                  {e.importance?.label ||
-                                    "Importance not supplied"}
-                                </p>
-                                <h3>
-                                  <Link
-                                    href={"/events/" + e.id + "?date=" + day}
-                                  >
-                                    {e.title} <ArrowUpRight size={19} />
-                                  </Link>
-                                </h3>
-                                <p>{e.summary}</p>
-                                {e.reasoning?.needs_review && <ReviewLabel />}
-                                {e.importance && (
-                                  <p className="help">
-                                    {e.importance.explanation}
-                                  </p>
-                                )}
-                              </article>
-                            ))
+                            <TopicStories events={events} day={day} />
                           ) : quiet ? null : data?.status === "error" ||
                             data?.publication?.status === "error" ? (
                             <Empty title="This edition is unavailable">
@@ -637,43 +630,12 @@ export function Portal({
                           day={day}
                           topic={topic}
                           followed={user?.topics || []}
+                          roundup={false}
                         />
                       )}
                     </section>
-                    {/* History lists the digests themselves; the reading-room rail would repeat the latest one. */}
-                    {view !== "history" && (
-                    <aside className="brief-aside">
-                      <p className="eyebrow">THE READING ROOM</p>
-                      <h3>Understanding takes perspective.</h3>
-                      <p>
-                        Every brief separates established facts, attributed
-                        statements and what remains uncertain.
-                      </p>
-                      <div className="aside-rule" />
-                      <h4>Latest digest</h4>
-                      {digests[0] ? (
-                        <p>{digests[0].summary}</p>
-                      ) : (
-                        <p>
-                          Your latest digest will appear here when published.
-                        </p>
-                      )}
-                      <Link href="/history">
-                        Explore the archive <ArrowRight size={15} />
-                      </Link>
-                      <div className="aside-rule" />
-                      <span className="status-dot" />
-                      <span className="help">
-                        {data?.status === "pending"
-                          ? "Live data connection pending"
-                          : data?.status === "demo"
-                            ? "DEMO fixture · fictional data"
-                            : data?.status === "error"
-                              ? "Data unavailable"
-                              : "Source data supplied"}
-                      </span>
-                    </aside>
-                    )}
+                    {/* The reading-room rail (slogan, latest digest, archive link, data status) was removed in the second
+                        cabinet pass, 2026-10-27: the digest sentence sits beside it, the archive is History in the menu. */}
                   </div>
                   {view === "topic" && (
                     <Spectrum sources={data?.sources || []} />

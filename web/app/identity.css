@@ -5,6 +5,9 @@
   --paper: #ffffff;
   --paper-2: #f4f1eb;
   --paper-3: #ebe6dd;
+  /* The fill of pill trays and low rows on the app routes (the date control, the story's view bar, Also today,
+     Impact, the claim groups): a neutral grey, clearly off the paper (Anastasia, 2026-10-27: "greyer, white melts in; plain grey, not light brown"). */
+  --tray: #e5e5e5;
   --ink: #141414;
   --ink-2: #5f5a53;
   --rule: #dcd6cc;
