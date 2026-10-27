@@ -30,6 +30,17 @@ Without --keys one worker runs every topic on the route in .env as it is (no key
 or a single direct key. The route counts as one key under the same caps (behind Nightshift it is still one NVIDIA
 account), so --max-calls-per-key bounds what one invocation starts there.
 
+--route nvidia (the default) is everything above, unchanged. --route meterless runs every topic on the Meterless
+Nightshift route (docs/DECISIONS.md › Demo for the judges, canonical editions of 27 October): one worker, no --keys
+and no key rotation; each live child gets MODEL_BASE_URL and MODEL_API_KEY blank (set in its environment, so its own
+load_dotenv(override=False) cannot fill them from .env) and QUORUM_MIN_INTERVAL_MS=0 (decision at METERLESS_CHILD_ENV);
+without a Meterless token (METERLESS_TOKEN, or its alias METERLESS_RUNTIME_TOKEN) every listed topic is failed with
+"meterless token missing" and nothing is started. The Meterless stop rule (decision at MeterlessWatch) stops a run at
+its first error and fails its topic; the topics after it are not started (they stay queued), and the runner prints
+the manual --route nvidia fallback command for that topic, which it never runs itself. A rerun resumes a stopped run id
+only when its journal keeps no call the rule fails and it published nothing; otherwise the topic stays failed and runs
+again as a fresh --attempt (decisions at unfit_version and unfit_resume).
+
 Status files (the portal's contract, Issue #2 6411408519): <status-dir>/<topic>/<date>.json with exactly topic, date,
 state (queued | running | published | failed | waiting_for_key), run_id, started_at, updated_at, attempts and reason
 (a string or null), written atomically (temp file + os.replace) and each followed by <date>.json.sha256
@@ -108,6 +119,25 @@ ULTRA_LANES = ("fact_checker", "reviewer")
 MIN_KEY_CHARS = 8
 REASON_MAX = 300
 ROUTE = "route"  # the pseudo-key name without --keys: the route in .env as it is
+ROUTES = ("nvidia", "meterless")  # --route
+METERLESS_TOKEN_NAMES = ("METERLESS_RUNTIME_TOKEN", "METERLESS_TOKEN")  # llm._route_family reads the first, then its alias
+NVIDIA_KEY_NAME = re.compile(r"^MODEL_API_KEY(?:_\w+)?$")  # names offered in the manual fallback command, never values
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a live child on --route meterless gets these values in its own
+# environment: MODEL_BASE_URL and MODEL_API_KEY blank, so llm._route_family reads the Meterless pair (the NVIDIA values in
+# .env stay there for the manual fallback), QUORUM_MIN_INTERVAL_MS=0, and the two lane pauses blank, so no lane is paced.
+# They are set before the child loads .env, and load_dotenv(override=False) keeps a variable that is set, empty or not.
+# Why: Yelysei's decision of 2026-10-26 (D1): the route needs no pacing (188 calls in about 6.5 min on 26 Oct); a lane
+# pause in .env (QUORUM_MIN_INTERVAL_MS_FACT_CHECKER, _REVIEWER) would still pace that lane, since a lane's own value
+# wins over the shared 0 (llm.min_interval_ms). Blanking the lane pauses was Claude Code's addition, to confirm.
+METERLESS_CHILD_ENV = {"MODEL_BASE_URL": "", "MODEL_API_KEY": "", "QUORUM_MIN_INTERVAL_MS": "0",
+                       "QUORUM_MIN_INTERVAL_MS_FACT_CHECKER": "", "QUORUM_MIN_INTERVAL_MS_REVIEWER": ""}
+# DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): on --route meterless the route pseudo-key is uncapped unless
+# --max-calls-per-key / --max-ultra-calls-per-key are given; given values apply as on the NVIDIA route. Why: the caps
+# model one NVIDIA account's bucket for key rotation, which this route does not do (D1: no key rotation); with the
+# default 650/250 the plan of the four demo topics leaves the last ones waiting_for_key "for >= 6 h", and the stop rule
+# already ends the invocation at the first refusal (HTTP 429). Proposed by Claude Code, to confirm by Yelysei.
+UNCAPPED = 1_000_000
+NO_PACE = {"fast": 0.0, "ultra": 0.0}
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -511,15 +541,18 @@ class Planner:
             self._release(item)
 
 
-def simulate(keys: list[Key], items: list[Item]) -> dict[str, dict[str, Any]]:
+def simulate(keys: list[Key], items: list[Item], pace: dict[str, float] | None = None) -> dict[str, dict[str, Any]]:
     """The plan the placement gives if every estimate is right: per topic its segments (key, calls it is expected to
-    make there, resume) and outcome, with run times from the base pacing only (model latency comes on top). A segment
+    make there, resume) and outcome, with run times from the base pacing only (model latency comes on top; `pace`
+    replaces PACE_S, NO_PACE on a route that paces nothing). A segment
     that cannot hold the rest of its topic is taken to progress on both lanes in step until its tighter lane runs out
     (the fast-lane nodes come first in the graph, so a drained key has rarely reached the fact-check)."""
+    pace = PACE_S if pace is None else pace
+    paced = any(pace.values())
     keys = [dataclasses.replace(k, busy=False) for k in keys]
     items = [dataclasses.replace(i) for i in items]
     planner = Planner(keys, items)
-    plan: dict[str, dict[str, Any]] = {i.topic: {"segments": [], "outcome": None} for i in items}
+    plan: dict[str, dict[str, Any]] = {i.topic: {"segments": [], "outcome": None, "paced": paced} for i in items}
     heap: list[tuple[float, int, Item, Key, tuple[int, int], tuple[int, int], bool]] = []
     t, seq = 0.0, 0
     while True:
@@ -530,7 +563,7 @@ def simulate(keys: list[Key], items: list[Item]) -> dict[str, dict[str, Any]]:
             if drains:
                 frac = min(res[0] / nf if nf else 1.0, res[1] / nu if nu else 1.0)
                 used = (min(res[0], round(nf * frac)), min(res[1], round(nu * frac)))
-            dur = used[0] * PACE_S["fast"] + used[1] * PACE_S["ultra"]
+            dur = used[0] * pace["fast"] + used[1] * pace["ultra"]
             plan[item.topic]["segments"].append({"key": key.name, "fast": used[0], "ultra": used[1], "resume": item.resume,
                                                  "starts_after_min": round(t / 60)})
             heapq.heappush(heap, (t + dur, seq, item, key, res, used, drains))
@@ -551,6 +584,8 @@ def simulate(keys: list[Key], items: list[Item]) -> dict[str, dict[str, Any]]:
 def describe_plan(entry: dict[str, Any]) -> str:
     segs = " -> ".join(f"{s['key']} ({s['fast']}/{s['ultra']}{', resume' if s['resume'] else ''})" for s in entry["segments"])
     if entry["outcome"] == "published":
+        if not entry.get("paced", True):
+            return f"{segs}; done (this route paces nothing: model latency only)"
         return f"{segs}; done after ~{entry.get('ends_after_min', 0)} min of pacing"
     return (segs + "; then " if segs else "") + f"waits for a key: {entry.get('reason', '')}"
 
@@ -624,6 +659,9 @@ class Statuses:
         # live mode: topic -> the run id whose published version the file shows and keeps in this invocation (another
         # run id: decision at follow_store; this one, found published at the start: decision at keep_published)
         self.pinned: dict[str, str] = {}
+        # live mode: topic -> another run id whose newest stored version the file does not show, because the Meterless
+        # stop rule failed that run (decision at follow_store)
+        self.rejected: dict[str, str] = {}
 
     def path(self, topic: str) -> Path:
         """The portal's status file of `topic` on this date."""
@@ -675,7 +713,8 @@ class Statuses:
             doc = dict(old)
             self.kept.add(topic)
         elif same:
-            doc = {k: v for k, v in old.items() if k in ("started_at", "started_mode", "attempts", "runs")}
+            # `route` too: the route the run id's live calls were made on (decision at route_mix)
+            doc = {k: v for k, v in old.items() if k in ("started_at", "started_mode", "attempts", "runs", "route")}
         else:
             doc = {}
         if self.mode == "live" and not doc.get("runs") and doc.get("started_mode") != "live":
@@ -724,13 +763,24 @@ class Statuses:
         the snapshot's published_at, 0 and null); this invocation's states go to its record only, until its own run
         publishes a newer version. Why: there is one status file per topic and date, and readers are served the newest
         version (latest.json); a later attempt turned a published topic into `queued` ("Waiting for its first brief") or
-        `failed` ("Could not be prepared") next to the edition they were reading (closing review round 2)."""
+        `failed` ("Could not be prepared") next to the edition they were reading (closing review round 2).
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a newest version whose run id the Meterless stop rule failed
+        (rejected_by_rule: its record has `stopped_by_rule`, or names the Meterless route while the version is `partial`)
+        is never shown: the file keeps this invocation's own states, as when the store holds no other version. Why: the
+        stop rule's verdict on that run is `failed` and its version is not for hand-over; the next fresh --attempt (the
+        runbook's and the printed fallback's) turned the file into `published` for that rejected version, and it stayed
+        so when the attempt failed or drained (review of 2026-10-26). latest.json still points at the rejected version
+        until a newer one is published, so the hand-over names v<N> explicitly (docs/reviews/2026-10-27-demo-runbook.md)."""
         if self.mode != "live":
             return None
         rid = self.docs[topic]["run_id"]
         shown = latest[1].get("run_id") if latest else None
         if not isinstance(shown, str) or shown == rid:
             self.pinned.pop(topic, None)
+            return None
+        if self.rejected_by_rule(topic, shown, latest[1] if latest else None):
+            self.pinned.pop(topic, None)
+            self.rejected[topic] = shown
             return None
         on_disk, verified = self._read_public(topic)
         if on_disk and verified and on_disk.get("state") == "published" and on_disk.get("run_id") == shown:
@@ -752,6 +802,19 @@ class Statuses:
         self.pinned[topic] = shown
         return shown
 
+    def rejected_by_rule(self, topic: str, rid: str, snapshot: dict[str, Any] | None) -> bool:
+        """True when the runner's record of run id `rid` says the Meterless stop rule failed it (`stopped_by_rule`), or
+        names the Meterless route while `snapshot` (its stored version) is `partial` (decisions at unfit_version and
+        follow_store). A run id without a record is not rejected here."""
+        rec = self._record_of(topic, rid)
+        if not rec:
+            return False
+        if rec.get("stopped_by_rule"):
+            return True
+        runs = [r for r in rec.get("runs") or [] if isinstance(r, dict)]
+        route = rec.get("route") or (runs[-1].get("route") if runs else None)
+        return route == "meterless" and isinstance(snapshot, dict) and snapshot.get("status") == "partial"
+
     def keep_published(self, topic: str) -> bool:
         """Live mode, for a run id found already published: True when this invocation leaves the status pair as it is,
         because it already shows this run id `published` with a matching .sha256 (or another run's newer version:
@@ -767,6 +830,8 @@ class Statuses:
         if topic in self.pinned:  # the file shows another run's newer version (follow_store) and stays as it is
             return True
         rid = self.docs[topic]["run_id"]
+        if self.rejected_by_rule(topic, rid, None):  # its callers check unfit_version first; kept here as well
+            return False
         on_disk, verified = self._read_public(topic)
         if on_disk and verified and on_disk.get("state") == "published" and on_disk.get("run_id") == rid:
             self.pinned[topic] = rid
@@ -843,6 +908,16 @@ class Ctx:
     redactor: Redactor
     timeout_s: float | None
     factor: float
+    # the route of this invocation's live runs: nvidia | meterless, or, without --keys on --route nvidia, the route the
+    # .env resolves to (or none); recorded per run (log header, record), never a value
+    route: str = "nvidia"
+    stop_rule: bool = False  # --route meterless: the Meterless stop rule (decision at MeterlessWatch)
+    keyed: bool = False  # --keys given: every live child holds one injected direct-route key
+    route_env: dict[str, str] = field(default_factory=dict)  # set in every live child's environment (METERLESS_CHILD_ENV)
+    token_missing: bool = False  # --route meterless without a Meterless token: nothing is started
+    fallback_keys: list[str] = field(default_factory=list)  # key variable NAMES for the printed manual fallback
+    fallback_dirs: list[str] = field(default_factory=list)  # --out/--log-dir/--status-dir/--dry-check-out as given
+    halted: str | None = None  # the topic whose run tripped the Meterless stop rule; nothing starts after it
     procs: dict[int, subprocess.Popen] = field(default_factory=dict)
     lock: threading.Lock = field(default_factory=threading.Lock)
     stopping: threading.Event = field(default_factory=threading.Event)
@@ -872,6 +947,8 @@ def _child_env(ctx: Ctx, key: Key | None) -> dict[str, str]:
         env[name] = ""
     if key is not None and key.inject:
         env["MODEL_API_KEY"] = ctx.key_values[key.name]
+    if key is not None:
+        env.update(ctx.route_env)  # a live child on --route meterless (decision at METERLESS_CHILD_ENV)
     env["PYTHONUNBUFFERED"] = "1"
     env.setdefault("PYTHONIOENCODING", "utf-8")
     return env
@@ -911,10 +988,146 @@ def stop_children(ctx: Ctx, grace_s: float = 10.0) -> None:
             _reap(p, 5.0)
 
 
+# what run.live_guard prints once the daemon's hmemKnowledge setpoint reads back false (pinned by a test against run.py)
+HMEM_OFF_LINE = "meterless: hmemKnowledge read back false"
+WATCH_POLL_S = 0.5
+_HTTP_CODE = re.compile(r"\b(?:HTTP|Error code:) ([45]\d\d)\b")
+_ERROR_CLASS = re.compile(r"\b((?:BadRequest|Authentication|PermissionDenied|NotFound|Conflict|UnprocessableEntity|RateLimit"
+                          r"|InternalServer|APIStatus)Error)\b")
+_FAILED_CALLS = re.compile(r"\bmodel calls: \d+ \((\d+) failed")
+# Lines of run.py's own output that trip the stop rule, with the public reason each gives (never the line itself).
+_STOP_LINES = (
+    (re.compile(r"Traceback \(most recent call last\)"), "a Traceback in the run's output"),
+    (re.compile(r"\brefusing to (?:run|continue)\b"), "run.py refused to run or to continue"),
+    (re.compile(r"\bREJECTED\b|rejected for injected memories"), "the runtime injected H-MEM memories into a call"),
+    (re.compile(r"\bREFUSED\b|refused as cache replays"), "a Nightshift cache replay was refused"),
+    (re.compile(r"\bSUBSTITUTED\b|lane substituted"), "a pinned lane was answered by another model (route substituted)"),
+    (re.compile(r"lane unverified"), "a pinned lane's response carried no model evidence (lane unverified)"),
+)
+_FAILED_LINE = re.compile(r"\bFAILED\b")  # llm's verbose line of a call that failed on both attempts
+
+
+def row_stop_reason(row: Any) -> str | None:
+    """Why one journal row trips the Meterless stop rule, or None. Reads flags and status codes only: the row's payload,
+    reply, receipt id and request key are never kept or printed."""
+    if not isinstance(row, dict):
+        return None
+    hmem = row.get("receipt_hmem_injected")
+    if row.get("hmem_rejected") or row.get("hmem_unreadable") or (hmem is not None and (type(hmem) is not int or hmem > 0)):
+        return "the runtime injected H-MEM memories into a call"
+    if row.get("route_substituted"):
+        return "a pinned lane was answered by another model (route substituted)"
+    if row.get("lane_unverified"):
+        return "a pinned lane's response carried no model evidence (lane unverified)"
+    status = row.get("http_status")
+    if type(status) is int and status >= 400:
+        return f"HTTP {status} on a model call"
+    retried = _HTTP_CODE.search(str(row.get("retried_after") or ""))
+    if retried:
+        return f"HTTP {retried.group(1)} on a model call (answered on its retry)"
+    if row.get("rate_headers"):
+        return "HTTP 429 on a model call"
+    if row.get("cache_refused") or row.get("receipt_from_cache") is True:
+        return "a Nightshift cache replay was refused"
+    if row.get("error"):
+        return "a model call failed"
+    return None
+
+
+def line_stop_reason(text: str) -> str | None:
+    """Why one (redacted) line of a live child's output trips the Meterless stop rule, or None."""
+    if text.startswith("summary ("):  # run.py's last line quotes the model-written topic summary: prose, not a signal
+        return None
+    for pattern, reason in _STOP_LINES:
+        if pattern.search(text):
+            return reason
+    code = _HTTP_CODE.search(text)
+    if code:
+        return f"HTTP {code.group(1)} on a model call"
+    cls = _ERROR_CLASS.search(text)
+    if cls:
+        return f"{cls.group(1)} on a model call"
+    failed = _FAILED_CALLS.search(text)
+    if _FAILED_LINE.search(text) or (failed and int(failed.group(1)) > 0):
+        return "a model call failed"
+    return None
+
+
+class MeterlessWatch:
+    """The Meterless stop rule for one live child: every line of its output and every row it adds to the run's journal.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): on --route meterless a live run stops at its first error: a call
+    answered 4xx/5xx (also one answered on its retry), a route_substituted or lane_unverified row, a call with H-MEM
+    memories injected (or an unreadable count), a Traceback, a refusal of run.py, or a non-zero exit of the child
+    (2, a published partial, and 3 included). The child is killed at once (its checkpoint and journal stay), its topic is
+    `failed` with a short public reason, the topics after it are not started (they stay `queued`), and the runner prints
+    the manual --route nvidia command for that topic as a fresh --attempt, which it never starts itself. Why: Yelysei's
+    rule for the canonical editions (D1, 2026-10-26): NVIDIA direct is a manual per-topic fallback only, by his word,
+    and an edition never mixes routes. Read from the journal (flags and status codes only, nothing else of a row is
+    kept) and from run.py's verbose lines (the scratch launcher's list of the two 26 Oct climate-policy runs).
+    Claude Code's additions, to confirm: any other error row (a transport failure, a reply without JSON, a refused cache
+    replay) also stops ("the first error"); a run that made calls without printing HMEM_OFF_LINE (the H-MEM guard's
+    confirmation) is failed after it ends."""
+
+    def __init__(self, journal: Path):
+        self.journal = journal
+        try:
+            self.offset = journal.stat().st_size  # rows of earlier runs of this run id are not this run's
+        except OSError:
+            self.offset = 0
+        self._partial = b""
+        self.reason: str | None = None
+        self.hmem_off = False
+        self._lock = threading.Lock()
+        self._poll_lock = threading.Lock()
+
+    def trip(self, reason: str | None) -> bool:
+        """Records `reason` as the stop reason when it is the first one; True only then."""
+        if reason is None:
+            return False
+        with self._lock:
+            if self.reason is None:
+                self.reason = reason
+                return True
+        return False
+
+    def line(self, text: str) -> bool:
+        if HMEM_OFF_LINE in text:
+            self.hmem_off = True
+            return False
+        return self.trip(line_stop_reason(text))
+
+    def poll(self) -> bool:
+        """Reads the complete rows the journal gained since the last poll; True when one tripped the rule first."""
+        with self._poll_lock:
+            try:
+                with self.journal.open("rb") as fh:
+                    fh.seek(self.offset)
+                    data = fh.read()
+            except OSError:
+                return False
+            if not data:
+                return False
+            self.offset += len(data)
+            *lines, self._partial = (self._partial + data).split(b"\n")
+            tripped = False
+            for raw in lines:
+                if not raw.strip():
+                    continue
+                try:
+                    row = json.loads(raw.decode("utf-8", "replace"))
+                except ValueError:
+                    continue  # a row cut short by a crash; llm._journal starts the next row on a new line
+                tripped = self.trip(row_stop_reason(row)) or tripped
+            return tripped
+
+
 def _pump(ctx: Ctx, argv: list[str], env: dict[str, str], log_path: Path, header: str,
-          timeout_s: float | None = None) -> tuple[int | None, list[str], str | None]:
+          timeout_s: float | None = None, watch: MeterlessWatch | None = None) -> tuple[int | None, list[str], str | None]:
     """Runs one child, its stdout+stderr redacted into `log_path`. Returns (exit code or None, last lines, why it did
-    not end on its own: could not start, timed out, interrupted)."""
+    not end on its own: could not start, timed out, interrupted). With `watch` (the Meterless stop rule), every output
+    line and, every WATCH_POLL_S, the run's new journal rows are checked, and the child is killed at the first trip;
+    the reason stays in `watch.reason`."""
     tail: deque[str] = deque(maxlen=60)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("ab") as log:
@@ -939,6 +1152,22 @@ def _pump(ctx: Ctx, argv: list[str], env: dict[str, str], log_path: Path, header
             timer = threading.Timer(timeout_s, _kill)
             timer.daemon = True
             timer.start()
+
+        def _stop_child() -> None:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+
+        polling = threading.Event()
+        poller = None
+        if watch is not None:
+            def _poll() -> None:
+                while not polling.wait(WATCH_POLL_S):
+                    if watch.poll():
+                        _stop_child()
+            poller = threading.Thread(target=_poll, daemon=True)
+            poller.start()
         try:
             assert proc.stdout is not None
             for raw in proc.stdout:
@@ -948,6 +1177,8 @@ def _pump(ctx: Ctx, argv: list[str], env: dict[str, str], log_path: Path, header
                 text = clean.decode("utf-8", "replace").rstrip()
                 if text:
                     tail.append(text)
+                    if watch is not None and watch.line(text):
+                        _stop_child()  # decision at MeterlessWatch: the first error ends the run
             rc = proc.wait()
         except BaseException:
             # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a fault while pumping a child's output (a log write,
@@ -958,9 +1189,16 @@ def _pump(ctx: Ctx, argv: list[str], env: dict[str, str], log_path: Path, header
         finally:
             if timer:
                 timer.cancel()
+            polling.set()
+            if poller is not None:
+                poller.join(timeout=10)
             with ctx.lock:
                 ctx.procs.pop(proc.pid, None)
+        if watch is not None:
+            watch.poll()  # rows the child wrote after the last poll
         log.write(f"--- exit {rc} at {now_iso()}\n".encode())
+        if watch is not None and watch.reason:
+            log.write(ctx.redactor.raw(f"--- Meterless stop rule: {watch.reason}\n".encode()))
         if timed_out.is_set():
             return rc, list(tail), f"timed out after {timeout_s / 60:g} min and was stopped (the checkpoint is kept)"
         if ctx.stopping.is_set():
@@ -1025,6 +1263,7 @@ class RunResult:
     resume: bool
     started_at: str
     ended_at: str
+    stop: str | None = None  # why the Meterless stop rule stopped or failed this run (decision at MeterlessWatch)
 
 
 def live_args(topic: str, edition_date: str, out: Path, attempt: int, resume: bool) -> list[str]:
@@ -1042,17 +1281,28 @@ def live_run(ctx: Ctx, item: Item, key: Key, n: int) -> RunResult:
     argv = ctx.live_cmd + live_args(item.topic, ctx.date, ctx.out, ctx.attempt, resume)
     log_name = run_log_name(ctx.date, item.topic, ctx.attempt, n, key.name)  # decision at run_log_name
     started = now_iso()
-    header = f"=== run {n} of {rid} on {key.name}{' (resume)' if resume else ''} at {started} ==="
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the first line of every live run's log names the route the run
+    # used (nvidia | meterless; without --keys on --route nvidia, the route .env resolves to), and whether the Meterless
+    # stop rule watched it; never a URL, key or token. Why: Yelysei's D1 (2026-10-26): the editions of 27 Oct run on
+    # Nightshift and an edition never mixes routes, so each run's log must say which route produced it.
+    header = (f"=== run {n} of {rid} on {key.name}{' (resume)' if resume else ''} at {started}; route {ctx.route}"
+              + ("; Meterless stop rule on" if ctx.stop_rule else "") + " ===")
+    watch = MeterlessWatch(ctx.out / "_journal" / f"{rid}.jsonl") if ctx.stop_rule else None
     try:
-        rc, tail, error = _pump(ctx, argv, _child_env(ctx, key), ctx.log_dir / log_name, header, ctx.timeout_s)
+        rc, tail, error = _pump(ctx, argv, _child_env(ctx, key), ctx.log_dir / log_name, header, ctx.timeout_s, watch)
     except Exception as exc:  # noqa: BLE001 — a runner fault fails this topic, not the others
         rc, tail, error = None, [], f"runner error: {type(exc).__name__}: {exc}"
     after_rows = journal_counts(ctx.out, rid)
     used = (max(0, after_rows[0] - before_rows[0]), max(0, after_rows[1] - before_rows[1]))
+    stop = None
+    if watch is not None:
+        stop = watch.reason
+        if stop is None and (used[0] or used[1]) and not watch.hmem_off:  # decision at MeterlessWatch
+            stop = "the run made calls without confirming the H-MEM guard (hmemKnowledge read back false)"
     published = None
-    if rc in (0, 2) and not error:
+    if (rc in (0, 2) and not error) or stop is not None:  # a stopped run may have published before the kill landed
         published = published_by(ctx.out, item.topic, ctx.date, rid, after=before_version)
-        if published is None and rc == 0:
+        if published is None and rc == 0 and stop is None:
             published = published_by(ctx.out, item.topic, ctx.date, rid)  # "had already finished and published"
     reason = error
     if reason is None and published is None and rc != 3:
@@ -1061,7 +1311,7 @@ def live_run(ctx: Ctx, item: Item, key: Key, n: int) -> RunResult:
             reason = f"exit 0 but the store holds no snapshot of run {rid}"
         else:
             reason = f"exit {rc}: {line}" if line else f"exit {rc}"
-    return RunResult(rc, used, published, reason, log_name, resume, started, now_iso())
+    return RunResult(rc, used, published, reason, log_name, resume, started, now_iso(), stop)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -1110,6 +1360,43 @@ def resolve_value(name: str, file_values: dict[str, str]) -> str:
     return (os.environ.get(name) or "").strip() or (file_values.get(name) or "").strip()
 
 
+def child_value(name: str, file_values: dict[str, str], overrides: dict[str, str] | None = None) -> str:
+    """What a live child reads for `name`: the runner's own setting for it, else the exported value (an empty one
+    included: load_dotenv(override=False) keeps any variable that is set), else the .env's. Never printed."""
+    if overrides and name in overrides:
+        return overrides[name]
+    if name in os.environ:
+        return os.environ[name]
+    return file_values.get(name) or ""
+
+
+def env_route(file_values: dict[str, str]) -> str:
+    """The route a child without injected keys and without the runner's overrides resolves (llm._route_family's
+    precedence): nvidia (NVIDIA's own endpoint), meterless (any other base URL, or only a Meterless token) or none."""
+    from quorum_reasoning import llm
+
+    def seen(name: str) -> str:
+        return child_value(name, file_values).strip()
+
+    model_key = seen("MODEL_API_KEY")
+    base = seen("MODEL_BASE_URL") or seen("METERLESS_BASE_URL")
+    key = model_key or seen("METERLESS_RUNTIME_TOKEN") or seen("METERLESS_TOKEN")
+    if not base and not model_key and key:
+        base = llm.METERLESS_DEFAULT_BASE_URL
+    if not (base and key):
+        return "none"
+    return "nvidia" if llm._is_direct_url(base) else "meterless"
+
+
+def nvidia_key_names(file_values: dict[str, str]) -> list[str]:
+    """The NVIDIA key variable NAMES (MODEL_API_KEY, MODEL_API_KEY_*) that hold a value, exported or in .env, for the
+    printed manual fallback command; MODEL_API_KEY alone when none does. Never a value."""
+    names = sorted({n for n in (*os.environ.keys(), *file_values.keys())
+                    if NVIDIA_KEY_NAME.match(n) and len(resolve_value(n, file_values)) >= MIN_KEY_CHARS},
+                   key=lambda n: (n != "MODEL_API_KEY", n))
+    return names or ["MODEL_API_KEY"]
+
+
 def list_db_topics(ctx: Ctx) -> dict[str, Any]:
     """collection's topics table through `dry_check.py --list-topics`: {"topics": [ids], "filtered": bool (active rows in
     collection order), "skipped": [{"id", "reason"}]}. A listed id that breaks the shared rule or is a Windows device name
@@ -1148,8 +1435,13 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--log-dir", required=True)
     ap.add_argument("--status-dir", required=True)
     ap.add_argument("--dry-check-out", required=True, help="scratch store for the dry checks' stand-in snapshots (never inside --out)")
-    ap.add_argument("--max-calls-per-key", type=int, default=FAST_CAP, help=f"fast-lane calls per key and invocation (default {FAST_CAP})")
-    ap.add_argument("--max-ultra-calls-per-key", type=int, default=ULTRA_CAP, help=f"Ultra calls per key and invocation (default {ULTRA_CAP})")
+    ap.add_argument("--route", choices=ROUTES, default="nvidia",
+                    help="nvidia (default): the NVIDIA direct route with --keys, or without --keys the route in .env as it is; "
+                         "meterless: the Meterless Nightshift route (no --keys, no key rotation, no pacing, the Meterless stop rule)")
+    ap.add_argument("--max-calls-per-key", type=int, default=None,
+                    help=f"fast-lane calls per key and invocation (default {FAST_CAP}; uncapped on --route meterless)")
+    ap.add_argument("--max-ultra-calls-per-key", type=int, default=None,
+                    help=f"Ultra calls per key and invocation (default {ULTRA_CAP}; uncapped on --route meterless)")
     ap.add_argument("--estimate-factor", type=float, default=ESTIMATE_FACTOR, help=f"dry-check count x this = the estimate (default {ESTIMATE_FACTOR})")
     ap.add_argument("--attempt", type=int, default=1, help="run.py --attempt for every topic (default 1)")
     ap.add_argument("--live", action="store_true", help="start the live runs (paid); without it only the dry checks and the plan run")
@@ -1179,12 +1471,19 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
         return refuse("--date is not a calendar date")
     if args.attempt < 1:
         return refuse("--attempt must be at least 1")
-    if args.max_calls_per_key < 1 or args.max_ultra_calls_per_key < 1:
+    meterless = args.route == "meterless"
+    if meterless and args.keys:
+        return refuse("--route meterless runs on the Nightshift runtime's own token, with no --keys and no key rotation "
+                      "(NVIDIA direct is --route nvidia --keys ...)")
+    default_fast, default_ultra = (UNCAPPED, UNCAPPED) if meterless else (FAST_CAP, ULTRA_CAP)  # decision at UNCAPPED
+    fast_cap = args.max_calls_per_key if args.max_calls_per_key is not None else default_fast
+    ultra_cap = args.max_ultra_calls_per_key if args.max_ultra_calls_per_key is not None else default_ultra
+    if fast_cap < 1 or ultra_cap < 1:
         return refuse("the per-key caps must be at least 1")
     if not (args.estimate_factor > 0 and math.isfinite(args.estimate_factor)):
         return refuse("--estimate-factor must be a positive number")
     try:
-        keys = parse_keys(args.keys, args.max_calls_per_key, args.max_ultra_calls_per_key)
+        keys = parse_keys(args.keys, fast_cap, ultra_cap)
     except ValueError as exc:
         return refuse(str(exc))
     topics_arg = args.topics.strip()
@@ -1231,12 +1530,26 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
         secrets |= {v for n, v in source.items() if SECRET_NAME.search(n) and isinstance(v, str)}
     redactor = Redactor(secrets)
 
+    from quorum_reasoning import llm
+
+    route_env = dict(METERLESS_CHILD_ENV) if meterless else {}
+    token_missing = False
+    if meterless:
+        token_missing = not any(len(child_value(n, file_values, route_env).strip()) >= MIN_KEY_CHARS for n in METERLESS_TOKEN_NAMES)
+        base = child_value("METERLESS_BASE_URL", file_values, route_env).strip()
+        if base and llm._is_direct_url(base):
+            return refuse("--route meterless, but METERLESS_BASE_URL (exported or in .env) is NVIDIA's own endpoint, not the "
+                          "Nightshift runtime: blank it (the runtime's 8088 loopback port is the default) or fix it")
+        route = "meterless"
+    elif any(k.inject for k in keys):
+        route = "nvidia"
+    else:
+        route = env_route(file_values)
+
     if args.live:
         if unusable:
             return refuse(f"no usable value for {', '.join(unusable)} (exported or in .env); list only keys that are set")
         if any(k.inject for k in keys):
-            from quorum_reasoning import llm
-
             base = resolve_value("MODEL_BASE_URL", file_values)
             if not base or not llm._is_direct_url(base):
                 return refuse("--keys sets MODEL_API_KEY, which only the direct NVIDIA route uses (MODEL_BASE_URL on nvidia.com); "
@@ -1251,7 +1564,10 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
               dry_cmd=dry_cmd or [args.python, "-X", "utf8", str(SCRIPTS / "dry_check.py")],
               workdir=REASONING, env_file=env_file if env_file.is_file() else None, key_values=key_values, blank=blank,
               redactor=redactor, timeout_s=args.run_timeout_min * 60 if args.run_timeout_min > 0 else None,
-              factor=args.estimate_factor)
+              factor=args.estimate_factor, route=route, stop_rule=meterless, keyed=any(k.inject for k in keys), route_env=route_env,
+              token_missing=token_missing, fallback_keys=nvidia_key_names(file_values),
+              fallback_dirs=["--out", args.out, "--log-dir", args.log_dir, "--status-dir", args.status_dir,
+                             "--dry-check-out", args.dry_check_out])
 
     lock = runner_dir(status_dir, args.date) / ".runner.lock"
     try:
@@ -1275,9 +1591,144 @@ def main(argv: list[str] | None = None, *, live_cmd: list[str] | None = None, dr
             pass
 
 
+def cap_text(k: Key) -> str:
+    return "uncapped" if k.cap_fast >= UNCAPPED and k.cap_ultra >= UNCAPPED else f"{k.cap_fast}/{k.cap_ultra}"
+
+
+def route_text(ctx: Ctx) -> str:
+    if ctx.stop_rule:
+        return "meterless (the Meterless stop rule on)"
+    if ctx.keyed:  # --keys: the direct route, checked at the start of a live invocation
+        return "nvidia"
+    return f"nvidia, no --keys: the route in .env as it is ({ctx.route})"
+
+
+def unfit_version(ctx: Ctx, rid: str, done: tuple[int, str | None] | None, record: dict[str, Any] | None) -> str | None:
+    """Why the stored version `done` of run id `rid` stays `failed` instead of "already published", or None.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a run id whose record says the Meterless stop rule failed it
+    (`stopped_by_rule`, written with the version when the run published before it was stopped) stays `failed` on every
+    later invocation, either route; on --route meterless so does a run id whose stored version is `partial`. Neither is
+    resumed: the run id is finished; a fresh --attempt runs the topic again. Why: the stop rule fails a run that hit an
+    error even when run.py published before the kill (an error in its last calls) or exited 2 (a published partial),
+    and a rerun of the same command turned that verdict into `published` ("already published by an earlier run")."""
+    if not done:
+        return None
+    if ctx.stop_rule and done[1] == "partial":
+        return (f"run {rid} published a partial snapshot (version {done[0]}), which the Meterless stop rule fails; a fresh "
+                f"--attempt {ctx.attempt + 1} runs the topic again")
+    if isinstance(record, dict) and record.get("run_id") == rid and record.get("stopped_by_rule"):
+        return (f"run {rid} was stopped by the Meterless stop rule, and its version {done[0]} is not for hand-over; a fresh "
+                f"--attempt {ctx.attempt + 1} runs the topic again")
+    return None
+
+
+def journal_flag(out: Path, rid: str) -> str | None:
+    """The stop rule's reason (row_stop_reason) for the first row of run id `rid`'s journal that trips it, or None.
+    Flags and status codes only: payloads, replies, receipt ids and request keys are parsed and dropped, never kept or
+    printed."""
+    path = out / "_journal" / f"{rid}.jsonl"
+    if not path.is_file():
+        return None
+    with path.open("r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                why = row_stop_reason(json.loads(line))
+            except ValueError:
+                continue  # a row cut short by a crash (llm.load_journal skips it too)
+            if why:
+                return why
+    return None
+
+
+def unfit_resume(ctx: Ctx, rid: str) -> str | None:
+    """--route meterless: why run id `rid` must not resume from its checkpoint and journal, or None.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): on --route meterless a run id whose journal holds a row the stop
+    rule trips on (row_stop_reason: an error row, an HTTP 4xx/5xx also when answered on its retry, a substituted or
+    unverified lane, H-MEM memories injected, a refused cache replay) is never resumed: its topic is `failed` at once and
+    a fresh --attempt N+1 runs it again, as for unfit_version; a stopped run id whose journal holds no such row (a
+    Traceback outside a model call, a timeout, an interrupt) resumes from its checkpoint. Why: llm.load_journal restores
+    every journal row, error rows included, into the ledger and the snapshot's provenance, so a resumed run's own summary
+    line ("model calls: N (k failed, ...)") trips the rule again at its end, after it has re-run the rest of the topic
+    and published a version that cannot be handed over (review of 2026-10-26: a 401 after a token change, a connection
+    refused while Nightshift restarts, each leaves such a row). Supersedes the first rule of this branch that a stopped
+    run id always resumes on a rerun. Proposed by Claude Code, to confirm by Yelysei."""
+    if not ctx.stop_rule:
+        return None
+    why = journal_flag(ctx.out, rid)
+    if why is None:
+        return None
+    return (f"run {rid} keeps a call the Meterless stop rule fails in its journal ({why}), which a resume would restore "
+            f"into the edition; a fresh --attempt {ctx.attempt + 1} runs the topic again")
+
+
+def route_mix(ctx: Ctx, rid: str, record: dict[str, Any] | None) -> str | None:
+    """Why run id `rid` must not continue on this invocation's route, or None.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a run id that already has live history (a checkpoint of its
+    thread or journal rows) continues only on the route its record names (`route`, written at every live start): on
+    --route meterless a run id whose record names no route (a run before this rule, or a lost record) or another route
+    is failed; on --route nvidia only a record naming the other real route is (records before this rule continue as
+    before). The failed topic is run again as a fresh --attempt on the route wanted. Why: Yelysei's D1 (2026-10-26):
+    one edition never mixes routes, and a resume would restore the other route's journal rows into the ledger and the
+    snapshot's provenance."""
+    if not (checkpoint_has_thread(ctx.out, rid) or journal_counts(ctx.out, rid) != (0, 0)):
+        return None
+    prev = None
+    if isinstance(record, dict) and record.get("run_id") == rid:
+        runs = [r for r in record.get("runs") or [] if isinstance(r, dict)]
+        prev = record.get("route") or (runs[-1].get("route") if runs else None)
+    if ctx.stop_rule:
+        mixed = prev != "meterless"
+    else:
+        mixed = prev in ROUTES and ctx.route in ROUTES and prev != ctx.route
+    if not mixed:
+        return None
+    where = f"the {prev} route" if prev in ROUTES else "a route this runner did not record"
+    return (f"run {rid} already has live calls on {where}; an edition never mixes routes: a fresh --attempt "
+            f"{ctx.attempt + 1} runs the topic on this route")
+
+
+def _token_missing(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str], mode: str, started_at: str) -> int:
+    """--route meterless without a Meterless token: every listed topic `failed` ("meterless token missing", unless its
+    run id is already published), no child of any kind started, not even the topics listing.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the check is what a live child would read (the runner's own
+    settings, else the exported value, else .env), for METERLESS_TOKEN or its alias METERLESS_RUNTIME_TOKEN, at least
+    MIN_KEY_CHARS long; `--topics all` is refused (exit 2) since the topics are known only from the listing. Why:
+    Yelysei's rule of 2026-10-26: write state=failed with reason "meterless token missing" and start nothing; run.py
+    would otherwise refuse every topic one by one ("no model route is configured")."""
+    if not topics:
+        print("refusing to run: --route meterless with no Meterless token (METERLESS_TOKEN or METERLESS_RUNTIME_TOKEN, exported "
+              "or in .env); with --topics all nothing can be marked, and nothing was started", file=sys.stderr)
+        return 2
+    statuses = Statuses(ctx.status_dir, ctx.date, ctx.redactor, mode, attempt=ctx.attempt)
+    final: dict[str, dict[str, Any]] = {}
+    for topic in topics:
+        rid = run_id(topic, ctx.date, ctx.attempt)
+        before = statuses.load(topic)
+        statuses.open(topic, rid)
+        statuses.follow_store(topic, latest_snapshot(ctx.out, topic, ctx.date))  # live mode only
+        done = published_by(ctx.out, topic, ctx.date, rid)
+        if done and not unfit_version(ctx, rid, done, before):
+            statuses.keep_published(topic)
+            final[topic] = statuses.save(topic, state="published", state_mode="live", version=done[0], snapshot_status=done[1],
+                                         reason="already published by an earlier run", exit_code=None)
+            continue
+        final[topic] = statuses.verdict(topic, "failed", "meterless token missing", plan=None)
+    ctx.say(f"run_editions {mode}: {args.date}, --route meterless: meterless token missing (METERLESS_TOKEN or "
+            f"METERLESS_RUNTIME_TOKEN, exported or in .env); nothing was started")
+    return _summary(ctx, args, mode, started_at, topics, final, keys, {}, [])
+
+
 def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str], unusable: list[str]) -> int:
     mode = "live" if args.live else "dry"
     started_at = now_iso()
+    if ctx.stop_rule and ctx.token_missing:
+        return _token_missing(ctx, args, keys, topics, mode, started_at)
     try:
         listing = list_db_topics(ctx)
     except Exception as exc:  # noqa: BLE001
@@ -1302,8 +1753,8 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
             return 2
     else:
         not_rows = {t for t in topics if t not in set(rows)}
-    ctx.say(f"run_editions {mode}: {args.date}, {len(topics)} topics ({', '.join(topics)}); keys: "
-            + ", ".join(f"{k.name} {k.cap_fast}/{k.cap_ultra}" for k in keys)
+    ctx.say(f"run_editions {mode}: {args.date}, {len(topics)} topics ({', '.join(topics)}); route {route_text(ctx)}; keys: "
+            + ", ".join(f"{k.name} {cap_text(k)}" for k in keys)
             + (f"; not usable (no value): {', '.join(unusable)}" if unusable else ""))
     if datetime.now(timezone.utc) < edition_cut_utc(args.date):
         ctx.say(f"note: before the edition cut ({edition_cut_utc(args.date).strftime('%Y-%m-%dT%H:%MZ')}): the day's corpus is not complete yet")
@@ -1319,11 +1770,15 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
     final: dict[str, dict[str, Any]] = {}
     for topic in topics:
         rid = run_id(topic, ctx.date, ctx.attempt)
+        before = statuses.load(topic)  # the record as an earlier invocation left it (its `route`)
         statuses.open(topic, rid)
         shown = statuses.follow_store(topic, latest_snapshot(ctx.out, topic, ctx.date))  # live mode only
         if shown:
             ctx.say(f"{topic}: its status file keeps the published version of run {shown} until run {rid} publishes; "
                     "this run's states go to the runner's record")
+        elif topic in statuses.rejected:
+            ctx.say(f"{topic}: the store's newest version is run {statuses.rejected[topic]}'s, which the Meterless stop rule "
+                    f"failed: its status file shows run {rid}, and that version is never handed over")
         if topic in statuses.kept:
             ctx.say(f"{topic}: its status keeps the live outcome {statuses.docs[topic].get('state')!r}; the plan goes to plan / plan_outcome")
         if topic in not_rows:
@@ -1332,11 +1787,26 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
             ctx.say(f"{topic}: failed, not {row_word} in collection's topics table")
             continue
         done = published_by(ctx.out, topic, ctx.date, rid)
+        unfit = unfit_version(ctx, rid, done, before)
+        if unfit:
+            final[topic] = statuses.verdict(topic, "failed", unfit, plan=None, stopped_by_rule=True, version=done[0])
+            ctx.say(f"{topic}: failed, {unfit}")
+            continue
         if done:  # a snapshot of this run id in the live store is a live outcome, whichever mode found it
             statuses.keep_published(topic)  # live mode: a pair that already says so stays byte-identical
             final[topic] = statuses.save(topic, state="published", state_mode="live", version=done[0], snapshot_status=done[1],
                                          reason="already published by an earlier run", exit_code=None)
             ctx.say(f"{topic}: already published (version {done[0]}), skipped")
+            continue
+        mixed = route_mix(ctx, rid, before)
+        if mixed:
+            final[topic] = statuses.verdict(topic, "failed", mixed, plan=None)
+            ctx.say(f"{topic}: failed, {mixed}")
+            continue
+        flagged = unfit_resume(ctx, rid)  # decision at unfit_resume
+        if flagged:
+            final[topic] = statuses.verdict(topic, "failed", flagged, plan=None, stopped_by_rule=True)
+            ctx.say(f"{topic}: failed, {flagged}")
             continue
         if topic not in statuses.kept:
             statuses.save(topic, state="queued", reason="dry check running")
@@ -1369,7 +1839,8 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
                 + (", resumes its checkpoint" if item.resume else ""))
 
     # 2. the plan
-    plan = simulate(usable_keys, items) if usable_keys else {i.topic: {"segments": [], "outcome": "waiting_for_key", "reason": "no usable key"} for i in items}
+    pace = NO_PACE if ctx.stop_rule else None  # the Meterless route paces nothing (decision at METERLESS_CHILD_ENV)
+    plan = simulate(usable_keys, items, pace) if usable_keys else {i.topic: {"segments": [], "outcome": "waiting_for_key", "reason": "no usable key"} for i in items}
     for item in items:
         entry = plan[item.topic]
         ctx.say(f"plan {item.topic}: {describe_plan(entry)}")
@@ -1399,7 +1870,7 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
 
     try:
         while True:
-            for item, key, res in planner.place():
+            for item, key, res in ([] if ctx.halted else planner.place()):  # decision at MeterlessWatch: nothing after a stop
                 doc = statuses.docs[item.topic]
                 n = int(doc.get("attempts") or 0) + 1
                 resume = item.resume or checkpoint_has_thread(ctx.out, run_id(item.topic, ctx.date, ctx.attempt))
@@ -1410,12 +1881,13 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
                 # (superseded 2026-10-26, closing review round 2: "until then" is when a live invocation first queued
                 # the run id, never a plan run's time; decision at Statuses.open)
                 first = {"started_at": now_iso(), "started_mode": "live"} if n == 1 and not doc.get("runs") else {}
-                statuses.save(item.topic, state="running", attempts=n, key=key.name, log=log_name, reason=None,
+                statuses.save(item.topic, state="running", attempts=n, key=key.name, route=ctx.route, log=log_name, reason=None,
                               reserved={"fast": res[0], "ultra": res[1]}, **first)
-                ctx.say(f"start {item.topic} on {key.name}{' (resume)' if resume else ''}, reserved {res[0]}/{res[1]}, log {log_name}")
+                ctx.say(f"start {item.topic} on {key.name} via route {ctx.route}{' (resume)' if resume else ''}, "
+                        f"reserved {res[0]}/{res[1]}, log {log_name}")
                 threading.Thread(target=worker, args=(item, key, res, n), daemon=True).start()
                 running += 1
-            for item, reason in planner.take_waiting():
+            for item, reason in ([] if ctx.halted else planner.take_waiting()):
                 final[item.topic] = statuses.save(item.topic, state="waiting_for_key", reason=reason, key=None, reserved=None)
                 ctx.say(f"{item.topic}: waiting for a key ({final[item.topic].get('reason')})")
             if running == 0:
@@ -1444,6 +1916,36 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
             except Exception:  # noqa: BLE001 — the fault that ended the loop may fail this write too; the stop came first
                 pass
         raise
+    if ctx.halted:  # decision at MeterlessWatch: the topics after the stopped one stay queued, never started
+        left = [i.topic for i in planner.pending] + [i.topic for i, _ in planner.take_waiting()]
+        for topic in left:
+            statuses.save(topic, state="queued", reason=f"not started: {ctx.halted} stopped at the first error on the "
+                                                        "Meterless route", key=None, reserved=None)
+        if left:
+            ctx.say(f"not started (stay queued): {', '.join(left)}")
+        ctx.say(f"once the cause is fixed, rerun the same command: the published topics are skipped, the queued ones "
+                f"start, and {halted_next(ctx, statuses.docs[ctx.halted])}")
+
+
+def halted_next(ctx: Ctx, doc: dict[str, Any]) -> str:
+    """What a rerun of the same command does with the topic the stop rule halted the invocation on (decisions at
+    unfit_version and unfit_resume)."""
+    topic, fresh = ctx.halted, f"--attempt {ctx.attempt + 1}"
+    if doc.get("version") is not None:
+        return (f"{topic} stays failed (its version {doc['version']} is not for hand-over): run it again alone as a "
+                f"fresh {fresh}")
+    if unfit_resume(ctx, run_id(topic, ctx.date, ctx.attempt)):
+        return (f"{topic} stays failed (its journal keeps a call the rule fails, which a resume would restore into the "
+                f"edition): run it again alone as a fresh {fresh}")
+    return f"{topic} resumes from its checkpoint (its journal holds no call the rule fails)"
+
+
+def fallback_command(ctx: Ctx, topic: str) -> str:
+    """The manual NVIDIA-direct command for one topic after a Meterless stop: a fresh --attempt (never a resume of the
+    Meterless run id), the key NAMES that hold a value, the folders as given. Printed only, never run."""
+    argv = ["python", "-X", "utf8", "scripts/run_editions.py", "--date", ctx.date, "--topics", topic, "--route", "nvidia",
+            "--keys", ",".join(ctx.fallback_keys), "--attempt", str(ctx.attempt + 1), *ctx.fallback_dirs, "--live"]
+    return subprocess.list2cmdline(argv)
 
 
 def _record(ctx: Ctx, statuses: Statuses, planner: Planner, final: dict[str, dict[str, Any]],
@@ -1453,8 +1955,16 @@ def _record(ctx: Ctx, statuses: Statuses, planner: Planner, final: dict[str, dic
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): exit 2 counts as published when the store holds a new version of
     this run id (run.py exits 2 for a `partial` snapshot after publishing it), with snapshot_status and a reason saying
     partial; exit 2 without one (a refusal) is failed. Why: the partial version is already latest.json for the portal,
-    so "failed" would misreport what readers see; the brief's "exit 2 -> failed" holds for refusals."""
-    if result.exit_code == 3 and not result.reason:
+    so "failed" would misreport what readers see; the brief's "exit 2 -> failed" holds for refusals.
+    On --route meterless the stop rule decides instead (decision at MeterlessWatch): only exit 0 with a new version of
+    the run id and no stop reason is `published`; anything else is `failed` and halts the invocation."""
+    stop = None
+    if ctx.stop_rule and not (result.exit_code == 0 and result.published and not result.stop and not result.reason):
+        stop = result.stop or result.reason or f"run.py exited {result.exit_code}"
+        if result.published:
+            stop += f" (its {result.published[1] or 'stored'} snapshot, version {result.published[0]}, is not for hand-over)"
+        outcome = "failed"
+    elif result.exit_code == 3 and not result.reason:
         outcome = "drained"
     elif result.published:
         outcome = "published"
@@ -1463,10 +1973,21 @@ def _record(ctx: Ctx, statuses: Statuses, planner: Planner, final: dict[str, dic
     planner.finish(item, key, res, outcome, result.used)
     doc = statuses.docs[item.topic]
     runs = list(doc.get("runs") or [])
-    runs.append({"n": doc.get("attempts"), "key": key.name, "resume": result.resume, "started_at": result.started_at,
+    runs.append({"n": doc.get("attempts"), "key": key.name, "route": ctx.route, "resume": result.resume, "started_at": result.started_at,
                  "ended_at": result.ended_at, "exit_code": result.exit_code, "outcome": outcome,
                  "calls": {"fast": result.used[0], "ultra": result.used[1]}, "log": result.log})
     common = {"runs": runs, "reserved": None, "calls_done": {"fast": item.done_fast, "ultra": item.done_ultra}}
+    if stop is not None:
+        reason = f"stopped at the first error on the Meterless route: {stop}"
+        kept = {"version": result.published[0], "snapshot_status": result.published[1]} if result.published else {}
+        final[item.topic] = statuses.save(item.topic, state="failed", reason=reason, exit_code=result.exit_code,
+                                          stopped_by_rule=True, **kept, **common)  # decision at unfit_version
+        ctx.halted = ctx.halted or item.topic
+        ctx.say(f"{item.topic}: failed ({final[item.topic].get('reason')}); no further topic starts in this invocation")
+        if not ctx.stopping.is_set():  # an interrupted runner prints no fallback
+            ctx.say(f"manual fallback for {item.topic}, NVIDIA direct, only by Yelysei's word (the runner never starts it; a "
+                    f"fresh attempt, so the edition never mixes routes): {fallback_command(ctx, item.topic)}")
+        return
     if outcome == "published":
         version, snap_status = result.published  # type: ignore[misc]
         statuses.follow_store(item.topic, latest_snapshot(ctx.out, item.topic, ctx.date))  # its own version is the newest now
@@ -1499,6 +2020,7 @@ def _summary(ctx: Ctx, args: argparse.Namespace, mode: str, started_at: str, top
         rows.append({"topic": str(s.get("id"))[:64], "state": "failed", "state_mode": mode, "calls_estimate": None, "version": None, "attempts": None,
                      "reason": f"topics row skipped, not run: {s.get('reason')}", "plan_outcome": None, "skipped_row": True})
     summary = {"date": ctx.date, "mode": mode, "started_at": started_at, "ended_at": now_iso(),
+               "route": ctx.route, "stop_rule": ctx.stop_rule, "halted_by": ctx.halted,
                "keys": [{"name": k.name, "cap_fast": k.cap_fast, "cap_ultra": k.cap_ultra, "used_fast": k.used_fast,
                          "used_ultra": k.used_ultra, "drained": k.drained, "usable": (not k.inject) or k.name in ctx.key_values} for k in keys],
                "topics": rows}
