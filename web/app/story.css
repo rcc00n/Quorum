@@ -470,8 +470,12 @@
   scroll-margin-top: 88px;
 }
 
-/* The claims-only page under a story (no analysis supplied): the claim sections as panels. */
+/* The claims-only page under a story (no analysis supplied): the claim sections as panels.
+   DECISION(2026-10-27, Anastasia/Claude Code): the panel is a block, not globals.css's two-column grid. Why:
+   that grid keeps its first column for the eyebrow, which this page hides, so the heading dropped into the
+   40 px column and overlapped the first claim at every width. */
 .story-page-plain .analysis-section {
+  display: block;
   margin-top: 32px;
   padding: 40px 40px 48px;
   border-radius: var(--radius);
