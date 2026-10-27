@@ -40,9 +40,11 @@ module.exports=async({page,sources})=>{
  if(await spectrum.locator('.sp-point').count()){
   await page.setViewportSize({width:1440,height:1000});await page.mouse.move(0,0);
   const minor=spectrum.locator('.sp-point:not(.sp-point-major):not([aria-pressed="true"])').first(); // a selected mark shows its label by design
-  if(await minor.count()){assert.equal(await minor.locator('.sp-point-label').evaluate(e=>getComputedStyle(e).opacity),'0');await minor.hover();await page.waitForFunction(e=>getComputedStyle(e.querySelector('.sp-point-label')).opacity==='1',await minor.elementHandle());}
+  // DECISION(2026-10-27, rcc00n/Codex): wait for label opacity to settle after the phone-to-desktop resize.
+  // Why: the production browser can observe the existing 120ms CSS transition; keep the exact visibility assertion.
+  if(await minor.count()){await page.waitForFunction(e=>getComputedStyle(e.querySelector('.sp-point-label')).opacity==='0',await minor.elementHandle());assert.equal(await minor.locator('.sp-point-label').evaluate(e=>getComputedStyle(e).opacity),'0');await minor.hover();await page.waitForFunction(e=>getComputedStyle(e.querySelector('.sp-point-label')).opacity==='1',await minor.elementHandle());}
   const major=spectrum.locator('.sp-point-major').first();
-  if(await major.count())assert.equal(await major.locator('.sp-point-label').evaluate(e=>getComputedStyle(e).opacity),'1');
+  if(await major.count()){await page.waitForFunction(e=>getComputedStyle(e.querySelector('.sp-point-label')).opacity==='1',await major.elementHandle());assert.equal(await major.locator('.sp-point-label').evaluate(e=>getComputedStyle(e).opacity),'1');}
   const stage=spectrum.locator('.sp-stage');await stage.scrollIntoViewIfNeeded();
   const box=await stage.boundingBox();await page.mouse.move(box.x+box.width*.7,box.y+box.height*.35);
   await page.waitForFunction(()=>Math.abs(parseFloat(document.querySelector('.sp-stage').style.getPropertyValue('--sp-ry')))>0);
