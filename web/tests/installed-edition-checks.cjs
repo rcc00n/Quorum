@@ -41,6 +41,11 @@ module.exports = async ({browser, root, password, temp, build}) => {
   })).status(), 200);
   await page.goto(`${root}/dashboard?date=${day}`);
   await page.locator('.tb-card h3').first().waitFor();
+  await page.locator('.tb-head[data-revealed="true"]').waitFor();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await page.locator('.tb-head').evaluate(e=>getComputedStyle(e).animationName),'none');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+
   const localLabel = await page.evaluate(() => new Intl.DateTimeFormat('en', {
     month: 'long', day: 'numeric', year: 'numeric',
   }).format(new Date()));

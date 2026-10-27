@@ -116,3 +116,5 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 Visual thesis: an editorial measuring instrument on paper, with precise colour-coded source positions and a shallow physical presence.
 Content plan: one rating selector and scope line; the rating × log-audience field; a selected-source inspector; the complete source/provenance ledger.
 Interaction thesis: stagger source marks into view once, interpolate between the four rating modes, and use restrained pointer depth plus a focused crosshair to connect a source to its values. Fine-pointer depth and transitions stop under reduced motion. Source colours keep their existing data meaning; no new political dimension or inferred audience is introduced.
+
+Section motion: the public evidence sheet and lead story are shallow depth surfaces; headings and independent sections reveal once as they enter the viewport. Motion never hides content; if IntersectionObserver is missing, sections keep their default appearance. The data, section order and palette are unchanged; reduced motion removes both reveals and pointer depth.

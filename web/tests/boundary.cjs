@@ -305,7 +305,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
         [path.join(repo, "web/tests", file)],
         {
           env: { ...process.env, QUORUM_TEST_URL: root, ...extra },
-          stdio: "ignore",
+          stdio: file === "motion.cjs" ? "inherit" : "ignore",
         },
       );
       children.push(child);
@@ -315,6 +315,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
       );
     });
   }
+  await browserScript("motion.cjs");
   await browserScript("analysis.cjs", { QUORUM_ANALYSIS_FIXTURE: output });
   await browserScript("demo.cjs", {
     TYPESCRIPT_MODULE: path.join(build, "node_modules/typescript"),

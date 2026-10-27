@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { PageMotion } from "./page-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -348,6 +349,7 @@ export function Portal({
             {dateLabel}
           </span>
         </header>
+        <PageMotion root=".workspace-main" ready={!loading && !error} epoch={data} />
         <main id="main" className="workspace-main">
           {loading ? (
             <div className="loading" role="status">

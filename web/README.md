@@ -35,6 +35,8 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-26 · rcc00n / Codex · Landing and workspace sections reveal once on viewport entry; the existing evidence sheet and lead story card gain fine-pointer depth. Content remains visible before observers run, and reduced motion disables all new effects. Why: Vadim requested noticeable motion while keeping the accepted reading layout, source facts and every keyboard action intact; effects use native observers/requestAnimationFrame with no new dependency.
+
 2026-10-26 · rcc00n / Codex · WEB-SPECTRUM-MOTION-01 uses a native source-position/audience instrument with exact existing ratings, logarithmic cited audience, an inspectable source selection and optional shallow pointer depth. Keyboard arrows, the complete source/provenance list, missing-data states and reduced motion remain available; no WebGL or animation dependency. Why: Vadim requested a separate frontend workstream with stronger diagrams and visible motion; presentation must preserve the canonical axes and source facts. Composition and motion: DESIGN.md › Spectrum instrument.
 
 2026-10-26 · rcc00n / Codex · Dashboard links accept an explicit edition date, with the same date format check as topic/story routes. Why: judges can open the accepted historical edition without relabelling it as today's news; the default remains the current day.
