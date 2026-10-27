@@ -8,6 +8,8 @@ import "./header.css";
 import "./spectrum.css";
 import "./reader.css";
 import "./navigator.css";
+import "./instrument-polish.css";
+import "./impact.css";
 import { ScrollState } from "@/components/scroll-state";
 export const metadata: Metadata = {
   title: { default: "Quorum — The news, with its working shown", template: "%s · Quorum" },

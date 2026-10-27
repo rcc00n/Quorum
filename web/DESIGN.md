@@ -112,6 +112,12 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 | 2026-10-25 | Anastasia / Claude Code | This file holds the portal's tokens; the identity decision stays in DECISIONS.md item 9. Look taken from Yelysei's prototype canvas (white, rounded display, crimson accent, 20 px photo cards, pills, dark sign-up); flows from DECISIONS where the prototype is older than them. Light theme only for the hackathon. Structure borrowed from GreenTrace and Saphan (real artifact up front, numbered loop, sponsors by job, honest limits); their dark palette and typefaces are not. | One place for the values, so the landing, the forms and the brief pages stop drifting; the prototype is the team's agreed look and matches item 9; changing it would need a new DECISIONS row. |
 
 
+## Instrument refinement
+
+2026-10-27 · rcc00n / Codex · WEB-PAPERCLIP-POLISH-01, requested by Vadim. Visual reference inspected at [Paperclip](https://paperclip.ing/) at 1440 and 390 px: thin framed surfaces, inset task panels, subtle nested divisions and clearly grouped controls. Adopt those construction details in Quorum's existing paper/ink/umber tokens. Keep the current typefaces/weights, hero/grid/wireline, page measure, card silhouettes, content, status wording and political data colours. No third-party assets/code, rainbow accents, dark-page conversion, rounded-pill system or button lift is adopted; earlier identity decisions remain in force.
+
+Visual thesis: a paper reading surface with quietly framed, precise instruments. Content plan: retain existing landing and reading sections; refine only existing sheets, ledgers, tab/date controls, search and topic rows. Interaction thesis: restrained hover/selection highlights, the existing search entrance and reader transition; all new transitions stop under reduced motion. Implementation: `app/instrument-polish.css`; one import is the feature boundary and can be reverted independently of navigation/data.
+
 ## Spectrum instrument
 
 Visual thesis: an editorial measuring instrument on paper, with precise colour-coded source positions and a shallow physical presence.
@@ -125,3 +131,13 @@ The source map has a direct signed-in entry at `/sources`; the app menu is Today
 2026-10-27 · rcc00n / Codex · Reading workspace uses a pinned numbered navigation instrument and one active pane; graph access is immediate, complete content remains in All sections, and reduced motion disables panel entry. Existing paper/ink/umber identity and story wording stay. Why: Vadim requested a substantial interaction upgrade without model spend; canonical product scope is docs/DECISIONS.md › Reader workspace amendment.
 
 2026-10-27 · rcc00n / Codex · App navigation adds a searchable destination sheet: one large input, a numbered list, one warm selected rule and a native modal backdrop; it is accessible from Search or Ctrl/Cmd-K. Why: a consistent interaction across the app without changing the identity or adding decorative dashboards.
+
+## Visual hierarchy refinement — 27 October 2026
+
+Visual thesis: quiet evidence instruments, with one clear measurement and secondary provenance.
+Content plan: Impact label → supplied score and four rubric dimensions → optional original notes; hero counts/date → source record → optional technical details.
+Interaction thesis: native disclosures expose detail deliberately; the existing shallow hero depth remains the only surface motion. No extra ambient animation or dependency.
+
+2026-10-27 · rcc00n / Codex · Impact uses a compact title, a large supplied total and four restrained segmented point scales after expansion; raw rationales remain in a secondary disclosure. Why: Vadim's screenshot review requested readable accents with less clutter; numeric data stays behind the reader's deliberate link, consistent with DECISIONS › User account and interface.
+
+2026-10-27 · rcc00n / Codex · Hero evidence-sheet refinement keeps the existing 12-column hero/wire line and type, emphasizing the two recorded counts and folding technical detail under Query details and provenance. Why: Vadim’s screenshot review; scope approved by Anastasia in Issue #2 comment6434672425, subject to before/after look approval in the PR. Existing source/date/context stay visible and all original proof fields remain present.

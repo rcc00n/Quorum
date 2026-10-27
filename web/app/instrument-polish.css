@@ -1,0 +1,95 @@
+/* DECISION(2026-10-27, rcc00n/Codex): adapt Paperclip's framed, nested tool surfaces in existing tokens.
+   Why: Vadim requested restrained visual borrowing; keep Quorum's type/grid/palette, content and square app controls.
+   Scope is tools and existing panels. No imported assets, new data colours, floating cards or button lift. */
+
+/* A single, quiet instrument instead of six unrelated tab backgrounds. */
+.reader-tabs {
+  padding: 4px;
+  margin-bottom: 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+.reader-tabs button {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-bottom-width: 2px;
+}
+.reader-tabs button[aria-selected="true"] {
+  border-color: var(--rule);
+  border-bottom-color: var(--umber);
+  background: var(--paper);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.reader-tabs button:hover:not([aria-selected="true"]) {
+  background: var(--paper);
+}
+
+/* Search is an explicit control; its shortcut reads as a small physical key. */
+.workspace-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  line-height: 1.35;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.workspace-search:hover:not(:disabled) { border-color: var(--ink-2); background: var(--paper-2); }
+.workspace-search kbd {
+  margin-left: 0;
+  padding: 3px 5px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  box-shadow: 0 1px 0 var(--rule);
+}
+.workspace-search-dialog { padding: 0; box-shadow: 0 24px 80px color-mix(in srgb, var(--ink) 18%, transparent); }
+.workspace-search-dialog header { margin: 0; padding: 20px 24px 16px; border-bottom: 1px solid var(--rule); background: var(--paper-2); }
+.workspace-search-dialog .workspace-search-label { margin: 20px 24px 8px; }
+.workspace-search-dialog input { width: calc(100% - 48px); margin: 0 24px; font-size: clamp(20px, 3vw, 26px); }
+.workspace-search-results { margin: 12px 12px 0; }
+.workspace-search-results > button { border-bottom: 1px solid var(--rule); }
+.workspace-search-results > button:last-child { border-bottom-color: transparent; }
+.workspace-search-results > button[aria-selected="true"] { background: var(--paper-2); }
+.workspace-search-dialog footer { margin: 12px 0 0; padding: 16px 24px; background: var(--paper-2); }
+.workspace-search-empty { padding: 24px; }
+
+/* Recessed groups, as in the reference's task panels; labels and values stay unchanged. */
+.edition-navigation {
+  padding: 4px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+.edition-navigation label > span { padding-left: 2px; }
+.edition-navigation button:hover:not(:disabled) { background: var(--paper); }
+.brief-toolbar > .filters > label select { min-height: 44px; font-size: 14px; }
+.tp .topic-option { transition: background-color 160ms ease; }
+.tp .topic-option:hover { background: var(--g-selected); }
+.tp .topic-option:has(input:checked) { box-shadow: inset 2px 0 0 var(--g-accent); }
+
+/* Existing content panels gain an inner paper surface, without changing their silhouettes. */
+.landing :is(.lp-sheet, .lp-ledger) { box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 4%, transparent); }
+.landing .lp-ledger-head { background: var(--paper-2); padding: 12px 16px; border: 1px solid var(--rule); }
+.reader-brief-group > summary { transition: background-color 160ms ease; }
+.reader-brief-group > summary:hover { background: var(--paper-2); }
+
+@media (max-width: 700px) {
+  .sidebar .workspace-search { padding: 6px 8px; gap: 0; align-self: center; }
+  .reader-tabs { padding: 3px; gap: 0; }
+  .reader-tabs button { padding-inline: 2px; }
+  .workspace-search-dialog header { padding: 16px 20px; }
+  .workspace-search-dialog .workspace-search-label { margin-inline: 20px; }
+  .workspace-search-dialog input { width: calc(100% - 40px); margin-inline: 20px; }
+  .workspace-search-results { margin-inline: 8px; }
+  .workspace-search-dialog footer { padding-inline: 20px; }
+  .edition-navigation { gap: 2px; }
+  .landing .lp-ledger-head { padding: 10px 12px; }
+}
+@media (max-width: 360px) {
+  .edition-navigation { padding: 3px; gap: 0; }
+  .reader-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .reader-tabs button { font-size: 10px; padding-inline: 1px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-search, .tp .topic-option, .reader-brief-group > summary { transition: none; }
+}
