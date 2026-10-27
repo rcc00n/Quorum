@@ -153,6 +153,9 @@ const assert = require("node:assert/strict");
     delete response.events[0].reasoning;response.events[0].article=suppliedArticle;response.events[0].importance=suppliedImportance;
     chartSources[0].audience = 0;
     await open();
+    // WEB-SPECTRUM-POLISH-02: the source ledger is a closed disclosure; open it before reaching a row.
+    const ledger = page.locator('.spectrum .sp-ledger').first();
+    if (await ledger.count() && (await ledger.getAttribute('open')) === null) await ledger.locator('> summary').click();
     await page.locator('.sp-source-button').filter({hasText:chartSources[0].name}).click();
     assert.equal(await page.locator('.sp-inspector .sp-reading strong').last().textContent(), '0');
     assert.equal(await page.locator(`.sp-point[data-source-id="${chartSources[0].id}"]`).count(), 0);

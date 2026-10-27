@@ -4,6 +4,13 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. The latest production milestone is below; older tables remain historical evidence.
 
+## Frontend refinement release — 27 October 2026 UTC
+
+Latest frontend: `20261027-paperclip-r1`, source `b938a12`, code identical to release-master `41aa9d0`.
+WEB-VISUAL-HIERARCHY-01, WEB-EDITION-NAV-01, WEB-AUTH-RETURN-01 and WEB-PAPERCLIP-POLISH-01 are DEPLOYED.
+[Exact feature releases, CI, genuine public browser, preservation and actual rollback/reapply evidence](reviews/2026-10-27-frontend-refinement-release.md).
+Each feature has a separate release/rollback point; #52 is separate. Earlier local-only entries below remain historical evidence.
+
 ## Production UX audit — 27 October 2026 UTC
 
 Production UX audit follow-up: WEB-EDITION-NAV-01 / WEB-AUTH-RETURN-01, owner Vadim / Codex,
