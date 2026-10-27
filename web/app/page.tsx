@@ -219,7 +219,11 @@ const LIMITS = [
 /* The anatomy of a story: every slot is a rule of docs/DECISIONS.md › Stories as articles, not a sample text. */
 type Part = { label: string; note?: string; kind: "home" | "headline" | "standfirst" | "key" | "facts" | "statements" | "open" | "appendix" | "also"; text: string };
 const ANATOMY: Part[] = [
-  { label: "Home", note: "One card per topic you follow.", kind: "home", text: "No story crossed the bar today." },
+  // DECISION(2026-10-28, Anastasia/Claude Code): the Home slot shows a story day, schematic like the other slots ("your
+  // topic · today's edition", "Your daily story."), not the quiet-day line with the 24 October edition. Why: Anastasia,
+  // 2026-10-28: "No story crossed the bar today" on the example card can confuse a first-time reader about what the card
+  // is for; the quiet day stays said plainly in limit 05 and on the board itself (DECISIONS › Selecting major news).
+  { label: "Home", note: "One card per topic you follow.", kind: "home", text: "Your daily story." },
   { label: "Headline", kind: "headline", text: "Subject, verb, object. No adjectives." },
   { label: "Standfirst", kind: "standfirst", text: "Three facts." },
   { label: "Key", kind: "key", text: "Plain text is confirmed and links to its sources. “Says” is a statement. Not confirmed comes last." },
@@ -438,7 +442,7 @@ export default function Home() {
                     <div className="lp-mini-card">
                       <span className="lp-mini-note">Imagine a photo here.</span>
                       <div className="lp-mini-text">
-                        <span className="lp-mini-meta">{`${evidence.topic_id} · edition ${evidence.edition_date}`}</span>
+                        <span className="lp-mini-meta">your topic · today’s edition</span>
                         <span className="lp-mini-line">{part.text}</span>
                       </div>
                     </div>
