@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import pwd
 import re
+import secrets
 import shlex
 import shutil
 import sqlite3
@@ -192,6 +193,27 @@ def workloads():
     )
 
 
+def isolated_test_environment(environment, directory):
+    # DECISION(2026-10-26, rcc00n/Codex): target-host tests run outside production data with no live reader roots.
+    # Why: the preview correctly refuses /var/lib/quorum descendants; tests must not weaken that security gate.
+    require(not Path(directory).resolve().is_relative_to(DATA), "test_runtime_must_be_outside_production")
+    return {
+        **environment,
+        "DJANGO_DEBUG": "1",
+        "DJANGO_SECRET_KEY": secrets.token_urlsafe(48),
+        "DJANGO_ALLOWED_HOSTS": "127.0.0.1,localhost,testserver,quorum.raccncode.com",
+        "QUORUM_PORTAL_DATA": str(directory),
+        "QUORUM_CATALOG_PATH": "",
+        "QUORUM_ENABLE_REASONING_READER": "0",
+        "QUORUM_REASONING_EDITIONS_ROOT": "",
+        "QUORUM_ENABLE_REASONING_PREVIEW": "0",
+        "QUORUM_REASONING_PREVIEW_FILE": "",
+        "QUORUM_REASONING_PREVIEW_SIDECAR": "",
+        "QUORUM_ENABLE_SNAPSHOT_PUBLICATION": "0",
+        "QUORUM_SNAPSHOT_ROOT": "",
+    }
+
+
 def execute(candidate, apply=False):
     require(os.geteuid() == 0, "root_required_for_quorum_upgrade")
     require((ROOT / "current").is_symlink(), "existing_quorum_release_required")
@@ -304,16 +326,9 @@ def execute(candidate, apply=False):
         )
 
     # Check Python 3.10 / installed wheels against a separate disposable test database.
-    with tempfile.TemporaryDirectory(
-        prefix="quorum-release-test-", dir=DATA
-    ) as test_data:
+    with tempfile.TemporaryDirectory(prefix="quorum-release-test-") as test_data:
         os.chown(test_data, account.pw_uid, account.pw_gid)
-        test_env = {
-            **env,
-            "DJANGO_DEBUG": "1",
-            "QUORUM_PORTAL_DATA": test_data,
-            "QUORUM_CATALOG_PATH": "",
-        }
+        test_env = isolated_test_environment(env, test_data)
         run(
             [
                 python,
