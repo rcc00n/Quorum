@@ -208,6 +208,36 @@
   font-size: 11px;
   color: rgba(255, 255, 255, 0.8);
 }
+/* No licensed picture: the same blurred field as the story page's lead slot (app/story.css), in white and
+   umber over the card's black, and the sentence small in the credit's place. Decorative: the card's media
+   area is aria-hidden without a picture. */
+.tb .tb-card-media-missing {
+  overflow: hidden;
+}
+.tb .tb-card-media-missing::after {
+  content: "";
+  position: absolute;
+  inset: -48px;
+  background:
+    radial-gradient(44% 60% at 24% 36%, rgba(201, 162, 126, 0.34), transparent 70%),
+    radial-gradient(34% 52% at 78% 30%, rgba(255, 255, 255, 0.2), transparent 70%),
+    radial-gradient(48% 46% at 62% 84%, rgba(255, 255, 255, 0.14), transparent 70%),
+    radial-gradient(28% 40% at 10% 86%, rgba(0, 0, 0, 0.3), transparent 70%);
+  filter: blur(26px);
+  pointer-events: none;
+}
+.tb .tb-card-note {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  z-index: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.92);
+}
+.tb .tb-card-lead .tb-card-note {
+  font-size: 13px;
+}
 .tb .tb-card-link > *:not(.tb-card-media) {
   margin-inline: 20px;
 }
