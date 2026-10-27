@@ -4,6 +4,15 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. The latest production milestone is below; older tables remain historical evidence.
 
+## Reviewed lead-photo release — 27 October 2026 UTC
+
+WEB-MEDIA-01 DEPLOYED: `20261027-editorial-photos-r2`, source `169b0fc`, normal #86–#89.
+Seven exact-bound reviewed photos on current story cards/pages; four openly licensed/public-domain
+assets with credits, factual file-image captions and source/licence links. Two ceasefire stories remain
+without a reviewed photo. Original editions, reasoning, accounts and the existing design are preserved.
+[Exact source/artifact, CI, genuine browser, rollback/reapply and preservation evidence](reviews/2026-10-27-editorial-photos-release.md).
+Data/topic processing stays with the teammates; no new model run. Also today #85 remains a separate release.
+
 ## Source-spectrum polish release — 27 October 2026 UTC
 
 WEB-SPECTRUM-POLISH-02 DEPLOYED: `20261027-spectrum-polish-r1`, source `f3e121e`, normal #52/#61/#63.
