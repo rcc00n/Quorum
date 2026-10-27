@@ -20,6 +20,7 @@ import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
 import type { Publication } from "@/lib/analysis";
 import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
+import { BriefStatus } from "./brief-status";
 import {
   api,
   session,
@@ -602,11 +603,18 @@ export function Portal({
                               Further results may still be missing.
                             </Empty>
                           ) : (
-                            <Empty title="Space for a clearer picture">
-                              No published events are available for this
-                              edition. Your brief will appear when source-backed
-                              analysis is connected.
-                            </Empty>
+                            // DECISION(2026-10-26, Anastasia/Claude Code): the empty brief explains the edition cut and what
+                            // happens next instead of a placeholder (WEB-UX-03; see brief-status.tsx). Why: DECISIONS › User
+                            // account and interface item 10.
+                            <BriefStatus
+                              day={day}
+                              topic={topic}
+                              topics={data?.topics || []}
+                              followed={user?.topics || []}
+                              status={data?.status}
+                              publicationStatus={data?.publication?.status}
+                              today={today()}
+                            />
                           );
                         })()
                       )}
