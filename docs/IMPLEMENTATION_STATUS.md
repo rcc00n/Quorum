@@ -4,6 +4,21 @@ Canonical cross-team release status: [Issue #2](https://github.com/rcc00n/Quorum
 
 **Current handoff:** [Start Here](TEAM_HANDOFF.md) and [current contract review](PORTAL_INTEGRATION.md). Sections below are chronological evidence: older “no sample”, missing timestamp and merge-conflict dependencies are superseded by later milestones. They do not describe today's contract. The latest production milestone is below; older tables remain historical evidence.
 
+## Sources and motion release — 27 October 2026 UTC
+
+Owner Vadim / Codex; branch `feature/web-spectrum-motion`; production `20261027-spectrum-r1`,
+source `6f16bd7feda9a8e3c1c105ddd3510b2dce9d27fa`; merged PRs #44/#45.
+[Exact release, CI, public browser and rollback evidence](../deploy/FRONTEND_RELEASE.md).
+
+| Feature ID | State | Evidence / limits |
+| --- | --- | --- |
+| WEB-SPECTRUM-MOTION-01 | DEPLOYED | Actual registry geometry/four modes, source inspector, keyboard/depth/reduced motion; public HTTPS and three widths |
+| WEB-SOURCES | DEPLOYED | Authenticated Sources navigation/route, exact 40-source ledger; 34 eligible plotted sources; anonymous redirect/API 401 |
+| WEB-PAGE-MOTION | DEPLOYED | Landing/workspace entry and pointer depth, reduced motion and observer fallback; no full no-JS claim |
+| WEB-UPGRADE / WEB-SESSION / WEB-PREFS | DEPLOYED | Actual r3 rollback/reapply, preserved accounts, restart session/preferences/feed persistence; 24 unrelated containers unchanged |
+
+These UI states do not close the fresh 27-Oct processing/sponsor/submission gates.
+
 ## Live release — 27 October 2026 UTC
 
 Production `20261027-live-r3`, source `63418421c1c0909dc0d7dfa1b451da3eed1bcc76`.
