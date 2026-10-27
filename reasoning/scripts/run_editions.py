@@ -37,7 +37,9 @@ load_dotenv(override=False) cannot fill them from .env) and QUORUM_MIN_INTERVAL_
 without a Meterless token (METERLESS_TOKEN, or its alias METERLESS_RUNTIME_TOKEN) every listed topic is failed with
 "meterless token missing" and nothing is started. The Meterless stop rule (decision at MeterlessWatch) stops a run at
 its first error and fails its topic; the topics after it are not started (they stay queued), and the runner prints
-the manual --route nvidia fallback command for that topic, which it never runs itself.
+the manual --route nvidia fallback command for that topic, which it never runs itself. A rerun resumes a stopped run id
+only when its journal keeps no call the rule fails and it published nothing; otherwise the topic stays failed and runs
+again as a fresh --attempt (decisions at unfit_version and unfit_resume).
 
 Status files (the portal's contract, Issue #2 6411408519): <status-dir>/<topic>/<date>.json with exactly topic, date,
 state (queued | running | published | failed | waiting_for_key), run_id, started_at, updated_at, attempts and reason
@@ -657,6 +659,9 @@ class Statuses:
         # live mode: topic -> the run id whose published version the file shows and keeps in this invocation (another
         # run id: decision at follow_store; this one, found published at the start: decision at keep_published)
         self.pinned: dict[str, str] = {}
+        # live mode: topic -> another run id whose newest stored version the file does not show, because the Meterless
+        # stop rule failed that run (decision at follow_store)
+        self.rejected: dict[str, str] = {}
 
     def path(self, topic: str) -> Path:
         """The portal's status file of `topic` on this date."""
@@ -758,13 +763,24 @@ class Statuses:
         the snapshot's published_at, 0 and null); this invocation's states go to its record only, until its own run
         publishes a newer version. Why: there is one status file per topic and date, and readers are served the newest
         version (latest.json); a later attempt turned a published topic into `queued` ("Waiting for its first brief") or
-        `failed` ("Could not be prepared") next to the edition they were reading (closing review round 2)."""
+        `failed` ("Could not be prepared") next to the edition they were reading (closing review round 2).
+        DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a newest version whose run id the Meterless stop rule failed
+        (rejected_by_rule: its record has `stopped_by_rule`, or names the Meterless route while the version is `partial`)
+        is never shown: the file keeps this invocation's own states, as when the store holds no other version. Why: the
+        stop rule's verdict on that run is `failed` and its version is not for hand-over; the next fresh --attempt (the
+        runbook's and the printed fallback's) turned the file into `published` for that rejected version, and it stayed
+        so when the attempt failed or drained (review of 2026-10-26). latest.json still points at the rejected version
+        until a newer one is published, so the hand-over names v<N> explicitly (docs/reviews/2026-10-27-demo-runbook.md)."""
         if self.mode != "live":
             return None
         rid = self.docs[topic]["run_id"]
         shown = latest[1].get("run_id") if latest else None
         if not isinstance(shown, str) or shown == rid:
             self.pinned.pop(topic, None)
+            return None
+        if self.rejected_by_rule(topic, shown, latest[1] if latest else None):
+            self.pinned.pop(topic, None)
+            self.rejected[topic] = shown
             return None
         on_disk, verified = self._read_public(topic)
         if on_disk and verified and on_disk.get("state") == "published" and on_disk.get("run_id") == shown:
@@ -786,6 +802,19 @@ class Statuses:
         self.pinned[topic] = shown
         return shown
 
+    def rejected_by_rule(self, topic: str, rid: str, snapshot: dict[str, Any] | None) -> bool:
+        """True when the runner's record of run id `rid` says the Meterless stop rule failed it (`stopped_by_rule`), or
+        names the Meterless route while `snapshot` (its stored version) is `partial` (decisions at unfit_version and
+        follow_store). A run id without a record is not rejected here."""
+        rec = self._record_of(topic, rid)
+        if not rec:
+            return False
+        if rec.get("stopped_by_rule"):
+            return True
+        runs = [r for r in rec.get("runs") or [] if isinstance(r, dict)]
+        route = rec.get("route") or (runs[-1].get("route") if runs else None)
+        return route == "meterless" and isinstance(snapshot, dict) and snapshot.get("status") == "partial"
+
     def keep_published(self, topic: str) -> bool:
         """Live mode, for a run id found already published: True when this invocation leaves the status pair as it is,
         because it already shows this run id `published` with a matching .sha256 (or another run's newer version:
@@ -801,6 +830,8 @@ class Statuses:
         if topic in self.pinned:  # the file shows another run's newer version (follow_store) and stays as it is
             return True
         rid = self.docs[topic]["run_id"]
+        if self.rejected_by_rule(topic, rid, None):  # its callers check unfit_version first; kept here as well
+            return False
         on_disk, verified = self._read_public(topic)
         if on_disk and verified and on_disk.get("state") == "published" and on_disk.get("run_id") == rid:
             self.pinned[topic] = rid
@@ -1592,6 +1623,48 @@ def unfit_version(ctx: Ctx, rid: str, done: tuple[int, str | None] | None, recor
     return None
 
 
+def journal_flag(out: Path, rid: str) -> str | None:
+    """The stop rule's reason (row_stop_reason) for the first row of run id `rid`'s journal that trips it, or None.
+    Flags and status codes only: payloads, replies, receipt ids and request keys are parsed and dropped, never kept or
+    printed."""
+    path = out / "_journal" / f"{rid}.jsonl"
+    if not path.is_file():
+        return None
+    with path.open("r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                why = row_stop_reason(json.loads(line))
+            except ValueError:
+                continue  # a row cut short by a crash (llm.load_journal skips it too)
+            if why:
+                return why
+    return None
+
+
+def unfit_resume(ctx: Ctx, rid: str) -> str | None:
+    """--route meterless: why run id `rid` must not resume from its checkpoint and journal, or None.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): on --route meterless a run id whose journal holds a row the stop
+    rule trips on (row_stop_reason: an error row, an HTTP 4xx/5xx also when answered on its retry, a substituted or
+    unverified lane, H-MEM memories injected, a refused cache replay) is never resumed: its topic is `failed` at once and
+    a fresh --attempt N+1 runs it again, as for unfit_version; a stopped run id whose journal holds no such row (a
+    Traceback outside a model call, a timeout, an interrupt) resumes from its checkpoint. Why: llm.load_journal restores
+    every journal row, error rows included, into the ledger and the snapshot's provenance, so a resumed run's own summary
+    line ("model calls: N (k failed, ...)") trips the rule again at its end, after it has re-run the rest of the topic
+    and published a version that cannot be handed over (review of 2026-10-26: a 401 after a token change, a connection
+    refused while Nightshift restarts, each leaves such a row). Supersedes the first rule of this branch that a stopped
+    run id always resumes on a rerun. Proposed by Claude Code, to confirm by Yelysei."""
+    if not ctx.stop_rule:
+        return None
+    why = journal_flag(ctx.out, rid)
+    if why is None:
+        return None
+    return (f"run {rid} keeps a call the Meterless stop rule fails in its journal ({why}), which a resume would restore "
+            f"into the edition; a fresh --attempt {ctx.attempt + 1} runs the topic again")
+
+
 def route_mix(ctx: Ctx, rid: str, record: dict[str, Any] | None) -> str | None:
     """Why run id `rid` must not continue on this invocation's route, or None.
 
@@ -1703,6 +1776,9 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
         if shown:
             ctx.say(f"{topic}: its status file keeps the published version of run {shown} until run {rid} publishes; "
                     "this run's states go to the runner's record")
+        elif topic in statuses.rejected:
+            ctx.say(f"{topic}: the store's newest version is run {statuses.rejected[topic]}'s, which the Meterless stop rule "
+                    f"failed: its status file shows run {rid}, and that version is never handed over")
         if topic in statuses.kept:
             ctx.say(f"{topic}: its status keeps the live outcome {statuses.docs[topic].get('state')!r}; the plan goes to plan / plan_outcome")
         if topic in not_rows:
@@ -1726,6 +1802,11 @@ def _run(ctx: Ctx, args: argparse.Namespace, keys: list[Key], topics: list[str],
         if mixed:
             final[topic] = statuses.verdict(topic, "failed", mixed, plan=None)
             ctx.say(f"{topic}: failed, {mixed}")
+            continue
+        flagged = unfit_resume(ctx, rid)  # decision at unfit_resume
+        if flagged:
+            final[topic] = statuses.verdict(topic, "failed", flagged, plan=None, stopped_by_rule=True)
+            ctx.say(f"{topic}: failed, {flagged}")
             continue
         if topic not in statuses.kept:
             statuses.save(topic, state="queued", reason="dry check running")
@@ -1841,8 +1922,22 @@ def _drive(ctx: Ctx, statuses: Statuses, keys: list[Key], items: list[Item], fin
             statuses.save(topic, state="queued", reason=f"not started: {ctx.halted} stopped at the first error on the "
                                                         "Meterless route", key=None, reserved=None)
         if left:
-            ctx.say(f"not started (stay queued): {', '.join(left)}; once the cause is fixed, rerun the same command (the "
-                    "stopped topic resumes from its checkpoint, its journal keeps the failed call) or give that topic a fresh --attempt")
+            ctx.say(f"not started (stay queued): {', '.join(left)}")
+        ctx.say(f"once the cause is fixed, rerun the same command: the published topics are skipped, the queued ones "
+                f"start, and {halted_next(ctx, statuses.docs[ctx.halted])}")
+
+
+def halted_next(ctx: Ctx, doc: dict[str, Any]) -> str:
+    """What a rerun of the same command does with the topic the stop rule halted the invocation on (decisions at
+    unfit_version and unfit_resume)."""
+    topic, fresh = ctx.halted, f"--attempt {ctx.attempt + 1}"
+    if doc.get("version") is not None:
+        return (f"{topic} stays failed (its version {doc['version']} is not for hand-over): run it again alone as a "
+                f"fresh {fresh}")
+    if unfit_resume(ctx, run_id(topic, ctx.date, ctx.attempt)):
+        return (f"{topic} stays failed (its journal keeps a call the rule fails, which a resume would restore into the "
+                f"edition): run it again alone as a fresh {fresh}")
+    return f"{topic} resumes from its checkpoint (its journal holds no call the rule fails)"
 
 
 def fallback_command(ctx: Ctx, topic: str) -> str:

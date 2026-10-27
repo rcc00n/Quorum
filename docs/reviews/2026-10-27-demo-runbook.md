@@ -93,25 +93,36 @@ It runs the topics one after the other and exits 0 when all four are published. 
 
 The stop rule (DECISIONS.md › Canonical editions of 27 October): at a run's first error the runner kills that run,
 marks its topic `failed`, starts none of the later topics (they stay `queued`), prints a `manual fallback for <topic>`
-command and exits 1. Then:
+command and a line starting `once the cause is fixed`, and exits 1. Then:
 
 1. Read the end of that run's log (`--- Meterless stop rule: …`) and the runner log
    (`snapshots/_runs/logs/2026-10-27_runner.log`). Report the cause in counts and codes only.
-2. If the cause is fixed on the Meterless side (for example, Nightshift restarted), run the step 4 command again: the
-   published topics are skipped and the stopped topic resumes from its checkpoint. A topic whose run published before
-   it was stopped, or published a partial, stays `failed`; it runs again only as a fresh attempt (`--attempt 2`, with
-   `--topics` naming it alone).
+2. If the cause is fixed on the Meterless side (for example, Nightshift restarted), do what the `once the cause is
+   fixed` line says for the stopped topic (rules: reasoning/README.md › Decisions, the runner's `--route` row, item 4):
+   - `<topic> resumes from its checkpoint`: run the step 4 command again. The published topics are skipped, the
+     stopped topic resumes, the queued ones follow.
+   - `<topic> stays failed … run it again alone as a fresh --attempt <M>` (`<M>` is 2 after attempt 1): its journal
+     keeps a call the rule failed (for example the connection refused while Nightshift was down, or a 401), or its run
+     published before it was stopped, or published a partial. A resume would restore that call into the edition, so
+     the runner refuses it. Run the step 4 command with `--topics <topic> --attempt <M>`, then the step 4 command again
+     with `--topics` listing only the topics still `queued`, in their order.
 3. Otherwise only Yelysei decides on the NVIDIA direct fallback for that one topic: the printed command, as printed
    (a fresh `--attempt`, so the edition never mixes routes; it needs `MODEL_BASE_URL` on the NVIDIA endpoint and the
    listed keys in `.env`). The runner never starts it.
 4. After a fallback, rerun the Meterless command with `--topics` listing only the topics not yet published, so the
    fallen-back topic is never continued on the other route.
 
+A version the stop rule failed is never handed over. It can still be the store's `latest.json` until a newer version is
+published. The status file does not show it as published (the runner log says `which the Meterless stop rule failed`).
+
 Never pass `--allow-before-cut`, and never `--resume` a run by hand on the other route.
 
 ## 5. Sidecars
 
-For each published topic (`N` is the version the runner reported, normally 1):
+For each published topic, `N` is the version the runner reported for the run that published it: `<topic>: published
+version N` in the runner log, `version` in `snapshots/_runs/status/_runner/2026-10-27/_summary.json`. It is normally 1,
+and higher when a version the rule failed was published before it. Always name `v<N>.json`, never `latest.json`, because after a stop `latest.json` can be a
+version the rule failed.
 
 ```bash
 python -X utf8 scripts/edition_sidecar.py --snapshot snapshots/_private/<topic>/2026-10-27/v<N>.json --corpus-as-of <dump time from step 1> --producer-commit <full 40-hex commit from step 0>
@@ -136,7 +147,10 @@ python -X utf8 scripts/export_public_edition.py snapshots/_private/<topic>/2026-
 
 It writes `docs/examples/editions/2026-10-27/<topic>.json` (the snapshot, byte for byte) and
 `<topic>.run-summary.json` (counts only). Check each summary: `provider_route` `meterless`, `calls.failed` 0,
-`route_substituted` 0, `lane_unverified` 0, `hmem_injected` 0. A refusal names what to fix and writes nothing.
+`route_substituted` 0, `lane_unverified` 0, `hmem_injected` 0. A resumed edition shows the same values: the runner
+resumes a stopped topic only when its journal keeps no call the rule fails (step 4.2). A summary that shows anything
+else is not an edition the stop rule let through. Do not commit it, and tell Yelysei; he decides what happens to the
+installed edition. A refusal names what to fix and writes nothing.
 Before committing, `git status` must show only files under `docs/examples/editions/2026-10-27/`.
 
 ## 8. README samples, then the submission

@@ -63,8 +63,9 @@ def ledger_rows() -> list[dict]:
         {**ok, "task": "write", "lane_unverified": True},
         {**ok, "task": "summary", "served": "error", "answered_model": LIGHTNING, "route_substituted": True,
          "error": f"route substituted {ULTRA} for {LIGHTNING}"},
-        {**ok, "task": "frame", "served": "error", "http_status": 429,
-         "error": f"RateLimitError: {FAKE_BEARER} {FAKE_NVAPI}",
+        # as llm.json_task's exception path builds it: the error's status code, no receipt field, no tokens
+        {"task": "frame", "lane": "default", "route": LIGHTNING, "served": "error", "ms": 100, "attempts": 2, "run_id": RUN_ID,
+         "http_status": 429, "error": f"RateLimitError: {FAKE_BEARER} {FAKE_NVAPI}",
          "rate_headers": [{"retry-after": "SECRET-RETRY-HEADER-VALUE"}]},
         {**ok, "task": "roundup_line", "served": "error", "receipt_hmem_injected": 2, "hmem_rejected": True,
          "error": "runtime injected 2 prior answers"},
@@ -311,6 +312,38 @@ def test_a_snapshot_holding_a_local_path_a_secret_or_a_ledger_id_is_refused(tmp_
     assert text not in out and not hand.out.exists()
 
 
+def test_a_secret_shaped_key_in_the_snapshot_is_refused(tmp_path: Path, producer, capsys):
+    rows = ledger_rows()
+    rows[0]["served"] = FAKE_NVAPI  # provenance.answered_by is keyed by the provider's model field
+    hand = Hand(tmp_path, producer, rows=rows).seal()  # edition_sidecar.make lets it through
+    code, out = hand.run(capsys)
+    assert code == 2 and "unsafe_snapshot_content" in out and "snapshot.provenance.answered_by (a key)" in out, out
+    assert FAKE_NVAPI not in out and not hand.out.exists()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("route", "C:/Users/someone/Projects/Quorum/reasoning/.env"),
+    ("route", "http://127.0.0.1:8088/v1"),
+    ("route", "mtk_live_" + "Z" * 30),
+    ("route", "rcpt-SECRET-RECEIPT"),  # a prefix of the receipt ids in the same ledger
+    ("served", "http://127.0.0.1:8088/v1"),  # by_model, in a snapshot without answered_by
+])
+def test_a_ledger_value_the_snapshot_lacks_counts_as_other(tmp_path: Path, producer, capsys, field: str, value: str):
+    rows = ledger_rows()
+    rows[2][field] = value
+    snap = base_snapshot(rows)
+    if field == "served":
+        del snap["provenance"]["answered_by"]
+    hand = Hand(tmp_path, producer, snap=snap, rows=rows).seal()
+    code, out = hand.run(capsys)
+    assert code == 0, out
+    text = hand.public[1].read_text(encoding="utf-8")
+    summary = json.loads(text)
+    assert summary["calls"]["by_route" if field == "route" else "by_model"]["other"] == 1
+    assert value not in text and value not in out
+    assert set(summary["calls"]["by_model"]) | set(summary["calls"]["by_route"]) <= {LIGHTNING, ULTRA, "error", "other"}
+
+
 @pytest.mark.parametrize("text", ["https://www.state.gov/home/remarks", "https://example.com/Users/guide",
                                   "Score: 5/10, at 09:30 on 10/26", "a profile:/x page"])
 def test_public_urls_and_prose_are_no_local_paths(text: str):
@@ -358,6 +391,19 @@ def test_the_allowlist_refuses_any_other_field_or_shape(hand: Hand, capsys):
     with pytest.raises(ex.ExportError) as err:
         ex.check_allowlist(leaky, set(PRIVATE))
     assert err.value.code == "summary_leaks_private_data"
+    ids = {LIGHTNING, ULTRA, "error"}
+    ex.check_allowlist(good, set(PRIVATE), ids)
+    for key in ("nvidia/another-model", "C:/Users/someone/.env", "http://127.0.0.1:8088/v1"):
+        s = copy.deepcopy(good)
+        s["calls"]["by_route"][key] = 1
+        with pytest.raises(ex.ExportError) as err:
+            ex.check_allowlist(s, set(PRIVATE), ids)
+        assert err.value.code == "summary_not_allowlisted", key
+    for key in ("C:/Users/someone/.env", "http://127.0.0.1:8088/v1"):  # no snapshot ids given: still refused
+        s = copy.deepcopy(good)
+        s["calls"]["by_model"][key] = 1
+        with pytest.raises(ex.ExportError):
+            ex.check_allowlist(s, set(PRIVATE))
 
 
 def test_rows_map_to_their_nodes_by_task_and_lane():
@@ -379,3 +425,22 @@ def test_provider_route_reads_the_receipt_evidence():
     assert ex.provider_route([{"http_status": 200}, {"http_status": 200}]) == "nvidia"
     assert ex.provider_route([{"http_status": 200}, {"http_status": 200, "receipt_id": "r-1"}]) == "mixed"
     assert ex.provider_route([{"http_status": None}]) == "unknown"
+    # an exception row (llm.json_task: the error's status code, no receipt field) is neutral
+    exc_row = {"task": "frame", "lane": "default", "served": "error", "ms": 900, "attempts": 1, "http_status": 503,
+               "error": "InternalServerError: Error code: 503"}
+    assert ex.provider_route([{"http_status": 200, "receipt_id": "r-1", "receipt_hmem_injected": 0}] * 5 + [exc_row]) == "meterless"
+    assert ex.provider_route([{"http_status": 200}, {**exc_row, "http_status": 401}]) == "nvidia"
+    assert ex.provider_route([exc_row]) == "unknown"
+    # a served error row got its completion and its receipt: it counts
+    assert ex.provider_route([{"http_status": 200}, {"http_status": 200, "served": "error", "receipt_hmem_injected": 2}]) == "mixed"
+
+
+def test_a_meterless_edition_with_an_http_error_row_is_meterless(tmp_path: Path, producer, capsys):
+    rows = [r for r in ledger_rows() if r.get("receipt_id") or "receipt_hmem_injected" in r]  # Meterless rows only
+    rows.append({"task": "frame", "lane": "default", "route": LIGHTNING, "served": "error", "ms": 0, "attempts": 1,
+                 "run_id": RUN_ID, "request_key": "ab" * 32, "http_status": 503, "error": "InternalServerError: Error code: 503"})
+    hand = Hand(tmp_path, producer, rows=rows).seal()
+    code, out = hand.run(capsys)
+    assert code == 0, out
+    summary = json.loads(hand.public[1].read_text(encoding="utf-8"))
+    assert summary["provider_route"] == "meterless" and summary["calls"]["failed"] >= 1

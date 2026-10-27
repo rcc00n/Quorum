@@ -23,10 +23,12 @@ samples). Before anything is written it checks, and refuses (exit 2, nothing wri
     matches; the sidecar gives `producer_commit` and `corpus_as_of_utc`;
   - the ledger is this snapshot's: the same topic, date, version and run id, and its rows give the snapshot's
     provenance counts (model_calls, answered_by, model_errors);
-  - no string of the snapshot holds a secret-shaped value, a value of a key/token variable (exported or in the repo's
-    .env), a receipt id, request key or reply hash of the ledger, or a local path (decision at unsafe_strings);
-  - the summary holds exactly the allowlisted fields with the allowlisted value shapes, and none of the ledger's
-    receipt ids, request keys, reply hashes, error texts or other private strings (decisions at check_allowlist);
+  - no string of the snapshot, key or value, holds a secret-shaped value, a value of a key/token variable (exported or
+    in the repo's .env), a receipt id, request key or reply hash of the ledger, or a local path (decision at
+    unsafe_strings);
+  - the summary holds exactly the allowlisted fields with the allowlisted value shapes, model ids only from the
+    snapshot itself (decision at public_ids), and none of the ledger's receipt ids, request keys, reply hashes, error
+    texts or other private strings, no local path and no URL (decisions at check_allowlist);
   - neither destination exists, unless --replace.
 
 The ledger (*.ledger.json), the call journals and the logs stay private: this tool reads the ledger and writes
@@ -36,7 +38,8 @@ DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the run summary holds counts
 lane, answering model and requested model route, failed calls, route_substituted, lane_unverified, calls with H-MEM
 memories injected, cache hits, Meterless receipts (a count), memory trace rows by kind, plus the identity of the
 snapshot (topic_id, edition_date, version, run_id, status), its `generated_at` and sha256, the producer commit,
-`corpus_as_of_utc` and `provider_route` (which route answered, read from the rows' Meterless receipt evidence). Why:
+`corpus_as_of_utc` and `provider_route` (which route answered, read from the Meterless receipt evidence of the rows that
+got a completion: decision at provider_route). Why:
 Yelysei's D2 (2026-10-26); `generated_at` is the snapshot's own, so a rerun of the export writes the same bytes;
 `provider_route` and the derivation of `by_node` from the ledger's task and lane (the ledger has no node field) are
 Claude Code's, to confirm.
@@ -241,7 +244,11 @@ def unsafe_strings(value: Any, deny: set[str], where: str = "snapshot") -> list[
             found.append(where)
     elif isinstance(value, dict):
         for key, item in value.items():
-            if isinstance(key, str) and (LOCAL_PATH.search(key) or any(d in key for d in deny)):
+            # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): a key gets the same three checks as a value
+            # (UNSAFE_CONTENT included) and is reported as its parent's path plus "(a key)", never by its text. Why:
+            # provenance.answered_by is keyed by the provider's model field, and a secret-shaped key passed every check
+            # and was published byte for byte (review of 2026-10-26); edition_sidecar's own check did not catch it.
+            if isinstance(key, str) and (es.UNSAFE_CONTENT.search(key) or LOCAL_PATH.search(key) or any(d in key for d in deny)):
                 found.append(f"{where} (a key)")
             found.extend(unsafe_strings(item, deny, f"{where}.{key}"))
     elif isinstance(value, list):
@@ -260,8 +267,32 @@ def node_of(row: dict[str, Any]) -> str:
     return TASK_NODE.get(task, OTHER)
 
 
-def _id_key(value: Any) -> str:
-    return value if isinstance(value, str) and MODEL_ID.fullmatch(value) and not es.UNSAFE_CONTENT.search(value) else OTHER
+def safe_id(value: Any) -> bool:
+    """A string shaped like a model id that is no secret, no local path and no URL."""
+    return (isinstance(value, str) and MODEL_ID.fullmatch(value) is not None and not es.UNSAFE_CONTENT.search(value)
+            and not LOCAL_PATH.search(value) and "://" not in value)
+
+
+def public_ids(p: dict[str, Any]) -> set[str]:
+    """The model ids the checked public snapshot already holds: provenance.model, provenance.fact_checker_model, the keys
+    of provenance.answered_by, and "error" (llm.served_counts files a call without a usable reply under it).
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the run summary's by_model and by_route keys are these ids
+    (each also safe_id); any other ledger value counts as "other", and check_allowlist refuses a key outside them. Why:
+    `route` and `served` come from the private ledger, and a crafted or unexpected value shaped like a model id (a local
+    path, a loopback URL, a token, a fragment of a receipt id) reached the public summary (review of 2026-10-26); this
+    way the summary adds no string the published snapshot lacks. On the 26 October immigration edition every route and
+    served value is one of them (1 435 rows, none other)."""
+    prov = p.get("provenance") if isinstance(p.get("provenance"), dict) else {}
+    ids = {"error", prov.get("model"), prov.get("fact_checker_model")}
+    answered = prov.get("answered_by")
+    if isinstance(answered, dict):
+        ids |= set(answered)
+    return {i for i in ids if safe_id(i)}
+
+
+def _id_key(value: Any, ids: set[str]) -> str:
+    return value if isinstance(value, str) and value in ids and safe_id(value) else OTHER
 
 
 def _counts(values: list[str]) -> dict[str, int]:
@@ -274,9 +305,15 @@ def hmem_injected(row: dict[str, Any]) -> bool:
 
 
 def provider_route(calls: list[dict[str, Any]]) -> str:
-    """meterless: every row that got a response carries Meterless receipt evidence (an H-MEM count or a receipt id);
-    nvidia: none does; mixed: some do; unknown: no row got a response."""
-    answered = [row for row in calls if type(row.get("http_status")) is int]
+    """meterless: every row that got a completion (an HTTP 2xx response) carries Meterless receipt evidence (an H-MEM
+    count or a receipt id); nvidia: none does; mixed: some do; unknown: no row got a completion.
+
+    DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): only rows with an integer 2xx `http_status` decide the route;
+    a row whose call raised (llm.json_task's exception path: the error's status code or None, never a receipt) is
+    neutral. Why: that path writes `http_status` from the exception and no receipt field, so one HTTP-error row on the
+    Meterless route labelled a Meterless-only edition "mixed" (review of 2026-10-26). A served error row (no JSON,
+    substituted, H-MEM or cache refusal) still got its completion with the receipt, and counts."""
+    answered = [row for row in calls if type(row.get("http_status")) is int and 200 <= row["http_status"] < 300]
     if not answered:
         return "unknown"
     marked = sum(1 for row in answered if "receipt_hmem_injected" in row or row.get("receipt_id"))
@@ -295,6 +332,7 @@ def memory_kind(decision: Any) -> str:
 def build_summary(p: dict[str, Any], calls: list[dict[str, Any]], snapshot_sha256: str, producer_commit: str,
                   corpus_as_of_utc: str) -> dict[str, Any]:
     memory = Counter(memory_kind(t.get("decision")) for t in p.get("trace") or [] if isinstance(t, dict) and t.get("node") == "memory")
+    ids = public_ids(p)  # decision at public_ids
     return {
         "schema": SCHEMA,
         "topic_id": p["topic_id"],
@@ -312,8 +350,8 @@ def build_summary(p: dict[str, Any], calls: list[dict[str, Any]], snapshot_sha25
             "failed": sum(1 for row in calls if row.get("error")),
             "by_node": _counts([node_of(row) for row in calls]),
             "by_lane": _counts([row.get("lane") if row.get("lane") in LANES else OTHER for row in calls]),
-            "by_model": _counts([_id_key(row.get("served")) for row in calls]),
-            "by_route": _counts([_id_key(row.get("route")) for row in calls]),
+            "by_model": _counts([_id_key(row.get("served"), ids) for row in calls]),
+            "by_route": _counts([_id_key(row.get("route"), ids) for row in calls]),
         },
         "route_substituted": sum(1 for row in calls if row.get("route_substituted")),
         "lane_unverified": sum(1 for row in calls if row.get("lane_unverified")),
@@ -328,21 +366,26 @@ def _count(value: Any) -> bool:
     return type(value) is int and value >= 0
 
 
-def _count_map(value: Any, keys: tuple[str, ...] | None) -> bool:
-    return isinstance(value, dict) and all(
-        isinstance(k, str) and (k in keys if keys is not None else (k == OTHER or MODEL_ID.fullmatch(k) is not None))
-        and _count(v) for k, v in value.items())
+def _count_map(value: Any, keys: tuple[str, ...] | None, ids: set[str] | None = None) -> bool:
+    def key_ok(k: Any) -> bool:
+        if keys is not None:
+            return k in keys
+        return k == OTHER or (safe_id(k) and (ids is None or k in ids))
+
+    return isinstance(value, dict) and all(isinstance(k, str) and key_ok(k) and _count(v) for k, v in value.items())
 
 
-def check_allowlist(summary: Any, private: set[str]) -> None:
-    """The run summary holds exactly RUN_SUMMARY_KEYS, each of its allowed shape, and no private string.
+def check_allowlist(summary: Any, private: set[str], ids: set[str] | None = None) -> None:
+    """The run summary holds exactly RUN_SUMMARY_KEYS, each of its allowed shape, and no private string; with `ids`
+    (public_ids of the snapshot), every by_model and by_route key is one of them or "other".
 
     DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): the summary is checked before it is written: exactly the
     allowlisted keys in order, identity and hashes matching their formats, every other value a non-negative integer or
-    a map of counts whose keys are a node, a lane, a memory kind or a model id, and its serialized text holds none of
-    the ledger's private strings (receipt ids, request keys, reply hashes, error texts, rate headers) or key/token
-    values. Why: D2 (Yelysei, 2026-10-26): never a receipt id, prompt, reply, request key, page text or token in the
-    public summary; an allowlist fails closed when a new field is added by mistake."""
+    a map of counts whose keys are a node, a lane, a memory kind or a model id the snapshot holds (decision at
+    public_ids), and its serialized text holds none of the ledger's private strings (receipt ids, request keys, reply
+    hashes, error texts, rate headers) or key/token values, no local path (LOCAL_PATH) and no URL. Why: D2 (Yelysei,
+    2026-10-26): never a receipt id, prompt, reply, request key, page text or token in the public summary; an allowlist
+    fails closed when a new field is added by mistake. The model-id and path/URL parts since the review of 2026-10-26."""
     _require(isinstance(summary, dict) and list(summary) == list(RUN_SUMMARY_KEYS), "summary_not_allowlisted",
              "the run summary's keys are not exactly the allowlisted ones")
     checks = {
@@ -360,14 +403,15 @@ def check_allowlist(summary: Any, private: set[str]) -> None:
         "memory_trace_rows": lambda v: isinstance(v, dict) and list(v) == list(MEMORY_KINDS) and all(_count(x) for x in v.values()),
         "calls": lambda v: (isinstance(v, dict) and list(v) == list(CALLS_KEYS) and _count(v["total"]) and _count(v["failed"])
                             and _count_map(v["by_node"], NODES + (OTHER,)) and _count_map(v["by_lane"], LANES + (OTHER,))
-                            and _count_map(v["by_model"], None) and _count_map(v["by_route"], None)),
+                            and _count_map(v["by_model"], None, ids) and _count_map(v["by_route"], None, ids)),
     }
     checks.update({key: _count for key in COUNT_KEYS})
     for key in RUN_SUMMARY_KEYS:
         _require(checks[key](summary[key]), "summary_not_allowlisted", f"the run summary's {key} is not of its allowed shape")
     text = serialize(summary).decode("utf-8")
-    _require(not es.UNSAFE_CONTENT.search(text) and not any(s in text for s in private), "summary_leaks_private_data",
-             "the run summary holds a private string of the ledger or a key/token value")
+    _require(not es.UNSAFE_CONTENT.search(text) and not LOCAL_PATH.search(text) and "://" not in text
+             and not any(s in text for s in private), "summary_leaks_private_data",
+             "the run summary holds a private string of the ledger, a key/token value, a local path or a URL")
 
 
 def serialize(summary: dict[str, Any]) -> bytes:
@@ -419,7 +463,7 @@ def export(snapshot: Path, sha256_file: Path, ledger_file: Path, out: Path, side
              "a secret-shaped value, a key/token value, a ledger id or a local path")
 
     summary = build_summary(p, calls, sha, producer_commit, corpus_as_of_utc)
-    check_allowlist(summary, secrets | ledger_private_strings(calls))
+    check_allowlist(summary, secrets | ledger_private_strings(calls), public_ids(p))
     data = serialize(summary)
 
     where = snapshot.resolve()

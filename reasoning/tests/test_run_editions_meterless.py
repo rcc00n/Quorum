@@ -79,6 +79,19 @@ if step.get("publish", step.get("exit", 0) == 0):
     snap = {"run_id": rid, "topic_id": topic, "edition_date": date, "status": step.get("status", "ok"), "version": v}
     (d / f"v{v}.json").write_text(json.dumps(snap))
     (d / "latest.json").write_text(json.dumps(snap))
+    # run.py's summary line after store.publish, from the whole journal: on --resume llm.load_journal restores every
+    # row, error rows included, into llm.calls, and flagged_calls_note names the flags
+    rows = [json.loads(x) for x in journal.read_text().splitlines() if x.strip()]
+    flags = ((sum(1 for r in rows if r.get("route_substituted")), "lane substituted"),
+             (sum(1 for r in rows if r.get("lane_unverified")), "lane unverified"),
+             (sum(1 for r in rows if r.get("hmem_rejected")), "rejected for injected memories"),
+             (sum(1 for r in rows if r.get("cache_refused")), "refused as cache replays"))
+    served = {}
+    for r in rows:
+        served[r.get("served")] = served.get(r.get("served"), 0) + 1
+    print(f"model calls: {len(rows)} ({sum(1 for r in rows if r.get('error'))} failed"
+          + "".join(f", {n} {label}" for n, label in flags if n) + "); answered by: "
+          + ", ".join(f"{m} x{n}" for m, n in served.items()), flush=True)
 for line in step.get("after", []):  # run.py prints its summary after store.publish
     print(line, flush=True)
 sys.exit(step.get("exit", 0))
@@ -318,13 +331,65 @@ def test_a_run_that_made_calls_without_the_guard_line_fails(mw: MWorld):
     assert "without confirming the H-MEM guard" in mw.w.public_of("t1")["reason"]
 
 
-def test_a_stopped_topic_resumes_on_the_meterless_route_when_rerun(mw: MWorld):
-    mw.scenario({"t1": [{"rows": [{"http_status": 429, "error": "x", "served": "error"}], "sleep": 30}, {}], "t2": [{}]})
+STOP_ROWS = {  # rows a stopped run leaves in its journal; llm.load_journal restores each into a resumed run's ledger
+    "http_429": {"http_status": 429, "error": "RateLimitError: Error code: 429", "served": "error"},
+    "http_401": {"http_status": 401, "error": "AuthenticationError: Error code: 401", "served": "error"},
+    "refused": {"http_status": None, "error": "APIConnectionError: Connection error.", "served": "error"},
+    "substituted": {"route_substituted": True, "served": "error", "error": "route substituted"},
+    "unverified": {"lane_unverified": True},
+    "hmem": {"hmem_rejected": True, "receipt_hmem_injected": 2, "served": "error", "error": "runtime injected"},
+    "retried_503": {"retried_after": "InternalServerError: HTTP 503, waited 5 s", "attempts": 2},
+}
+
+
+@pytest.mark.parametrize("case", sorted(STOP_ROWS))
+def test_a_stopped_topic_whose_journal_keeps_a_call_the_rule_fails_is_not_resumed(mw: MWorld, capsys: pytest.CaptureFixture[str],
+                                                                                  case: str):
+    # a resume would restore that row, and its own summary line ("model calls: N (1 failed ...)") would trip the rule
+    # again at its end, after re-running the rest of the topic and publishing a version that cannot be handed over
+    mw.scenario({"t1": [{"rows": [STOP_ROWS[case]], "sleep": 30}, {}], "t2": [{}]})
     assert mw.run("t1,t2") == 1
-    assert mw.run("t1,t2") == 0  # same route: the stopped run id resumes from its checkpoint, then t2 runs
+    halt = next(line for line in capsys.readouterr().out.splitlines() if "once the cause is fixed" in line)
+    assert "t1 stays failed (its journal keeps a call the rule fails" in halt and "a fresh --attempt 2" in halt
+    assert mw.run("t1,t2") == 1  # the same command again: t1 is failed at once, t2 runs
+    t1 = mw.w.public_of("t1")
+    assert t1["state"] == "failed" and "keeps a call the Meterless stop rule fails in its journal" in t1["reason"], t1
+    assert t1["reason"].endswith("a fresh --attempt 2 runs the topic again") and "rcpt" not in t1["reason"]
+    assert [r["topic"] for r in mw.w.runs()] == ["t1", "t2"] and mw.w.public_of("t2")["state"] == "published"
+    assert mw.run("t1", "--attempt", "2") == 0  # the fresh attempt: its own journal, clean
+    doc = mw.w.public_of("t1")
+    assert (doc["state"], doc["run_id"]) == ("published", f"{DATE}-t1-2")
+
+
+def test_a_stopped_topic_whose_journal_is_clean_resumes_and_ends_clean(mw: MWorld, capsys: pytest.CaptureFixture[str]):
+    mw.scenario({"t1": [{"crash": True}, {}], "t2": [{}]})  # a Traceback outside any model call: 2 clean rows stay
+    assert mw.run("t1,t2") == 1
+    halt = next(line for line in capsys.readouterr().out.splitlines() if "once the cause is fixed" in line)
+    assert "t1 resumes from its checkpoint" in halt
+    assert mw.run("t1,t2") == 0  # same route: the stopped run id resumes, its summary line is clean, then t2 runs
     first, second, third = mw.w.runs()
     assert (first["topic"], second["topic"], third["topic"]) == ("t1", "t1", "t2")
     assert second["resume"] and not first["resume"]
+    assert mw.w.public_of("t1")["state"] == "published" and "model calls: 4 (0 failed)" in mw.logs()
+
+
+@pytest.mark.parametrize("second", ["meterless", "nvidia"])
+def test_a_version_the_rule_rejected_is_never_shown_as_published(mw: MWorld, second: str):
+    # run 1 publishes v1, then its summary line trips the rule: v1 is the store's latest.json but not for hand-over
+    mw.scenario({"t1": [{"after": ["model calls: 3 (0 failed, 1 lane unverified); answered by: m x3"]},
+                        {"rows": [{"lane_unverified": True}], "sleep": 30}]})
+    assert mw.run("t1") == 1 and mw.w.public_of("t1")["state"] == "failed"
+    if second == "meterless":  # the fresh attempt the runbook gives, stopped before it publishes
+        assert mw.run("t1", "--attempt", "2") == 1
+        state = "failed"
+    else:  # the printed NVIDIA fallback, whose key drains
+        mw.w.scenario({"t1": [{"exit": 3, "fast": 50}]})
+        assert mw.w.main(mw.w.argv("t1", "--attempt", "2", keys="QTEST_KEY_A")) == 3
+        state = "waiting_for_key"
+    doc = mw.w.public_of("t1")  # attempt 2's own state, the same as its record
+    assert (doc["state"], doc["run_id"]) == (state, f"{DATE}-t1-2"), doc
+    assert f"the store's newest version is run {DATE}-t1-1's, which the Meterless stop rule failed" in mw.logs()
+    assert "keeps the published version" not in mw.logs()
 
 
 def test_a_run_stopped_after_it_published_stays_failed_on_either_route(mw: MWorld):
