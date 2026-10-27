@@ -17,6 +17,12 @@
 .investigation-reader .reader-opening { max-width: 740px; margin: 12px auto 48px; }
 .reader-opening h1 { font-size: clamp(32px, 4.5vw, 54px); font-weight: 500; line-height: 1.1; letter-spacing: -.045em; }
 .reader-opening .lede { font-size: 18px; line-height: 1.6; margin: 24px 0; color: var(--ink-2); }
+.reader-selection { margin: 24px 0; border-block: 1px solid var(--rule); font-size: 13px; }
+.reader-selection > summary { display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; cursor: pointer; list-style: none; }
+.reader-selection > summary::-webkit-details-marker { display: none; }
+.reader-selection > summary span { color: var(--accent); }
+.reader-selection[open] > summary span { rotate: 45deg; }
+.reader-selection > p { font-size: 12px; line-height: 1.65; color: var(--ink-2); padding: 12px 0 20px; overflow-wrap: anywhere; }
 .reader-brief { margin: 32px 0; border-top: 1px solid var(--rule); }
 .reader-brief-group { border-bottom: 1px solid var(--rule); }
 .reader-brief-group > summary { list-style: none; display: flex; justify-content: space-between; gap: 16px; padding: 18px 0; font-size: 16px; cursor: pointer; }
