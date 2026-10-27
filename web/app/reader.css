@@ -51,7 +51,7 @@
    bar is a tray of round pills in the board's style (overrides app/instrument-polish.css on this bar only, by
    specificity); the Read pane's Impact and claim groups are low rounded rows like the board's roundup rows.
    DECISION: pills without numbers or caption, the tray left-aligned with the 740 px reading column, the selected
-   pill filled ink; the tray and the rows on --paper-3, a shade greyer than --paper-2 so they do not melt into the
+   pill filled ink; the tray and the rows on --tray, clearly greyer than the paper so they do not melt into the
    paper (Anastasia, 2026-10-27), 14 px corners and the count in the mono. Why: Anastasia's review of
    2026-10-27 (title first, the menu under it fixed on scroll, rounded; the five links read as random). */
 .reader-head { max-width: 740px; margin: 8px auto 26px; }
@@ -60,19 +60,19 @@
 .reader-head .story-review { margin: 14px 0 0; }
 .reader-head-lede { font-size: 18px; line-height: 1.6; color: var(--ink-2); margin: 18px 0 0; max-width: 60ch; }
 .investigation-reader .reader-bar { border-top: 0; padding: 8px 0 12px; }
-.investigation-reader .reader-tabs { display: flex; flex-wrap: wrap; gap: 4px; width: max-content; max-width: 100%; margin: 0 auto 0 max(0px, calc(50% - 370px)); padding: 4px; border: 0; border-radius: 999px; background: var(--paper-3); }
+.investigation-reader .reader-tabs { display: flex; flex-wrap: wrap; gap: 4px; width: max-content; max-width: 100%; margin: 0 auto 0 max(0px, calc(50% - 370px)); padding: 4px; border: 0; border-radius: 999px; background: var(--tray); }
 .investigation-reader .reader-tabs button { flex: 0 0 auto; min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-2); font-family: var(--ui); font-size: 14px; font-weight: 500; gap: 0; box-shadow: none; }
 .investigation-reader .reader-tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); border: 0; box-shadow: none; }
 .investigation-reader .reader-tabs button:hover:not([aria-selected="true"]) { background: var(--paper-2); color: var(--ink); }
 .investigation-reader .reader-tabs button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .investigation-reader .reader-opening { margin-top: 0; }
-.investigation-reader .impact-assessment { border: 0; border-radius: 14px; background: var(--paper-3); padding: 0 18px; margin: 0; }
+.investigation-reader .impact-assessment { border: 0; border-radius: 14px; background: var(--tray); padding: 0 18px; margin: 0; }
 .investigation-reader .impact-assessment > summary { padding: 16px 0; min-height: 56px; }
 .investigation-reader .impact-assessment > summary > strong { font-size: 16px; }
 .investigation-reader .impact-assessment > summary .impact-summary-note { font-family: var(--mono); font-size: 12px; }
 .investigation-reader .reader-brief { margin: 24px 0 0; border-top: 0; display: grid; gap: 8px; }
 .reader-brief-kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 2px; }
-.investigation-reader .reader-brief-group { border: 0; border-radius: 14px; background: var(--paper-3); padding: 0 18px; }
+.investigation-reader .reader-brief-group { border: 0; border-radius: 14px; background: var(--tray); padding: 0 18px; }
 .investigation-reader .reader-brief-group > summary { padding: 16px 0; font-size: 16px; align-items: center; }
 .investigation-reader .reader-brief-group > summary:hover { background: transparent; }
 .reader-brief-count { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
@@ -92,3 +92,10 @@
 body:has(.investigation-reader) { overflow-anchor: none; }
 /* Only the arrow turns when a row opens; the count stays upright (Anastasia, 2026-10-27: "the zero flips"). */
 .investigation-reader .reader-brief-group[open] > summary .reader-brief-count { rotate: none; }
+/* The disclosure sign on every row is the chevron that reads as "opens", turning over when open (Anastasia,
+   2026-10-27: the diagonal arrow said "goes somewhere"). */
+.investigation-reader .reader-brief-chevron, .investigation-reader .impact-toggle { color: var(--ink-2); transition: rotate 180ms; }
+.investigation-reader .reader-brief-group[open] > summary .reader-brief-chevron, .investigation-reader .impact-assessment[open] > summary .impact-toggle { rotate: 180deg; }
+@media (prefers-reduced-motion: reduce) { .investigation-reader .reader-brief-chevron, .investigation-reader .impact-toggle { transition: none; } }
+/* The claim rows' labels in ink like "Impact", not in the accent: all rows read as one list (Anastasia, 2026-10-27). */
+.investigation-reader .reader-brief-group > summary { color: var(--ink); font-weight: 500; }

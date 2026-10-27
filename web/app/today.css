@@ -56,18 +56,18 @@
    are Vadim's and stay; this surface rounds the tray, the arrow buttons and the field, hides the "Edition date"
    label visually (it stays for assistive tech) and sets "Today" as a small pill. Why: one shape family in
    the cabinet's controls. */
-.tb .tb-controls .edition-navigation {
+:is(.tb, .brief-toolbar) .tb-controls .edition-navigation {
   align-items: center;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--rule);
   border-radius: 999px;
-  background: var(--paper-3);
+  background: var(--tray);
 }
-.tb .tb-controls .edition-navigation label {
+:is(.tb, .brief-toolbar) .tb-controls .edition-navigation label {
   display: block;
 }
-.tb .tb-controls .edition-navigation label > span {
+:is(.tb, .brief-toolbar) .tb-controls .edition-navigation label > span {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -76,7 +76,7 @@
   white-space: nowrap;
   padding: 0;
 }
-.tb .tb-controls .edition-navigation input[type="date"] {
+:is(.tb, .brief-toolbar) .tb-controls .edition-navigation input[type="date"] {
   width: 140px;
   min-height: 44px;
   padding: 6px 8px;
@@ -87,17 +87,17 @@
   font-size: 14px;
   text-align: center;
 }
-.tb .tb-controls .edition-navigation button {
+:is(.tb, .brief-toolbar) .tb-controls .edition-navigation button {
   min-width: 44px; /* the 44 px tap target web/tests/edition-navigation-checks.cjs asserts */
   min-height: 44px;
   padding: 6px;
   border-radius: 999px;
 }
-.tb .tb-controls .edition-navigation button:hover:not(:disabled) {
+:is(.tb, .brief-toolbar) .tb-controls .edition-navigation button:hover:not(:disabled) {
   background: var(--paper);
   border-color: transparent;
 }
-.tb .tb-controls .edition-navigation .edition-today {
+:is(.tb, .brief-toolbar) .tb-controls .edition-navigation .edition-today {
   padding-inline: 12px;
   border: 1px solid var(--rule);
   background: var(--paper);
@@ -122,7 +122,7 @@
   cursor: pointer;
 }
 .tb .tb-add:hover {
-  background: var(--paper-2);
+  background: var(--tray);
 }
 .tb .tb-add[aria-expanded="true"] {
   background: var(--ink);

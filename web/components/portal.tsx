@@ -28,6 +28,7 @@ import { Brand } from "./brand";
 import { TopicPicker, FirstSetup } from "./topic-picker";
 import { BriefStatus } from "./brief-status";
 import { TodayBoard } from "./today-board";
+import { TopicStories } from "./topic-stories";
 import { EditionNavigation } from "./edition-navigation";
 import { editionHref, validEditionDate } from "@/lib/edition-navigation.mjs";
 import { StoryCrumb, storyReadable, ReviewLabel } from "./story";
@@ -311,14 +312,13 @@ export function Portal({
                 />
               ) : view !== "dashboard" && view !== "sources" && (
               <div className="page-heading">
-                <p className="eyebrow">
-                  {view === "dashboard"
-                    ? "CURATED AROUND YOUR INTERESTS"
-                    : view === "history"
-                      ? "ARCHIVE"
-                      : view.toUpperCase()}
-                </p>
+                {/* No capital kickers on the cabinet pages (second cabinet pass, 2026-10-27); the first setup keeps its. */}
+                {view === "onboarding" && <p className="eyebrow">{view.toUpperCase()}</p>}
                 {view !== "event" && <h1>{names[view]}</h1>}
+                {view === "topic" && (() => {
+                  const n = visibleStories(data?.events || [], day, topic, user?.topics || []).length;
+                  return n ? <p className="page-meta">{`${n} ${n === 1 ? "story" : "stories"} today`}</p> : null;
+                })()}
                 <p>
                   {view === "dashboard"
                     ? "A considered view of the stories that matter to you."
@@ -479,16 +479,10 @@ export function Portal({
                 })()
               ) : (
                 <>
+                  {/* The tabs ("The daily edition / Evidence first", "Past digests") are gone: Evidence lives on the story
+                      page; the date control and the topic filter are pills in the board's manner (second cabinet pass). */}
                   <div className="brief-toolbar">
-                    <div className="tabs">
-                      <span className="selected">
-                        {view === "history"
-                          ? "Past digests"
-                          : "The daily edition"}
-                      </span>
-                      <span>Evidence first</span>
-                    </div>
-                    <div className="filters">
+                    <div className="filters tb-controls">
                       <EditionNavigation day={day} today={today()} onDay={selectEdition} />
                       {view === "history" && (
                         <label>
@@ -523,18 +517,14 @@ export function Portal({
                       </Link>
                     </div>
                   )}
-                  <div className={view === "history" ? "brief-columns brief-columns-single" : "brief-columns"}>
+                  <div className="brief-columns brief-columns-single">
                     <section>
-                      <div className="section-heading">
-                        <h2>
-                          {view === "history"
-                            ? "Daily digests"
-                            : view === "topic"
-                              ? "Important stories"
-                              : "Today’s important stories"}
-                        </h2>
-                        <span className="edition-label">{day}</span>
-                      </div>
+                      {view === "history" && (
+                        <div className="section-heading">
+                          <h2>Daily digests</h2>
+                          <span className="edition-label">{day}</span>
+                        </div>
+                      )}
                       {view === "history" ? (
                         digests.length ? (
                           digests.map((d, i) => (
@@ -574,30 +564,10 @@ export function Portal({
                                 : !!user?.topics.includes(e.topic_id)) &&
                               isQuietDay(data, e),
                           );
+                          // The topic's stories as rows (components/topic-stories.tsx); the standfirst, the rubric and its
+                          // rationale are read on the story page (second cabinet pass, 2026-10-27).
                           return events.length ? (
-                            events.map((e, i) => (
-                              <article className="event-row" key={e.id}>
-                                <p className="eyebrow">
-                                  {String(i + 1).padStart(2, "0")} /{" "}
-                                  {e.importance?.label ||
-                                    "Importance not supplied"}
-                                </p>
-                                <h3>
-                                  <Link
-                                    href={"/events/" + e.id + "?date=" + day}
-                                  >
-                                    {e.title} <ArrowUpRight size={19} />
-                                  </Link>
-                                </h3>
-                                <p>{e.summary}</p>
-                                {e.reasoning?.needs_review && <ReviewLabel />}
-                                {e.importance && (
-                                  <p className="help">
-                                    {e.importance.explanation}
-                                  </p>
-                                )}
-                              </article>
-                            ))
+                            <TopicStories events={events} day={day} />
                           ) : quiet ? null : data?.status === "error" ||
                             data?.publication?.status === "error" ? (
                             <Empty title="This edition is unavailable">
@@ -637,43 +607,12 @@ export function Portal({
                           day={day}
                           topic={topic}
                           followed={user?.topics || []}
+                          roundup={false}
                         />
                       )}
                     </section>
-                    {/* History lists the digests themselves; the reading-room rail would repeat the latest one. */}
-                    {view !== "history" && (
-                    <aside className="brief-aside">
-                      <p className="eyebrow">THE READING ROOM</p>
-                      <h3>Understanding takes perspective.</h3>
-                      <p>
-                        Every brief separates established facts, attributed
-                        statements and what remains uncertain.
-                      </p>
-                      <div className="aside-rule" />
-                      <h4>Latest digest</h4>
-                      {digests[0] ? (
-                        <p>{digests[0].summary}</p>
-                      ) : (
-                        <p>
-                          Your latest digest will appear here when published.
-                        </p>
-                      )}
-                      <Link href="/history">
-                        Explore the archive <ArrowRight size={15} />
-                      </Link>
-                      <div className="aside-rule" />
-                      <span className="status-dot" />
-                      <span className="help">
-                        {data?.status === "pending"
-                          ? "Live data connection pending"
-                          : data?.status === "demo"
-                            ? "DEMO fixture · fictional data"
-                            : data?.status === "error"
-                              ? "Data unavailable"
-                              : "Source data supplied"}
-                      </span>
-                    </aside>
-                    )}
+                    {/* The reading-room rail (slogan, latest digest, archive link, data status) was removed in the second
+                        cabinet pass, 2026-10-27: the digest sentence sits beside it, the archive is History in the menu. */}
                   </div>
                   {view === "topic" && (
                     <Spectrum sources={data?.sources || []} />

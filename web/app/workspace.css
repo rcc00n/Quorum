@@ -200,11 +200,11 @@ summary:focus-visible {
    On the board (cabinet pass, 2026-10-27) the plain line moves to the foot of the page as a mono colophon,
    so the title is the first thing read; the warning panel stays at the top. The story page follows (cabinet pages
    pass, 2026-10-27). */
-.workspace-main:has(.tb, .investigation-reader) {
+.workspace-main:has(.tb, .investigation-reader, .brief-toolbar) {
   display: flex;
   flex-direction: column;
 }
-.workspace-main:has(.tb, .investigation-reader) > .publication-line {
+.workspace-main:has(.tb, .investigation-reader, .brief-toolbar) > .publication-line {
   order: 99;
   margin: 48px 0 0;
   padding-top: 16px;
@@ -384,17 +384,17 @@ label {
   font-size: 13px;
 }
 .message {
-  background: var(--paper-2);
+  background: var(--tray);
   border-left: 2px solid var(--umber);
   color: var(--ink);
   border-radius: 0;
 }
 .error {
-  background: var(--paper-2);
+  background: var(--tray);
   border-color: var(--umber-ink);
 }
 .notice {
-  background: var(--paper-2);
+  background: var(--tray);
   border-left: 2px solid var(--umber);
 }
 .notice p {
@@ -405,7 +405,7 @@ label {
 .publication-notice,
 .uncertainty,
 .r-claim-status {
-  background: var(--paper-2);
+  background: var(--tray);
 }
 .claim-detail h3,
 .perspective-column h3 {
@@ -441,7 +441,7 @@ label {
   border-left: 2px solid var(--umber);
 }
 .r-final {
-  background: var(--paper-2);
+  background: var(--tray);
 }
 .r-repeat {
   border-left: 2px solid var(--umber) !important;
@@ -503,7 +503,7 @@ label {
   margin: 0 0 8px;
   border-bottom: 0;
   border-radius: 14px;
-  background: var(--paper-3);
+  background: var(--tray);
 }
 .roundup-item p {
   grid-column: 1;
@@ -617,3 +617,111 @@ label {
     padding: 24px var(--gutter) 40px;
   }
 }
+
+/* The topic and history pages after the board's rules (second cabinet pass, 2026-10-27): no kicker, a mono line
+   under the title, the toolbar as pills only (the date control shares the board's pill, the topic filter is a
+   pill select), one column, the topic's stories as the board's card row, the publication line at the foot. */
+.page-heading .page-meta {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin: 6px 0 0;
+}
+.brief-toolbar {
+  justify-content: flex-start;
+  border: 0;
+  padding: 0;
+  margin: 8px 0 28px;
+}
+.brief-toolbar .filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.brief-toolbar .filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  font-size: 0;
+}
+.brief-toolbar .filters select {
+  min-height: 44px;
+  padding: 0 40px 0 18px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--ui);
+  font-size: 14px;
+  color: var(--ink);
+}
+/* The sub-line under a page title (History's "Editions by day.", Account's line) in the mono, like the board's. */
+.page-heading > p:not(.eyebrow) {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+/* The spectrum's rating-mode select as a pill on the app routes; the instrument itself is untouched. */
+.workspace-main .spectrum-modern .inline-label select, .workspace-main .inline-label select {
+  min-height: 40px;
+  padding: 0 36px 0 16px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--ui);
+  font-size: 14px;
+}
+/* The topic page's stories as rows like "Also today" (components/topic-stories.tsx). */
+.topic-stories {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.topic-story {
+  border-radius: 14px;
+  background: var(--tray);
+  padding: 16px 18px;
+}
+.topic-story-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: baseline;
+  color: inherit;
+  text-decoration: none;
+}
+.topic-story-title {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.topic-story-link:hover .topic-story-title {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.topic-story-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.topic-story .story-review {
+  margin: 10px 0 0;
+}
+@media (max-width: 700px) {
+  .topic-story-link {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+}
+/* One grey for every filled element on the app routes (Anastasia, 2026-10-27): notices, status panels, the
+   search key cap and the hover of the "+ Add topics" pill share --tray with the rows and trays above. */
+.workspace-search kbd { background: var(--tray); }
+.quiet-day { background: var(--tray); border-radius: 14px; }
+.brief-toolbar { margin-bottom: 16px; }
+.brief-columns.brief-columns-single { margin-top: 16px; }

@@ -104,11 +104,13 @@ export function EditionNotes({
   day,
   topic,
   followed,
+  roundup = true,
 }: {
   snapshot: Snapshot;
   day: string;
   topic: string;
   followed: string[];
+  roundup?: boolean;
 }) {
   if (
     !snapshot.publication ||
@@ -125,7 +127,7 @@ export function EditionNotes({
             (topic ? e.topic_id === topic : followed.includes(e.topic_id)),
         )
         .map((e) => (
-          <EditionNote key={e.topic_id} snapshot={snapshot} edition={e} />
+          <EditionNote key={e.topic_id} snapshot={snapshot} edition={e} roundup={roundup} />
         ))}
     </>
   );
@@ -133,9 +135,13 @@ export function EditionNotes({
 function EditionNote({
   snapshot,
   edition: e,
+  roundup = true,
 }: {
   snapshot: Snapshot;
   edition: EditionPresentation;
+  // The topic page shows the digest sentence and the quiet day but not "Also today", which stays on Home
+  // (Anastasia, second cabinet pass 2026-10-27).
+  roundup?: boolean;
 }) {
   return (
     <section className="edition-notes" aria-label="Edition context">
@@ -149,7 +155,7 @@ function EditionNote({
         </div>
       )}
       {!!e.summary && <p>{e.summary}</p>}
-      {!!e.roundup.length && (
+      {roundup && !!e.roundup.length && (
         <section aria-label="Also today">
           <h3>Also today</h3>
           <p className="help">

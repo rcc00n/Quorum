@@ -5,6 +5,7 @@ import type { Event, Source } from "@/lib/api";
 import { safeUrl } from "@/lib/api";
 import { Story, storyReadable, ReviewLabel, formatDate } from "./story";
 import { ImpactAssessment } from "./impact-assessment";
+import { ChevronDown } from "lucide-react";
 
 const views = [
   ["reading", "Read", "Reading", "The story, at your pace"],
@@ -107,7 +108,7 @@ export function LegacyClaims({ event }: { event: Event }) {
   // the rows read as one list with a purpose instead of five unexplained links. Labels unchanged.
   return <div className="reader-brief"><p className="reader-brief-kicker">Claims and coverage</p>{(["established", "statements", "disputed", "unknown", "coverage"] as const).map((key, i) =>
     <details className="reader-brief-group" id={`claims-${key}`} key={key}>
-      <summary>{["What is established", "Attributed statements", "Disputed claims", "What remains unknown", "Coverage differences"][i]}<span className="reader-brief-count">{event[key].length}</span><span aria-hidden="true">↗</span></summary>
+      <summary>{["What is established", "Attributed statements", "Disputed claims", "What remains unknown", "Coverage differences"][i]}<span className="reader-brief-count">{event[key].length}</span><ChevronDown size={16} className="reader-brief-chevron" aria-hidden="true" /></summary>
       {event[key].length ? event[key].map((item, j) => <article key={j}><h3>{item.text}</h3><p>{item.explanation}</p>{item.sources.map((s, k) => safeUrl(s.url) && <a className="source-link" key={k} href={safeUrl(s.url)} target="_blank" rel="noopener noreferrer">{s.title} ↗</a>)}</article>) : <p className="muted">No information supplied for this section.</p>}
     </details>)}</div>;
 }
