@@ -151,17 +151,19 @@ REVIEWED_IMAGES.update({
 })
 
 
-# DECISION(2026-10-27, Anastasia/Claude Code): permit only these 8 inspected review captures of the AI headline notice
-# (anastasia/web-ux-ai-notice): Home and a story page before and after, desktop and phone, on the FICTIONAL 22 October
-# preview sample under a DEMO reader served by Playwright routes; no real edition, no credential. Why: Vadim's gate for
-# review PNGs (his f3e121e pattern); arbitrary binaries stay excluded.
+# DECISION(2026-10-27, Anastasia/Claude Code): permit only these 9 inspected review captures of the AI headline notice
+# (anastasia/web-ux-ai-notice): Home and a story page before and after (closable notices), desktop and phone, and Home
+# with both notices closed, on the FICTIONAL 22 October preview sample under a DEMO reader served by Playwright routes;
+# no real edition, no credential. The first after-set's hashes are replaced, not kept. Why: Vadim's gate for review
+# PNGs (his f3e121e pattern); arbitrary binaries stay excluded.
 REVIEWED_IMAGES.update({
-    'docs/reviews/2026-10-27-web-ai-notice/home-after-desktop.png': '874245e4f220aac95655724870f205c75efc5ce5063007f64c7f44e9792aa766',
-    'docs/reviews/2026-10-27-web-ai-notice/home-after-phone.png': 'b366cc495b2cc9626e855d9f241bf129b0723fa7e353a9f48e04a01f5265f0c3',
+    'docs/reviews/2026-10-27-web-ai-notice/home-after-desktop.png': '8ce49e977d2b4993a3d7940a9cb0518ad8615c90cee1dc083060822e57fdc0fb',
+    'docs/reviews/2026-10-27-web-ai-notice/home-after-phone.png': 'bc38e39737e669400cc73552872de79c5bbbec90538e552a78741bb3ef5a4122',
     'docs/reviews/2026-10-27-web-ai-notice/home-before-desktop.png': 'ee64697ebf0b8f99c8ce20b3afbb9f6b8c9403160247c113bac85a1f32b3ee4e',
     'docs/reviews/2026-10-27-web-ai-notice/home-before-phone.png': '51e384c753628d32a37899edac239f4f74c507033428c2ad3747906f85a4a279',
-    'docs/reviews/2026-10-27-web-ai-notice/story-after-desktop.png': '54afe3ae5ebfde87f705a91580f258d1f53b66be41d828c4b060905a7022ada3',
-    'docs/reviews/2026-10-27-web-ai-notice/story-after-phone.png': 'bdef6d7baed222e4e8e7a0b048aeadaec00da28f607fa2cea4b4087fae296c83',
+    'docs/reviews/2026-10-27-web-ai-notice/home-closed-desktop.png': '0b522450132b879e0a9c083192e472a665a7d46a84f950ff5d2598dcf2701531',
+    'docs/reviews/2026-10-27-web-ai-notice/story-after-desktop.png': 'cb679795597482bd793068bb359369d1a8353113a016835f31805912c817eb31',
+    'docs/reviews/2026-10-27-web-ai-notice/story-after-phone.png': 'd2652ac4ba4cbb4a1b4bfe8c680e9ec28f6c23cf405942df76f90e94b1bc6ed4',
     'docs/reviews/2026-10-27-web-ai-notice/story-before-desktop.png': 'a38187a486ca2501a17654e704525b769eb05153b280cd4421f3eb607796cfcd',
     'docs/reviews/2026-10-27-web-ai-notice/story-before-phone.png': '53b702bfa3c0a9377d580fe1e1bae5c52e89601a044aa5cedcc144343ce46e68',
 })
