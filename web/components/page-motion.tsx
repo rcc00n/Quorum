@@ -5,6 +5,11 @@ import "@/app/page-motion.css";
 // DECISION(2026-10-26, rcc00n/Codex): observers only add presentation; unrevealed content stays readable.
 // Why: scrolling, reduced-motion settings or a missing observer must never hide news or block a link.
 export function PageMotion({ root, ready = true, epoch }: { root: string; ready?: boolean; epoch?: unknown }) {
+  // DECISION(2026-10-27, Anastasia/Claude Code; second cabinet pass): an element arrives once. The effect re-runs on
+  // every load (the date turns, the data changes), and it used to strip every element's arrival and replay it, so
+  // turning the dates read as flipping pages. Now the cleanup only disconnects the observer: an element already
+  // revealed keeps its end state and is skipped, one marked but not yet revealed is observed again (React's
+  // development double-run), and only elements never seen before arrive. Why: Anastasia's review of 2026-10-27.
   useEffect(() => {
     if (!ready) return;
     const parent = document.querySelector<HTMLElement>(root);
@@ -17,9 +22,11 @@ export function PageMotion({ root, ready = true, epoch }: { root: string; ready?
         if (entry.isIntersecting) { (entry.target as HTMLElement).dataset.revealed = "true"; observer?.unobserve(entry.target); }
       });
     }, { threshold: 0, rootMargin: "0px 0px -24px 0px" }) : null;
-    parent.querySelectorAll<HTMLElement>(".lp-hero-text, .lp-sheet, .landing main > section:not(#hero), .tb-head, .tb-section, .page-heading, .r-section, .analysis-section, .spectrum-modern").forEach(el => {
-      if (!observer || el.parentElement?.closest('.q-reveal')) return;
-      el.classList.add('q-reveal');el.style.setProperty('--q-delay', `${Math.min(revealed.length, 4) * 45}ms`);
+    // The board's head and the page headings (title, date control, "+ Add topics") stay still; only what sits
+    // below the rule arrives (Anastasia, second cabinet pass 2026-10-27: no reveal on the head when the date changes).
+    parent.querySelectorAll<HTMLElement>(".lp-hero-text, .lp-sheet, .landing main > section:not(#hero), .tb-section, .r-section, .analysis-section, .spectrum-modern").forEach(el => {
+      if (!observer || el.parentElement?.closest('.q-reveal') || el.dataset.revealed === "true") return;
+      if (!el.classList.contains('q-reveal')) { el.classList.add('q-reveal');el.style.setProperty('--q-delay', `${Math.min(revealed.length, 4) * 45}ms`); }
       revealed.push(el);observer.observe(el);
     });
     const surfaces = Array.from(parent.querySelectorAll<HTMLElement>(".lp-sheet, .tb-card-lead .tb-card-link"));
@@ -47,7 +54,7 @@ export function PageMotion({ root, ready = true, epoch }: { root: string; ready?
     return () => {
       reset();observer?.disconnect();parent.removeEventListener('pointermove', move);parent.removeEventListener('pointerleave', reset);
       surfaces.forEach(el => el.classList.remove('q-depth'));
-      revealed.forEach(el => { el.classList.remove('q-reveal');delete el.dataset.revealed;el.style.removeProperty('--q-delay'); });
+      // The arrival classes stay: a revealed element keeps its end state and never replays.
     };
   }, [root, ready, epoch]);
   return null;

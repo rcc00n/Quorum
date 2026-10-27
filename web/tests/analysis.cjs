@@ -244,8 +244,24 @@ const assert = require("node:assert/strict");
         exact: true,
       })
       .waitFor();
+    // "Also today" lives on Home only since the cabinet pages pass (Anastasia, 2026-10-27, web/DESIGN.md › Cabinet):
+    // absent on the topic page, present on the board for the followed topic.
+    assert.equal(
+      await page
+        .getByRole("heading", { name: "Also today", exact: true })
+        .count(),
+      0,
+    );
+    await page.goto(root + "/dashboard?date=2026-10-22");
     await page
       .getByRole("heading", { name: "Also today", exact: true })
+      .waitFor();
+    await page.goto(root + "/topics/demo-topic?date=2026-10-22");
+    await page
+      .getByRole("heading", {
+        name: "A quiet day for major stories",
+        exact: true,
+      })
       .waitFor();
     for (const [status, title] of [
       ["pending", "No edition for 22 October 2026 is installed on this portal."],

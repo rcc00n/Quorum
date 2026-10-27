@@ -17,7 +17,7 @@ import type {
 } from "@/lib/analysis";
 import { displayTime } from "@/lib/analysis";
 import { Spectrum } from "./spectrum";
-import { InvestigationReader, ReaderPanel, EventReading } from "./investigation-reader";
+import { InvestigationReader, ReaderPanel, EventReading, StoryHead } from "./investigation-reader";
 import { claimKey } from "./story";
 import { readableArticle } from "@/lib/editorial";
 
@@ -482,8 +482,8 @@ export function AnalysisWorkspace({
   // Why: DECISIONS › Reader workspace supersedes only the continuous appendix navigation.
   const readable = !supplementary && readableArticle(event);
   return (
-    <InvestigationReader title={event.title} needsReview={event.reasoning?.needs_review} className={readable ? "analysis-workspace story-page" : "analysis-workspace"}>
-      <ReaderPanel name="reading"><EventReading event={event} sources={sources} /></ReaderPanel>
+    <InvestigationReader head={<StoryHead event={event} />} className={readable ? "analysis-workspace story-page" : "analysis-workspace"}>
+      <ReaderPanel name="reading"><EventReading event={event} sources={sources} headless /></ReaderPanel>
       <ReaderPanel name="evidence">
       <section id="evidence-explorer" className="analysis-block">
         <div className="analysis-block-heading">

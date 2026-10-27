@@ -1,4 +1,5 @@
 import type { Event } from "@/lib/api";
+import { ChevronDown } from "lucide-react";
 
 // DECISION(2026-10-27, rcc00n/Codex): visualize only a complete, internally consistent supplied rubric.
 // Why: partial fields must not become an invented score. Ranges: DECISIONS › Selecting major news.
@@ -6,14 +7,21 @@ const dimensions = [
   ["legal_force", "Legal force", 2], ["reach", "Reach", 3],
   ["irreversibility", "Irreversibility", 2], ["confirmation", "Confirmation", 2],
 ] as const;
+// The supplied total, only when the rubric is complete and adds up; null otherwise (the topic page's rows and the
+// Impact row read the same number, cabinet pages pass 2026-10-27).
+export function rubricTotal(event: Event): number | null {
+  const rubric = event.reasoning?.rubric;
+  const complete = !!rubric && dimensions.every(([key, , max]) => Number.isInteger(rubric[key]) && rubric[key] >= 0 && rubric[key] <= max)
+    && Number.isInteger(rubric.total) && rubric.total === dimensions.reduce((sum, [key]) => sum + rubric[key], 0);
+  return complete ? rubric.total : null;
+}
 export function ImpactAssessment({ event }: { event: Event }) {
   const record = event.importance, rubric = event.reasoning?.rubric;
-  const complete = rubric && dimensions.every(([key, , max]) => Number.isInteger(rubric[key]) && rubric[key] >= 0 && rubric[key] <= max)
-    && Number.isInteger(rubric.total) && rubric.total === dimensions.reduce((sum, [key]) => sum + rubric[key], 0);
+  const complete = rubricTotal(event) !== null;
   if (!record && !complete) return null;
   return <details className="impact-assessment">
-    <summary><strong>Impact</strong><span className="impact-summary-note">Selection rubric</span><span className="impact-toggle" aria-hidden="true">+</span></summary>
-    {complete ? <div className="impact-overview">
+    <summary><strong>Impact</strong><span className="impact-summary-note">{complete && rubric ? `${rubric.total} / 9` : "Selection rubric"}</span><ChevronDown size={16} className="impact-toggle" aria-hidden="true" /></summary>
+    {complete && rubric ? <div className="impact-overview">
       <div className="impact-total"><span>Recorded points</span><div><strong className="impact-total-value">{rubric.total}</strong><span> / 9</span></div><p>From this edition’s selection rubric.</p></div>
       <dl className="impact-dimensions">{dimensions.map(([key, label, max]) => <div className="impact-dimension" key={key} data-dimension={key}>
         <div><dt>{label}</dt><dd><strong>{rubric[key]}</strong> / {max}</dd></div>
@@ -22,7 +30,7 @@ export function ImpactAssessment({ event }: { event: Event }) {
     </div> : <p className="impact-original-label">{record?.label}</p>}
     <details className="impact-notes">
       <summary>Selection evidence and original notes <span aria-hidden="true">↗</span></summary>
-      {complete && <dl className="impact-rationales">{dimensions.map(([key, label]) => <div key={key}><dt>{label}</dt><dd data-dimension={key}>{rubric.rationale?.[key] || "Rationale not supplied."}</dd></div>)}</dl>}
+      {complete && rubric && <dl className="impact-rationales">{dimensions.map(([key, label]) => <div key={key}><dt>{label}</dt><dd data-dimension={key}>{rubric.rationale?.[key] || "Rationale not supplied."}</dd></div>)}</dl>}
       {record && <div className="impact-original"><span>Original selection record</span><strong>{record.label}</strong><p>{record.explanation}</p></div>}
     </details>
   </details>;
