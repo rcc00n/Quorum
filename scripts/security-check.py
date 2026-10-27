@@ -79,6 +79,29 @@ REVIEWED_IMAGES.update({
 })
 
 
+# DECISION(2026-10-27, Anastasia/Claude Code): permit only these fifteen inspected PR #62 review captures: the cabinet
+# pages on the committed FICTIONAL 22 October sample under a disposable local account (home, topic panel, Also today
+# fold with the sample's rows repeated, Account) and the same pages on integration as the before pictures; no real
+# edition, no credential. Why: Vadim's gate for review PNGs (his f3e121e pattern); arbitrary binaries stay excluded.
+REVIEWED_IMAGES.update({
+    'docs/reviews/2026-10-27-web-cabinet/account-desktop.png': '71c24bac072aad4b731a3eb3500d87e4334ba5cc01b18e96ceda540b1c7baf4f',
+    'docs/reviews/2026-10-27-web-cabinet/account-phone.png': '0bbc8ccff14c7788681afab261c566131200832344ff692773f64a5f7f41e7d3',
+    'docs/reviews/2026-10-27-web-cabinet/account-tablet.png': '608afb0268b29818ea1e2871c28b4eeddb03f6743f4fa0d64ea9d91b1894fa80',
+    'docs/reviews/2026-10-27-web-cabinet/also-fold-desktop.png': 'd42274421c87e34bf6ed1b798d87603fcb7b30964eae4412e7fdea50f7c63548',
+    'docs/reviews/2026-10-27-web-cabinet/also-fold-phone.png': 'c5821308c235f5ee633644feabc9635495b629685ce44add47eea582fd7e36f6',
+    'docs/reviews/2026-10-27-web-cabinet/before-home-desktop.png': 'fb1ba4967001c531347a75bd32472d585b95fcaedc9ab179b9ce9ecbc335f670',
+    'docs/reviews/2026-10-27-web-cabinet/before-home-phone.png': '6277ef45a273cd20e0f4ff8b03355590333caf97074bce949ab9d9ba02b74e3d',
+    'docs/reviews/2026-10-27-web-cabinet/before-settings-desktop.png': '0f6ed781af9b1c9cb386bdc68ae4b47348bcb86676a6640e53a4bb8e747691a7',
+    'docs/reviews/2026-10-27-web-cabinet/before-settings-phone.png': '66c5276e75ee2612e39dd1e420f3d69fa8401c6b0759dd57229738fa4e21b060',
+    'docs/reviews/2026-10-27-web-cabinet/home-desktop.png': 'add5013344de80d3aa09b9c4fef6c3600f95610a1a036e1c5e9f7563cb27d077',
+    'docs/reviews/2026-10-27-web-cabinet/home-phone.png': '4ac70e673bc119503a604c2266ca01fae8c1065144a5af1a9f11fef7a200cfda',
+    'docs/reviews/2026-10-27-web-cabinet/home-tablet.png': 'a7fe40ca4f66da58071bd4fcf9feb1266cd0babac03b31bd82704e7d4aa1c2bc',
+    'docs/reviews/2026-10-27-web-cabinet/home-topics-desktop.png': 'f4166f42cd34795f60ed52d7489894b3dadd9358d7310d162f9555b641216d7d',
+    'docs/reviews/2026-10-27-web-cabinet/home-topics-phone.png': '1028225c28445100913184a2ea7f0df71a1e901863202ff7da5f8b25c057f529',
+    'docs/reviews/2026-10-27-web-cabinet/home-topics-tablet.png': '8151ebda5a3360a4e48ff22909d7c068699efeff207b970f94ba6b1d701c4e9e',
+})
+
+
 def approved_review_image(name, data):
     return (name in REVIEWED_IMAGES and data.startswith(b'\x89PNG\r\n\x1a\n')
             and hashlib.sha256(data).hexdigest() == REVIEWED_IMAGES[name])
