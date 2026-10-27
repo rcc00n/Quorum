@@ -182,8 +182,8 @@ export function Portal({
   const names: Record<string, string> = {
     dashboard: "Your daily perspective",
     topic: data?.topics.find((t) => t.id === id)?.name || "Topic brief",
-    history: "The perspective archive",
-    settings: "Your workspace",
+    history: "History",
+    settings: "My topics",
     onboarding: "What matters to you?",
     event: "Event analysis",
   };
@@ -301,16 +301,18 @@ export function Portal({
                 <p className="eyebrow">
                   {view === "dashboard"
                     ? "CURATED AROUND YOUR INTERESTS"
-                    : view.toUpperCase()}
+                    : view === "history"
+                      ? "ARCHIVE"
+                      : view.toUpperCase()}
                 </p>
                 {view !== "event" && <h1>{names[view]}</h1>}
                 <p>
                   {view === "dashboard"
                     ? "A considered view of the stories that matter to you."
                     : view === "history"
-                      ? "Return to a day. Revisit the evidence."
+                      ? "Editions by day."
                       : view === "settings"
-                        ? "A few details. A more personal brief."
+                        ? "Your topics, name and password."
                         : view === "onboarding"
                           ? "Start with your interests. Keep an open perspective."
                           : ""}
@@ -323,7 +325,8 @@ export function Portal({
                   findings.
                 </p>
               )}
-              <PublicationNotice publication={data?.publication} />
+              {/* The settings page shows no edition, so it carries no publication notice (polish, 2026-10-27). */}
+              {view !== "settings" && <PublicationNotice publication={data?.publication} />}
               {message && (
                 <p className="message" role="status">
                   {message}
@@ -506,7 +509,7 @@ export function Portal({
                       </Link>
                     </div>
                   )}
-                  <div className="brief-columns">
+                  <div className={view === "history" ? "brief-columns brief-columns-single" : "brief-columns"}>
                     <section>
                       <div className="section-heading">
                         <h2>
@@ -623,6 +626,8 @@ export function Portal({
                         />
                       )}
                     </section>
+                    {/* History lists the digests themselves; the reading-room rail would repeat the latest one. */}
+                    {view !== "history" && (
                     <aside className="brief-aside">
                       <p className="eyebrow">THE READING ROOM</p>
                       <h3>Understanding takes perspective.</h3>
@@ -654,6 +659,7 @@ export function Portal({
                               : "Source data supplied"}
                       </span>
                     </aside>
+                    )}
                   </div>
                   {view === "topic" && (
                     <Spectrum sources={data?.sources || []} />
@@ -663,9 +669,11 @@ export function Portal({
             </>
           )}
         </main>
+        {/* The landing's footer line and repository link, so every route ends the same way (polish, 2026-10-27). */}
         <footer className="workspace-footer">
-          <span>QUORUM</span>
-          <span>Follow the evidence. Keep the questions.</span>
+          <span>Quorum</span>
+          <span>Evidence under every line.</span>
+          <a href="https://github.com/rcc00n/Quorum">github.com/rcc00n/Quorum</a>
         </footer>
       </div>
     </div>

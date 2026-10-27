@@ -163,17 +163,58 @@ summary:focus-visible {
   padding: 32px var(--gutter) 48px;
   max-width: var(--measure); /* the page column of identity.css; globals.css centres it */
 }
+/* The footer as on the landing (app/landing.css .lp-foot): wordmark, one line, the repository (2026-10-27). */
 .workspace-footer {
   font-family: var(--body);
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  font-size: 15px;
+  letter-spacing: 0;
   color: var(--ink);
   border-top: 1px solid var(--rule);
-  padding-inline: var(--column-gutter);
+  padding: 32px var(--column-gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  flex-wrap: wrap;
 }
 .workspace-footer span:first-child {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.02em;
   color: var(--ink);
+}
+.workspace-footer span:nth-child(2) {
+  color: var(--ink-2);
+}
+.workspace-footer a {
   font-weight: 500;
+  color: var(--ink);
+}
+.workspace-footer a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* The publication line (components/analysis-workspace.tsx PublicationNotice, words unchanged) as a quiet
+   dateline above the title: grey, 12 px, no bold (2026-10-27). The warning version keeps its panel. */
+.publication-line {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin: 0 0 20px;
+}
+.publication-line strong {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.publication-line > .status-dot {
+  display: inline-block; /* globals.css stacks the spans; the pending line's dot stays on its line */
+  margin-right: 8px;
+  vertical-align: middle;
+}
+/* History without the reading-room rail: one column. */
+.brief-columns-single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* Type on the pages */
@@ -251,6 +292,12 @@ summary:focus-visible {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+/* The 404 page's button: `.empty a` above outranks `.button`, which left ink text on the ink button. On the
+   gate surface the button follows the gate's theme (paper on ink by day, ink on paper on the dark switch). */
+.empty a.button {
+  color: var(--g-btn-fg, #fff);
+  text-decoration: none;
 }
 .brief-aside {
   border-left: 1px solid var(--rule);
@@ -389,6 +436,9 @@ label {
 }
 .edition-notes {
   border-top: 1px solid var(--rule);
+}
+.edition-notes > section {
+  margin-top: 28px; /* the digest sentence and the "Also today" head touched */
 }
 
 @media (max-width: 700px) {

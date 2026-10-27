@@ -33,6 +33,10 @@ const APPENDIX_TITLE = "Across the spectrum";
 const APPENDIX_TAIL = " · Evidence and investigation";
 const APPENDIX_SUB = "How the outlets told this story, every claim with its evidence, and the trace of the investigation.";
 const CRUMB_FALLBACK = "Today";
+// The lead slot when the edition carries no licensed photo (reasoning's photo tool is not built; every story
+// arrives with photo: null). A blurred fill in the paper's colours and a plain sentence that says so.
+const PHOTO_MISSING_LEAD = "Imagine a photo here.";
+const PHOTO_MISSING_TAIL = "We ran out of hackathon before we got to this feature.";
 // The spectrum body (Yelysei's story-page specification, 2026-10-26): his wording for the coverage sentence; the
 // column labels, "Read as", "Example" and the two links are service lines for him to approve.
 const SPECTRUM_SUB = "How outlets told this story, measured from their texts.";
@@ -182,9 +186,27 @@ export function StoryCrumb({ topic, date }: { topic: Topic | null; date?: string
   );
 }
 
+// DECISION(2026-10-27, Anastasia/Claude Code): when no licensed photo exists the lead slot shows a blurred
+// fill of the paper's own colours and one honest sentence, never a stock image or a fake photograph. The fill
+// is decorative (aria-hidden); the sentence is plain text. Why: the photo tool did not fit in the hackathon,
+// and an empty frame read as a bug; DECISIONS › Photos says no photo is fine, and a joke that says so plainly
+// keeps the page honest.
+function PhotoMissing() {
+  return (
+    <div className="story-photo story-photo-missing">
+      <div className="story-photo-frame">
+        <span className="story-photo-blur" aria-hidden="true" />
+        <p className="story-photo-note">
+          <span className="story-photo-note-lead">{PHOTO_MISSING_LEAD}</span> <span>{PHOTO_MISSING_TAIL}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function Photo({ photo }: { photo: EditorialPhoto }) {
   const [failed, setFailed] = useState(false);
-  if (failed || !licensedPhoto(photo)) return null;
+  if (failed || !licensedPhoto(photo)) return <PhotoMissing />;
   const source = safeUrl(photo.source_url);
   const licence = safeUrl(photo.license_url);
   return (
@@ -429,7 +451,7 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
   return (
     <>
       <article className="story" aria-label="Source-backed article">
-        {article.photo && <Photo photo={article.photo} />}
+        {article.photo ? <Photo photo={article.photo} /> : <PhotoMissing />}
         <time className="story-date" dateTime={event.date}>
           {formatDate(event.date)}
         </time>
