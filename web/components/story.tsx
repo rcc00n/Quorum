@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ImpactAssessment } from "./impact-assessment";
 import { Fragment, useState } from "react";
 import type { Event, Source, Topic } from "@/lib/api";
 import { rating, cohort, safeUrl } from "@/lib/api";
@@ -513,11 +514,7 @@ export function Story({ event, sources }: { event: Event; sources: Source[] }) {
             {line}
           </p>
         ))}
-        {event.importance && (
-          <p className="story-appendix-bar">
-            <strong>{event.importance.label}</strong> {event.importance.explanation}
-          </p>
-        )}
+        {event.importance && <ImpactAssessment event={event} />}
         <p className="story-appendix-links">
           <a href={claimsHref}>{`All ${plural(claims.order.length, "claim", "claims")} with evidence`}</a>
           {claims.hasAnalysis && <a href="#investigation-timeline">{CHECKED_LINK}</a>}

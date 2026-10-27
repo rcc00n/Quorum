@@ -8,6 +8,7 @@ import registry from "@/fixtures/landing/sources.json";
 import rules from "@/fixtures/landing/rules.json";
 import graph from "@/fixtures/landing/graph.json";
 import "./landing.css";
+import "./landing-evidence.css";
 
 // DECISION(2026-10-25, Anastasia/Claude Code): the landing is a server component that renders only
 // committed fixtures (web/fixtures/landing) and copy; it calls no API, reads no database and shows
@@ -291,7 +292,7 @@ export default function Home() {
           <div className="lp-field-wrap" aria-hidden="true">
             <Field id="lp-blur-hero" />
           </div>
-          <aside className="lp-sheet" aria-labelledby="evidence-title">
+          <aside className="lp-sheet lp-sheet-focus" aria-labelledby="evidence-title">
             <p className="lp-eyebrow">Real query · read through Zetaris</p>
             <h2 id="evidence-title" className="lp-sheet-title">
               {`${evidence.topic_id} · edition ${evidence.edition_date}`}
@@ -306,40 +307,45 @@ export default function Home() {
                 <dd>{f.sources}</dd>
               </div>
             </dl>
-            <dl className="lp-kv lp-kv-figures">
-              <dt>Left · right · agencies and unrated</dt>
-              <dd>{`${f.left} · ${f.right} · ${f.unrated}`}</dd>
-              <dt>Full text · headline and lead</dt>
-              <dd>{`${f.fullText} · ${f.headlineOnly}`}</dd>
-              <dt>Official documents</dt>
-              <dd>{f.official}</dd>
-            </dl>
-            <details className="lp-sql">
-              <summary>Show the SQL</summary>
-              <pre>
-                <code>{evidence.sql.documents}</code>
-              </pre>
-              <pre>
-                <code>{evidence.sql.official_docs}</code>
-              </pre>
-              <p className="lp-fine">No article text is stored or shown; titles are cut at 80 characters by the file.</p>
+            {/* DECISION(2026-10-27, rcc00n/Codex): keep recorded counts/date/context visible and fold the intact query provenance.
+                Why: Vadim requested readable emphasis; Anastasia approved this scope in Issue #2, with look review before merge. */}
+            <details className="lp-sheet-details">
+              <summary>Query details and provenance<span aria-hidden="true">+</span></summary>
+              <dl className="lp-kv lp-kv-figures">
+                <dt>Left · right · agencies and unrated</dt>
+                <dd>{`${f.left} · ${f.right} · ${f.unrated}`}</dd>
+                <dt>Full text · headline and lead</dt>
+                <dd>{`${f.fullText} · ${f.headlineOnly}`}</dd>
+                <dt>Official documents</dt>
+                <dd>{f.official}</dd>
+              </dl>
+              <details className="lp-sql">
+                <summary>Show the SQL</summary>
+                <pre>
+                  <code>{evidence.sql.documents}</code>
+                </pre>
+                <pre>
+                  <code>{evidence.sql.official_docs}</code>
+                </pre>
+                <p className="lp-fine">No article text is stored or shown; titles are cut at 80 characters by the file.</p>
+              </details>
+              <dl className="lp-kv">
+                <dt>Window</dt>
+                <dd>{windowLabel()}</dd>
+                <dt>Run</dt>
+                <dd>{utc(evidence.run_at_utc)}</dd>
+                <dt>Route</dt>
+                <dd>{evidence.route}</dd>
+                <dt>Datasource</dt>
+                <dd>{evidence.datasource}</dd>
+                <dt>Commit</dt>
+                <dd>{`${evidence.branch}@${evidence.commit}`}</dd>
+                <dt>File</dt>
+                <dd>
+                  <a href={EVIDENCE_URL}>collectors/zetaris/evidence</a>
+                </dd>
+              </dl>
             </details>
-            <dl className="lp-kv">
-              <dt>Window</dt>
-              <dd>{windowLabel()}</dd>
-              <dt>Run</dt>
-              <dd>{utc(evidence.run_at_utc)}</dd>
-              <dt>Route</dt>
-              <dd>{evidence.route}</dd>
-              <dt>Datasource</dt>
-              <dd>{evidence.datasource}</dd>
-              <dt>Commit</dt>
-              <dd>{`${evidence.branch}@${evidence.commit}`}</dd>
-              <dt>File</dt>
-              <dd>
-                <a href={EVIDENCE_URL}>collectors/zetaris/evidence</a>
-              </dd>
-            </dl>
           </aside>
         </section>
 

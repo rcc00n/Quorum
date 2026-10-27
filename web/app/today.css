@@ -51,26 +51,6 @@
   align-items: flex-end;
   gap: 20px;
 }
-.tb .tb-date-pick {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--ink);
-}
-.tb .tb-date-pick > span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-.tb .tb-date-pick input {
-  min-height: 40px;
-  font-size: 14px;
-  width: auto;
-  border-radius: 2px;
-}
 /* "+ Add topics": a pill in the manner of untitled.stream's round "+" (cabinet pass, 2026-10-27). */
 .tb .tb-add {
   display: inline-flex;

@@ -172,6 +172,10 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
     await require('./installed-edition-checks.cjs')({browser, root, password, temp, build});
     return;
   }
+  if (!reasoningMode && process.argv.includes("--edition-navigation")) {
+    await require('./edition-navigation-checks.cjs')({browser,root,password});
+    return;
+  }
   if (reasoningMode) {
     if (process.argv.includes("--roundup-checks")) {
       await require("./roundup-checks.cjs")({ browser, root, env, password });
@@ -278,6 +282,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
       throw Error("overflow");
   }
   await require('./sources-route-checks.cjs')({page,browser,root});
+  await require('./edition-navigation-checks.cjs')({browser,root,password});
   const denied = await page.request.get(root + "/staff/", { maxRedirects: 0 });
   if (denied.status() !== 302) throw Error("regular staff denial failed");
   const adminContext = await browser.newContext();
@@ -311,7 +316,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
         {
           env: { ...process.env, QUORUM_TEST_URL: root, ...extra },
           // These two suites use public DOM or explicit DEMO interception, never account credentials.
-          stdio: ["motion.cjs", "analysis.cjs"].includes(file) ? "inherit" : "ignore",
+          stdio: ["motion.cjs", "landing-evidence.cjs", "analysis.cjs"].includes(file) ? "inherit" : "ignore",
         },
       );
       children.push(child);
@@ -322,6 +327,7 @@ f.write_text(json.dumps(p));s.publish(f,hashlib.sha256(f.read_bytes()).hexdigest
     });
   }
   await browserScript("motion.cjs");
+  await browserScript("landing-evidence.cjs");
   await browserScript("analysis.cjs", { QUORUM_ANALYSIS_FIXTURE: output });
   await browserScript("demo.cjs", {
     TYPESCRIPT_MODULE: path.join(build, "node_modules/typescript"),

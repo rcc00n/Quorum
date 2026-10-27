@@ -1,5 +1,6 @@
 import { Portal } from "@/components/portal";
 import type { Metadata } from "next";
+import { validEditionDate } from "@/lib/edition-navigation.mjs";
 export const metadata: Metadata = { title: "Topic" };
 export default async function Page({
   params,
@@ -15,7 +16,7 @@ export default async function Page({
       view="topic"
       id={p.slug}
       initialDay={
-        q.date && /^\d{4}-\d{2}-\d{2}$/.test(q.date) ? q.date : undefined
+        validEditionDate(q.date) ? q.date : undefined
       }
     />
   );

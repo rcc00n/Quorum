@@ -44,6 +44,8 @@ They create only TEST inputs and disposable indexes; they are not live integrati
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · Extend the exact review-image allowlist to the visually inspected public landing and fictional DEMO before/after captures in `docs/reviews/2026-10-27-visual-hierarchy`; retain every existing hash and all binary/path/size/secret checks. Why: the agreed owner look review needs reproducible desktop/phone evidence, without admitting private editions or arbitrary images.
+
 2026-10-27 · rcc00n / Codex · The index scanner permits only exact hash-bound public/fictional PR47 review PNGs, retaining size/path/secret checks and rejecting changed or unlisted binaries. Why: preserve the approved visual review artifacts without a blanket image/binary exclusion.
 
 

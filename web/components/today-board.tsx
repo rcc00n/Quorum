@@ -7,6 +7,7 @@ import { TopicPicker } from "./topic-picker";
 import type { EditionPresentation } from "@/lib/editorial";
 import { visibleStories, isQuietDay, licensedPhoto } from "@/lib/editorial";
 import { describeCut, utcLabel } from "@/lib/edition-cut.mjs";
+import { EditionNavigation } from "./edition-navigation";
 import "@/app/today.css";
 
 // DECISION(2026-10-26, Anastasia/Claude Code): the daily brief is a board of topic sections on the white page,
@@ -138,10 +139,7 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
           </p>
         </div>
         <div className="tb-controls">
-          <label className="tb-date-pick">
-            <span>Edition date</span>
-            <input type="date" value={day} max={today} onChange={(e) => onDay(e.target.value || today)} />
-          </label>
+          <EditionNavigation day={day} today={today} onDay={onDay} />
           <button type="button" className="tb-add" aria-expanded={open || n === 0} aria-controls="tb-topics" onClick={() => setOpen((o) => !o)}>
             <span className="tb-add-mark" aria-hidden="true">{open || n === 0 ? "−" : "+"}</span>
             {n === 0 ? "Choose topics" : "Add topics"}
