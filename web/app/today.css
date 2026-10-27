@@ -256,20 +256,22 @@
   min-height: 460px;
 }
 /* The foot of the card: the review label and the headline on a translucent band that darkens the same
-   picture or blurred field, which runs under the whole card and fades into the band over its last 56 px.
-   DECISION(2026-10-27, Anastasia/Claude Code): black at 30 % over the card's own 60 % (about 72 % black over
-   the paper in all, white type above 7:1; 50 % over a real photograph), so the headline band reads darker
-   than the picture while the field still shows through; the fade is the band's ::before over the picture's
-   last 128 px with eased stops, since a short linear ramp reads as a hard edge (Mach bands) and looked like
-   two darkenings laid over each other; the "Imagine a photo here." note keeps its z-index above it. Why:
-   Anastasia's review of 2026-10-27: "the lower part darker, more contrast", then "the whole background
-   blurred, the headline part just darker", then "a little more transparent, the transition is harsh". */
+   picture or blurred field, which runs under the whole card and fades into the band over its last 128 px.
+   DECISION(2026-10-27, Anastasia/Claude Code): black at 46 % over the card's own 60 % (about 78 % black over
+   the paper, white type above 9:1; 58 % over a real photograph), as translucent as dark glass laid over the
+   field, which still shows through; the fade is the band's ::before over the picture's foot with eased stops,
+   since a short linear ramp reads as a hard edge (Mach bands) and looked like two darkenings laid over each
+   other; a pane with a crisp rim and a backdrop blur was tried and declined, the gradient stays. The "Imagine
+   a photo here." note keeps its z-index above the fade. Why: Anastasia's reviews of 2026-10-27: "the lower
+   part darker, more contrast", "the whole background blurred, the headline part just darker", "a little more
+   transparent, the transition is harsh", "close to a matte black", "more transparent, as if dark glass were
+   laid over the background", "bring the gradient back, the glass only said how transparent". */
 .tb .tb-card-text {
   position: relative;
   display: grid;
   gap: 10px;
   padding: 18px 20px 24px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.46);
 }
 .tb .tb-card-text::before {
   content: "";
@@ -281,28 +283,28 @@
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.01) 12%,
-    rgba(0, 0, 0, 0.05) 28%,
-    rgba(0, 0, 0, 0.12) 45%,
-    rgba(0, 0, 0, 0.2) 62%,
-    rgba(0, 0, 0, 0.27) 80%,
-    rgba(0, 0, 0, 0.3) 100%
+    rgba(0, 0, 0, 0.02) 12%,
+    rgba(0, 0, 0, 0.07) 28%,
+    rgba(0, 0, 0, 0.18) 45%,
+    rgba(0, 0, 0, 0.31) 62%,
+    rgba(0, 0, 0, 0.41) 80%,
+    rgba(0, 0, 0, 0.46) 100%
   );
   pointer-events: none;
 }
 .tb .tb-card-link:not(.tb-card-link-blank) .tb-card-text {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.58);
 }
 .tb .tb-card-link:not(.tb-card-link-blank) .tb-card-text::before {
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0) 0%,
     rgba(0, 0, 0, 0.02) 12%,
-    rgba(0, 0, 0, 0.08) 28%,
-    rgba(0, 0, 0, 0.2) 45%,
-    rgba(0, 0, 0, 0.33) 62%,
-    rgba(0, 0, 0, 0.45) 80%,
-    rgba(0, 0, 0, 0.5) 100%
+    rgba(0, 0, 0, 0.09) 28%,
+    rgba(0, 0, 0, 0.23) 45%,
+    rgba(0, 0, 0, 0.39) 62%,
+    rgba(0, 0, 0, 0.52) 80%,
+    rgba(0, 0, 0, 0.58) 100%
   );
 }
 /* The review label on a flagged story (Yelysei's rule), small, white at 80 %, above the headline. */
