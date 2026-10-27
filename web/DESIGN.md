@@ -98,6 +98,11 @@ No icons on the landing (2026-10-26); the app routes keep Lucide, 20 px, stroke 
 
 ## Decisions
 
+Photo follow-up, 2026-10-27: the earlier no-illustration/blurred-fill choice is superseded only for
+the anatomy's Home example, at Vadim's explicit request. The reviewed illustrative file photo and its
+credit/licence are specified in [README › Decisions](README.md#decisions), WEB-MEDIA-02. Missing-photo
+failure handling, palette, composition and the product's evidence field retain their existing rules.
+
 | Date | Who | What | Why |
 | --- | --- | --- | --- |
 | 2026-10-27 | Anastasia / Claude Code (evening, branch `anastasia/web-ux-also-today`) | Home's "Also today" as one block per topic headed "Also today · <topic name>", the digest under the heading, anchor `also-today-<topic id>`; the board's "N events below the bar" card jumps to it instead of the topic page; no repeated quiet-day panel under the board. Topic page unchanged. See › Cabinet › Also today. | Anastasia, 27 October, production board with three topics: the unlabeled blocks read as a duplicate, and the card led to a page without the events it counted. |

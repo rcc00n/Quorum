@@ -28,6 +28,14 @@ import "./landing-evidence.css";
 const REPO = "https://github.com/rcc00n/Quorum";
 const HACKATHON = "https://hackathon.genai.works/event/open-agent-hackathon-2026";
 const EVIDENCE_URL = `${REPO}/blob/master/collectors/zetaris/evidence/russia-ukraine-war_2026-10-24.json`;
+// DECISION(2026-10-27, rcc00n/Codex): the anatomy's example uses a reviewed, explicitly illustrative
+// file photo with its author/licence; it is not a current story. Why: Vadim requested photos in every
+// story/example slot. See web/README.md > Decisions; the source tally and news fixtures are unchanged.
+const EXAMPLE_PHOTO = {
+  url: "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d2/Exterior_of_Supreme_Court_Building_20240601.jpg/960px-Exterior_of_Supreme_Court_Building_20240601.jpg",
+  source: "https://commons.wikimedia.org/wiki/File:Exterior_of_Supreme_Court_Building_20240601.jpg",
+  licence: "https://creativecommons.org/licenses/by-sa/4.0/",
+};
 
 type SampleRow = (typeof evidence.documents.sample)[number];
 type Source = (typeof registry.sources)[number];
@@ -429,7 +437,9 @@ export default function Home() {
               key and Also today are the cabinet's grey tray rows, the margin labels are mono captions without the
               prototype's parentheses, and the only rule is the article's own, before the appendix. The parts and
               their words are unchanged (DECISIONS › Stories as articles). Why: Anastasia's review of 2026-10-27:
-              "the What you get section too", in the deck's manner, consistent with the rest. */}
+              "the What you get section too", in the deck's manner, consistent with the rest.
+              Superseded 2026-10-27 only for the Home example's blurred fill: a reviewed illustrative
+              file photo replaces it at Vadim's request; the anatomy, band and composition stay. */}
           <div className="lp-anatomy">
             {ANATOMY.map((part) => (
               <Fragment key={part.label}>
@@ -439,13 +449,21 @@ export default function Home() {
                 </div>
                 <div className={`lp-slot lp-slot-${part.kind}`}>
                   {part.kind === "home" ? (
-                    <div className="lp-mini-card">
-                      <span className="lp-mini-note">Imagine a photo here.</span>
-                      <div className="lp-mini-text">
-                        <span className="lp-mini-meta">your topic · today’s edition</span>
-                        <span className="lp-mini-line">{part.text}</span>
+                    <figure className="lp-mini-example">
+                      <div className="lp-mini-card">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={EXAMPLE_PHOTO.url} width={960} height={640} loading="lazy" decoding="async" alt="The U.S. Supreme Court building, photographed on 1 June 2024." />
+                        <div className="lp-mini-text">
+                          <span className="lp-mini-meta">your topic · today’s edition</span>
+                          <span className="lp-mini-line">{part.text}</span>
+                        </div>
                       </div>
-                    </div>
+                      <figcaption>
+                        Illustrative file photo · June 2024.<br />
+                        <a href={EXAMPLE_PHOTO.source} target="_blank" rel="noreferrer">Photo: 颐园居 / Wikimedia Commons</a>
+                        {" · "}<a href={EXAMPLE_PHOTO.licence} target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
+                      </figcaption>
+                    </figure>
                   ) : part.kind === "standfirst" ? (
                     <p>
                       {part.text}
