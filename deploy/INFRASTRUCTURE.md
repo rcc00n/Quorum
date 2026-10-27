@@ -16,7 +16,8 @@ flowchart LR
   P --> D[Private post-cut dump]
   D --> Z[Yelysei: restored Postgres and official Zetaris bundle]
   Z --> R[LangGraph reasoning]
-  R --> N[Local Nightshift runtime → remote NVIDIA Nemotron]
+  R --> N[26-Oct accepted edition: direct NVIDIA Nemotron]
+  R -. separate owner-reported showcase and 27-Oct route .-> M[Local Nightshift runtime → remote NVIDIA Nemotron]
   R <--> H[External H-MEM reference sidecar; candidates only]
   R --> E[Immutable original edition and SHA-bound sidecar]
   E --> A[Acceptance CLI; producer commit and config hash]
@@ -25,6 +26,14 @@ flowchart LR
   API --> W[Next.js behind Nginx TLS]
   W --> J[Authenticated judge browser]
 ```
+
+The installed 26-Oct immigration edition used the direct NVIDIA route, not
+Nightshift. Its original declares 1,435 model calls (1,287 Lightning / 148 Ultra,
+zero model errors); this is preserved producer evidence, not an independently
+replayed provider or billing audit. The separate Nightshift showcase and H-MEM
+live-write checks are owner-reported; live engine recall remains pending.
+See [owner handoff](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6428555157)
+and [Nightshift evidence](https://github.com/rcc00n/Quorum/issues/2#issuecomment-6423850385).
 
 The processing locations and 27-Oct run schedule are owner-confirmed in Issue #2
 6430394441/6430558228; this session has not remotely audited their machines. The
