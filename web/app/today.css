@@ -122,15 +122,27 @@
 }
 
 /* The row: horizontal, snapping, keyboard-reachable through the cards' links */
+/* DECISION(2026-10-27, Anastasia/Claude Code): the row of cards runs to the viewport's edges, as Apple News'
+   rows do, while the first card stays on the page column; a second card is then cut by the screen's edge,
+   not by the column's, and reads as more to scroll. The board clips the row's box (overflow-x: clip) so a
+   classic scrollbar's width never widens the page (web/tests/browser.cjs refuses any horizontal overflow).
+   Why: Anastasia's review of 2026-10-27: a card cut at the column edge with white paper beyond it looked
+   like a bug. */
+.tb {
+  overflow-x: clip;
+}
 .tb-row {
   list-style: none;
-  margin: 0;
-  padding: 4px 0 10px;
+  margin: 0 calc(50% - 50vw);
+  padding: 4px calc(50vw - 50%) 10px;
   display: flex;
   gap: 16px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: 0;
+  /* The snap padding equals the row's padding; here 100% is the scrollport (the viewport), so the column
+     gutter of identity.css gives the same value (calc(50vw - 50%) would resolve against the viewport twice
+     and snap the first card 20 px off the column). */
+  scroll-padding-inline: var(--column-gutter);
   scrollbar-width: thin;
   scrollbar-color: var(--rule) transparent;
 }
