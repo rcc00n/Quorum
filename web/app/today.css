@@ -48,8 +48,62 @@
 }
 .tb-controls {
   display: flex;
-  align-items: flex-end;
-  gap: 20px;
+  align-items: center;
+  gap: 16px;
+}
+/* The date control on the board as a pill (Anastasia's review of 2026-10-27: it read too square beside the
+   pills). DECISION(2026-10-27, Anastasia/Claude Code): components/edition-navigation.tsx and its stylesheet
+   are Vadim's and stay; this surface rounds the tray, the arrow buttons and the field, hides the "Edition date"
+   label visually (it stays for assistive tech) and sets "Today" as a small pill. Why: one shape family in
+   the cabinet's controls. */
+.tb .tb-controls .edition-navigation {
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.tb .tb-controls .edition-navigation label {
+  display: block;
+}
+.tb .tb-controls .edition-navigation label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  padding: 0;
+}
+.tb .tb-controls .edition-navigation input[type="date"] {
+  width: 140px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 14px;
+  text-align: center;
+}
+.tb .tb-controls .edition-navigation button {
+  min-width: 44px; /* the 44 px tap target web/tests/edition-navigation-checks.cjs asserts */
+  min-height: 44px;
+  padding: 6px;
+  border-radius: 999px;
+}
+.tb .tb-controls .edition-navigation button:hover:not(:disabled) {
+  background: var(--paper);
+  border-color: transparent;
+}
+.tb .tb-controls .edition-navigation .edition-today {
+  padding-inline: 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
 }
 /* "+ Add topics": a pill in the manner of untitled.stream's round "+" (cabinet pass, 2026-10-27). */
 .tb .tb-add {
