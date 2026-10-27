@@ -83,6 +83,8 @@ const photo = {
 };
 // Shape/allowlist checks only; no image is fetched or asserted licensed by this test.
 assert.equal(licensedPhoto(photo), true);
+assert.equal(licensedPhoto({ ...photo, url: "https://thumb.wikimedia.org/TEST-thumbnail.jpg" }), true);
+assert.equal(licensedPhoto({ ...photo, url: "https://thumb.wikimedia.org.evil.example/TEST.jpg" }), false);
 assert.equal(licensedPhoto({ ...photo, rights_confirmed: false }), false);
 assert.equal(licensedPhoto({ ...photo, credit: "" }), false);
 assert.equal(
