@@ -219,7 +219,7 @@ function PhotoMissing() {
   );
 }
 
-function Photo({ photo }: { photo: EditorialPhoto }) {
+export function StoryPhoto({ photo }: { photo: EditorialPhoto }) {
   const [failed, setFailed] = useState(false);
   if (failed || !licensedPhoto(photo)) return <PhotoMissing />;
   const source = safeUrl(photo.source_url);
@@ -466,7 +466,7 @@ export function Story({ event, sources, headless = false }: { event: Event; sour
   return (
     <>
       <article className="story" aria-label="Source-backed article">
-        {article.photo ? <Photo photo={article.photo} /> : <PhotoMissing />}
+        {article.photo ? <StoryPhoto key={article.photo.url} photo={article.photo} /> : <PhotoMissing />}
         {/* In the reader the date, headline, standfirst and review label are the head above the view bar
             (components/investigation-reader.tsx StoryHead); the article keeps its photo, meta and body. */}
         {!headless && (

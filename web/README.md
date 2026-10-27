@@ -35,6 +35,11 @@ The board shows story cards only for a published edition, and the portal has non
 
 ## Decisions
 
+2026-10-27 · rcc00n / Codex · WEB-MEDIA-01 reuses `StoryPhoto` in both readable articles and the claims-only
+reader. A reviewed image does not make prose readable or change a claim/review status; the original
+`storyReadable` gate stays. Why: real installed stories can legitimately use the claims-only view, whose
+missing photo slot also hid source/licence credits. Canonical photo scope: docs/DECISIONS.md › Photos.
+
 2026-10-27 · rcc00n / Codex · Landing headline-only bars retain their existing outline/class and visible headline labels, with a 25% tint of the same cohort/neutral colour on paper; the legend distinguishes solid from lightly filled outlined bars. Why: Vadim requested a subtle colour fill for empty outlines. Widths/counts/access metadata and the active cabinet work remain untouched; design amendment: DESIGN.md › Headline-only source bars.
 
 2026-10-27 · rcc00n / Codex · `app/instrument-polish.css` adapts the inspected Paperclip reference's nested, hairline-separated tools: framed reader tabs/date controls, a segmented search dialog and quiet hover/selected states. It loads after the existing instruments and uses only current palette/type/shape tokens; original words, source colours, layouts and motion remain. Why: Vadim explicitly requested modest visual borrowing and authorized checked deployment with separate-feature rollback. Design rationale and reference: DESIGN.md › Instrument refinement; release authority: docs/DECISIONS.md › Session release authorization.
