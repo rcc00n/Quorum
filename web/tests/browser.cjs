@@ -67,6 +67,7 @@ const fs = require("fs");
     !(await page.locator(".topic-option input").first().isChecked())
   )
     throw Error("Selected topic did not persist");
+  await go("/settings"); // the profile form lives on Account
   await page.getByLabel("Name", { exact: true }).fill("Visual Reader");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await page.getByText("Profile saved.", { exact: true }).waitFor();
