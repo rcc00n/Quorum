@@ -202,6 +202,7 @@ def test_run_maps_rate_limit_abort_to_exit_3(fake_route_env, monkeypatch, tmp_pa
         raise llm.RateLimitAbort(MODEL, 2)
 
     monkeypatch.setattr(graph, "run_local", refuse)
+    monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None)  # the 127.0.0.1:9 route is Meterless: never the real daemon pipe
     assert run_cli.main(["--model", "live", "--quiet", "--out", str(tmp_path)]) == 3
     err = capsys.readouterr().err
     assert f"refusing to continue: route {MODEL} is drained (2 refused calls in 10 min)" in err
@@ -481,6 +482,10 @@ def test_seed_journal_loads_replay_without_a_checkpoint(tmp_path, monkeypatch):
     # DECISION(2026-10-24, rcc00n/Codex): stub route discovery for this journal-only test.
     # Why: graph execution is already stubbed; replay regression must not require real credentials.
     monkeypatch.setattr(llm, "route_configured", lambda: True)
+    # DECISION(2026-10-26, Yelysei Shkirpan/Claude Code): stub run.live_guard here as well as route discovery (merge of
+    # master into the H-MEM guard). Why: master dropped the earlier no-op live_guard stub; with the guard the 127.0.0.1:9
+    # route is Meterless, so the real live_guard would send the H-MEM setpoint request and the suite's pipe guard fails it.
+    monkeypatch.setattr(run_cli, "live_guard", lambda *a, **k: None)
     monkeypatch.setenv("QUORUM_DRY_RUN", "0")
     # pin a model route so the test does not depend on the developer's .env (it failed on a clean integration checkout)
     monkeypatch.setenv("MODEL_BASE_URL", "http://127.0.0.1:9/v1")

@@ -192,9 +192,17 @@ def test_cli_sql_escapes_apostrophes(monkeypatch, capsys):
     out = capsys.readouterr().out.strip()
     assert out == (
         "INSERT INTO topics (id, name, query_terms) VALUES ('climate-policy-carbon-tax', 'O''Rourke''s Border Plan', "
-        "ARRAY['o''rourke', 'o''rourke''s', 'border wall']) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, "
-        "query_terms = EXCLUDED.query_terms;"
+        "ARRAY['o''rourke', 'o''rourke''s', 'border wall']) ON CONFLICT (id) DO NOTHING RETURNING id;"
     )
+
+
+def test_to_sql_never_overwrites_an_existing_topic():
+    """Insert-only (DECISION in topics.to_sql): "Russia Ukraine war" slugs to the seed's id and must not replace it."""
+    sql = topics.to_sql(topics.derive("Russia Ukraine war"))
+    assert sql.startswith("INSERT INTO topics (id, name, query_terms) VALUES ('russia-ukraine-war', ")
+    assert sql.endswith("ON CONFLICT (id) DO NOTHING RETURNING id;")
+    assert "DO UPDATE" not in sql and "EXCLUDED" not in sql and sql.count(";") == 1
+    assert topics.to_sql({"slug": "x-y", "name": "X", "terms": []}).endswith("ARRAY[]::text[]) ON CONFLICT (id) DO NOTHING RETURNING id;")
 
 
 def test_cli_json_and_readable(no_route, capsys):

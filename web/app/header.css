@@ -1,0 +1,36 @@
+/* The site header's surface on every route: the landing masthead (.lp-head), the gate screens (.gate-head) and
+   the app bar (.sidebar, laid out by workspace.css). Loaded after workspace.css by app/layout.tsx; the flag it
+   reads, html[data-scrolled], is set by components/scroll-state.tsx.
+   DECISION(2026-10-26, Anastasia/Claude Code): the header is clear over the page while the page rests at the
+   top; once the page scrolls under it, it turns to paper at 80 % with saturate(1.8) blur(20px) over 0.24 s. No
+   rule and no shadow under it. The 3 px double masthead rule and the black 60 % app bar are retired; the story
+   cards keep their 60 %. Why: Anastasia's review of 2026-10-26: keep the landing's menu on every route, without
+   its bottom border, with the background effect of the local nav on apple.com/apple-news (measured live: clear
+   at rest, rgba(250,250,252,.8) with saturate(1.8) blur(20px) once sticking, 0.24 s, no border). */
+html :is(.lp-head, .gate-head, .sidebar) {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding-inline: var(--column-gutter); /* the header's content lines up with the page column */
+  background-color: transparent;
+  border-bottom: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition:
+    background-color 0.24s cubic-bezier(0.28, 0.11, 0.32, 1),
+    -webkit-backdrop-filter 0.24s cubic-bezier(0.28, 0.11, 0.32, 1),
+    backdrop-filter 0.24s cubic-bezier(0.28, 0.11, 0.32, 1);
+}
+html[data-scrolled="true"] :is(.lp-head, .gate-head, .sidebar) {
+  background-color: rgba(255, 255, 255, 0.8);
+  -webkit-backdrop-filter: saturate(1.8) blur(20px);
+  backdrop-filter: saturate(1.8) blur(20px);
+}
+html[data-theme="dark"][data-scrolled="true"] .gate-head {
+  background-color: rgba(20, 20, 20, 0.8);
+}
+@media (prefers-reduced-motion: reduce) {
+  html :is(.lp-head, .gate-head, .sidebar) {
+    transition: none;
+  }
+}

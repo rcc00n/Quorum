@@ -1,0 +1,48 @@
+{
+ "source": "reasoning/config/reasoning.toml",
+ "what": "the loop limits ([loops]) and the critic's word lists ([writing]) that the landing quotes; copied values, checked against the TOML by web/tests/landing.cjs",
+ "loops": {
+  "research_rounds_max": 2,
+  "drafts_max": 3,
+  "review_disputed_max": 1
+ },
+ "forbidden_words": [
+  "alarming",
+  "shocking",
+  "stunning",
+  "historic",
+  "unprecedented",
+  "devastating",
+  "crucial",
+  "controversial",
+  "massive",
+  "huge",
+  "major blow",
+  "landmark",
+  "sweeping",
+  "dramatic",
+  "clearly",
+  "obviously",
+  "undoubtedly",
+  "arguably",
+  "will likely",
+  "could lead to",
+  "may lead to",
+  "why it matters",
+  "this matters",
+  "experts say",
+  "critics say",
+  "some say"
+ ],
+ "attribution_verbs": [
+  "says",
+  "said",
+  "states",
+  "stated",
+  "claims",
+  "claimed",
+  "according to",
+  "announced",
+  "told"
+ ]
+}

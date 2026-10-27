@@ -166,6 +166,21 @@ def topic_match_of(title: str, lead: str | None, query_terms: Iterable[str]) -> 
     return None
 
 
+def claimed_by_older(title: str, lead: str | None, older_topics: list[dict] | None) -> bool:
+    """True when a topic earlier in collection order matches the item, so a single-topic pass must not store it.
+
+    DECISION(2026-10-26, Anastasia/Claude Code; asked by Yelysei in the PR #28 review): `run.py --topic` keeps the
+    loop's ownership rule (the first matching topic in collection order owns a document). RSS and official feeds
+    are matched against the full ordered list and only the requested topic's wins are stored; the per-topic API
+    collectors (Guardian, Federal Register, Congress) skip a result that an older topic's terms match. Why: a
+    single-topic pass that matched the requested topic alone moved shared items, and edited versions of an older
+    topic's rows, under the new topic for good, which broke supersede chains resolved per topic on the reasoning side.
+    """
+    if not older_topics:
+        return False
+    return first_topic_match(title, lead, older_topics)[0] is not None
+
+
 def first_topic_match(title: str, lead: str | None, topics: list[dict]) -> tuple[dict, str] | tuple[None, None]:
     """The first topic in list order whose terms match, with where it matched: (topic, 'title' | 'lead').
 
@@ -185,10 +200,32 @@ def first_topic_match(title: str, lead: str | None, topics: list[dict]) -> tuple
 _TRACKING = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "cmpid", "ito"}
 
 
+# Newsmax story path: any number of section segments, then <slug>/<yyyy>/<mm>/<dd>/id/<n>. The kept tail starts at the
+# slug, so applying the fold twice yields the same URL (idempotent) and section depth does not matter.
+_NEWSMAX_STORY = re.compile(r"^(?:/[a-z0-9-]+)*?/([a-z0-9-]+/\d{4}/\d{2}/\d{2}/id/\d+)$")
+
+
+def _is_newsmax(netloc: str) -> bool:
+    host = netloc.split("@")[-1].split(":")[0]
+    return host == "newsmax.com" or host.endswith(".newsmax.com")
+
+
 def canonicalize(url: str) -> str:
     parts = urlsplit(url.strip())
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in _TRACKING]
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/") or "/", urlencode(query), ""))
+    netloc = parts.netloc.lower()
+    path = parts.path.rstrip("/") or "/"
+    if _is_newsmax(netloc):
+        # DECISION(2026-10-26, Anastasia/Claude Code; found by Yelysei, Issue #2 6405714186, refined in PR #28 review):
+        # Newsmax publishes one story under several section paths (/newsfront/<slug>/<date>/id/<n> and
+        # /politics/<slug>/<date>/id/<n>); the section segments are dropped from the canonical URL so the slug + id
+        # identify the story and a second section feed refreshes the first row instead of inserting a duplicate.
+        # The fold is idempotent and depth-independent, and the host check is anchored to newsmax.com. Rows stored
+        # before this rule are rewritten once by migrations_005_newsmax_canonical.sql. documents.url keeps the URL as seen.
+        m = _NEWSMAX_STORY.match(path)
+        if m:
+            path = "/" + m.group(1)
+    return urlunsplit((parts.scheme.lower(), netloc, path, urlencode(query), ""))
 
 
 def content_hash(title: str, lead: str | None, text: str | None) -> str:

@@ -39,7 +39,12 @@ def claim(cid: str, eid: str, origin: int, text: str, verifier: str) -> Claim:
 
 @pytest.fixture
 def threshold_6(monkeypatch):
+    # The gate is exercised at the bar of 6 it was written for (the product bar is 4 since 2026-10-26); the
+    # fact-check node binds `threshold` by name, so it is pinned there too.
+    from quorum_reasoning.nodes import fact_check
+
     monkeypatch.setattr(impact_bar, "threshold", lambda: 6)
+    monkeypatch.setattr(fact_check, "threshold", lambda: 6)
 
 
 @pytest.mark.parametrize("points, gated", [((1, 1, 1), True), ((2, 1, 1), False), ((1, 1, 0), True), ((2, 2, 1), False), ((0, 0, 0), True)])

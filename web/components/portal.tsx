@@ -19,11 +19,16 @@ import { visibleStories, isQuietDay } from "@/lib/editorial";
 import { AnalysisWorkspace, PublicationNotice } from "./analysis-workspace";
 import type { Publication } from "@/lib/analysis";
 import { Brand } from "./brand";
+import { TopicPicker, FirstSetup } from "./topic-picker";
+import { BriefStatus } from "./brief-status";
+import { TodayBoard } from "./today-board";
+import { StoryCrumb, Story, storyReadable, ReviewLabel } from "./story";
 import {
   api,
   session,
   feed,
   eventSnapshot,
+  previewSnapshot,
   User,
   Snapshot,
   Event,
@@ -65,16 +70,26 @@ function Analysis({
         sources={sources}
       />
     );
+  // The story layout also on the claims-only page when the reasoning story carries a readable article
+  // (components/story.tsx); the claim sections below become its appendix.
+  const readable = storyReadable(event, sources);
   return (
-    <>
-      <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
-      <h1>{event.title}</h1>
-      <p className="lede">{event.summary}</p>
-      {event.importance && (
-        <aside className="notice">
-          <strong>{event.importance.label}</strong>
-          <p>{event.importance.explanation}</p>
-        </aside>
+    <div className={readable ? "story-page story-page-plain" : undefined}>
+      {readable ? (
+        <Story event={event} sources={sources} />
+      ) : (
+        <>
+          <p className="eyebrow">EVENT ANALYSIS / {event.date}</p>
+          <h1>{event.title}</h1>
+          {event.reasoning?.needs_review && <ReviewLabel />}
+          <p className="lede">{event.summary}</p>
+          {event.importance && (
+            <aside className="notice">
+              <strong>{event.importance.label}</strong>
+              <p>{event.importance.explanation}</p>
+            </aside>
+          )}
+        </>
       )}
       {(
         [
@@ -85,7 +100,7 @@ function Analysis({
           "coverage",
         ] as const
       ).map((key, i) => (
-        <section className="analysis-section" key={key}>
+        <section className="analysis-section" id={`claims-${key}`} key={key}>
           <p className="eyebrow">0{i + 1}</p>
           <h2>
             {
@@ -132,7 +147,7 @@ function Analysis({
         sources={sources}
         supplementary
       />
-    </>
+    </div>
   );
 }
 export function Portal({
@@ -140,11 +155,13 @@ export function Portal({
   id,
   initialDay,
   initialRevision,
+  initialPreview = false,
 }: {
   view: string;
   id?: string;
   initialDay?: string;
   initialRevision?: string;
+  initialPreview?: boolean;
 }) {
   const router = useRouter();
   const path = usePathname();
@@ -170,7 +187,9 @@ export function Portal({
       setSelected(s.user.topics);
       setData(
         view === "event"
-          ? await eventSnapshot(id || "", initialDay, initialRevision)
+          ? initialPreview
+            ? await previewSnapshot(initialDay)
+            : await eventSnapshot(id || "", initialDay, initialRevision)
           : await feed(day, topic),
       );
     } catch (e) {
@@ -178,7 +197,7 @@ export function Portal({
     } finally {
       setLoading(false);
     }
-  }, [router, day, topic, view, id, initialDay, initialRevision]);
+  }, [router, day, topic, view, id, initialDay, initialRevision, initialPreview]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -231,54 +250,26 @@ export function Portal({
     event: "Event analysis",
   };
   const topicsPanel = (
-    <section className="topic-picker">
-      <div className="section-heading">
-        <h2>Your topics</h2>
-        <span className="muted">{selected.length} selected</span>
-      </div>
-      <p>Choose the topics you want in your daily brief.</p>
-      {data?.catalog_revision && (
-        <p className="help">
-          Team catalog snapshot · definitions only. Live analysis is pending.
-        </p>
-      )}
-      {data?.topics.length ? (
-        <div className="topic-options">
-          {data.topics.map((t) => (
-            <label key={t.id} className="topic-option">
-              <input
-                type="checkbox"
-                checked={selected.includes(t.id)}
-                onChange={(e) =>
-                  setSelected(
-                    e.target.checked
-                      ? [...selected, t.id]
-                      : selected.filter((x) => x !== t.id),
-                  )
-                }
-              />
-              <span>{t.name}</span>
-            </label>
-          ))}
-        </div>
-      ) : (
-        <aside className="notice">
-          <Bookmark size={20} />
-          <div>
-            <strong>The topic catalog is not connected yet.</strong>
-            <p>
-              You can return here to choose topics once the catalog is
-              available.
-            </p>
-          </div>
-        </aside>
-      )}
-      <button className="button" disabled={busy} onClick={saveTopics}>
-        {view === "onboarding" ? "Continue to your brief" : "Save topics"}
-        <ArrowRight size={16} />
-      </button>
-    </section>
+    <TopicPicker
+      topics={data?.topics ?? []}
+      catalogRevision={data?.catalog_revision ?? null}
+      selected={selected}
+      onChange={setSelected}
+      busy={busy}
+      onSave={saveTopics}
+      saveLabel={view === "onboarding" ? "Continue to your brief" : "Save topics"}
+    />
   );
+  // DECISION(2026-10-26, Anastasia/Claude Code): first setup is its own full screen (the prototype's night
+  // screen), not a page inside the workspace layout; the session, catalog and preferences logic above is
+  // unchanged. Why: WEB-UX-02; the API and the workspace stay Vadim's.
+  if (view === "onboarding") {
+    return (
+      <FirstSetup loading={loading} error={error} onRetry={load} message={message} demo={data?.status === "demo"}>
+        {topicsPanel}
+      </FirstSetup>
+    );
+  }
   return (
     <div className="app-layout">
       <aside className="sidebar">
@@ -286,9 +277,12 @@ export function Portal({
         <p className="nav-label">YOUR WORKSPACE</p>
         <nav>
           {[
-            [LayoutDashboard, "Daily brief", "/dashboard"],
+            // DECISION(2026-10-26, Anastasia/Claude Code): the menu reads Today · History · My topics and sits
+            // in the top bar (styled by app/workspace.css); settings stay behind "My topics". Why: Anastasia's
+            // brief for the personal page.
+            [LayoutDashboard, "Today", "/dashboard"],
             [History, "History", "/history"],
-            [Settings, "Settings", "/settings"],
+            [Settings, "My topics", "/settings"],
           ].map(([Icon, label, url]) => {
             const I = Icon as typeof History;
             return (
@@ -359,6 +353,13 @@ export function Portal({
             </div>
           ) : (
             <>
+              {view === "event" ? (
+                // The story page's navigation: the topic's name, back to its page (components/story.tsx).
+                <StoryCrumb
+                  topic={data?.topics.find((t) => t.id === data?.events.find((e) => e.id === id)?.topic_id) ?? null}
+                  date={data?.events.find((e) => e.id === id)?.date ?? initialDay}
+                />
+              ) : view !== "dashboard" && (
               <div className="page-heading">
                 <p className="eyebrow">
                   {view === "dashboard"
@@ -378,6 +379,7 @@ export function Portal({
                           : ""}
                 </p>
               </div>
+              )}
               {data?.status === "demo" && (
                 <p className="message" role="status">
                   DEMO · Fictional interface fixture. Not verified news or live
@@ -465,6 +467,34 @@ export function Portal({
                 </div>
               ) : view === "onboarding" ? (
                 topicsPanel
+              ) : view === "dashboard" ? (
+                // DECISION(2026-10-26, Anastasia/Claude Code; Yelysei's reviews of PR #27): the board keeps the honest
+                // empty states and the edition notes of the brief view; a failed, stale or partial edition never
+                // reads as "waiting" (DECISIONS › User account and interface, Guards). A stale or partial day that
+                // still carries visible stories shows them under the publication notice's warning instead of an
+                // empty state that would call them absent. Why: the store marks every expired edition stale and the
+                // reader marks a day partial on one error row, so hiding the stories would be false.
+                data?.status === "error" || data?.publication?.status === "error" ? (
+                  <Empty title="This edition is unavailable">
+                    A data or processing failure prevented this edition from loading. No completed quiet day is
+                    inferred.
+                  </Empty>
+                ) : data?.publication?.status === "stale" &&
+                  !visibleStories(data.events, day, "", user?.topics || []).length ? (
+                  <Empty title="This stored edition is out of date">
+                    No stories are available in this stored edition. A current result has not been supplied.
+                  </Empty>
+                ) : data?.publication?.status === "partial" &&
+                  !visibleStories(data.events, day, "", user?.topics || []).length ? (
+                  <Empty title="This edition is incomplete">
+                    No completed major-story selection was supplied. Further results may still be missing.
+                  </Empty>
+                ) : (
+                  <>
+                    <TodayBoard data={data} user={user} day={day} today={today()} onDay={(d) => setDay(d)} />
+                    {data && <EditionNotes snapshot={data} day={day} topic="" followed={user?.topics || []} />}
+                  </>
+                )
               ) : view === "event" ? (
                 (() => {
                   const event = data?.events.find((e) => e.id === id);
@@ -604,6 +634,7 @@ export function Portal({
                                   </Link>
                                 </h3>
                                 <p>{e.summary}</p>
+                                {e.reasoning?.needs_review && <ReviewLabel />}
                                 {e.importance && (
                                   <p className="help">
                                     {e.importance.explanation}
@@ -629,11 +660,18 @@ export function Portal({
                               Further results may still be missing.
                             </Empty>
                           ) : (
-                            <Empty title="Space for a clearer picture">
-                              No published events are available for this
-                              edition. Your brief will appear when source-backed
-                              analysis is connected.
-                            </Empty>
+                            // DECISION(2026-10-26, Anastasia/Claude Code): the empty brief explains the edition cut and what
+                            // happens next instead of a placeholder (WEB-UX-03; see brief-status.tsx). Why: DECISIONS › User
+                            // account and interface item 10.
+                            <BriefStatus
+                              day={day}
+                              topic={topic}
+                              topics={data?.topics || []}
+                              followed={user?.topics || []}
+                              status={data?.status}
+                              publicationStatus={data?.publication?.status}
+                              today={today()}
+                            />
                           );
                         })()
                       )}
