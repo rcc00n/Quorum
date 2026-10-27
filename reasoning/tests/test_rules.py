@@ -79,9 +79,12 @@ def test_adjudication_never_resolves_disagreement_by_guessing():
 
 
 def test_bar_needs_total_and_confirmation():
+    # The bar is 4 of 9 with confirmation >= 1 since 2026-10-26 (6 until then; DECISIONS › Selecting major news).
+    assert impact_bar.threshold() == 4
     assert impact_bar.crosses_bar(impact_bar.build_rubric(2, 2, 2, 2, {}))
+    assert impact_bar.crosses_bar(impact_bar.build_rubric(1, 1, 1, 1, {}))  # exactly 4, confirmed once
     assert not impact_bar.crosses_bar(impact_bar.build_rubric(2, 3, 2, 0, {}))  # 7 points but nothing independent
-    assert not impact_bar.crosses_bar(impact_bar.build_rubric(1, 1, 1, 2, {}))  # 5 points
+    assert not impact_bar.crosses_bar(impact_bar.build_rubric(1, 1, 0, 1, {}))  # 3 points
 
 
 def test_points_are_clamped_to_their_ranges():
@@ -100,7 +103,7 @@ def test_cap_is_a_maximum_not_a_target():
     def event(i: int, total_points: tuple[int, int, int, int], review: bool = False):
         return {"id": f"e{i}", "rubric": impact_bar.build_rubric(*total_points, {}), "above_bar": False, "rank": None, "needs_review": review}
 
-    events = [event(1, (2, 2, 2, 2)), event(2, (1, 1, 1, 1)), event(3, (2, 3, 2, 2), review=True), event(4, (2, 2, 1, 1))]
+    events = [event(1, (2, 2, 2, 2)), event(2, (1, 1, 0, 1)), event(3, (2, 3, 2, 2), review=True), event(4, (2, 2, 1, 1))]  # e2: 3 of 9, below the bar of 4
     ordered = impact_bar.rank_and_cap(events)  # type: ignore[arg-type]
     above = [e["id"] for e in ordered if e["above_bar"]]
     assert above == ["e1", "e4"]  # e2 below the bar, e3 flagged for review

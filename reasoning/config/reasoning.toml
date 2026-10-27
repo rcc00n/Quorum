@@ -1,7 +1,7 @@
 # Reasoning block configuration. Changing a threshold here is a product decision: record it in docs/DECISIONS.md.
 
 [impact_bar]
-threshold = 6          # minimum rubric total (legal_force 0-2 + reach 0-3 + irreversibility 0-2 + confirmation 0-2)
+threshold = 4          # minimum rubric total (legal_force 0-2 + reach 0-3 + irreversibility 0-2 + confirmation 0-2); 6 until 2026-10-26 (Yelysei's D4, DECISIONS › Selecting major news)
 confirmation_min = 1   # a story needs at least one independent source
 cap_per_day = 10       # at most this many stories per topic and day; no minimum
 
