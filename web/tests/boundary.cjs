@@ -217,6 +217,7 @@ s=SnapshotStore();s.prepare();f=s.root/'staging/input.json';f.write_text(json.du
   });
   await page.goto(root + "/events/demo-event");
   await require("./reader-checks.cjs")({page});
+    await require("./navigator-checks.cjs")({page});
   for (const name of [
     "Evidence Explorer",
     "Perspective Comparison",

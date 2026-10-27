@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { PageMotion } from "./page-motion";
+import { WorkspaceNavigator } from "./workspace-navigator";
 import { InvestigationReader, ReaderPanel, EventReading, LegacyClaims } from "./investigation-reader";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -234,6 +235,7 @@ export function Portal({
               </Link>
             );
           })}
+          <WorkspaceNavigator data={data} day={day} currentId={view === "event" ? id : undefined} revision={initialRevision} disabled={!user || loading || !!error} />
         </nav>
         <div className="sidebar-topics">
           <p className="nav-label">FOLLOWING</p>

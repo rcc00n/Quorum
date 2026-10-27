@@ -90,6 +90,8 @@ A story is a short article the reader can form their own view from: facts with s
 
 **Reader workspace amendment (2026-10-27, Vadim / rcc00n, implemented with Codex).** The article remains the default reading view, in the fixed order above. Its analysis appendix is also reachable immediately through pinned Read / Evidence / Coverage / Map / Trace navigation, with an optional All sections view. This supersedes only the requirement to physically scroll past all prose before accessing the appendix; the earlier reading-first wording remains as history. The source map is registry context, separate from recorded event coverage. Original content, attribution, review/provisional labels and existing claim/revision links are retained. Tabs change presentation only and never start processing or refetch data. Why: Vadim explicitly requested a broader working interface upgrade and immediate access to diagrams, with minimal extra credit use.
 
+The shared signed-in navigation also provides a local destination search (Search, Ctrl/Cmd-K) over the currently loaded edition's topics/stories and existing app routes. It explicitly does not claim to search unloaded news or start analysis. Date, revision and story-view links preserve their original context (2026-10-27, Vadim / rcc00n with Codex, same requested interaction upgrade).
+
 ## Selecting major news
 
 Importance is measured by impact on people's lives, not by how many outlets covered an event. Ten stories a day per topic is a cap, not a target: a day with three stories shows three, a day with none says so.
@@ -284,6 +286,7 @@ Every change to this document gets a row here. Newest rows on top. Rules are in 
 
 | Date | Who (human / tool) | What was decided | Why |
 | --- | --- | --- | --- |
+| 2026-10-27 | rcc00n / Codex | Add shared local destination search over loaded edition topics/stories, app pages and current-story analysis views; preserve exact date/revision links. | Faster navigation throughout the app without new API/inference requests or paid tooling. |
 | 2026-10-27 | rcc00n / Codex, explicit interface request by Vadim | Add a reading-first investigation workspace with pinned evidence/coverage/map/trace views, complete All sections and preserved deep links; continuous-scroll-only appendix access superseded. | Reach diagrams in one action without changing story content, schema, source values or spending inference credits. |
 | 2026-10-26 | rcc00n / Codex, explicit frontend request by Vadim | Add an authenticated Sources entry and `/sources` registry spectrum; retain canonical ratings, cited log-audience axis and provenance. Earlier three-item navigation is superseded only for this entry. | Direct access to the requested interactive diagram; no inference or event-coverage claim from registry membership. |
 | 2026-10-26 | rcc00n / Codex | Resolve the reviewed PR #23/#26/#27/#30/#31 integration conflicts (including retaining the calibrated impact threshold and the signed-in reader amendment) by retaining every reasoning and web decision row. | Parallel owners appended at the same table position; no approved product decision is replaced. |

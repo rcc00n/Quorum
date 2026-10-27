@@ -122,3 +122,5 @@ Section motion: the public evidence sheet and lead story are shallow depth surfa
 The source map has a direct signed-in entry at `/sources`; the app menu is Today · History · Sources · My topics. This navigation amendment supersedes only the three-link menu in earlier entries above; see docs/DECISIONS.md › User account and interface.
 
 2026-10-27 · rcc00n / Codex · Reading workspace uses a pinned numbered navigation instrument and one active pane; graph access is immediate, complete content remains in All sections, and reduced motion disables panel entry. Existing paper/ink/umber identity and story wording stay. Why: Vadim requested a substantial interaction upgrade without model spend; canonical product scope is docs/DECISIONS.md › Reader workspace amendment.
+
+2026-10-27 · rcc00n / Codex · App navigation adds a searchable destination sheet: one large input, a numbered list, one warm selected rule and a native modal backdrop; it is accessible from Search or Ctrl/Cmd-K. Why: a consistent interaction across the app without changing the identity or adding decorative dashboards.

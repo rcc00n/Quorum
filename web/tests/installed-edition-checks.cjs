@@ -61,6 +61,7 @@ module.exports = async ({browser, root, password, temp, build}) => {
     await page.goto(`${root}/events/${story.event_id}?date=${day}`);
     await page.getByRole('heading', {name: story.headline, exact: true}).waitFor();
     await require('./reader-checks.cjs')({page});
+    await require("./navigator-checks.cjs")({page});
     for (const name of ['Evidence Explorer', 'Perspective Comparison', 'Investigation Timeline'])
       await page.getByRole('heading', {name, exact: true}).waitFor();
     await page.getByText(/Provisional corpus as of/).first().waitFor();
