@@ -216,8 +216,8 @@ export function TodayBoard({ data, user, day, today, onDay }: Props) {
               )}
               {edition && (
                 <li className="tb-card tb-card-roundup">
-                  {/* DECISION(2026-10-27, Anastasia/Claude Code): the card leads to this topic's "Also today" block on
-                      this page (components/editorial.tsx, anchor also-today-<topic id>), not to the topic page, which
+                  {/* DECISION(2026-10-27, Anastasia/Claude Code): the card leads to this topic's part of the "Also today"
+                      section on this page (components/editorial.tsx, anchor also-today-<topic id>), not to the topic page, which
                       carries no roundup since the second cabinet pass; an edition without roundup lines keeps the topic
                       link. Why: Anastasia, 27 October: the card's "12 events below the bar" opened a page without them. */}
                   {below ? (

@@ -101,8 +101,9 @@ module.exports = async ({browser, root, password, temp, build}) => {
   else await page.getByText('A quiet day for major stories').first().waitFor();
   assert.equal(await page.getByRole('heading', {name: 'Also today', exact: true}).count(), 0);
   await page.goto(`${root}/dashboard?date=${day}`);
-  // On Home the block is named for its topic (2026-10-27, Anastasia/Claude Code; web/DESIGN.md › Cabinet).
-  await page.getByRole('heading', {name: /^Also today · /}).first().waitFor();
+  // On Home one "Also today" section, the topic as a part under it (2026-10-27, Anastasia/Claude Code; web/DESIGN.md › Cabinet).
+  await page.getByRole('heading', {name: 'Also today', exact: true}).waitFor();
+  assert.equal(await page.locator(`#also-today-${original.topic_id} > h4`).count(), 1);
   assert.equal(await page.locator('.roundup-item').count(), original.roundup.count);
   await require('./sources-route-checks.cjs')({page,browser,root});
   const next = await (await context.request.get(root + '/api/session/')).json();

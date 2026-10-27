@@ -278,11 +278,13 @@ const assert = require("node:assert/strict");
       0,
     );
     await page.goto(root + "/dashboard?date=2026-10-22");
-    // On Home the block is named for its topic, the board's card jumps to it, and the quiet-day panel is not repeated
-    // under the board (2026-10-27, Anastasia/Claude Code; web/DESIGN.md › Cabinet).
-    const alsoToday = page.getByRole("heading", { name: /^Also today · / });
+    // On Home one "Also today" section holds every topic as a part headed by its name; the board's card jumps to that
+    // part, and the quiet-day panel is not repeated under the board (2026-10-27, Anastasia/Claude Code; web/DESIGN.md
+    // › Cabinet).
+    const alsoToday = page.getByRole("heading", { name: "Also today", exact: true });
     await alsoToday.first().waitFor();
     assert.equal(await alsoToday.count(), 1);
+    assert.equal(await page.locator("#also-today-demo-topic > h4").count(), 1);
     assert.equal(
       await page
         .getByRole("heading", { name: "A quiet day for major stories", exact: true })
