@@ -74,7 +74,7 @@ if sd:
         seen = "unreadable"
 rec = {"topic": topic, "argv": args, "resume": "--resume" in args, "key_name": sc["values"].get(key, "?" if key else ""),
        "blank_ok": all(os.environ.get(nm, "") == "" for nm in sc.get("blank_expected", [])), "status_seen": seen,
-       "dry_env": os.environ.get("QUORUM_DRY_RUN"), "start": time.time()}
+       "dry_env": os.environ.get("QUORUM_DRY_RUN"), "start": time.monotonic()}
 if sc.get("echo_key"):
     print(f"stdout sees MODEL_API_KEY={key}", flush=True)
     print(f"stderr sees {key}", file=sys.stderr, flush=True)
@@ -95,7 +95,7 @@ if step.get("checkpoint", True):
     c.commit()
     c.close()
 time.sleep(step.get("sleep", 0))
-rec["end"] = time.time()
+rec["end"] = time.monotonic()
 tmp = rec_dir / f"{time.time_ns()}-{os.getpid()}.tmp"
 tmp.write_text(json.dumps(rec))
 os.replace(tmp, rec_dir / f"{time.time_ns()}-{os.getpid()}.json")

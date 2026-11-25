@@ -43,7 +43,7 @@ for line in Path(sc["env_file"]).read_text().splitlines():
             os.environ[k] = v
 names = ("MODEL_BASE_URL", "MODEL_API_KEY", "QUORUM_MIN_INTERVAL_MS", "QUORUM_MIN_INTERVAL_MS_FACT_CHECKER",
          "QUORUM_MIN_INTERVAL_MS_REVIEWER", "MODEL_API_KEY_8", "MODEL_API_KEY_9", "QUORUM_HMEM", "QUORUM_HMEM_DIR", "METERLESS_HOME")
-rec = {"topic": topic, "argv": args, "resume": "--resume" in args, "start": time.time(),
+rec = {"topic": topic, "argv": args, "resume": "--resume" in args, "start": time.monotonic(),
        "env": {k: os.environ.get(k) for k in names}, "token_seen": os.environ.get("METERLESS_TOKEN") == sc.get("token")}
 tmp = rec_dir / f"{time.time_ns()}-{os.getpid()}.tmp"
 tmp.write_text(json.dumps(rec))

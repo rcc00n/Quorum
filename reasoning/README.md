@@ -111,6 +111,9 @@ On the fixture day the trace shows every mechanism the architecture promises: a 
 
 ## Decisions
 
+2026-11-25 · rcc00n / Codex · The fake-runner tests record elapsed-order timestamps with a monotonic clock. Why: wall-clock corrections can reverse two sequential fake jobs and fail the ordering assertion; no production runner or reasoning rule changes.
+
+
 Module-level decisions (AGENTS.md § 2). Project-level ones are in `docs/DECISIONS.md`; one-line ones sit as `DECISION(...)` comments in the code.
 
 | Date | Who | What | Why |
