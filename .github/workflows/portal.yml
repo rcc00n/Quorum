@@ -4,10 +4,10 @@ name: Portal regressions
 on:
   push:
     branches: ["feature/web-*", integration, master]
-    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', 'agent/**', 'scripts/**', 'docs/examples/**', '.github/workflows/portal.yml']
+    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', 'agent/**', 'scripts/**', 'docs/examples/**', 'README.md', 'docs/REVIEWER_GUIDE.md', 'docs/history/**', '.github/workflows/portal.yml']
   pull_request:
     branches: [integration, master]
-    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', 'agent/**', 'scripts/**', 'docs/examples/**', '.github/workflows/portal.yml']
+    paths: ['backend/**', 'web/**', 'deploy/**', 'reasoning/**', 'collectors/**', 'agent/**', 'scripts/**', 'docs/examples/**', 'README.md', 'docs/REVIEWER_GUIDE.md', 'docs/history/**', '.github/workflows/portal.yml']
   workflow_dispatch:
 permissions:
   contents: read
